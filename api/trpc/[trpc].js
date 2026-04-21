@@ -1008,7 +1008,7 @@ var orderRouter = router({
       };
     }
     const returnURL = `${input.origin}/api/ecpay/notify`;
-    const orderResultURL = `${input.origin}/order/${merchantTradeNo}`;
+    const orderResultURL = `${input.origin}/api/ecpay/order-result`;
     const clientBackURL = `${input.origin}/products`;
     const paymentParams = buildCreditPaymentParams({
       merchantTradeNo,

@@ -63,6 +63,28 @@ export function registerECPayRoutes(app: Application) {
   });
 
   /**
+   * 綠界付款完成後，使用者瀏覽器端的 POST 導回（OrderResultURL）。
+   * Vercel SPA 靜態頁不接受 POST（會回 405），所以改由此 API 接住，
+   * 讀出 MerchantTradeNo 後 302 轉回 GET /order/:merchantTradeNo，
+   * 讓前端 React 路由照常顯示訂單結果頁。
+   */
+  app.post("/api/ecpay/order-result", (req: Request, res: Response) => {
+    try {
+      const data = req.body as Record<string, string>;
+      const merchantTradeNo = data?.MerchantTradeNo ?? "";
+      console.log("[ECPay OrderResult]", { merchantTradeNo, RtnCode: data?.RtnCode });
+      if (!merchantTradeNo) {
+        res.redirect(302, "/");
+        return;
+      }
+      res.redirect(302, `/order/${encodeURIComponent(merchantTradeNo)}`);
+    } catch (err) {
+      console.error("[ECPay OrderResult] Error:", err);
+      res.redirect(302, "/");
+    }
+  });
+
+  /**
    * 超商選店地圖啟動
    * GET /api/ecpay/cvs-map?tradeNo=xxx&subType=UNIMART&clientReturn=xxx
    * 回傳自動提交的 HTML 表單，將使用者導向綠界選店地圖

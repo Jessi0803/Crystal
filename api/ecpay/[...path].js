@@ -488,6 +488,21 @@ function registerECPayRoutes(app2) {
       res.send("0|Server Error");
     }
   });
+  app2.post("/api/ecpay/order-result", (req, res) => {
+    try {
+      const data = req.body;
+      const merchantTradeNo = data?.MerchantTradeNo ?? "";
+      console.log("[ECPay OrderResult]", { merchantTradeNo, RtnCode: data?.RtnCode });
+      if (!merchantTradeNo) {
+        res.redirect(302, "/");
+        return;
+      }
+      res.redirect(302, `/order/${encodeURIComponent(merchantTradeNo)}`);
+    } catch (err) {
+      console.error("[ECPay OrderResult] Error:", err);
+      res.redirect(302, "/");
+    }
+  });
   app2.get("/api/ecpay/cvs-map", (req, res) => {
     const { tradeNo, subType, clientReturn } = req.query;
     if (!tradeNo || !subType) {

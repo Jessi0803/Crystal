@@ -126,7 +126,7 @@ export const orderRouter = router({
 
       // 信用卡/Apple Pay：產生綠界付款表單
       const returnURL = `${input.origin}/api/ecpay/notify`;
-      const orderResultURL = `${input.origin}/order/${merchantTradeNo}`;
+      const orderResultURL = `${input.origin}/api/ecpay/order-result`;
       const clientBackURL = `${input.origin}/products`;
 
       const paymentParams = buildCreditPaymentParams({
