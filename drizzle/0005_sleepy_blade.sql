@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `receiverZipCode` varchar(10);

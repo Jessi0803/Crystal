@@ -1,0 +1,449 @@
+/* ============================================================
+   日日好日 能量水晶 — Global Styles
+   Design: Vacanza-inspired Minimalist Modern
+   Color: Pure white bg, black text, soft rose accent, gold highlight
+   Font: Noto Sans TC (body) + Cormorant Garamond (display)
+   ============================================================ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  /* Brand Colors */
+  --crystal-black: oklch(0.1 0 0);
+  --crystal-white: oklch(1 0 0);
+  --crystal-gray-100: oklch(0.97 0 0);
+  --crystal-gray-200: oklch(0.93 0 0);
+  --crystal-gray-300: oklch(0.85 0 0);
+  --crystal-gray-400: oklch(0.7 0 0);
+  --crystal-gray-500: oklch(0.55 0 0);
+  --crystal-gray-600: oklch(0.4 0 0);
+  --crystal-rose: oklch(0.88 0.04 15);
+  --crystal-rose-dark: oklch(0.75 0.07 15);
+  --crystal-gold: oklch(0.72 0.09 70);
+  --crystal-gold-light: oklch(0.88 0.06 70);
+
+  /* Shadcn tokens */
+  --radius: 0;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.1 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.1 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.1 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.1 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.1 0 0);
+  --chart-1: oklch(0.72 0.09 70);
+  --chart-2: oklch(0.88 0.04 15);
+  --chart-3: oklch(0.1 0 0);
+  --chart-4: oklch(0.55 0 0);
+  --chart-5: oklch(0.85 0 0);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.1 0 0);
+  --sidebar-primary: oklch(0.1 0 0);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.1 0 0);
+  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-ring: oklch(0.1 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Vacanza font stack: Noto Sans TC for CJK, Helvetica Neue for Latin */
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, system-ui, -apple-system, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+}
+
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+      max-width: 1440px;
+    }
+  }
+
+  /* ── Announcement Bar ── */
+  .announcement-bar {
+    background-color: oklch(0.88 0.04 15);
+    color: oklch(0.1 0 0);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .marquee-track {
+    display: flex;
+    animation: marquee 28s linear infinite;
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ── Typography (Vacanza-aligned) ── */
+  /* Vacanza uses Noto Sans TC for ALL text including headings (font-weight 500 for h2/h3) */
+  /* Cormorant Garamond reserved only for Logo subtitle and decorative italic accents */
+  .font-display {
+    font-family: 'Cormorant Garamond', 'Noto Sans TC', serif;
+  }
+
+  .font-body {
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+
+  .heading-xl {
+    /* Vacanza-style: Noto Sans TC, medium weight, tight tracking */
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: oklch(0.1 0 0);
+  }
+
+  .heading-lg {
+    /* Vacanza-style: Noto Sans TC, medium weight */
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: clamp(1.4rem, 3vw, 2.2rem);
+    font-weight: 500;
+    line-height: 1.25;
+    color: oklch(0.1 0 0);
+  }
+
+  .eyebrow {
+    /* Vacanza nav style: Noto Sans TC, very small, wide tracking */
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.65rem;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: oklch(0.55 0 0);
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: oklch(0.1 0 0);
+    color: oklch(1 0 0);
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    padding: 0.875rem 2rem;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background-color: oklch(0.25 0 0);
+  }
+
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: transparent;
+    color: oklch(0.1 0 0);
+    border: 1px solid oklch(0.1 0 0);
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    padding: 0.875rem 2rem;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .btn-outline:hover {
+    background-color: oklch(0.1 0 0);
+    color: oklch(1 0 0);
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background-color: transparent;
+    color: oklch(0.1 0 0);
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid oklch(0.1 0 0);
+    transition: opacity 0.2s ease;
+  }
+
+  .btn-ghost:hover {
+    opacity: 0.6;
+  }
+
+  /* ── Product Card ── */
+  .product-card {
+    display: flex;
+    flex-direction: column;
+    background: oklch(1 0 0);
+    cursor: pointer;
+  }
+
+  .product-card-image {
+    aspect-ratio: 3/4;
+    overflow: hidden;
+    background: oklch(0.97 0 0);
+    position: relative;
+  }
+
+  .product-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .product-card:hover .product-card-image img {
+    transform: scale(1.05);
+  }
+
+  .product-card-info {
+    padding: 0.875rem 0 0;
+  }
+
+  .product-card-name {
+    /* Vacanza product name style: Noto Sans TC, small, normal weight */
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: oklch(0.1 0 0);
+    line-height: 1.5;
+    margin-bottom: 0.2rem;
+  }
+
+  .product-card-price {
+    /* Vacanza price style: same font, slightly muted */
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: oklch(0.4 0 0);
+  }
+
+  /* ── Category Split Card ── */
+  .split-card {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .split-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .split-card:hover img {
+    transform: scale(1.04);
+  }
+
+  .split-card-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem;
+    background: linear-gradient(to top, oklch(0 0 0 / 0.5) 0%, transparent 100%);
+  }
+
+  /* ── Scroll Reveal ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
+  .reveal-delay-4 { transition-delay: 0.4s; }
+
+  /* ── Page Enter ── */
+  .page-enter {
+    animation: pageEnter 0.4s ease-out;
+  }
+
+  @keyframes pageEnter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Horizontal Scroll ── */
+  .scroll-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 1rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scroll-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-item {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: oklch(0.9 0 0);
+  }
+
+  /* ── Tag/Badge ── */
+  .tag {
+    display: inline-block;
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.6rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid oklch(0.85 0 0);
+    color: oklch(0.4 0 0);
+  }
+
+  .tag-rose {
+    border-color: oklch(0.88 0.04 15);
+    color: oklch(0.55 0.07 15);
+    background: oklch(0.97 0.02 15);
+  }
+
+  .tag-gold {
+    border-color: oklch(0.88 0.06 70);
+    color: oklch(0.55 0.09 70);
+    background: oklch(0.97 0.03 70);
+  }
+}
+
+/* ── ChatBot button animations ── */
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}

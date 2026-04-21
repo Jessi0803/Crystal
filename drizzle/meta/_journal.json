@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1775913953440,
+      "tag": "0000_silky_piledriver",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1775914028716,
+      "tag": "0001_spotty_rick_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776259536118,
+      "tag": "0002_keen_bastion",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1776313990322,
+      "tag": "0003_heavy_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1776328059339,
+      "tag": "0004_gifted_vivisector",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1776770483394,
+      "tag": "0005_sleepy_blade",
+      "breakpoints": true
+    }
+  ]
+}

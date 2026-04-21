@@ -1,0 +1,245 @@
+// 日日好日 — Product Detail Page
+// Design: Vacanza-inspired — large image + clean product info
+import { useState, useEffect } from "react";
+import { useParams, Link } from "wouter";
+import { Plus, Minus, ShoppingBag } from "lucide-react";
+import { products } from "@/lib/data";
+import { useCart } from "@/contexts/CartContext";
+import { toast } from "sonner";
+
+export default function ProductDetail() {
+  const { id } = useParams<{ id: string }>();
+  const product = products.find((p) => p.id === id);
+  const [qty, setQty] = useState(1);
+  const [activeTab, setActiveTab] = useState<"story" | "benefits" | "howto">("story");
+  const { addToCart, setIsOpen } = useCart();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
+
+  if (!product) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-white">
+        <p className="text-3xl font-light text-[oklch(0.7_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>找不到此商品</p>
+        <Link href="/products">
+          <button className="btn-primary">返回商品列表</button>
+        </Link>
+      </div>
+    );
+  }
+
+  const handleAddToCart = () => {
+    for (let i = 0; i < qty; i++) addToCart(product);
+    toast.success(`已加入購物袋：${product.name} × ${qty}`);
+    setIsOpen(true);
+  };
+
+  const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
+
+  const tabs = [
+    { id: "story" as const, label: "商品故事" },
+    { id: "benefits" as const, label: "功效說明" },
+    { id: "howto" as const, label: "使用方式" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-white page-enter">
+
+      {/* Breadcrumb */}
+      <div className="border-b border-[oklch(0.93_0_0)] px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-[1440px] mx-auto flex items-center gap-2">
+          <Link href="/products">
+            <span className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors tracking-wide">
+              所有商品
+            </span>
+          </Link>
+          <span className="text-[0.65rem] text-[oklch(0.7_0_0)]">/</span>
+          <span className="text-[0.65rem] font-body text-[oklch(0.1_0_0)] tracking-wide">{product.name}</span>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
+
+          {/* Left: Image */}
+          <div className="bg-[oklch(0.97_0_0)] aspect-square overflow-hidden">
+            <img
+              src={product.image}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          {/* Right: Info */}
+          <div className="flex flex-col justify-center">
+            {/* Category + Tags */}
+            <div className="flex items-center gap-2 mb-5">
+              <span className="eyebrow">{product.categoryLabel}</span>
+              <span className="text-[oklch(0.7_0_0)]">·</span>
+              {product.tags.slice(0, 2).map((tag) => (
+                <span key={tag} className="tag">{tag}</span>
+              ))}
+            </div>
+
+            {/* Name */}
+            <h1 className="heading-lg mb-2">{product.name}</h1>
+            <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] mb-6 leading-relaxed">
+              {product.subtitle}
+            </p>
+
+            {/* Price */}
+            <div className="flex items-baseline gap-3 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
+              <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                NT$ {product.price.toLocaleString()}
+              </span>
+              {product.originalPrice && (
+                <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
+                  NT$ {product.originalPrice.toLocaleString()}
+                </span>
+              )}
+              {product.originalPrice && (
+                <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
+                  省 NT$ {(product.originalPrice - product.price).toLocaleString()}
+                </span>
+              )}
+            </div>
+
+            {/* Qty + Add to Cart */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center border border-[oklch(0.9_0_0)]">
+                <button
+                  onClick={() => setQty(Math.max(1, qty - 1))}
+                  className="w-10 h-10 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                  aria-label="減少"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-10 text-center text-sm font-body">{qty}</span>
+                <button
+                  onClick={() => setQty(qty + 1)}
+                  className="w-10 h-10 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                  aria-label="增加"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <button
+                onClick={handleAddToCart}
+                className="btn-primary flex-1 justify-center"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                加入購物袋
+              </button>
+            </div>
+
+            {/* Suitable For */}
+            <div className="mb-6 pb-6 border-b border-[oklch(0.93_0_0)]">
+              <p className="eyebrow mb-3">SUITABLE FOR · 適合族群</p>
+              <div className="flex flex-wrap gap-2">
+                {product.suitableFor.map((s) => (
+                  <span key={s} className="text-[0.65rem] font-body text-[oklch(0.4_0_0)] bg-[oklch(0.97_0_0)] px-3 py-1.5">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div>
+              <div className="flex border-b border-[oklch(0.93_0_0)] mb-5">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-2.5 text-[0.7rem] tracking-[0.1em] font-body border-b-2 transition-colors ${
+                      activeTab === tab.id
+                        ? "border-[oklch(0.1_0_0)] text-[oklch(0.1_0_0)]"
+                        : "border-transparent text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)]"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {activeTab === "story" && (
+                <p className="text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
+                  {product.story}
+                </p>
+              )}
+              {activeTab === "benefits" && (
+                <ul className="space-y-2">
+                  {product.benefits.map((b, i) => (
+                    <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
+                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {activeTab === "howto" && (
+                <ul className="space-y-2">
+                  {product.howToUse.map((h, i) => (
+                    <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
+                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5 font-body">{i + 1}.</span>
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Service Badges */}
+            <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-[oklch(0.93_0_0)]">
+              {[
+                { icon: "◇", label: "天然水晶", desc: "A級嚴選" },
+                { icon: "◈", label: "手工製作", desc: "職人工藝" },
+                { icon: "◉", label: "7天退換", desc: "無憂保障" },
+              ].map((item, i) => (
+                <div key={i} className="text-center">
+                  <div className="text-xl text-[oklch(0.72_0.09_70)] mb-1">{item.icon}</div>
+                  <p className="text-[0.65rem] font-body font-medium text-[oklch(0.2_0_0)] tracking-wide">{item.label}</p>
+                  <p className="text-[0.6rem] font-body text-[oklch(0.6_0_0)]">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Disclaimer */}
+            <p className="mt-6 text-[0.6rem] font-body text-[oklch(0.65_0_0)] leading-relaxed border-t border-[oklch(0.95_0_0)] pt-4">
+              ⚠ {product.disclaimer}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Related Products */}
+      {related.length > 0 && (
+        <section className="border-t border-[oklch(0.93_0_0)] py-14">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-8">
+              <p className="eyebrow mb-2">YOU MAY ALSO LIKE</p>
+              <h2 className="heading-lg">相關商品</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {related.map((p) => (
+                <Link key={p.id} href={`/products/${p.id}`}>
+                  <div className="product-card group">
+                    <div className="product-card-image">
+                      <img src={p.image} alt={p.name} loading="lazy" />
+                    </div>
+                    <div className="product-card-info">
+                      <p className="product-card-name">{p.name}</p>
+                      <p className="product-card-price">NT$ {p.price.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

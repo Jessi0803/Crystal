@@ -1,0 +1,482 @@
+// 日日好日 — Navbar
+// Design: Vacanza-inspired — announcement bar + centered logo + full nav row (left: 最新商品、商品分類、購物說明、聯絡我們 | right: 能量測驗、水晶知識 + icons)
+import { useState, useEffect, useRef } from "react";
+import { Link, useLocation } from "wouter";
+import { Search, ShoppingBag, Heart, User, Menu, X, ChevronDown } from "lucide-react";
+import { useCart } from "@/contexts/CartContext";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+
+const categorySubLinks = [
+  { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
+  { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: "💰" },
+  { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: "🛡️" },
+  { label: "情緒療癒", href: "/products?category=heal", desc: "紫水晶・月光石", icon: "🧘" },
+];
+
+const rightNavLinks = [
+  { label: "水晶知識", href: "/knowledge" },
+];
+
+// 購物說明下拉選單
+function ShoppingGuideDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const guideItems = [
+    { label: "退換貨說明", href: "/shopping-guide#return" },
+    { label: "運送說明", href: "/shopping-guide#shipping" },
+    { label: "付款方式", href: "/shopping-guide#payment" },
+    { label: "常見問題", href: "/shopping-guide#faq" },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1 text-[0.7rem] tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
+          open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
+        }`}
+      >
+        購物說明
+        <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`} strokeWidth={1.5} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-44 bg-white border border-[oklch(0.93_0_0)] shadow-lg z-50">
+          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-l border-t border-[oklch(0.93_0_0)] rotate-45" />
+          <div className="py-1.5">
+            {guideItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <div
+                  onClick={() => setOpen(false)}
+                  className="px-4 py-2.5 text-[0.7rem] tracking-[0.05em] text-[oklch(0.3_0_0)] hover:bg-[oklch(0.97_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors cursor-pointer"
+                >
+                  {item.label}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 商品分類下拉選單
+function CategoryDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1 text-[0.7rem] tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
+          open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
+        }`}
+      >
+        商品分類
+        <ChevronDown
+          className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          strokeWidth={1.5}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-64 bg-white border border-[oklch(0.93_0_0)] shadow-lg z-50">
+          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-l border-t border-[oklch(0.93_0_0)] rotate-45" />
+          <div className="px-5 pt-4 pb-3 border-b border-[oklch(0.95_0_0)]">
+            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">SHOP BY CATEGORY</p>
+          </div>
+          <div className="py-2">
+            {categorySubLinks.map((cat) => (
+              <Link key={cat.href} href={cat.href}>
+                <div
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.97_0_0)] transition-colors group cursor-pointer"
+                >
+                  <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-[0.75rem] font-medium text-[oklch(0.1_0_0)] tracking-[0.05em] group-hover:text-[oklch(0.3_0_0)] transition-colors">
+                      {cat.label}
+                    </p>
+                    <p className="text-[0.6rem] text-[oklch(0.6_0_0)] mt-0.5 tracking-wide">
+                      {cat.desc}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div className="border-t border-[oklch(0.95_0_0)] px-5 py-3">
+            <Link href="/products">
+              <div
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between cursor-pointer group"
+              >
+                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.4_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">
+                  查看全部商品
+                </span>
+                <span className="text-[0.65rem] text-[oklch(0.6_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">→</span>
+              </div>
+            </Link>
+          </div>
+          <div className="border-t border-[oklch(0.95_0_0)] px-5 py-3" style={{background: "oklch(0.97 0.01 70)"}}>
+            <Link href="/custom">
+              <div
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between cursor-pointer group"
+              >
+                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.55_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors font-medium">
+                  ✦ 客製化方案
+                </span>
+                <span className="text-[0.65rem] text-[oklch(0.65_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors">→</span>
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Navbar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileCatOpen, setMobileCatOpen] = useState(false);
+  const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { totalItems, setIsOpen } = useCart();
+  const [location] = useLocation();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    setMobileCatOpen(false);
+    setMobileGuideOpen(false);
+  }, [location]);
+
+  return (
+    <>
+      {/* ── Main Header ── */}
+      <header
+        className={`sticky top-0 z-50 bg-white transition-shadow duration-300 ${
+          scrolled ? "shadow-[0_1px_0_0_oklch(0.9_0_0)]" : "border-b border-[oklch(0.93_0_0)]"
+        }`}
+      >
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+
+            {/* Left: 最新商品、商品分類、購物說明、聯絡我們 */}
+            <nav className="hidden lg:flex items-center gap-6">
+              <Link href="/products?sort=new">
+                <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                  最新商品
+                </span>
+              </Link>
+              <CategoryDropdown />
+              <ShoppingGuideDropdown />
+              <Link href="/about">
+                <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                  品牌故事
+                </span>
+              </Link>
+              <Link href="/contact">
+                <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                  聯絡我們
+                </span>
+              </Link>
+            </nav>
+
+            {/* Center: Logo */}
+            <Link href="/">
+              <div className="flex flex-col items-center gap-0.5 select-none">
+                <div className="flex items-baseline gap-1.5">
+                  <span
+                    className="text-[1.6rem] leading-none text-[oklch(0.1_0_0)]"
+                    style={{
+                      fontFamily: "'Noto Serif TC', serif",
+                      fontWeight: 300,
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    椛
+                  </span>
+                  <span
+                    className="text-[0.6rem] text-[oklch(0.55_0_0)]"
+                    style={{
+                      fontFamily: "'Noto Sans TC', sans-serif",
+                      fontWeight: 300,
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    ˙
+                  </span>
+                  <span
+                    className="text-[1.4rem] leading-none text-[oklch(0.2_0_0)] italic"
+                    style={{
+                      fontFamily: "'Cormorant Garamond', 'Georgia', serif",
+                      fontWeight: 300,
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    Crystal
+                  </span>
+                </div>
+                <span
+                  className="text-[0.45rem] tracking-[0.35em] text-[oklch(0.65_0_0)]"
+                  style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
+                >
+                  CRYSTAL ENERGY
+                </span>
+              </div>
+            </Link>
+
+            {/* Right: 能量測驗、水晶知識 + Icons */}
+            <div className="flex items-center gap-5">
+              <nav className="hidden lg:flex items-center gap-6">
+                {rightNavLinks.map((link) => (
+                  <Link key={link.href} href={link.href}>
+                    <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                      {link.label}
+                    </span>
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Icons */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => toast.info("搜尋功能即將上線")}
+                  className="p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                  aria-label="搜尋"
+                >
+                  <Search className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+                <button
+                  onClick={() => toast.info("收藏功能即將上線")}
+                  className="p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors hidden sm:block"
+                  aria-label="收藏"
+                >
+                  <Heart className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+                <MemberIconButton />
+                <button
+                  onClick={() => setIsOpen(true)}
+                  className="relative p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                  aria-label="購物車"
+                >
+                  <ShoppingBag className="w-4 h-4" strokeWidth={1.5} />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[oklch(0.1_0_0)] text-white text-[0.55rem] flex items-center justify-center font-body">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setMobileOpen(!mobileOpen)}
+                  className="lg:hidden p-1.5 text-[oklch(0.25_0_0)]"
+                  aria-label="選單"
+                >
+                  {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {mobileOpen && (
+          <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
+            <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
+              <Link href="/products?sort=newest">
+                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                  最新商品
+                </span>
+              </Link>
+
+              {/* 商品分類展開 */}
+              <div>
+                <button
+                  onClick={() => setMobileCatOpen((v) => !v)}
+                  className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                >
+                  <span>商品分類</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileCatOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
+                </button>
+                {mobileCatOpen && (
+                  <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
+                    {categorySubLinks.map((cat) => (
+                      <Link key={cat.href} href={cat.href}>
+                        <div className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                          <span className="text-base w-5 shrink-0">{cat.icon}</span>
+                          <div>
+                            <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
+                            <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                    <Link href="/products">
+                      <div className="flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                        <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">查看全部商品</span>
+                        <span className="text-xs text-[oklch(0.6_0_0)]">→</span>
+                      </div>
+                    </Link>
+                    <Link href="/custom">
+                      <div className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer" style={{background: "oklch(0.97 0.01 70)"}}>
+                        <span className="text-xs tracking-[0.1em] text-[oklch(0.55_0.08_70)] font-medium">✦ 客製化方案</span>
+                        <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* 購物說明展開 */}
+              <div>
+                <button
+                  onClick={() => setMobileGuideOpen((v) => !v)}
+                  className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                >
+                  <span>購物說明</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileGuideOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
+                </button>
+                {mobileGuideOpen && (
+                  <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
+                    {[
+                      { label: "退換貨說明", href: "/shopping-guide#return" },
+                      { label: "運送說明", href: "/shopping-guide#shipping" },
+                      { label: "付款方式", href: "/shopping-guide#payment" },
+                      { label: "常見問題", href: "/shopping-guide#faq" },
+                    ].map((item) => (
+                      <Link key={item.href} href={item.href}>
+                        <div className="px-5 py-3 text-sm text-[oklch(0.3_0_0)] hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                          {item.label}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 品牌故事 */}
+              <Link href="/about">
+                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                  品牌故事
+                </span>
+              </Link>
+
+              {/* 聯絡我們 */}
+              <Link href="/contact">
+                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                  聯絡我們
+                </span>
+              </Link>
+
+              {rightNavLinks.map((link) => (
+                <Link key={link.href} href={link.href}>
+                  <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                    {link.label}
+                  </span>
+                </Link>
+              ))}
+              <MobileMemberLinks />
+            </nav>
+          </div>
+        )}
+      </header>
+    </>
+  );
+}
+
+/** 桌面版會員 icon：已登入 → 連到會員中心，未登入 → 連到登入頁 */
+function MemberIconButton() {
+  const { data: user } = trpc.auth.me.useQuery();
+  const [, navigate] = useLocation();
+
+  return (
+    <button
+      onClick={() => navigate(user ? "/member" : "/login")}
+      className="relative p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors hidden sm:block"
+      aria-label={user ? "會員中心" : "登入"}
+      title={user ? `${user.name ?? user.email}` : "登入 / 註冊"}
+    >
+      <User className="w-4 h-4" strokeWidth={1.5} />
+      {user && (
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[oklch(0.6_0.12_60)] rounded-full" />
+      )}
+    </button>
+  );
+}
+
+/** 手機版 mobile menu 底部的登入/會員連結 */
+function MobileMemberLinks() {
+  const { data: user } = trpc.auth.me.useQuery();
+  const utils = trpc.useUtils();
+
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+      toast.success("已登出");
+    },
+  });
+
+  if (user) {
+    return (
+      <>
+        <Link href="/member">
+          <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+            會員中心（{user.name ?? user.email}）
+          </span>
+        </Link>
+        <button
+          onClick={() => logoutMutation.mutate()}
+          className="w-full text-left py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.35_0_0)] transition-colors"
+        >
+          登出
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Link href="/login">
+        <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+          會員登入
+        </span>
+      </Link>
+      <Link href="/register">
+        <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+          註冊帳號
+        </span>
+      </Link>
+    </>
+  );
+}
