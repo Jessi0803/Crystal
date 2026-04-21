@@ -42,7 +42,7 @@ vi.mock("./ecpay", () => ({
   ECPAY_CONFIG: { PaymentURL: "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5" },
 }));
 
-import { appRouter } from "./routers";
+import { appRouter } from "./appRouter";
 
 function createCaller(user: { id: number; role: string } | null) {
   return appRouter.createCaller({
