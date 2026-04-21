@@ -15,6 +15,12 @@ export default async function handler(_req: IncomingMessage, res: ServerResponse
       return;
     }
     const conn = await mysql.createConnection(url);
+    const [dbNameRaw] = await conn.query("SELECT DATABASE() AS db");
+    const currentDb = (dbNameRaw as Array<{ db: string }>)[0]?.db ?? null;
+    const [dbsRaw] = await conn.query("SHOW DATABASES");
+    const databases = (dbsRaw as Array<Record<string, string>>).map(
+      (row) => Object.values(row)[0]
+    );
     const [tablesRaw] = await conn.query("SHOW TABLES");
     const tables = (tablesRaw as Array<Record<string, string>>).map(
       (row) => Object.values(row)[0]
@@ -29,7 +35,13 @@ export default async function handler(_req: IncomingMessage, res: ServerResponse
     }
     await conn.end();
     res.statusCode = 200;
-    res.end(JSON.stringify({ tables, orderColumns, ordersError }, null, 2));
+    res.end(
+      JSON.stringify(
+        { currentDb, databases, tables, orderColumns, ordersError },
+        null,
+        2
+      )
+    );
   } catch (err) {
     res.statusCode = 500;
     res.end(
