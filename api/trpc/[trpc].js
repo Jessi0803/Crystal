@@ -2423,13 +2423,17 @@ var memberRouter = router({
     const verifyToken = crypto3.randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
     await setVerifyToken(input.email, verifyToken, verifyExpiresAt);
-    const siteOrigin = input.origin ?? "https://crystalaura-hsimzrub.manus.space";
+    const siteOrigin = input.origin ?? "https://goodaytarot.com";
     const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
-    sendVerificationEmail({
-      to: input.email,
-      name: input.name,
-      verifyUrl
-    }).catch((err) => console.error("[Email] \u9A57\u8B49\u4FE1\u767C\u9001\u5931\u6557:", err));
+    try {
+      await sendVerificationEmail({
+        to: input.email,
+        name: input.name,
+        verifyUrl
+      });
+    } catch (err) {
+      console.error("[Email] \u9A57\u8B49\u4FE1\u767C\u9001\u5931\u6557:", err);
+    }
     return { success: true, user: { id: user.id, name: user.name, email: user.email } };
   }),
   /** 登入 */
@@ -2483,7 +2487,7 @@ var memberRouter = router({
     const verifyToken = crypto3.randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
     await setVerifyToken(ctx.user.email, verifyToken, verifyExpiresAt);
-    const siteOrigin = input.origin ?? "https://crystalaura-hsimzrub.manus.space";
+    const siteOrigin = input.origin ?? "https://goodaytarot.com";
     const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
     await sendVerificationEmail({
       to: ctx.user.email,
@@ -2504,13 +2508,17 @@ var memberRouter = router({
     const token = crypto3.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await setResetToken(input.email, token, expiresAt);
-    const siteOrigin = input.origin ?? "https://crystalaura-hsimzrub.manus.space";
+    const siteOrigin = input.origin ?? "https://goodaytarot.com";
     const resetUrl = `${siteOrigin}/reset-password?token=${token}`;
-    sendPasswordResetEmail({
-      to: input.email,
-      name: user.name ?? input.email,
-      resetUrl
-    }).catch((err) => console.error("[Email] \u5FD8\u8A18\u5BC6\u78BC\u4FE1\u767C\u9001\u5931\u6557:", err));
+    try {
+      await sendPasswordResetEmail({
+        to: input.email,
+        name: user.name ?? input.email,
+        resetUrl
+      });
+    } catch (err) {
+      console.error("[Email] \u5FD8\u8A18\u5BC6\u78BC\u4FE1\u767C\u9001\u5931\u6557:", err);
+    }
     return {
       success: true,
       message: "\u82E5\u6B64 Email \u5DF2\u8A3B\u518A\uFF0C\u91CD\u8A2D\u9023\u7D50\u5DF2\u767C\u9001"

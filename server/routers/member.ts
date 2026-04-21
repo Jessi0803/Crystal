@@ -63,17 +63,21 @@ export const memberRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
 
-      // 非同步發送驗證信
+      // 發送驗證信（必須 await，否則 Vercel Serverless 會在 response 結束後凍結 function）
       const verifyToken = crypto.randomBytes(32).toString("hex");
       const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 小時
       await db.setVerifyToken(input.email, verifyToken, verifyExpiresAt);
-      const siteOrigin = input.origin ?? "https://crystalaura-hsimzrub.manus.space";
+      const siteOrigin = input.origin ?? "https://goodaytarot.com";
       const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
-      sendVerificationEmail({
-        to: input.email,
-        name: input.name,
-        verifyUrl,
-      }).catch((err) => console.error("[Email] 驗證信發送失敗:", err));
+      try {
+        await sendVerificationEmail({
+          to: input.email,
+          name: input.name,
+          verifyUrl,
+        });
+      } catch (err) {
+        console.error("[Email] 驗證信發送失敗:", err);
+      }
 
       return { success: true, user: { id: user.id, name: user.name, email: user.email } };
     }),
@@ -142,7 +146,7 @@ export const memberRouter = router({
       const verifyToken = crypto.randomBytes(32).toString("hex");
       const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await db.setVerifyToken(ctx.user.email, verifyToken, verifyExpiresAt);
-      const siteOrigin = input.origin ?? "https://crystalaura-hsimzrub.manus.space";
+      const siteOrigin = input.origin ?? "https://goodaytarot.com";
       const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
       await sendVerificationEmail({
         to: ctx.user.email,
@@ -170,15 +174,19 @@ export const memberRouter = router({
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 小時後過期
       await db.setResetToken(input.email, token, expiresAt);
 
-      const siteOrigin = input.origin ?? "https://crystalaura-hsimzrub.manus.space";
+      const siteOrigin = input.origin ?? "https://goodaytarot.com";
       const resetUrl = `${siteOrigin}/reset-password?token=${token}`;
 
-      // 非同步發信，不阻塞回應
-      sendPasswordResetEmail({
-        to: input.email,
-        name: user.name ?? input.email,
-        resetUrl,
-      }).catch((err) => console.error("[Email] 忘記密碼信發送失敗:", err));
+      // 必須 await，Vercel Serverless 會在 response 結束後凍結 function
+      try {
+        await sendPasswordResetEmail({
+          to: input.email,
+          name: user.name ?? input.email,
+          resetUrl,
+        });
+      } catch (err) {
+        console.error("[Email] 忘記密碼信發送失敗:", err);
+      }
 
       return {
         success: true,
