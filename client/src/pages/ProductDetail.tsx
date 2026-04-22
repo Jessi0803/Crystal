@@ -43,12 +43,13 @@ export default function ProductDetail() {
   const isCustomizableProduct = product.categoryLabel === "D 設計款" && product.id !== "d003-venus";
   const wristSizeNumber = Number(selectedWristSize);
   const isMoonClearHeart = product.id === "d005-moon-clear-heart";
+  const isMorningWhisper = product.id === "d004-morning-whisper";
   const basePrice = isCustomizableProduct
     ? wristSizeNumber <= 13.5
-      ? isMoonClearHeart ? 1400 : 1480
+      ? isMorningWhisper ? 1700 : isMoonClearHeart ? 1400 : 1480
       : wristSizeNumber <= 17
-        ? isMoonClearHeart ? 1500 : 1580
-        : isMoonClearHeart ? 1600 : 1680
+        ? isMorningWhisper ? 1800 : isMoonClearHeart ? 1500 : 1580
+        : isMorningWhisper ? 1900 : isMoonClearHeart ? 1600 : 1680
     : product.price;
   const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
