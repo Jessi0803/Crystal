@@ -16,6 +16,7 @@ import Knowledge from "./pages/Knowledge";
 import ShoppingGuide from "./pages/ShoppingGuide";
 import Contact from "./pages/Contact";
 import About from "./pages/About";
+import CrystalWorkshop from "./pages/CrystalWorkshop";
 import Checkout from "./pages/Checkout";
 import OrderResult from "./pages/OrderResult";
 import AdminOrders from "./pages/AdminOrders";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/custom" component={Custom} />
       <Route path="/knowledge" component={Knowledge} />
       <Route path="/shopping-guide" component={ShoppingGuide} />
+      <Route path="/crystal-workshop" component={CrystalWorkshop} />
       <Route path="/contact" component={Contact} />
       <Route path="/about" component={About} />
       <Route path="/checkout" component={Checkout} />

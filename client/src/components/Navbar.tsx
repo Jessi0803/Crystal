@@ -240,6 +240,11 @@ export default function Navbar() {
                   </span>
                 </Link>
                 <CategoryDropdown />
+                <Link href="/crystal-workshop">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                    水晶創業班
+                  </span>
+                </Link>
                 <ShoppingGuideDropdown />
                 <Link href="/about">
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
@@ -344,6 +349,12 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
+
+              <Link href="/crystal-workshop">
+                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                  水晶創業班
+                </span>
+              </Link>
 
               {/* 購物說明展開 */}
               <div>
