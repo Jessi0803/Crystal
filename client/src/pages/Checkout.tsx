@@ -117,9 +117,9 @@ export default function Checkout() {
           : undefined,
         receiverZipCode: shippingMethod === "home" ? form.shippingZip : undefined,
         items: items.map((i) => ({
-          id: i.product.id,
-          name: i.product.name,
-          price: i.product.price,
+          id: i.id,
+          name: `${i.product.name}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}`,
+          price: i.unitPrice,
           quantity: i.quantity,
           image: i.product.image,
         })).concat(
@@ -468,7 +468,7 @@ export default function Checkout() {
               </h2>
               <div className="space-y-4 mb-6">
                 {items.map((item) => (
-                  <div key={item.product.id} className="flex gap-3">
+                  <div key={item.id} className="flex gap-3">
                     <div className="w-16 h-16 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
                       {item.product.image && (
                         <img
@@ -481,9 +481,16 @@ export default function Checkout() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.product.name}</p>
                       <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">x {item.quantity}</p>
+                      {(item.wristSize || item.claspType) && (
+                        <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mt-0.5">
+                          {item.wristSize ? `手圍 ${item.wristSize} cm` : ""}
+                          {item.wristSize && item.claspType ? " · " : ""}
+                          {item.claspType === "elastic" ? "彈力繩" : item.claspType === "lobster" ? "龍蝦扣" : item.claspType === "magnetic" ? "磁扣" : ""}
+                        </p>
+                      )}
                     </div>
                     <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)] shrink-0">
-                      NT$ {(item.product.price * item.quantity).toLocaleString()}
+                      NT$ {(item.unitPrice * item.quantity).toLocaleString()}
                     </p>
                   </div>
                 ))}

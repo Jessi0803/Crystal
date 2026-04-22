@@ -59,8 +59,8 @@ export default function CartDrawer() {
             </div>
           ) : (
             <div className="divide-y divide-[oklch(0.95_0_0)]">
-              {items.map(({ product, quantity }) => (
-                <div key={product.id} className="flex gap-4 px-6 py-5">
+              {items.map(({ id, product, quantity, unitPrice, wristSize, claspType }) => (
+                <div key={id} className="flex gap-4 px-6 py-5">
                   {/* Image */}
                   <div className="w-20 h-24 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
                     <img
@@ -78,11 +78,18 @@ export default function CartDrawer() {
                     <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-3">
                       {product.categoryLabel}
                     </p>
+                    {(wristSize || claspType) && (
+                      <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mb-2">
+                        {wristSize ? `手圍 ${wristSize} cm` : ""}
+                        {wristSize && claspType ? " · " : ""}
+                        {claspType === "elastic" ? "彈力繩" : claspType === "lobster" ? "龍蝦扣" : claspType === "magnetic" ? "磁扣" : ""}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between">
                       {/* Qty */}
                       <div className="flex items-center border border-[oklch(0.9_0_0)]">
                         <button
-                          onClick={() => updateQuantity(product.id, quantity - 1)}
+                          onClick={() => updateQuantity(id, quantity - 1)}
                           className="w-7 h-7 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
                           aria-label="減少"
                         >
@@ -90,7 +97,7 @@ export default function CartDrawer() {
                         </button>
                         <span className="w-7 text-center text-xs font-body">{quantity}</span>
                         <button
-                          onClick={() => updateQuantity(product.id, quantity + 1)}
+                          onClick={() => updateQuantity(id, quantity + 1)}
                           className="w-7 h-7 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
                           aria-label="增加"
                         >
@@ -98,7 +105,7 @@ export default function CartDrawer() {
                         </button>
                       </div>
                       <p className="text-xs font-body font-medium text-[oklch(0.1_0_0)]">
-                        NT$ {(product.price * quantity).toLocaleString()}
+                        NT$ {(unitPrice * quantity).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -106,7 +113,7 @@ export default function CartDrawer() {
                   {/* Remove */}
                   <button
                     onClick={() => {
-                      removeFromCart(product.id);
+                      removeFromCart(id);
                       toast.success("已從購物袋移除");
                     }}
                     className="self-start p-1 text-[oklch(0.7_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"

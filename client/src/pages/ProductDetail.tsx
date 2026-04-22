@@ -11,7 +11,15 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
-  const [activeTab, setActiveTab] = useState<"benefits" | "howto">("benefits");
+  const [activeTab, setActiveTab] = useState<"benefits" | "content" | "howto">("benefits");
+  const wristSizes = ["12", "12.5", "13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
+  const claspOptions = [
+    { id: "elastic" as const, label: "彈力繩" },
+    { id: "lobster" as const, label: "龍蝦扣 (+NT$200)" },
+    { id: "magnetic" as const, label: "磁扣 (+NT$200)" },
+  ];
+  const [selectedWristSize, setSelectedWristSize] = useState("14");
+  const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const { addToCart, setIsOpen } = useCart();
 
   useEffect(() => {
@@ -29,8 +37,27 @@ export default function ProductDetail() {
     );
   }
 
+  const isMoonSecret = product.id === "d001-moon-secret";
+  const wristSizeNumber = Number(selectedWristSize);
+  const basePrice = isMoonSecret
+    ? wristSizeNumber <= 13.5
+      ? 1480
+      : wristSizeNumber <= 17
+        ? 1580
+        : 1680
+    : product.price;
+  const claspExtra = isMoonSecret && selectedClaspType !== "elastic" ? 200 : 0;
+  const currentPrice = basePrice + claspExtra;
+
   const handleAddToCart = () => {
-    for (let i = 0; i < qty; i++) addToCart(product);
+    for (let i = 0; i < qty; i++) {
+      addToCart(
+        product,
+        isMoonSecret
+          ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType }
+          : undefined
+      );
+    }
     toast.success(`已加入購物袋：${product.name} × ${qty}`);
     setIsOpen(true);
   };
@@ -39,6 +66,7 @@ export default function ProductDetail() {
 
   const tabs = [
     { id: "benefits" as const, label: "功效說明" },
+    { id: "content" as const, label: "商品內容" },
     { id: "howto" as const, label: "客製調整" },
   ];
 
@@ -91,7 +119,7 @@ export default function ProductDetail() {
             {/* Price */}
             <div className="flex items-baseline gap-3 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
               <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                NT$ {product.price.toLocaleString()}
+                NT$ {currentPrice.toLocaleString()}
               </span>
               {product.originalPrice && (
                 <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
@@ -104,6 +132,44 @@ export default function ProductDetail() {
                 </span>
               )}
             </div>
+
+            {isMoonSecret && (
+              <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
+                <div>
+                  <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">手圍尺寸</p>
+                  <select
+                    value={selectedWristSize}
+                    onChange={(e) => setSelectedWristSize(e.target.value)}
+                    className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                  >
+                    {wristSizes.map((size) => (
+                      <option key={size} value={size}>
+                        {size} cm
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">扣件類型</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {claspOptions.map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() => setSelectedClaspType(opt.id)}
+                        className={`px-3 py-2 text-xs font-body border transition-colors ${
+                          selectedClaspType === opt.id
+                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                            : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Qty + Add to Cart */}
             <div className="flex items-center gap-4 mb-6">
@@ -169,6 +235,16 @@ export default function ProductDetail() {
                     <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
                       <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
                       {b}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {activeTab === "content" && (
+                <ul className="space-y-2">
+                  {product.crystalType.split("、").map((item) => (
+                    <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
+                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                      {item}
                     </li>
                   ))}
                 </ul>
