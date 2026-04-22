@@ -66,7 +66,7 @@ export default function About() {
           <div className="flex flex-col md:flex-row items-center gap-16 mt-24">
             <div className="w-full md:w-5/12 aspect-[4/5] bg-[#E5DCD5] rounded-t-full overflow-hidden relative group">
               <img
-                src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=1200&q=80"
+                src="/images/about-crystal.jpg"
                 alt="水晶手鍊細節"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -151,10 +151,6 @@ export default function About() {
         </div>
       </section>
 
-      {/* Footer Decoration */}
-      <footer className="py-12 text-center opacity-30">
-        <span className="font-serif-en text-[9px] tracking-[0.6em] uppercase">MOMIJI CRYSTAL • EST 2024</span>
-      </footer>
     </div>
   );
 }
