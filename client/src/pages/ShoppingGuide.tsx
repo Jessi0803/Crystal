@@ -84,33 +84,9 @@ export default function ShoppingGuide() {
               <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>運送說明</h2>
 
               <div className="space-y-6 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { label: "處理時間", value: "訂單確認後 1–2 個工作天出貨" },
-                    { label: "配送時間", value: "出貨後 2–3 個工作天到貨" },
-                    { label: "免運門檻", value: "單筆訂單滿 NT$ 1,500 免運費" },
-                    { label: "運費", value: "未達門檻收取 NT$ 80 運費" },
-                  ].map((item) => (
-                    <div key={item.label} className="border border-[oklch(0.93_0_0)] p-4">
-                      <p className="text-[0.65rem] tracking-[0.1em] text-[oklch(0.55_0_0)] mb-1">{item.label}</p>
-                      <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-[oklch(0.1_0_0)] mb-2">配送方式</h3>
-                  <ul className="space-y-2 pl-4">
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>黑貓宅急便（宅配到府）</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>7-ELEVEN 超商取貨</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>全家便利商店取貨</li>
-                  </ul>
-                </div>
-
-                <div className="bg-[oklch(0.97_0_0)] p-5 border-l-2 border-[oklch(0.72_0.09_70)]">
-                  <p className="text-xs text-[oklch(0.4_0_0)]">
-                    📦 所有商品均以精美禮盒包裝出貨，適合自用或送禮。如需加購禮品包裝服務，請在訂單備註欄說明。
-                  </p>
+                <div className="space-y-2">
+                  <p>台灣地區（含離島）：黑貓宅急便（$100）、7-11店到店（$60）單次購買兩條以上免運。</p>
+                  <p>• 台灣地區以外：馬來西亞、香港、新加波、美國、英國、澳洲</p>
                 </div>
               </div>
             </section>
