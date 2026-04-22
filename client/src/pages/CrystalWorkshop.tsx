@@ -236,9 +236,6 @@ export default function CrystalWorkshop() {
                     <span className="text-sm tracking-widest">桃園小檜溪區 (預約制)</span>
                   </div>
                 </div>
-                <button className="bg-white text-[#8E735B] px-12 py-5 rounded-full font-serif-zh text-sm tracking-[0.3em] hover:shadow-2xl transition-all hover:-translate-y-1">
-                  私訊報名「人數 + 日期」
-                </button>
                 <div className="mt-6">
                   <a
                     href="https://line.me/R/ti/p/@011tymeh"
