@@ -25,6 +25,9 @@ export default function ProductDetail() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
+  useEffect(() => {
+    setActiveTab("benefits");
+  }, [id]);
 
   if (!product) {
     return (
@@ -64,10 +67,11 @@ export default function ProductDetail() {
 
   const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
 
+  const showHowToTab = product.id !== "d003-venus";
   const tabs = [
     { id: "benefits" as const, label: "功效說明" },
     { id: "content" as const, label: "商品內容" },
-    { id: "howto" as const, label: "客製調整" },
+    ...(showHowToTab ? [{ id: "howto" as const, label: "客製調整" }] : []),
   ];
 
   return (
@@ -249,7 +253,7 @@ export default function ProductDetail() {
                   ))}
                 </ul>
               )}
-              {activeTab === "howto" && (
+              {showHowToTab && activeTab === "howto" && (
                 <ul className="space-y-2">
                   {product.howToUse.map((h, i) => (
                     <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
