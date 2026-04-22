@@ -120,6 +120,16 @@ export default function ChatBot() {
     }
   }, [isOpen]);
 
+  // Allow other pages to open chatbot programmatically.
+  useEffect(() => {
+    const openHandler = () => {
+      setIsOpen(true);
+      setShowLabel(false);
+    };
+    window.addEventListener("open-chatbot", openHandler);
+    return () => window.removeEventListener("open-chatbot", openHandler);
+  }, []);
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || chatMutation.isPending) return;
 

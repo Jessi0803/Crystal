@@ -160,12 +160,19 @@ export default function ShoppingGuide() {
             <div className="bg-[oklch(0.1_0_0)] p-8 text-white text-center">
               <p className="eyebrow text-white/50 mb-3">STILL HAVE QUESTIONS?</p>
               <h3 className="text-xl font-medium mb-2" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
-              <p className="text-xs text-white/60 leading-relaxed mb-6">我們的客服團隊週一至週五 10:00–18:00 線上服務</p>
-              <Link href="/contact">
-                <button className="btn-primary bg-white text-[oklch(0.1_0_0)] hover:bg-[oklch(0.95_0_0)]">
-                  聯絡我們
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
+                <Link href="/contact">
+                  <button className="btn-primary bg-white text-[oklch(0.1_0_0)] hover:bg-[oklch(0.95_0_0)]">
+                    聯絡我們
+                  </button>
+                </Link>
+                <button
+                  onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
+                  className="btn-secondary border-white text-white hover:bg-white hover:text-[oklch(0.1_0_0)]"
+                >
+                    問問24小時椛小助人工智能服務
                 </button>
-              </Link>
+              </div>
             </div>
 
           </div>
