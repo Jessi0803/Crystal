@@ -198,12 +198,6 @@ export default function Custom() {
               聯繫 LINE 客服
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
-            <p
-              className="text-[0.65rem] text-[oklch(0.6_0_0)] mt-3"
-              style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-            >
-              也可以在訂單備註欄說明你的需求
-            </p>
           </div>
         </div>
       </section>
