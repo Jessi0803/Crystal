@@ -2169,14 +2169,14 @@ var SDKServer = class {
         algorithms: ["HS256"]
       });
       const { openId, appId, name } = payload;
-      if (!isNonEmptyString2(openId) || !isNonEmptyString2(appId) || !isNonEmptyString2(name)) {
-        console.warn("[Auth] Session payload missing required fields");
+      if (!isNonEmptyString2(openId)) {
+        console.warn("[Auth] Session payload missing openId");
         return null;
       }
       return {
         openId,
-        appId,
-        name
+        appId: typeof appId === "string" ? appId : "",
+        name: typeof name === "string" ? name : ""
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
