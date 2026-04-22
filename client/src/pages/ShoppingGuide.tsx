@@ -96,21 +96,9 @@ export default function ShoppingGuide() {
               <p className="eyebrow mb-3">PAYMENT</p>
               <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>付款方式</h2>
 
-              <div className="space-y-4 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
-                {[
-                  { icon: "💳", title: "信用卡付款", desc: "支援 VISA、Mastercard、JCB，可選擇分期付款（3/6/12 期，依各銀行規定）" },
-                  { icon: "📱", title: "LINE Pay", desc: "使用 LINE Pay 快速結帳，享有 LINE Points 回饋" },
-                  { icon: "🏦", title: "ATM 轉帳", desc: "訂單成立後 24 小時內完成轉帳，逾時訂單將自動取消" },
-                  { icon: "🏪", title: "超商代碼繳費", desc: "至 7-ELEVEN、全家、萊爾富、OK 超商繳費，繳費期限為 3 天" },
-                ].map((item) => (
-                  <div key={item.title} className="flex gap-4 p-5 border border-[oklch(0.93_0_0)] hover:border-[oklch(0.8_0_0)] transition-colors">
-                    <span className="text-2xl shrink-0">{item.icon}</span>
-                    <div>
-                      <p className="text-sm font-medium text-[oklch(0.1_0_0)] mb-1">{item.title}</p>
-                      <p className="text-xs text-[oklch(0.5_0_0)]">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-2 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
+                <p>• 台灣地區（含離島）：轉帳、信用卡、Apple pay（信用卡、Apple pay需額外支付2%手續費）</p>
+                <p>• 台灣以外：Paypal（需額外支付6%手續費）</p>
               </div>
             </section>
 
