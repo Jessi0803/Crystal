@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Anchor, Leaf, Sparkles } from "lucide-react";
+import { Anchor, Leaf } from "lucide-react";
 
 export default function About() {
   // 滾動漸顯動畫
@@ -63,9 +63,13 @@ export default function About() {
           </div>
 
           <div className="flex flex-col md:flex-row items-center gap-16 mt-24">
-            <div className="w-full md:w-5/12 aspect-[4/5] bg-[#E5DCD5] rounded-t-full overflow-hidden flex items-center justify-center relative group">
-              <Sparkles className="w-10 h-10 text-white/40" />
-              <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors duration-500" />
+            <div className="w-full md:w-5/12 aspect-[4/5] bg-[#E5DCD5] rounded-t-full overflow-hidden relative group">
+              <img
+                src="https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=1200&q=80"
+                alt="水晶手鍊細節"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-500" />
             </div>
             <div className="w-full md:w-7/12">
               <p className="text-lg font-sans-zh leading-[2.2] font-light text-gray-600 tracking-wide">
