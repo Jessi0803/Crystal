@@ -119,7 +119,7 @@ export default function ShoppingGuide() {
                   },
                   {
                     q: "手鍊怎麼淨化？",
-                    a: "水晶碎石或水晶洞的話，就是單純放在他們上面就可以了！\n鼠尾草精油的話就是用水氧機把精油蒸出來 那個煙去過手鍊\n月光的話就是可以放在照得到月光的地方放置一個晚上然後要注意白天太陽出來的時候不要曬太久\n天使音叉就是買來敲敲敲就可以了\n另外，水晶碎石我們也有販售 80$一包是一條手鍊的量"
+                    a: "• 水晶碎石或水晶洞的話，就是單純放在他們上面就可以了！\n• 鼠尾草精油的話就是用水氧機把精油蒸出來 那個煙去過手鍊\n• 月光的話就是可以放在照得到月光的地方放置一個晚上然後要注意白天太陽出來的時候不要曬太久\n• 天使音叉就是買來敲敲敲就可以了\n• 另外，水晶碎石我們也有販售 80$一包是一條手鍊的量"
                   },
                   {
                     q: "如何開啟水晶能量？",
@@ -160,7 +160,7 @@ export default function ShoppingGuide() {
             <div className="bg-[oklch(0.1_0_0)] p-8 text-white text-center">
               <p className="eyebrow text-white/50 mb-3">STILL HAVE QUESTIONS?</p>
               <h3 className="text-xl font-medium mb-2" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
+              <div className="flex flex-col items-center justify-center gap-3 mt-6">
                 <Link href="/contact">
                   <button className="btn-primary bg-white text-[oklch(0.1_0_0)] hover:bg-[oklch(0.95_0_0)]">
                     聯絡我們
@@ -168,7 +168,7 @@ export default function ShoppingGuide() {
                 </Link>
                 <button
                   onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
-                  className="btn-secondary border-white text-white hover:bg-white hover:text-[oklch(0.1_0_0)]"
+                  className="btn-primary bg-white text-[oklch(0.1_0_0)] hover:bg-[oklch(0.95_0_0)] tracking-[0.05em] shadow-sm"
                 >
                     問問24小時椛小助人工智能服務
                 </button>
