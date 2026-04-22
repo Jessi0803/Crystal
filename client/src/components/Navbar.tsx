@@ -1,5 +1,5 @@
 // 日日好日 — Navbar
-// Design: Vacanza-inspired — announcement bar + centered logo + full nav row (left: 最新商品、商品分類、購物說明、聯絡我們 | right: 能量測驗、水晶知識 + icons)
+// Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Search, ShoppingBag, Heart, User, Menu, X, ChevronDown } from "lucide-react";
@@ -12,10 +12,6 @@ const categorySubLinks = [
   { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: "💰" },
   { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: "🛡️" },
   { label: "情緒療癒", href: "/products?category=heal", desc: "紫水晶・月光石", icon: "🧘" },
-];
-
-const rightNavLinks = [
-  { label: "水晶知識", href: "/knowledge" },
 ];
 
 // 購物說明下拉選單
@@ -257,18 +253,8 @@ export default function Navbar() {
               </div>
             </Link>
 
-            {/* Right: 能量測驗、水晶知識 + Icons */}
+            {/* Right: Icons */}
             <div className="flex items-center gap-5">
-              <nav className="hidden lg:flex items-center gap-6">
-                {rightNavLinks.map((link) => (
-                  <Link key={link.href} href={link.href}>
-                    <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                      {link.label}
-                    </span>
-                  </Link>
-                ))}
-              </nav>
-
               {/* Icons */}
               <div className="flex items-center gap-3">
                 <button
@@ -399,13 +385,6 @@ export default function Navbar() {
                 </span>
               </Link>
 
-              {rightNavLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
-                    {link.label}
-                  </span>
-                </Link>
-              ))}
               <MobileMemberLinks />
             </nav>
           </div>
