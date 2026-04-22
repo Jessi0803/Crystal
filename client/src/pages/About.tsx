@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Anchor, Leaf } from "lucide-react";
+import { Link } from "wouter";
 
 export default function About() {
   // 滾動漸顯動畫
@@ -65,7 +66,7 @@ export default function About() {
           <div className="flex flex-col md:flex-row items-center gap-16 mt-24">
             <div className="w-full md:w-5/12 aspect-[4/5] bg-[#E5DCD5] rounded-t-full overflow-hidden relative group">
               <img
-                src="https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=1200&q=80"
+                src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=1200&q=80"
                 alt="水晶手鍊細節"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -141,10 +142,12 @@ export default function About() {
             都是為了那個正在修復中的你而存在。
           </p>
 
-          <button className="group relative overflow-hidden px-12 py-5 border border-[#FAF9F6] border-opacity-30 hover:border-opacity-100 transition-all duration-500">
-            <span className="relative z-10 font-serif-zh text-xs tracking-[0.4em] uppercase">探索與你有緣的頻率</span>
-            <div className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-500 opacity-5" />
-          </button>
+          <Link href="/products">
+            <button className="group relative overflow-hidden px-12 py-5 border border-[#FAF9F6] border-opacity-30 hover:border-opacity-100 transition-all duration-500">
+              <span className="relative z-10 font-serif-zh text-xs tracking-[0.4em] uppercase">探索與你有緣的頻率</span>
+              <div className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-500 opacity-5" />
+            </button>
+          </Link>
         </div>
       </section>
 
