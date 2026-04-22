@@ -157,25 +157,32 @@ export default function ShoppingGuide() {
             </section>
 
             {/* Contact CTA */}
-            <div className="bg-[oklch(0.32_0.01_40)] p-8 sm:p-10 text-white text-center">
-              <p className="eyebrow text-white/50 mb-3">STILL HAVE QUESTIONS?</p>
-              <h3 className="text-lg font-medium mb-5" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
+            <div className="relative bg-[#F8F5F2] p-8 sm:p-10 text-center overflow-hidden">
+              <div className="pointer-events-none absolute -top-20 -left-16 w-64 h-64 rounded-full bg-[rgba(199,174,255,0.14)] blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-24 -right-10 w-72 h-72 rounded-full bg-[rgba(156,214,255,0.12)] blur-3xl" />
+              <p className="eyebrow text-[oklch(0.45_0.01_60)] mb-3">STILL HAVE QUESTIONS?</p>
+              <h3 className="text-lg font-medium mb-5 text-[oklch(0.28_0.01_40)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
               <div className="flex flex-col items-center justify-center gap-5 mt-6">
                 <Link href="/contact">
-                  <button className="w-full sm:w-[560px] h-16 border border-white/20 text-white hover:border-white/40 hover:bg-white/[0.03] transition-all duration-300 flex items-center justify-center gap-2.5 text-base sm:text-lg tracking-[0.05em] font-light"
+                  <button className="w-full sm:w-[560px] h-16 border border-[oklch(0.78_0.01_60)] bg-white text-[oklch(0.26_0.01_40)] hover:border-[oklch(0.68_0.02_55)] hover:bg-[oklch(0.99_0.003_90)] transition-all duration-300 flex items-center justify-center gap-2.5 text-base sm:text-lg tracking-[0.05em] font-light shadow-[0_6px_20px_rgba(120,100,80,0.08)]"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}>
-                    <MessageCircle className="w-4 h-4 text-[#cbb8b8]" strokeWidth={1.8} />
+                    <MessageCircle className="w-4 h-4 text-[oklch(0.48_0.03_55)]" strokeWidth={1.8} />
                     聯絡我們
                   </button>
                 </Link>
-                <button
-                  onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
-                  className="w-full sm:w-[560px] h-16 bg-white text-[oklch(0.15_0_0)] hover:bg-[oklch(0.96_0_0)] transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_26px_rgba(255,255,255,0.3)] flex items-center justify-center gap-2.5 text-base sm:text-lg tracking-[0.02em] font-light"
-                  style={{ fontFamily: "'Noto Serif TC', serif" }}
-                >
-                  <CircleHelp className="w-4 h-4 text-[#8e735b]" strokeWidth={1.8} />
-                  問問24小時椛小助人工智能服務
-                </button>
+                <div className="w-full sm:w-[560px]">
+                  <button
+                    onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
+                    className="w-full h-16 bg-gradient-to-r from-[#8E735B] via-[#A8835F] to-[#7A614D] text-white hover:brightness-105 transition-all duration-300 shadow-[0_10px_24px_rgba(122,97,77,0.28)] hover:shadow-[0_14px_28px_rgba(122,97,77,0.34)] flex items-center justify-center gap-2.5 text-base sm:text-lg tracking-[0.02em] font-light"
+                    style={{ fontFamily: "'Noto Serif TC', serif" }}
+                  >
+                    <CircleHelp className="w-4 h-4 text-[#F8F1E9]" strokeWidth={1.8} />
+                    問問24小時椛小助人工智能服務
+                  </button>
+                  <p className="mt-2 text-[0.58rem] tracking-[0.28em] text-[oklch(0.5_0.01_55)] uppercase">
+                    AI ASSISTANT SERVICE
+                  </p>
+                </div>
               </div>
             </div>
 
