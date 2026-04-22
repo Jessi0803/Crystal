@@ -191,25 +191,6 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Service Badges */}
-            <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-[oklch(0.93_0_0)]">
-              {[
-                { icon: "◇", label: "天然水晶", desc: "A級嚴選" },
-                { icon: "◈", label: "手工製作", desc: "職人工藝" },
-                { icon: "◉", label: "7天退換", desc: "無憂保障" },
-              ].map((item, i) => (
-                <div key={i} className="text-center">
-                  <div className="text-xl text-[oklch(0.72_0.09_70)] mb-1">{item.icon}</div>
-                  <p className="text-[0.65rem] font-body font-medium text-[oklch(0.2_0_0)] tracking-wide">{item.label}</p>
-                  <p className="text-[0.6rem] font-body text-[oklch(0.6_0_0)]">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Disclaimer */}
-            <p className="mt-6 text-[0.6rem] font-body text-[oklch(0.65_0_0)] leading-relaxed border-t border-[oklch(0.95_0_0)] pt-4">
-              ⚠ {product.disclaimer}
-            </p>
           </div>
         </div>
       </div>
