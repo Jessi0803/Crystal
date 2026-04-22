@@ -32,7 +32,7 @@ export default function About() {
           <div className="order-first lg:order-none">
             <div className="aspect-[4/5] overflow-hidden rounded-[2px]">
               <img
-                src="https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=1200&q=80"
+                src="https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=1200&q=80"
                 alt="柔焦的水晶手鍊生活照"
                 className="w-full h-full object-cover saturate-75 blur-[0.2px]"
               />
@@ -48,7 +48,7 @@ export default function About() {
             className="text-[170px] sm:text-[240px] leading-none opacity-[0.06]"
             style={{ fontFamily: "'Noto Serif TC', serif" }}
           >
-            楓
+            椛
           </span>
         </div>
         <div className="relative max-w-3xl mx-auto text-center">
@@ -68,7 +68,7 @@ export default function About() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div className="aspect-[4/5] overflow-hidden rounded-[2px]">
             <img
-              src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=1200&q=80"
+              src="https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=1200&q=80"
               alt="手部觸摸手鍊的特寫圖"
               className="w-full h-full object-cover"
             />
