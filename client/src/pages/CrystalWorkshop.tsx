@@ -187,9 +187,21 @@ export default function CrystalWorkshop() {
                   <div className="absolute left-[15px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-px bg-[#E5DCD5]" />
 
                   {[
-                    { time: "2HR", title: "理論與知識", desc: "基礎美學、金屬材質與常用配件配飾、各水晶能量統整" },
-                    { time: "3HR", title: "實戰手作", desc: "瞭解獨門配色秘訣、獨門打結與製作手法 (有效保護線材)" },
-                    { time: "0.5HR", title: "喚醒與連結", desc: "手把手教授製作技巧、上述知識運用、淨化保養" },
+                    {
+                      time: "2HR",
+                      title: "理論與知識／創業基礎",
+                      desc: "基礎美學、金屬材質與常用配件配飾、各水晶能量統整；認識天然石、工具、飾品配件；主要課程（塔羅、生命靈數、星座三選一）與小資創業 SOP。",
+                    },
+                    {
+                      time: "3HR",
+                      title: "療癒手作時間（3件作品）",
+                      desc: "進入實作與完整作品製作流程，融合獨門配色秘訣與打結製作手法，將理論轉化為可直接應用的手作能力。",
+                    },
+                    {
+                      time: "0.5HR",
+                      title: "喚醒與連結／淨化保養",
+                      desc: "手把手教授製作技巧的最後整合，並進行淨化保養介紹、如何喚醒手鍊與連結，建立後續配戴與能量維護習慣。",
+                    },
                   ].map((step, i) => (
                     <div key={i} className={`relative flex items-center mb-16 last:mb-0 ${i % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"}`}>
                       <div className="hidden md:block w-1/2 px-12" />
