@@ -159,21 +159,21 @@ export default function ShoppingGuide() {
             {/* Contact CTA */}
             <div className="bg-[oklch(0.1_0_0)] p-8 sm:p-10 text-white text-center">
               <p className="eyebrow text-white/50 mb-3">STILL HAVE QUESTIONS?</p>
-              <h3 className="text-4xl sm:text-5xl font-light mb-12" style={{fontFamily: "'Noto Serif TC', serif"}}>還有其他問題？</h3>
+              <h3 className="text-xl font-medium mb-6" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
               <div className="flex flex-col items-center justify-center gap-5 mt-6">
                 <Link href="/contact">
-                  <button className="w-full sm:w-[620px] h-24 border border-white/20 text-white hover:border-white/40 hover:bg-white/[0.03] transition-all duration-300 flex items-center justify-center gap-4 text-4xl sm:text-[2.2rem] tracking-[0.15em] font-light"
+                  <button className="w-full sm:w-[620px] h-20 border border-white/20 text-white hover:border-white/40 hover:bg-white/[0.03] transition-all duration-300 flex items-center justify-center gap-3 text-lg sm:text-xl tracking-[0.08em] font-light"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}>
-                    <MessageCircle className="w-8 h-8 text-[#cbb8b8]" strokeWidth={1.8} />
+                    <MessageCircle className="w-5 h-5 text-[#cbb8b8]" strokeWidth={1.8} />
                     聯絡我們
                   </button>
                 </Link>
                 <button
                   onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
-                  className="w-full sm:w-[620px] h-24 bg-white text-[oklch(0.15_0_0)] hover:bg-[oklch(0.96_0_0)] transition-all duration-300 shadow-[0_0_26px_rgba(255,255,255,0.25)] hover:shadow-[0_0_34px_rgba(255,255,255,0.35)] flex items-center justify-center gap-4 text-4xl sm:text-[2.2rem] tracking-[0.08em] font-light"
+                  className="w-full sm:w-[620px] h-20 bg-white text-[oklch(0.15_0_0)] hover:bg-[oklch(0.96_0_0)] transition-all duration-300 shadow-[0_0_26px_rgba(255,255,255,0.25)] hover:shadow-[0_0_34px_rgba(255,255,255,0.35)] flex items-center justify-center gap-3 text-lg sm:text-xl tracking-[0.05em] font-light"
                   style={{ fontFamily: "'Noto Serif TC', serif" }}
                 >
-                  <CircleHelp className="w-8 h-8 text-[#8e735b]" strokeWidth={1.8} />
+                  <CircleHelp className="w-5 h-5 text-[#8e735b]" strokeWidth={1.8} />
                   問問24小時椛小助人工智能服務
                 </button>
               </div>
