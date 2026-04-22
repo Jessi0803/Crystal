@@ -202,7 +202,7 @@ export default function CrystalWorkshop() {
                 {[
                   { title: "小資創業 SOP", icon: <Award className="w-5 h-5" />, list: ["水晶創業應知道的大小事", "進貨方式與庫存管理", "真假分辨與挑選品質"] },
                   { title: "全能技法", icon: <Gem className="w-5 h-5" />, list: ["彈力繩、磁扣、龍蝦扣", "調節繩、項鍊、吊飾", "獨門 U 型扣技法"] },
-                  { title: "專屬贈禮", icon: <Gift className="w-5 h-5" />, list: ["早鳥優惠 -$888/人", "IG 分享送許願蠟燭", "淨化水晶一包"] },
+                  { title: "專屬贈禮", icon: <Gift className="w-5 h-5" />, list: ["IG 分享送許願蠟燭", "淨化水晶一包"] },
                 ].map((box, i) => (
                   <div key={i} className="p-10 bg-white border-t-2 border-[#8E735B] flex flex-col items-center text-center">
                     <div className="mb-6 text-[#8E735B]">{box.icon}</div>
