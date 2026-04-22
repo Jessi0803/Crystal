@@ -97,7 +97,7 @@ export default function CrystalWorkshop() {
                     </div>
                   </div>
                   <p className="text-gray-600 leading-loose font-light font-sans-zh">
-                    這是一場探索自我的旅程。我們將透過生命靈數分析您的缺數與連線，為您挑選最契合的頻率，並親手編織出一條專屬的靈魂之鍊。
+                    這堂課會讓你學到：
                   </p>
                 </div>
 
@@ -242,11 +242,6 @@ export default function CrystalWorkshop() {
         <p className="font-serif-zh text-sm tracking-widest text-gray-400">
           願每一顆水晶，都能指引您找到內在的完整。
         </p>
-        <div className="mt-12 flex justify-center gap-8 opacity-40 grayscale">
-          <span className="text-[10px] tracking-widest cursor-pointer hover:opacity-100">FACEBOOK</span>
-          <span className="text-[10px] tracking-widest cursor-pointer hover:opacity-100">INSTAGRAM</span>
-          <span className="text-[10px] tracking-widest cursor-pointer hover:opacity-100">LINE @LAFLEUR</span>
-        </div>
       </footer>
     </div>
   );
