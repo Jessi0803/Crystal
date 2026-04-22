@@ -179,9 +179,6 @@ export default function ShoppingGuide() {
                     <CircleHelp className="w-4 h-4 text-[#F8F1E9]" strokeWidth={1.8} />
                     問問24小時椛小助人工智能服務
                   </button>
-                  <p className="mt-2 text-[0.58rem] tracking-[0.28em] text-[oklch(0.5_0.01_55)] uppercase">
-                    AI ASSISTANT SERVICE
-                  </p>
                 </div>
               </div>
             </div>
