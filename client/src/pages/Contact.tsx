@@ -50,7 +50,7 @@ export default function Contact() {
                   label: "LINE 官方帳號",
                   value: "@rijihori",
                   sub: "即時客服、訂單查詢",
-                  href: "https://line.me",
+                  href: "https://line.me/R/ti/p/@011tymeh",
                 },
                 {
                   icon: <Clock className="w-4 h-4" strokeWidth={1.5} />,

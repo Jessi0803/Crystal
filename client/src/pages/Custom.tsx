@@ -1,7 +1,7 @@
 // 椛 ˙Crystal — 客製化方案頁面
 import { ExternalLink } from "lucide-react";
 
-const LINE_URL = "https://line.me/ti/p/~@crystalaura"; // 可替換為真實 LINE ID
+const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
 const plans = [
   {
