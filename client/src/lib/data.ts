@@ -88,7 +88,7 @@ export const products: Product[] = [
   },
   {
     id: "d003-venus",
-    name: "維納斯 Venus 手鍊",
+    name: "維納斯 Venus",
     subtitle: "喚醒自信與吸引力的日常配戴款",
     category: "love",
     categoryLabel: "D 設計款",
@@ -105,7 +105,6 @@ export const products: Product[] = [
     ],
     suitableFor: ["想建立自信與氣場者", "需要兼顧事業與情緒平衡者", "偏好輕量日常配戴者"],
     howToUse: [
-      "建議白天配戴，強化行動與表達狀態",
       "每月淨化一次，保持晶石清晰頻率",
       "避免長時間接觸化學清潔與香水"
     ],

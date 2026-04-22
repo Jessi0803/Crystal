@@ -37,7 +37,7 @@ export default function ProductDetail() {
     );
   }
 
-  const isCustomizableProduct = product.categoryLabel === "D 設計款";
+  const isCustomizableProduct = product.categoryLabel === "D 設計款" && product.id !== "d003-venus";
   const wristSizeNumber = Number(selectedWristSize);
   const basePrice = isCustomizableProduct
     ? wristSizeNumber <= 13.5
