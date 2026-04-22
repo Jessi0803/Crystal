@@ -85,7 +85,7 @@ export default function ShoppingGuide() {
 
               <div className="space-y-6 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
                 <div className="space-y-2">
-                  <p>台灣地區（含離島）：黑貓宅急便（$100）、7-11店到店（$60）單次購買兩條以上免運。</p>
+                  <p>• 台灣地區（含離島）：黑貓宅急便（$100）、7-11店到店（$60）單次購買兩條以上免運。</p>
                   <p>• 台灣地區以外：馬來西亞、香港、新加波、美國、英國、澳洲</p>
                 </div>
               </div>
