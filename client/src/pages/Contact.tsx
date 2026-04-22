@@ -21,7 +21,7 @@ export default function Contact() {
       </div>
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-1 gap-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
 
           {/* Left: Contact Info */}
           <div>
@@ -87,6 +87,40 @@ export default function Contact() {
             </div>
           </div>
 
+          {/* Right: Quick Contact Card */}
+          <div className="lg:pt-2">
+            <div className="border border-[oklch(0.93_0_0)] bg-[oklch(0.98_0.005_240)] p-8 sm:p-10">
+              <p className="eyebrow mb-3">QUICK CONTACT</p>
+              <h2
+                className="text-xl font-medium text-[oklch(0.12_0_0)] mb-3"
+                style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+              >
+                立即聯繫我們
+              </h2>
+              <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-8">
+                官方管道僅提供 LINE 與 Instagram，點擊下方按鈕即可直接前往。
+              </p>
+
+              <div className="space-y-3">
+                <a
+                  href="https://line.me/R/ti/p/@011tymeh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-12 inline-flex items-center justify-center text-sm tracking-[0.08em] text-white bg-[#06C755] hover:opacity-90 transition-opacity"
+                >
+                  前往官方 LINE
+                </a>
+                <a
+                  href="https://instagram.com/gooday_tarot_"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-12 inline-flex items-center justify-center text-sm tracking-[0.08em] text-[oklch(0.18_0_0)] border border-[oklch(0.85_0_0)] bg-white hover:border-[oklch(0.7_0_0)] transition-colors"
+                >
+                  前往 Instagram
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
