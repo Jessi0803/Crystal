@@ -234,11 +234,6 @@ export default function Navbar() {
 
               {/* Left nav: 最新商品、商品分類、購物說明、聯絡我們 */}
               <nav className="hidden lg:flex items-center gap-6">
-                <Link href="/">
-                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                    椛 crystal
-                  </span>
-                </Link>
                 <Link href="/products?sort=new">
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
                     最新商品
@@ -306,11 +301,6 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
             <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
-              <Link href="/">
-                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
-                  椛 crystal
-                </span>
-              </Link>
               <Link href="/products?sort=newest">
                 <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   最新商品
