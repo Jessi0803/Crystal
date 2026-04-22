@@ -129,6 +129,14 @@ export default function CrystalWorkshop() {
                     </div>
                   </div>
                 </div>
+                <a
+                  href="https://line.me/R/ti/p/@011tymeh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center px-8 py-3 bg-[#06C755] text-white text-sm tracking-[0.1em] hover:opacity-90 transition-opacity"
+                >
+                  聯繫 LINE 諮詢課程
+                </a>
               </div>
             </div>
           ) : (
@@ -231,6 +239,16 @@ export default function CrystalWorkshop() {
                 <button className="bg-white text-[#8E735B] px-12 py-5 rounded-full font-serif-zh text-sm tracking-[0.3em] hover:shadow-2xl transition-all hover:-translate-y-1">
                   私訊報名「人數 + 日期」
                 </button>
+                <div className="mt-6">
+                  <a
+                    href="https://line.me/R/ti/p/@011tymeh"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center px-8 py-3 bg-[#06C755] text-white text-sm tracking-[0.1em] hover:opacity-90 transition-opacity"
+                  >
+                    聯繫 LINE 諮詢課程
+                  </a>
+                </div>
               </div>
             </div>
           )}
