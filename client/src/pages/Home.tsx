@@ -303,7 +303,6 @@ export default function Home() {
                     "生命靈數水晶手鍊體驗課",
                     "3 件作品實戰 + 6 種核心技法",
                     "小資創業 SOP 與進貨品質分辨",
-                    "LINE 一對一課程諮詢",
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-3">
                       <span className="text-[oklch(0.72_0.09_70)] mt-0.5">◇</span>
