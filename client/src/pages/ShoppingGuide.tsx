@@ -68,49 +68,13 @@ export default function ShoppingGuide() {
               <p className="eyebrow mb-3">RETURN POLICY</p>
               <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>退換貨說明</h2>
 
-              <div className="space-y-6 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
-                <div>
-                  <h3 className="text-sm font-medium text-[oklch(0.1_0_0)] mb-2">退貨條件</h3>
-                  <ul className="space-y-2 pl-4">
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>商品自收貨日起 <strong className="text-[oklch(0.1_0_0)]">7 天內</strong>可申請退換貨（鑑賞期）</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>商品須保持<strong className="text-[oklch(0.1_0_0)]">全新未使用</strong>狀態，含原始包裝、吊牌、附件</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>因個人喜好或非商品瑕疵的退貨，運費由買家自行負擔</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>商品瑕疵或寄送錯誤，運費由本店負擔</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-[oklch(0.1_0_0)] mb-2">不接受退換貨情形</h3>
-                  <ul className="space-y-2 pl-4">
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>商品已配戴使用、有磨損或污漬</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>包裝盒、吊牌已拆除或損毀</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>特價品、客製化商品、限量商品</li>
-                    <li className="flex gap-2"><span className="text-[oklch(0.72_0.09_70)] shrink-0">·</span>超過 7 天鑑賞期</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-[oklch(0.1_0_0)] mb-2">退換貨流程</h3>
-                  <ol className="space-y-3 pl-4">
-                    {[
-                      "聯絡客服（Email 或 LINE），說明退換貨原因並附上訂單編號與商品照片",
-                      "客服確認後，將提供退貨地址與包裝說明",
-                      "商品寄回後，本店於 3–5 個工作天內完成審核",
-                      "退款將於審核通過後 7–14 個工作天內退回原付款帳戶",
-                    ].map((step, i) => (
-                      <li key={i} className="flex gap-3">
-                        <span className="w-5 h-5 bg-[oklch(0.1_0_0)] text-white text-[0.6rem] flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                        <span>{step}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                <div className="bg-[oklch(0.97_0_0)] p-5 border-l-2 border-[oklch(0.72_0.09_70)]">
-                  <p className="text-xs text-[oklch(0.4_0_0)]">
-                    ⚠ 依據消費者保護法，網路購物享有 7 天鑑賞期（非試用期）。鑑賞期內退貨，商品須維持原狀，否則本店有權拒絕退貨或扣除折舊費用。
-                  </p>
-                </div>
+              <div className="space-y-4 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
+                <p>
+                  每一條手鍊出貨前皆經過細心檢查，出貨後恕不提供退換貨服務。
+                </p>
+                <p>
+                  若收到商品有瑕疵，或手圍尺寸有任何疑慮，歡迎透過官方 LINE 與我們聯繫，我們將盡力為您協助處理。
+                </p>
               </div>
             </section>
 
