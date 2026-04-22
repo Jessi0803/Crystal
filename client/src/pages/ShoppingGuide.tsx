@@ -160,11 +160,11 @@ export default function ShoppingGuide() {
             <div className="relative bg-[#F8F5F2] p-8 sm:p-10 text-center overflow-hidden">
               <div className="pointer-events-none absolute -top-20 -left-16 w-64 h-64 rounded-full bg-[rgba(199,174,255,0.14)] blur-3xl" />
               <div className="pointer-events-none absolute -bottom-24 -right-10 w-72 h-72 rounded-full bg-[rgba(156,214,255,0.12)] blur-3xl" />
-              <p className="eyebrow text-[oklch(0.45_0.01_60)] mb-3">STILL HAVE QUESTIONS?</p>
-              <h3 className="text-lg font-medium mb-5 text-[oklch(0.28_0.01_40)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
+              <p className="eyebrow text-[0.55rem] text-[oklch(0.45_0.01_60)] mb-3">STILL HAVE QUESTIONS?</p>
+              <h3 className="text-base font-medium mb-5 text-[oklch(0.28_0.01_40)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
               <div className="flex flex-col items-center justify-center gap-5 mt-6">
                 <Link href="/contact">
-                  <button className="w-full sm:w-[560px] h-16 border border-[oklch(0.78_0.01_60)] bg-white text-[oklch(0.26_0.01_40)] hover:border-[oklch(0.68_0.02_55)] hover:bg-[oklch(0.99_0.003_90)] transition-all duration-300 flex items-center justify-center gap-2.5 text-base sm:text-lg tracking-[0.05em] font-light shadow-[0_6px_20px_rgba(120,100,80,0.08)]"
+                  <button className="w-full sm:w-[560px] h-16 border border-[oklch(0.78_0.01_60)] bg-white text-[oklch(0.26_0.01_40)] hover:border-[oklch(0.68_0.02_55)] hover:bg-[oklch(0.99_0.003_90)] transition-all duration-300 flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.05em] font-light shadow-[0_6px_20px_rgba(120,100,80,0.08)]"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}>
                     <MessageCircle className="w-4 h-4 text-[oklch(0.48_0.03_55)]" strokeWidth={1.8} />
                     聯絡我們
@@ -173,7 +173,7 @@ export default function ShoppingGuide() {
                 <div className="w-full sm:w-[560px]">
                   <button
                     onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
-                    className="w-full h-16 bg-gradient-to-r from-[#8E735B] via-[#A8835F] to-[#7A614D] text-white hover:brightness-105 transition-all duration-300 shadow-[0_10px_24px_rgba(122,97,77,0.28)] hover:shadow-[0_14px_28px_rgba(122,97,77,0.34)] flex items-center justify-center gap-2.5 text-base sm:text-lg tracking-[0.02em] font-light"
+                    className="w-full h-16 bg-gradient-to-r from-[#8E735B] via-[#A8835F] to-[#7A614D] text-white hover:brightness-105 transition-all duration-300 shadow-[0_10px_24px_rgba(122,97,77,0.28)] hover:shadow-[0_14px_28px_rgba(122,97,77,0.34)] flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.02em] font-light"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}
                   >
                     <CircleHelp className="w-4 h-4 text-[#F8F1E9]" strokeWidth={1.8} />

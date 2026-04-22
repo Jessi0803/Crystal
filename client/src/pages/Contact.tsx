@@ -26,7 +26,7 @@ export default function Contact() {
           {/* Left: Contact Info */}
           <div>
             <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-10 max-w-md">
-              有任何關於商品、訂單或能量水晶的問題，歡迎透過以下方式聯絡我們。我們將在 1–2 個工作天內回覆您。
+              有任何關於商品、訂單或能量水晶的問題，歡迎透過以下方式聯絡我們。
             </p>
 
             <div className="space-y-6">
@@ -35,14 +35,14 @@ export default function Contact() {
                   icon: <Instagram className="w-4 h-4" strokeWidth={1.5} />,
                   label: "Instagram",
                   value: "gooday_tarot_",
-                  sub: "商品諮詢、新品資訊",
+                  sub: "",
                   href: "https://instagram.com/gooday_tarot_",
                 },
                 {
                   icon: <Phone className="w-4 h-4" strokeWidth={1.5} />,
                   label: "LINE 官方帳號",
                   value: "@011tymeh",
-                  sub: "即時客服、訂單查詢",
+                  sub: "",
                   href: "https://line.me/R/ti/p/@011tymeh",
                 },
               ].map((item) => (

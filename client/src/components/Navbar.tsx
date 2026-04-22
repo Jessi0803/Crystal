@@ -187,71 +187,77 @@ export default function Navbar() {
       >
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
-
-            {/* Left: 最新商品、商品分類、購物說明、聯絡我們 */}
-            <nav className="hidden lg:flex items-center gap-6">
-              <Link href="/products?sort=new">
-                <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                  最新商品
-                </span>
-              </Link>
-              <CategoryDropdown />
-              <ShoppingGuideDropdown />
-              <Link href="/about">
-                <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                  品牌故事
-                </span>
-              </Link>
-              <Link href="/contact">
-                <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                  聯絡我們
-                </span>
-              </Link>
-            </nav>
-
-            {/* Center: Logo */}
-            <Link href="/">
-              <div className="flex flex-col items-center gap-0.5 select-none">
-                <div className="flex items-baseline gap-1.5">
+            <div className="flex items-center gap-8">
+              {/* Left: Logo */}
+              <Link href="/">
+                <div className="flex flex-col items-center gap-0.5 select-none">
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className="text-[1.6rem] leading-none text-[oklch(0.1_0_0)]"
+                      style={{
+                        fontFamily: "'Noto Serif TC', serif",
+                        fontWeight: 300,
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      椛
+                    </span>
+                    <span
+                      className="text-[0.6rem] text-[oklch(0.55_0_0)]"
+                      style={{
+                        fontFamily: "'Noto Sans TC', sans-serif",
+                        fontWeight: 300,
+                        letterSpacing: "0.1em",
+                      }}
+                    >
+                      ˙
+                    </span>
+                    <span
+                      className="text-[1.4rem] leading-none text-[oklch(0.2_0_0)] italic"
+                      style={{
+                        fontFamily: "'Cormorant Garamond', 'Georgia', serif",
+                        fontWeight: 300,
+                        letterSpacing: "0.08em",
+                      }}
+                    >
+                      Crystal
+                    </span>
+                  </div>
                   <span
-                    className="text-[1.6rem] leading-none text-[oklch(0.1_0_0)]"
-                    style={{
-                      fontFamily: "'Noto Serif TC', serif",
-                      fontWeight: 300,
-                      letterSpacing: "0.05em",
-                    }}
+                    className="text-[0.45rem] tracking-[0.35em] text-[oklch(0.65_0_0)]"
+                    style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
                   >
-                    椛
-                  </span>
-                  <span
-                    className="text-[0.6rem] text-[oklch(0.55_0_0)]"
-                    style={{
-                      fontFamily: "'Noto Sans TC', sans-serif",
-                      fontWeight: 300,
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    ˙
-                  </span>
-                  <span
-                    className="text-[1.4rem] leading-none text-[oklch(0.2_0_0)] italic"
-                    style={{
-                      fontFamily: "'Cormorant Garamond', 'Georgia', serif",
-                      fontWeight: 300,
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    Crystal
+                    CRYSTAL ENERGY
                   </span>
                 </div>
-                <span
-                  className="text-[0.45rem] tracking-[0.35em] text-[oklch(0.65_0_0)]"
-                  style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-                >
-                  CRYSTAL ENERGY
-                </span>
-              </div>
-            </Link>
+              </Link>
+
+              {/* Left nav: 最新商品、商品分類、購物說明、聯絡我們 */}
+              <nav className="hidden lg:flex items-center gap-6">
+                <Link href="/">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                    椛 crystal
+                  </span>
+                </Link>
+                <Link href="/products?sort=new">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                    最新商品
+                  </span>
+                </Link>
+                <CategoryDropdown />
+                <ShoppingGuideDropdown />
+                <Link href="/about">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                    品牌故事
+                  </span>
+                </Link>
+                <Link href="/contact">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                    聯絡我們
+                  </span>
+                </Link>
+              </nav>
+            </div>
 
             {/* Right: Icons */}
             <div className="flex items-center gap-5">
@@ -300,6 +306,11 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
             <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
+              <Link href="/">
+                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                  椛 crystal
+                </span>
+              </Link>
               <Link href="/products?sort=newest">
                 <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   最新商品
