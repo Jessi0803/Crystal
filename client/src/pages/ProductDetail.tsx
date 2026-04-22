@@ -11,7 +11,7 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
-  const [activeTab, setActiveTab] = useState<"story" | "benefits" | "howto">("story");
+  const [activeTab, setActiveTab] = useState<"benefits" | "howto">("benefits");
   const { addToCart, setIsOpen } = useCart();
 
   useEffect(() => {
@@ -38,9 +38,8 @@ export default function ProductDetail() {
   const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
 
   const tabs = [
-    { id: "story" as const, label: "商品故事" },
     { id: "benefits" as const, label: "功效說明" },
-    { id: "howto" as const, label: "使用方式" },
+    { id: "howto" as const, label: "客製調整" },
   ];
 
   return (
@@ -164,11 +163,6 @@ export default function ProductDetail() {
                 ))}
               </div>
 
-              {activeTab === "story" && (
-                <p className="text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
-                  {product.story}
-                </p>
-              )}
               {activeTab === "benefits" && (
                 <ul className="space-y-2">
                   {product.benefits.map((b, i) => (
