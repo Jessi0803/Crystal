@@ -277,6 +277,46 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ─── CRYSTAL WORKSHOP INTRO ─── */}
+      <section className="py-16 border-t border-[oklch(0.93_0_0)] bg-[oklch(0.985_0.008_75)]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
+            <div className="reveal">
+              <p className="eyebrow mb-3">CRYSTAL WORKSHOP</p>
+              <h2 className="heading-lg mb-5">水晶創業班</h2>
+              <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-8 max-w-xl">
+                從生命靈數體驗課到水晶創業全能班，帶你完整學會配色美學、手作技法、淨化保養與小資創業 SOP。
+                如果你想把熱愛變成專業，這裡會是最好的起點。
+              </p>
+              <Link href="/crystal-workshop">
+                <button className="btn-primary">
+                  前往水晶創業班 <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </Link>
+            </div>
+
+            <div className="reveal reveal-delay-1">
+              <div className="bg-white border border-[oklch(0.92_0_0)] p-6 sm:p-8">
+                <p className="text-[0.65rem] tracking-[0.18em] text-[oklch(0.55_0_0)] mb-5">課程亮點</p>
+                <div className="space-y-3">
+                  {[
+                    "生命靈數水晶手鍊體驗課",
+                    "3 件作品實戰 + 6 種核心技法",
+                    "小資創業 SOP 與進貨品質分辨",
+                    "LINE 一對一課程諮詢",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-3">
+                      <span className="text-[oklch(0.72_0.09_70)] mt-0.5">◇</span>
+                      <span className="text-sm font-body font-light text-[oklch(0.35_0_0)]">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }
