@@ -70,9 +70,6 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-[0.65rem] font-body font-light text-white/40">
-            © 2025 日日好日 能量水晶. All rights reserved.
-          </p>
-          <p className="text-[0.65rem] font-body font-light text-white/40">
             本網站商品為天然礦石飾品，非醫療用品，不具任何醫療療效。
           </p>
         </div>

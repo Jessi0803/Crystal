@@ -106,7 +106,6 @@ export default function Home() {
 
         {/* Right: Text */}
         <div className="flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-20 py-16 bg-white">
-          <p className="eyebrow mb-6">日日好日 · CRYSTAL ENERGY · 2025</p>
           <h1 className="mb-4" style={{
             fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif",
             fontSize: "clamp(2.2rem, 5vw, 3.5rem)",
