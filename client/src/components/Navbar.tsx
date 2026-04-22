@@ -105,6 +105,32 @@ function CategoryDropdown() {
           <div className="px-5 pt-4 pb-3 border-b border-[oklch(0.95_0_0)]">
             <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">SHOP BY CATEGORY</p>
           </div>
+          <div className="border-b border-[oklch(0.95_0_0)] px-5 py-3">
+            <Link href="/products">
+              <div
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between cursor-pointer group"
+              >
+                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.4_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">
+                  查看全部商品
+                </span>
+                <span className="text-[0.65rem] text-[oklch(0.6_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">→</span>
+              </div>
+            </Link>
+          </div>
+          <div className="border-b border-[oklch(0.95_0_0)] px-5 py-3" style={{background: "oklch(0.97 0.01 70)"}}>
+            <Link href="/custom">
+              <div
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between cursor-pointer group"
+              >
+                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.55_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors font-medium">
+                  ✦ 客製化方案
+                </span>
+                <span className="text-[0.65rem] text-[oklch(0.65_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors">→</span>
+              </div>
+            </Link>
+          </div>
           <div className="py-2">
             {categorySubLinks.map((cat) => (
               <Link key={cat.href} href={cat.href}>
@@ -124,32 +150,6 @@ function CategoryDropdown() {
                 </div>
               </Link>
             ))}
-          </div>
-          <div className="border-t border-[oklch(0.95_0_0)] px-5 py-3">
-            <Link href="/products">
-              <div
-                onClick={() => setOpen(false)}
-                className="flex items-center justify-between cursor-pointer group"
-              >
-                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.4_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">
-                  查看全部商品
-                </span>
-                <span className="text-[0.65rem] text-[oklch(0.6_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">→</span>
-              </div>
-            </Link>
-          </div>
-          <div className="border-t border-[oklch(0.95_0_0)] px-5 py-3" style={{background: "oklch(0.97 0.01 70)"}}>
-            <Link href="/custom">
-              <div
-                onClick={() => setOpen(false)}
-                className="flex items-center justify-between cursor-pointer group"
-              >
-                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.55_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors font-medium">
-                  ✦ 客製化方案
-                </span>
-                <span className="text-[0.65rem] text-[oklch(0.65_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors">→</span>
-              </div>
-            </Link>
           </div>
         </div>
       )}
@@ -323,17 +323,6 @@ export default function Navbar() {
                 </button>
                 {mobileCatOpen && (
                   <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
-                    {categorySubLinks.map((cat) => (
-                      <Link key={cat.href} href={cat.href}>
-                        <div className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
-                          <span className="text-base w-5 shrink-0">{cat.icon}</span>
-                          <div>
-                            <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
-                            <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
                     <Link href="/products">
                       <div className="flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
                         <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">查看全部商品</span>
@@ -346,6 +335,17 @@ export default function Navbar() {
                         <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
                       </div>
                     </Link>
+                    {categorySubLinks.map((cat) => (
+                      <Link key={cat.href} href={cat.href}>
+                        <div className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                          <span className="text-base w-5 shrink-0">{cat.icon}</span>
+                          <div>
+                            <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
+                            <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
