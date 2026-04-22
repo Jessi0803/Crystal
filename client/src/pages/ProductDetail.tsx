@@ -37,23 +37,23 @@ export default function ProductDetail() {
     );
   }
 
-  const isMoonSecret = product.id === "d001-moon-secret";
+  const isCustomizableProduct = product.categoryLabel === "D 設計款";
   const wristSizeNumber = Number(selectedWristSize);
-  const basePrice = isMoonSecret
+  const basePrice = isCustomizableProduct
     ? wristSizeNumber <= 13.5
       ? 1480
       : wristSizeNumber <= 17
         ? 1580
         : 1680
     : product.price;
-  const claspExtra = isMoonSecret && selectedClaspType !== "elastic" ? 200 : 0;
+  const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
 
   const handleAddToCart = () => {
     for (let i = 0; i < qty; i++) {
       addToCart(
         product,
-        isMoonSecret
+        isCustomizableProduct
           ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType }
           : undefined
       );
@@ -133,7 +133,7 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {isMoonSecret && (
+            {isCustomizableProduct && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
                 <div>
                   <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">手圍尺寸</p>
