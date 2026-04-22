@@ -40,12 +40,12 @@ export default function About() {
       `}</style>
 
       {/* Hero Section */}
-      <section className="h-screen flex flex-col items-center justify-center px-6 text-center">
+      <section className="h-[88vh] flex flex-col items-center justify-center px-6 text-center">
         <div className="fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
           <span className="font-serif-en text-sm tracking-[0.5em] text-[#8E735B] mb-8 block uppercase font-light">
             椛 · CRYSTAL
           </span>
-          <h1 className="text-3xl md:text-5xl font-serif-zh leading-tight letter-spacing-wide mb-6 font-medium">
+          <h1 className="text-2xl md:text-4xl font-serif-zh leading-tight letter-spacing-wide mb-6 font-medium">
             每一顆水晶，都在等一個對的人
           </h1>
           <div className="w-16 h-px bg-[#D8C3BD] mx-auto mt-12 opacity-60" />
