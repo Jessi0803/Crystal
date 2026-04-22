@@ -163,7 +163,7 @@ export default function CrystalWorkshop() {
                 <div className="scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-300">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="aspect-square bg-[#E5DCD5] rounded-2xl overflow-hidden shadow-lg">
-                      <img src="https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?q=80&w=2070&auto=format&fit=crop" className="w-full h-full object-cover" alt="課程細節圖" />
+                      <img src="/images/d-design/d001.jpg" className="w-full h-full object-cover" alt="課程細節圖" />
                     </div>
                     <div className="aspect-square bg-[#D8C3BD]/30 rounded-2xl p-6 flex flex-col justify-center">
                       <Sparkles className="w-8 h-8 text-[#8E735B] mb-4" />
