@@ -12,8 +12,6 @@ const categories = [
   { id: "love", label: "愛情桃花" },
   { id: "wealth", label: "財運事業" },
   { id: "protect", label: "能量防護" },
-  { id: "heal", label: "情緒療癒" },
-  { id: "protection", label: "防護淨化" },
   { id: "healing", label: "療癒系列" },
 ];
 
