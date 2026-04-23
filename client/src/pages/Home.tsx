@@ -106,15 +106,6 @@ export default function Home() {
 
         {/* Right: Text */}
         <div className="flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-20 py-16 bg-white">
-          <Link href="/" className="inline-block mb-8 lg:mb-10 w-fit">
-            <img
-              src="/logo.jpg"
-              alt="椛 Crystal 能量水晶"
-              className="h-14 sm:h-16 md:h-[4.5rem] w-auto max-w-[min(100%,220px)] object-contain object-left"
-              loading="eager"
-              decoding="async"
-            />
-          </Link>
           <h1 className="mb-4" style={{
             fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif",
             fontSize: "clamp(2.2rem, 5vw, 3.5rem)",

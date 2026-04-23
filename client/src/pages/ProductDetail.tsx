@@ -40,8 +40,9 @@ export default function ProductDetail() {
     );
   }
 
-  const isCustomizableProduct = product.categoryLabel === "D 設計款" && product.id !== "d003-venus";
-  const visibleTags = product.tags.filter((tag) => tag !== "D設計款");
+  const isCustomizableProduct =
+    product.id !== "d003-venus" && product.howToUse.some((line) => line.includes("手圍"));
+  const visibleTags = product.tags;
   const wristSizeNumber = Number(selectedWristSize);
   const isMoonClearHeart = product.id === "d005-moon-clear-heart";
   const isMorningWhisper = product.id === "d004-morning-whisper";
@@ -109,9 +110,9 @@ export default function ProductDetail() {
           {/* Right: Info */}
           <div className="flex flex-col justify-center">
             {/* Category + Tags */}
-            <div className="flex items-center gap-2 mb-5">
-              {product.categoryLabel !== "D 設計款" && <span className="eyebrow">{product.categoryLabel}</span>}
-              {product.categoryLabel !== "D 設計款" && visibleTags.length > 0 && <span className="text-[oklch(0.7_0_0)]">·</span>}
+            <div className="flex items-center gap-2 mb-5 flex-wrap">
+              <span className="eyebrow">{product.categoryLabel}</span>
+              {visibleTags.length > 0 && <span className="text-[oklch(0.7_0_0)]">·</span>}
               {visibleTags.slice(0, 2).map((tag) => (
                 <span key={tag} className="tag">{tag}</span>
               ))}
