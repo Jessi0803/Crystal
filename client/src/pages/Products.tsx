@@ -13,6 +13,9 @@ const categories = [
   { id: "wealth", label: "財運事業" },
   { id: "protect", label: "能量防護" },
   { id: "healing", label: "療癒系列" },
+  { id: "necklace", label: "項鍊" },
+  { id: "pendant", label: "吊飾" },
+  { id: "other", label: "其他" },
 ];
 
 const sortOptions = [

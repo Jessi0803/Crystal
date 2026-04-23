@@ -90,7 +90,7 @@ export const products: Product[] = [
     id: "d003-venus",
     name: "維納斯 Venus",
     subtitle: "喚醒自信與吸引力的日常配戴款",
-    category: "love",
+    category: "pendant",
     categoryLabel: "D 設計款",
     price: 950,
     image: "/images/d-design/d003.jpg",
