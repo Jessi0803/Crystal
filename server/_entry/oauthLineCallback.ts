@@ -1,10 +1,12 @@
-// Vercel：/api/line-oauth/*（vercel.json 將 /api/oauth/line/* rewrite 至此）
+// Vercel：GET /api/oauth-line-callback（vercel.json 將 /api/oauth/line/callback rewrite 至此）
 import type { IncomingMessage, ServerResponse } from "node:http";
 import express, { type NextFunction } from "express";
-import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
+import { lineOAuthCallback } from "../lineOAuthRoutes";
+
+const PATH = "/api/oauth-line-callback";
 
 const app = express();
-registerLineOAuthRoutes(app);
+app.get(PATH, lineOAuthCallback);
 
 app.use((req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", path: req.url } });
@@ -13,7 +15,7 @@ app.use((req, res) => {
 app.use(
   (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = err instanceof Error ? err.stack || err.message : String(err);
-    console.error("[api/line-oauth] express error:", err);
+    console.error("[api/oauth-line-callback] express error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: { code: "LINE_OAUTH_EXPRESS_ERROR", message } });
     }

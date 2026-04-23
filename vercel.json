@@ -3,10 +3,8 @@
   "installCommand": "pnpm install",
   "buildCommand": "pnpm run build",
   "rewrites": [
-    {
-      "source": "/api/oauth/line/:path*",
-      "destination": "/api/line-oauth/:path*"
-    },
+    { "source": "/api/oauth/line/start", "destination": "/api/oauth-line-start" },
+    { "source": "/api/oauth/line/callback", "destination": "/api/oauth-line-callback" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

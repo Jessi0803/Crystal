@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/_entry/trpcHandler.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile='api/trpc/[trpc].js' && esbuild server/_entry/ecpayHandler.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile='api/ecpay/[...path].js' && esbuild server/_entry/lineOAuthHandler.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile='api/line-oauth/[...path].js'",
+    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/_entry/trpcHandler.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile='api/trpc/[trpc].js' && esbuild server/_entry/ecpayHandler.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile='api/ecpay/[...path].js' && esbuild server/_entry/oauthLineStart.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile=api/oauth-line-start.js && esbuild server/_entry/oauthLineCallback.ts --platform=node --target=node20 --packages=external --bundle --format=esm --outfile=api/oauth-line-callback.js",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",

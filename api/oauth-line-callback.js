@@ -211,12 +211,10 @@ var init_schema = __esm({
   }
 });
 
-// server/_entry/lineOAuthHandler.ts
+// server/_entry/oauthLineCallback.ts
 import express from "express";
 
 // server/lineOAuthRoutes.ts
-import { Router } from "express";
-import * as crypto from "node:crypto";
 import { parse as parseCookieHeader2 } from "cookie";
 
 // shared/const.ts
@@ -654,110 +652,86 @@ async function lineVerifyIdToken(idToken, clientId) {
   }
   return json2;
 }
-function registerLineOAuthRoutes(app2) {
-  const lineRouter = Router();
-  lineRouter.get("/start", (req, res) => {
-    const { channelId, channelSecret } = lineConfig();
-    if (!channelId || !channelSecret) {
-      res.status(503).send(
-        "LINE \u767B\u5165\u5C1A\u672A\u8A2D\u5B9A\uFF1A\u8ACB\u5728\u74B0\u5883\u8B8A\u6578\u8A2D\u5B9A LINE_CHANNEL_ID\u3001LINE_CHANNEL_SECRET\uFF0C\u4E26\u65BC LINE Developers \u767B\u9304 Callback URL\u3002"
-      );
+async function lineOAuthCallback(req, res) {
+  const clearStateCookie = () => {
+    res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
+  };
+  try {
+    const code = typeof req.query.code === "string" ? req.query.code : "";
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    const cookieState = readCookie(req, LINE_STATE_COOKIE);
+    if (!code || !state || !cookieState || state !== cookieState) {
+      clearStateCookie();
+      res.status(400).send("\u767B\u5165\u72C0\u614B\u9A57\u8B49\u5931\u6557\uFF0C\u8ACB\u95DC\u9589\u8996\u7A97\u5F8C\u5F9E\u767B\u5165\u9801\u518D\u8A66\u4E00\u6B21\u3002");
       return;
     }
-    const state = crypto.randomBytes(24).toString("hex");
-    const callback = lineCallbackUrl(req);
-    const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 6e5 };
-    res.cookie(LINE_STATE_COOKIE, state, cookieOpts);
-    const authorize = new URL("https://access.line.me/oauth2/v2.1/authorize");
-    authorize.searchParams.set("response_type", "code");
-    authorize.searchParams.set("client_id", channelId);
-    authorize.searchParams.set("redirect_uri", callback);
-    authorize.searchParams.set("state", state);
-    authorize.searchParams.set("scope", "profile openid email");
-    res.redirect(302, authorize.toString());
-  });
-  lineRouter.get("/callback", async (req, res) => {
-    const clearStateCookie = () => {
-      res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
-    };
-    try {
-      const code = typeof req.query.code === "string" ? req.query.code : "";
-      const state = typeof req.query.state === "string" ? req.query.state : "";
-      const cookieState = readCookie(req, LINE_STATE_COOKIE);
-      if (!code || !state || !cookieState || state !== cookieState) {
-        clearStateCookie();
-        res.status(400).send("\u767B\u5165\u72C0\u614B\u9A57\u8B49\u5931\u6557\uFF0C\u8ACB\u95DC\u9589\u8996\u7A97\u5F8C\u5F9E\u767B\u5165\u9801\u518D\u8A66\u4E00\u6B21\u3002");
-        return;
-      }
-      const { channelId, channelSecret } = lineConfig();
-      if (!channelId || !channelSecret) {
-        clearStateCookie();
-        res.status(503).send("LINE \u767B\u5165\u5C1A\u672A\u8A2D\u5B9A\u3002");
-        return;
-      }
-      const redirectUri = lineCallbackUrl(req);
-      const tokenJson = await lineExchangeCode(code, redirectUri, channelId, channelSecret);
-      const profile = await lineGetProfile(tokenJson.access_token);
-      let email = null;
-      if (tokenJson.id_token) {
-        try {
-          const verify = await lineVerifyIdToken(tokenJson.id_token, channelId);
-          if (verify.email) {
-            email = normalizeOrderEmail(verify.email);
-          }
-        } catch {
-        }
-      }
-      const openId = `line:${profile.userId}`;
-      const name = profile.displayName?.trim() || null;
-      await upsertUser({
-        openId,
-        name: name ?? void 0,
-        email: email ?? void 0,
-        loginMethod: "line",
-        lastSignedIn: /* @__PURE__ */ new Date()
-      });
-      let user = await getUserByOpenId(openId);
-      if (!user) {
-        throw new Error("user_missing_after_upsert");
-      }
-      if (shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
-        const db2 = await getDb();
-        if (db2) {
-          const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq2 } = await import("drizzle-orm");
-          await db2.update(users2).set({ role: "admin" }).where(eq2(users2.id, user.id));
-          user = await getUserByOpenId(openId);
-        }
-      }
-      const sessionToken = await sdk.createSessionToken(openId, {
-        name: user.name ?? "",
-        expiresInMs: ONE_YEAR_MS
-      });
+    const { channelId, channelSecret } = lineConfig();
+    if (!channelId || !channelSecret) {
       clearStateCookie();
-      const sessionCookieOpts = { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS };
-      res.cookie(COOKIE_NAME, sessionToken, sessionCookieOpts);
-      res.redirect(302, "/member");
-    } catch (err) {
-      console.error("[LINE OAuth] callback failed", err);
-      clearStateCookie();
-      res.status(500).send("LINE \u767B\u5165\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002");
+      res.status(503).send("LINE \u767B\u5165\u5C1A\u672A\u8A2D\u5B9A\u3002");
+      return;
     }
-  });
-  app2.use("/api/line-oauth", lineRouter);
-  app2.use("/api/oauth/line", lineRouter);
+    const redirectUri = lineCallbackUrl(req);
+    const tokenJson = await lineExchangeCode(code, redirectUri, channelId, channelSecret);
+    const profile = await lineGetProfile(tokenJson.access_token);
+    let email = null;
+    if (tokenJson.id_token) {
+      try {
+        const verify = await lineVerifyIdToken(tokenJson.id_token, channelId);
+        if (verify.email) {
+          email = normalizeOrderEmail(verify.email);
+        }
+      } catch {
+      }
+    }
+    const openId = `line:${profile.userId}`;
+    const name = profile.displayName?.trim() || null;
+    await upsertUser({
+      openId,
+      name: name ?? void 0,
+      email: email ?? void 0,
+      loginMethod: "line",
+      lastSignedIn: /* @__PURE__ */ new Date()
+    });
+    let user = await getUserByOpenId(openId);
+    if (!user) {
+      throw new Error("user_missing_after_upsert");
+    }
+    if (shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+      const db2 = await getDb();
+      if (db2) {
+        const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const { eq: eq2 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq2(users2.id, user.id));
+        user = await getUserByOpenId(openId);
+      }
+    }
+    const sessionToken = await sdk.createSessionToken(openId, {
+      name: user.name ?? "",
+      expiresInMs: ONE_YEAR_MS
+    });
+    clearStateCookie();
+    const sessionCookieOpts = { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS };
+    res.cookie(COOKIE_NAME, sessionToken, sessionCookieOpts);
+    res.redirect(302, "/member");
+  } catch (err) {
+    console.error("[LINE OAuth] callback failed", err);
+    clearStateCookie();
+    res.status(500).send("LINE \u767B\u5165\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002");
+  }
 }
 
-// server/_entry/lineOAuthHandler.ts
+// server/_entry/oauthLineCallback.ts
+var PATH = "/api/oauth-line-callback";
 var app = express();
-registerLineOAuthRoutes(app);
+app.get(PATH, lineOAuthCallback);
 app.use((req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", path: req.url } });
 });
 app.use(
   (err, _req, res, _next) => {
     const message = err instanceof Error ? err.stack || err.message : String(err);
-    console.error("[api/line-oauth] express error:", err);
+    console.error("[api/oauth-line-callback] express error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: { code: "LINE_OAUTH_EXPRESS_ERROR", message } });
     }

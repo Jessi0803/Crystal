@@ -8,10 +8,10 @@
  *   未設定時預設為 {SITE}/api/oauth/line/callback（本機請搭配 ngrok 或設此變數）
  * - SITE_URL（選填）：網站根網址，無尾隨斜線；有助於正確組出 redirect
  *
- * 對外網址維持 /api/oauth/line/*。Vercel 上 Serverless 檔案放在 api/line-oauth/[...path].js
- * （與 api/ecpay 同層深度），並由 vercel.json 將 /api/oauth/line/* rewrite 過去。
+ * 對外網址維持 /api/oauth/line/*。Vercel 上改為兩個頂層 function（api/oauth-line-start.js、
+ * api/oauth-line-callback.js），vercel.json 將 /api/oauth/line/start|callback rewrite 過去。
  */
-import { Router, type Express, type Request, type Response } from "express";
+import type { Express, Request, Response } from "express";
 import * as crypto from "node:crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
@@ -109,36 +109,33 @@ async function lineVerifyIdToken(idToken: string, clientId: string): Promise<Ver
   return json;
 }
 
-export function registerLineOAuthRoutes(app: Express) {
-  const lineRouter = Router();
+export function lineOAuthStart(req: Request, res: Response): void {
+  const { channelId, channelSecret } = lineConfig();
+  if (!channelId || !channelSecret) {
+    res
+      .status(503)
+      .send(
+        "LINE 登入尚未設定：請在環境變數設定 LINE_CHANNEL_ID、LINE_CHANNEL_SECRET，並於 LINE Developers 登錄 Callback URL。"
+      );
+    return;
+  }
 
-  lineRouter.get("/start", (req: Request, res: Response) => {
-    const { channelId, channelSecret } = lineConfig();
-    if (!channelId || !channelSecret) {
-      res
-        .status(503)
-        .send(
-          "LINE 登入尚未設定：請在環境變數設定 LINE_CHANNEL_ID、LINE_CHANNEL_SECRET，並於 LINE Developers 登錄 Callback URL。"
-        );
-      return;
-    }
+  const state = crypto.randomBytes(24).toString("hex");
+  const callback = lineCallbackUrl(req);
+  const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 600_000 };
+  res.cookie(LINE_STATE_COOKIE, state, cookieOpts);
 
-    const state = crypto.randomBytes(24).toString("hex");
-    const callback = lineCallbackUrl(req);
-    const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 600_000 };
-    res.cookie(LINE_STATE_COOKIE, state, cookieOpts);
+  const authorize = new URL("https://access.line.me/oauth2/v2.1/authorize");
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("client_id", channelId);
+  authorize.searchParams.set("redirect_uri", callback);
+  authorize.searchParams.set("state", state);
+  authorize.searchParams.set("scope", "profile openid email");
 
-    const authorize = new URL("https://access.line.me/oauth2/v2.1/authorize");
-    authorize.searchParams.set("response_type", "code");
-    authorize.searchParams.set("client_id", channelId);
-    authorize.searchParams.set("redirect_uri", callback);
-    authorize.searchParams.set("state", state);
-    authorize.searchParams.set("scope", "profile openid email");
+  res.redirect(302, authorize.toString());
+}
 
-    res.redirect(302, authorize.toString());
-  });
-
-  lineRouter.get("/callback", async (req: Request, res: Response) => {
+export async function lineOAuthCallback(req: Request, res: Response): Promise<void> {
     const clearStateCookie = () => {
       res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
     };
@@ -215,8 +212,9 @@ export function registerLineOAuthRoutes(app: Express) {
       clearStateCookie();
       res.status(500).send("LINE 登入失敗，請稍後再試。");
     }
-  });
+}
 
-  app.use("/api/line-oauth", lineRouter);
-  app.use("/api/oauth/line", lineRouter);
+export function registerLineOAuthRoutes(app: Express) {
+  app.get("/api/oauth/line/start", lineOAuthStart);
+  app.get("/api/oauth/line/callback", lineOAuthCallback);
 }
