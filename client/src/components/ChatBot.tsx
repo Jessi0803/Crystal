@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { X, Send, Loader2, MessageCircle } from "lucide-react";
+import { X, Send, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
 interface Message {
@@ -67,22 +67,11 @@ function CrystalChatIcon({ className }: { className?: string }) {
 
 export default function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [showLabel, setShowLabel] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [showQuickQuestions, setShowQuickQuestions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // 初次載入 2 秒後顯示標籤，5 秒後自動收起
-  useEffect(() => {
-    const showTimer = setTimeout(() => setShowLabel(true), 2000);
-    const hideTimer = setTimeout(() => setShowLabel(false), 7000);
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  }, []);
 
   const chatMutation = trpc.chatbot.chat.useMutation({
     onSuccess: (data) => {
@@ -124,7 +113,6 @@ export default function ChatBot() {
   useEffect(() => {
     const openHandler = () => {
       setIsOpen(true);
-      setShowLabel(false);
     };
     window.addEventListener("open-chatbot", openHandler);
     return () => window.removeEventListener("open-chatbot", openHandler);
@@ -160,26 +148,25 @@ export default function ChatBot() {
     <>
       {/* 懸浮按鈕區域 */}
       <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
-        {/* 浮動標籤（初次載入提示，點開後不再顯示） */}
-        {showLabel && !isOpen && (
+        {/* 浮動標籤（聊天關閉時常駐顯示） */}
+        {!isOpen && (
           <div
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full shadow-md animate-fade-in-right"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-2xl shadow-md max-w-[min(220px,calc(100vw-5.5rem))]"
             style={{
               background: "white",
               border: "1px solid rgba(192, 132, 212, 0.3)",
               boxShadow: "0 2px 12px rgba(155, 89, 182, 0.15)",
-              animation: "fadeInRight 0.4s ease-out",
             }}
           >
             <span
-              className="text-xs whitespace-nowrap"
+              className="text-xs leading-snug text-left"
               style={{
                 color: "#9b59b6",
                 fontFamily: "'Noto Sans TC', sans-serif",
                 fontWeight: 500,
               }}
             >
-              ✦ 問問椛小助
+              你好！我是椛小助 ✨
             </span>
           </div>
         )}
@@ -209,7 +196,6 @@ export default function ChatBot() {
           <button
             onClick={() => {
               setIsOpen((v) => !v);
-              setShowLabel(false);
             }}
             className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95"
             style={{
