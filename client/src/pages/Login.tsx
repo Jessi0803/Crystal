@@ -121,6 +121,17 @@ export default function Login() {
             >
               {loginMutation.isPending ? "登入中..." : "登入"}
             </button>
+
+            <p className="text-center text-[10px] text-[oklch(0.55_0_0)] font-body pt-1">或</p>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = `${window.location.origin}/api/oauth/line/start`;
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3.5 text-sm font-body border border-[#06C755] text-[#06C755] hover:bg-[#06C755]/10 transition-colors"
+            >
+              使用 LINE 登入
+            </button>
           </form>
         </div>
 

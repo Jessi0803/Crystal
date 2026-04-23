@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
 import { appRouter } from "../appRouter";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -36,6 +37,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  registerLineOAuthRoutes(app);
   // 綠界 ECPay Webhook 通知接收
   registerECPayRoutes(app);
   // tRPC API

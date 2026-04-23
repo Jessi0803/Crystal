@@ -1653,7 +1653,7 @@ var products = [
     id: "d003-venus",
     name: "\u7DAD\u7D0D\u65AF Venus",
     subtitle: "\u559A\u9192\u81EA\u4FE1\u8207\u5438\u5F15\u529B\u7684\u65E5\u5E38\u914D\u6234\u6B3E",
-    category: "love",
+    category: "pendant",
     categoryLabel: "D \u8A2D\u8A08\u6B3E",
     price: 950,
     image: "/images/d-design/d003.jpg",
