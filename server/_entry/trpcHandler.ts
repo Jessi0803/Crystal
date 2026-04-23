@@ -2,10 +2,11 @@
 // 透過 esbuild 打包成 api/trpc/[trpc].js 後，Vercel 只當成一般 JS 部署，
 // 不必再走它自己的 TS 編譯與 ESM 解析，徹底避開 directory-import / .js 副檔名問題。
 import type { IncomingMessage, ServerResponse } from "node:http";
-import express from "express";
+import express, { type NextFunction } from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../appRouter";
 import { createContext } from "../_core/context";
+import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -14,6 +15,9 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
   res.json({ ok: true, at: new Date().toISOString() });
 });
+
+// LINE Login：與本地 server 共用路由，且走已部署的 /api/trpc/* function（單一路徑段）
+registerLineOAuthRoutes(app);
 
 app.use(
   createExpressMiddleware({
@@ -31,7 +35,7 @@ app.use(
     err: unknown,
     _req: express.Request,
     res: express.Response,
-    _next: express.NextFunction
+    _next: NextFunction
   ) => {
     const message =
       err instanceof Error ? err.stack || err.message : String(err);

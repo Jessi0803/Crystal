@@ -5,11 +5,12 @@
  * - LINE_CHANNEL_ID：LINE Login Channel 的 Channel ID
  * - LINE_CHANNEL_SECRET：Channel secret
  * - LINE_CALLBACK_URL（選填）：完整 Callback URL，須與 LINE 後台登入的 Callback 完全一致；
- *   未設定時預設為 {SITE}/api/oauth/line/callback（本機請搭配 ngrok 或設此變數）
+ *   未設定時預設為 {SITE}/api/trpc/line-oauth-callback（本機請搭配 ngrok 或設此變數）
  * - SITE_URL（選填）：網站根網址，無尾隨斜線；有助於正確組出 redirect
  *
- * 對外網址維持 /api/oauth/line/*。Vercel 上改為兩個頂層 function（api/oauth-line-start.js、
- * api/oauth-line-callback.js），vercel.json 將 /api/oauth/line/start|callback rewrite 過去。
+ * Vercel 上與 tRPC 共用同一支 Serverless（api/trpc/[trpc].js），路徑須為單一段：
+ * GET /api/trpc/line-oauth-start、GET /api/trpc/line-oauth-callback。
+ * vercel.json 可將舊網址 rewrite 至此。
  */
 import type { Express, Request, Response } from "express";
 import * as crypto from "node:crypto";
@@ -49,7 +50,7 @@ function siteBaseUrl(req: Request): string {
 function lineCallbackUrl(req: Request): string {
   const fromEnv = process.env.LINE_CALLBACK_URL?.trim();
   if (fromEnv) return fromEnv;
-  return `${siteBaseUrl(req)}/api/oauth/line/callback`;
+  return `${siteBaseUrl(req)}/api/trpc/line-oauth-callback`;
 }
 
 async function lineExchangeCode(
@@ -215,6 +216,6 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
 }
 
 export function registerLineOAuthRoutes(app: Express) {
-  app.get("/api/oauth/line/start", lineOAuthStart);
-  app.get("/api/oauth/line/callback", lineOAuthCallback);
+  app.get("/api/trpc/line-oauth-start", lineOAuthStart);
+  app.get("/api/trpc/line-oauth-callback", lineOAuthCallback);
 }

@@ -126,7 +126,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => {
-                window.location.href = `${window.location.origin}/api/oauth-line-start`;
+                window.location.href = `${window.location.origin}/api/trpc/line-oauth-start`;
               }}
               className="w-full flex items-center justify-center gap-2 py-3.5 text-sm font-body border border-[#06C755] text-[#06C755] hover:bg-[#06C755]/10 transition-colors"
             >

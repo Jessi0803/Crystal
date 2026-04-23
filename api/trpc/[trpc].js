@@ -2651,6 +2651,172 @@ async function createContext(opts) {
   };
 }
 
+// server/lineOAuthRoutes.ts
+import * as crypto4 from "node:crypto";
+import { parse as parseCookieHeader2 } from "cookie";
+var LINE_STATE_COOKIE = "line_oauth_state";
+function lineConfig() {
+  const channelId = process.env.LINE_CHANNEL_ID?.trim();
+  const channelSecret = process.env.LINE_CHANNEL_SECRET?.trim();
+  return { channelId, channelSecret };
+}
+function readCookie(req, name) {
+  const raw = req.headers.cookie;
+  if (!raw) return void 0;
+  const parsed = parseCookieHeader2(raw);
+  return typeof parsed[name] === "string" ? parsed[name] : void 0;
+}
+function siteBaseUrl(req) {
+  const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
+  if (fixed) return fixed;
+  const host = (req.get("x-forwarded-host") || req.get("host") || "").trim();
+  const protoHeader = req.get("x-forwarded-proto");
+  const proto = (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader?.split(",")[0]?.trim()) || (req.protocol === "https" ? "https" : "http");
+  return `${proto}://${host}`;
+}
+function lineCallbackUrl(req) {
+  const fromEnv = process.env.LINE_CALLBACK_URL?.trim();
+  if (fromEnv) return fromEnv;
+  return `${siteBaseUrl(req)}/api/trpc/line-oauth-callback`;
+}
+async function lineExchangeCode(code, redirectUri, clientId, clientSecret) {
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri,
+    client_id: clientId,
+    client_secret: clientSecret
+  });
+  const res = await fetch("https://api.line.me/oauth2/v2.1/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString()
+  });
+  const json2 = await res.json();
+  if (!res.ok) {
+    console.error("[LINE OAuth] token error", json2);
+    throw new Error(String(json2.error_description || json2.error || "line_token_failed"));
+  }
+  return json2;
+}
+async function lineGetProfile(accessToken) {
+  const res = await fetch("https://api.line.me/v2/profile", {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const json2 = await res.json();
+  if (!res.ok) {
+    console.error("[LINE OAuth] profile error", json2);
+    throw new Error(json2.message || "line_profile_failed");
+  }
+  return json2;
+}
+async function lineVerifyIdToken(idToken, clientId) {
+  const body = new URLSearchParams({ id_token: idToken, client_id: clientId });
+  const res = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString()
+  });
+  const json2 = await res.json();
+  if (!res.ok || !json2.sub) {
+    console.error("[LINE OAuth] verify error", json2);
+    throw new Error(json2.error || "line_verify_failed");
+  }
+  return json2;
+}
+function lineOAuthStart(req, res) {
+  const { channelId, channelSecret } = lineConfig();
+  if (!channelId || !channelSecret) {
+    res.status(503).send(
+      "LINE \u767B\u5165\u5C1A\u672A\u8A2D\u5B9A\uFF1A\u8ACB\u5728\u74B0\u5883\u8B8A\u6578\u8A2D\u5B9A LINE_CHANNEL_ID\u3001LINE_CHANNEL_SECRET\uFF0C\u4E26\u65BC LINE Developers \u767B\u9304 Callback URL\u3002"
+    );
+    return;
+  }
+  const state = crypto4.randomBytes(24).toString("hex");
+  const callback = lineCallbackUrl(req);
+  const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 6e5 };
+  res.cookie(LINE_STATE_COOKIE, state, cookieOpts);
+  const authorize = new URL("https://access.line.me/oauth2/v2.1/authorize");
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("client_id", channelId);
+  authorize.searchParams.set("redirect_uri", callback);
+  authorize.searchParams.set("state", state);
+  authorize.searchParams.set("scope", "profile openid email");
+  res.redirect(302, authorize.toString());
+}
+async function lineOAuthCallback(req, res) {
+  const clearStateCookie = () => {
+    res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
+  };
+  try {
+    const code = typeof req.query.code === "string" ? req.query.code : "";
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    const cookieState = readCookie(req, LINE_STATE_COOKIE);
+    if (!code || !state || !cookieState || state !== cookieState) {
+      clearStateCookie();
+      res.status(400).send("\u767B\u5165\u72C0\u614B\u9A57\u8B49\u5931\u6557\uFF0C\u8ACB\u95DC\u9589\u8996\u7A97\u5F8C\u5F9E\u767B\u5165\u9801\u518D\u8A66\u4E00\u6B21\u3002");
+      return;
+    }
+    const { channelId, channelSecret } = lineConfig();
+    if (!channelId || !channelSecret) {
+      clearStateCookie();
+      res.status(503).send("LINE \u767B\u5165\u5C1A\u672A\u8A2D\u5B9A\u3002");
+      return;
+    }
+    const redirectUri = lineCallbackUrl(req);
+    const tokenJson = await lineExchangeCode(code, redirectUri, channelId, channelSecret);
+    const profile = await lineGetProfile(tokenJson.access_token);
+    let email = null;
+    if (tokenJson.id_token) {
+      try {
+        const verify = await lineVerifyIdToken(tokenJson.id_token, channelId);
+        if (verify.email) {
+          email = normalizeOrderEmail(verify.email);
+        }
+      } catch {
+      }
+    }
+    const openId = `line:${profile.userId}`;
+    const name = profile.displayName?.trim() || null;
+    await upsertUser({
+      openId,
+      name: name ?? void 0,
+      email: email ?? void 0,
+      loginMethod: "line",
+      lastSignedIn: /* @__PURE__ */ new Date()
+    });
+    let user = await getUserByOpenId(openId);
+    if (!user) {
+      throw new Error("user_missing_after_upsert");
+    }
+    if (shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+      const db2 = await getDb();
+      if (db2) {
+        const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const { eq: eq5 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq5(users2.id, user.id));
+        user = await getUserByOpenId(openId);
+      }
+    }
+    const sessionToken = await sdk.createSessionToken(openId, {
+      name: user.name ?? "",
+      expiresInMs: ONE_YEAR_MS
+    });
+    clearStateCookie();
+    const sessionCookieOpts = { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS };
+    res.cookie(COOKIE_NAME, sessionToken, sessionCookieOpts);
+    res.redirect(302, "/member");
+  } catch (err) {
+    console.error("[LINE OAuth] callback failed", err);
+    clearStateCookie();
+    res.status(500).send("LINE \u767B\u5165\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002");
+  }
+}
+function registerLineOAuthRoutes(app2) {
+  app2.get("/api/trpc/line-oauth-start", lineOAuthStart);
+  app2.get("/api/trpc/line-oauth-callback", lineOAuthCallback);
+}
+
 // server/_entry/trpcHandler.ts
 var app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -2658,6 +2824,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
   res.json({ ok: true, at: (/* @__PURE__ */ new Date()).toISOString() });
 });
+registerLineOAuthRoutes(app);
 app.use(
   createExpressMiddleware({
     router: appRouter,
