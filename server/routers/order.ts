@@ -68,7 +68,7 @@ export const orderRouter = router({
         sessionToken: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const merchantTradeNo = generateMerchantTradeNo();
       const totalAmount = input.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -85,6 +85,7 @@ export const orderRouter = router({
       // 建立訂單
       const orderId = await createOrder(
         {
+          userId: ctx.user?.id ?? null, // 紀錄登入會員 ID
           merchantTradeNo,
           paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
           paymentMethod: input.paymentMethod,

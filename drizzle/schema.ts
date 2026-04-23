@@ -63,6 +63,8 @@ export type InsertInventoryLock = typeof inventoryLocks.$inferInsert;
 // ─── 訂單主表 ─────────────────────────────────────────────────────────────────
 export const orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),
+  // 關聯會員（若為匿名購買則為 null）
+  userId: int("userId"),
   // 綠界交易編號（MerchantTradeNo）
   merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
   // 綠界回傳的交易序號

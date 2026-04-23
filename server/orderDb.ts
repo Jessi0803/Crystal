@@ -333,6 +333,38 @@ export async function updateLogisticsStatus(
     .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
 }
 
+/** 依 userId 查詢該會員的所有訂單（含商品明細） */
+export async function getOrdersByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const memberOrders = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.userId, userId))
+    .orderBy(desc(orders.createdAt))
+    .limit(50);
+
+  const ordersWithItems = await Promise.all(
+    memberOrders.map(async (order) => {
+      const items = await db!
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id));
+
+      const [logistics] = await db!
+        .select()
+        .from(logisticsOrders)
+        .where(eq(logisticsOrders.orderId, order.id))
+        .limit(1);
+
+      return { ...order, items, logistics: logistics ?? null };
+    })
+  );
+
+  return ordersWithItems;
+}
+
 /** 依 buyerEmail 查詢該會員的所有訂單（含商品明細） */
 export async function getOrdersByEmail(email: string) {
   const db = await getDb();
