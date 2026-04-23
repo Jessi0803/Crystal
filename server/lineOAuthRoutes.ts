@@ -183,6 +183,8 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
         email: email ?? undefined,
         loginMethod: "line",
         lastSignedIn: new Date(),
+        // 不要求 LINE 用戶再收站內驗證信（與 Email 註冊分流）
+        emailVerified: true,
       });
 
       let user = await db.getUserByOpenId(openId);

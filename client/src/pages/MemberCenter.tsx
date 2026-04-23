@@ -125,8 +125,11 @@ export default function MemberCenter() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Email 驗證提示 */}
-        {user && !(user as unknown as { emailVerified?: boolean }).emailVerified && (
+        {/* Email 驗證提示（僅 Email+密碼註冊；LINE 登入不要求站內驗證信） */}
+        {user &&
+          (user as unknown as { loginMethod?: string | null }).loginMethod === "email" &&
+          !(user as unknown as { emailVerified?: boolean }).emailVerified &&
+          user.email && (
           <div className="mb-6 bg-amber-50 border border-amber-200 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1">
               <p className="text-sm font-medium text-amber-800" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
