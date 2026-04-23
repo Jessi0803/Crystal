@@ -71,6 +71,8 @@ var init_schema = __esm({
     });
     orders = mysqlTable("orders", {
       id: int("id").autoincrement().primaryKey(),
+      // 關聯會員（若為匿名購買則為 null）
+      userId: int("userId"),
       // 綠界交易編號（MerchantTradeNo）
       merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
       // 綠界回傳的交易序號
@@ -549,6 +551,14 @@ async function upsertUser(user) {
       values.role = "admin";
       updateSet.role = "admin";
     }
+    if (user.emailVerified !== void 0) {
+      values.emailVerified = user.emailVerified;
+      updateSet.emailVerified = user.emailVerified;
+      if (user.emailVerified) {
+        updateSet.verifyToken = null;
+        updateSet.verifyTokenExpiresAt = null;
+      }
+    }
     if (!values.lastSignedIn) {
       values.lastSignedIn = /* @__PURE__ */ new Date();
     }
@@ -777,6 +787,19 @@ async function createLogisticsOrder(data) {
   const [created] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.logisticsMerchantTradeNo, data.logisticsMerchantTradeNo)).limit(1);
   return created;
 }
+async function getOrdersByUserId(userId) {
+  const db = await getDb();
+  if (!db) return [];
+  const memberOrders = await db.select().from(orders).where(eq2(orders.userId, userId)).orderBy(desc(orders.createdAt)).limit(50);
+  const ordersWithItems = await Promise.all(
+    memberOrders.map(async (order) => {
+      const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
+      const [logistics] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1);
+      return { ...order, items, logistics: logistics ?? null };
+    })
+  );
+  return ordersWithItems;
+}
 async function getOrdersByEmail(email) {
   const db = await getDb();
   if (!db) return [];
@@ -982,7 +1005,7 @@ var orderRouter = router({
       // 庫存鎖定 session token
       sessionToken: z2.string().optional()
     })
-  ).mutation(async ({ input }) => {
+  ).mutation(async ({ input, ctx }) => {
     const merchantTradeNo = generateMerchantTradeNo();
     const totalAmount = input.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -991,24 +1014,28 @@ var orderRouter = router({
     const itemName = input.items.map((i) => `${i.name} x${i.quantity}`).join("#");
     const isPreorder = input.items.some((i) => i.isPreorder);
     const buyerEmail = normalizeOrderEmail(input.buyerEmail);
+    const orderRow = {
+      merchantTradeNo,
+      paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
+      paymentMethod: input.paymentMethod,
+      shippingMethod: input.shippingMethod,
+      orderStatus: "pending_payment",
+      isPreorder,
+      totalAmount,
+      buyerName: input.buyerName,
+      buyerEmail,
+      buyerPhone: input.buyerPhone,
+      cvsStoreId: input.cvsStoreId,
+      cvsStoreName: input.cvsStoreName,
+      cvsType: input.cvsType,
+      shippingAddress: input.shippingAddress,
+      receiverZipCode: input.receiverZipCode
+    };
+    if (ctx.user?.id != null) {
+      orderRow.userId = ctx.user.id;
+    }
     const orderId = await createOrder(
-      {
-        merchantTradeNo,
-        paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
-        paymentMethod: input.paymentMethod,
-        shippingMethod: input.shippingMethod,
-        orderStatus: "pending_payment",
-        isPreorder,
-        totalAmount,
-        buyerName: input.buyerName,
-        buyerEmail,
-        buyerPhone: input.buyerPhone,
-        cvsStoreId: input.cvsStoreId,
-        cvsStoreName: input.cvsStoreName,
-        cvsType: input.cvsType,
-        shippingAddress: input.shippingAddress,
-        receiverZipCode: input.receiverZipCode
-      },
+      orderRow,
       input.items.map((item) => ({
         orderId: 0,
         productId: item.id,
@@ -2611,9 +2638,16 @@ var memberRouter = router({
   }),
   /** 查詢自己的訂單 */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.user.email) return [];
-    const orders2 = await getOrdersByEmail(ctx.user.email);
-    return orders2;
+    try {
+      const ordersById = await getOrdersByUserId(ctx.user.id);
+      if (ordersById.length > 0) return ordersById;
+    } catch (e) {
+      console.warn("[member.myOrders] getOrdersByUserId failed (DB \u662F\u5426\u5DF2 migration userId\uFF1F)", e);
+    }
+    if (ctx.user.email) {
+      return getOrdersByEmail(ctx.user.email);
+    }
+    return [];
   })
 });
 
@@ -2783,7 +2817,9 @@ async function lineOAuthCallback(req, res) {
       name: name ?? void 0,
       email: email ?? void 0,
       loginMethod: "line",
-      lastSignedIn: /* @__PURE__ */ new Date()
+      lastSignedIn: /* @__PURE__ */ new Date(),
+      // 不要求 LINE 用戶再收站內驗證信（與 Email 註冊分流）
+      emailVerified: true
     });
     let user = await getUserByOpenId(openId);
     if (!user) {

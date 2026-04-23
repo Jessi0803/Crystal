@@ -242,14 +242,15 @@ export const memberRouter = router({
 
   /** 查詢自己的訂單 */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
-    // 優先使用 userId 查詢（精確關聯）
-    const ordersById = await getOrdersByUserId(ctx.user.id);
-    
-    // 如果沒有 userId 關聯的訂單，則嘗試用 email 查詢（相容舊訂單或 LINE 未抓到 email 的情況）
-    if (ordersById.length === 0 && ctx.user.email) {
-      return await getOrdersByEmail(ctx.user.email);
+    try {
+      const ordersById = await getOrdersByUserId(ctx.user.id);
+      if (ordersById.length > 0) return ordersById;
+    } catch (e) {
+      console.warn("[member.myOrders] getOrdersByUserId failed (DB 是否已 migration userId？)", e);
     }
-    
-    return ordersById;
+    if (ctx.user.email) {
+      return getOrdersByEmail(ctx.user.email);
+    }
+    return [];
   }),
 });

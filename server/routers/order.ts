@@ -82,26 +82,30 @@ export const orderRouter = router({
       const isPreorder = input.items.some((i) => i.isPreorder);
       const buyerEmail = normalizeOrderEmail(input.buyerEmail);
 
-      // 建立訂單
+      // 建立訂單（userId 僅在已登入時寫入；需 DB 已執行 migration 0006_orders_user_id）
+      const orderRow: Parameters<typeof createOrder>[0] = {
+        merchantTradeNo,
+        paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
+        paymentMethod: input.paymentMethod,
+        shippingMethod: input.shippingMethod,
+        orderStatus: "pending_payment",
+        isPreorder,
+        totalAmount,
+        buyerName: input.buyerName,
+        buyerEmail,
+        buyerPhone: input.buyerPhone,
+        cvsStoreId: input.cvsStoreId,
+        cvsStoreName: input.cvsStoreName,
+        cvsType: input.cvsType,
+        shippingAddress: input.shippingAddress,
+        receiverZipCode: input.receiverZipCode,
+      };
+      if (ctx.user?.id != null) {
+        orderRow.userId = ctx.user.id;
+      }
+
       const orderId = await createOrder(
-        {
-          userId: ctx.user?.id ?? null, // 紀錄登入會員 ID
-          merchantTradeNo,
-          paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
-          paymentMethod: input.paymentMethod,
-          shippingMethod: input.shippingMethod,
-          orderStatus: "pending_payment",
-          isPreorder,
-          totalAmount,
-          buyerName: input.buyerName,
-          buyerEmail,
-          buyerPhone: input.buyerPhone,
-          cvsStoreId: input.cvsStoreId,
-          cvsStoreName: input.cvsStoreName,
-          cvsType: input.cvsType,
-          shippingAddress: input.shippingAddress,
-          receiverZipCode: input.receiverZipCode,
-        },
+        orderRow,
         input.items.map((item) => ({
           orderId: 0,
           productId: item.id,
