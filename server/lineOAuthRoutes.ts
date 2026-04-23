@@ -5,10 +5,13 @@
  * - LINE_CHANNEL_ID：LINE Login Channel 的 Channel ID
  * - LINE_CHANNEL_SECRET：Channel secret
  * - LINE_CALLBACK_URL（選填）：完整 Callback URL，須與 LINE 後台登入的 Callback 完全一致；
- *   未設定時由請求的 Host / X-Forwarded-* 組出（本機請搭配 ngrok 或設此變數）
+ *   未設定時預設為 {SITE}/api/oauth/line/callback（本機請搭配 ngrok 或設此變數）
  * - SITE_URL（選填）：網站根網址，無尾隨斜線；有助於正確組出 redirect
+ *
+ * 對外網址維持 /api/oauth/line/*。Vercel 上 Serverless 檔案放在 api/line-oauth/[...path].js
+ * （與 api/ecpay 同層深度），並由 vercel.json 將 /api/oauth/line/* rewrite 過去。
  */
-import type { Express, Request, Response } from "express";
+import { Router, type Express, type Request, type Response } from "express";
 import * as crypto from "node:crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
@@ -107,7 +110,9 @@ async function lineVerifyIdToken(idToken: string, clientId: string): Promise<Ver
 }
 
 export function registerLineOAuthRoutes(app: Express) {
-  app.get("/api/oauth/line/start", (req: Request, res: Response) => {
+  const lineRouter = Router();
+
+  lineRouter.get("/start", (req: Request, res: Response) => {
     const { channelId, channelSecret } = lineConfig();
     if (!channelId || !channelSecret) {
       res
@@ -133,7 +138,7 @@ export function registerLineOAuthRoutes(app: Express) {
     res.redirect(302, authorize.toString());
   });
 
-  app.get("/api/oauth/line/callback", async (req: Request, res: Response) => {
+  lineRouter.get("/callback", async (req: Request, res: Response) => {
     const clearStateCookie = () => {
       res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
     };
@@ -211,4 +216,7 @@ export function registerLineOAuthRoutes(app: Express) {
       res.status(500).send("LINE 登入失敗，請稍後再試。");
     }
   });
+
+  app.use("/api/line-oauth", lineRouter);
+  app.use("/api/oauth/line", lineRouter);
 }

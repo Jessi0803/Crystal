@@ -215,6 +215,7 @@ var init_schema = __esm({
 import express from "express";
 
 // server/lineOAuthRoutes.ts
+import { Router } from "express";
 import * as crypto from "node:crypto";
 import { parse as parseCookieHeader2 } from "cookie";
 
@@ -654,7 +655,8 @@ async function lineVerifyIdToken(idToken, clientId) {
   return json2;
 }
 function registerLineOAuthRoutes(app2) {
-  app2.get("/api/oauth/line/start", (req, res) => {
+  const lineRouter = Router();
+  lineRouter.get("/start", (req, res) => {
     const { channelId, channelSecret } = lineConfig();
     if (!channelId || !channelSecret) {
       res.status(503).send(
@@ -674,7 +676,7 @@ function registerLineOAuthRoutes(app2) {
     authorize.searchParams.set("scope", "profile openid email");
     res.redirect(302, authorize.toString());
   });
-  app2.get("/api/oauth/line/callback", async (req, res) => {
+  lineRouter.get("/callback", async (req, res) => {
     const clearStateCookie = () => {
       res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
     };
@@ -742,6 +744,8 @@ function registerLineOAuthRoutes(app2) {
       res.status(500).send("LINE \u767B\u5165\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002");
     }
   });
+  app2.use("/api/line-oauth", lineRouter);
+  app2.use("/api/oauth/line", lineRouter);
 }
 
 // server/_entry/lineOAuthHandler.ts
@@ -753,7 +757,7 @@ app.use((req, res) => {
 app.use(
   (err, _req, res, _next) => {
     const message = err instanceof Error ? err.stack || err.message : String(err);
-    console.error("[api/oauth/line] express error:", err);
+    console.error("[api/line-oauth] express error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: { code: "LINE_OAUTH_EXPRESS_ERROR", message } });
     }
