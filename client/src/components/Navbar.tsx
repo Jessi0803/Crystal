@@ -11,7 +11,10 @@ const categorySubLinks = [
   { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
   { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: "💰" },
   { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: "🛡️" },
-  { label: "情緒療癒", href: "/products?category=heal", desc: "紫水晶・月光石", icon: "🧘" },
+  { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: "🧘" },
+  { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: "📿" },
+  { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: "🧿" },
+  { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: "✨" },
 ];
 
 // 購物說明下拉選單

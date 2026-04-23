@@ -39,9 +39,9 @@ const categoryCards = [
   },
   {
     en: "HEALING",
-    zh: "情緒療癒",
+    zh: "療癒系列",
     desc: "舒緩焦慮・內在平衡",
-    href: "/products?category=heal",
+    href: "/products?category=healing",
     img: HERO_BANNER2_IMG,
   },
 ];

@@ -257,9 +257,9 @@ export const categories = [
     textColor: "text-amber-700"
   },
   {
-    id: "protection",
+    id: "protect",
     icon: "🛡️",
-    name: "防護淨化",
+    name: "能量防護",
     description: "遠離負能量，建立能量防護罩",
     crystals: "黑曜石・黑碧璽",
     color: "from-slate-50 to-gray-100",
@@ -269,12 +269,42 @@ export const categories = [
   {
     id: "healing",
     icon: "🧘",
-    name: "情緒療癒",
+    name: "療癒系列",
     description: "安撫焦慮，找回內在平靜",
     crystals: "紫水晶・月光石",
     color: "from-violet-50 to-purple-100",
     borderColor: "border-violet-200",
     textColor: "text-violet-700"
+  },
+  {
+    id: "necklace",
+    icon: "📿",
+    name: "項鍊",
+    description: "日常疊戴，展現優雅與個人風格",
+    crystals: "鎖骨鍊・能量鍊",
+    color: "from-stone-50 to-zinc-100",
+    borderColor: "border-stone-300",
+    textColor: "text-stone-700"
+  },
+  {
+    id: "pendant",
+    icon: "🧿",
+    name: "吊飾",
+    description: "隨身點綴，帶著能量一起出門",
+    crystals: "守護吊飾・隨身掛件",
+    color: "from-sky-50 to-cyan-100",
+    borderColor: "border-cyan-200",
+    textColor: "text-cyan-700"
+  },
+  {
+    id: "other",
+    icon: "✨",
+    name: "其他",
+    description: "更多特別款與周邊配件",
+    crystals: "限定品・配件",
+    color: "from-neutral-50 to-slate-100",
+    borderColor: "border-slate-200",
+    textColor: "text-slate-700"
   }
 ];
 
