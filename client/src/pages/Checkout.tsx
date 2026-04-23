@@ -50,6 +50,21 @@ export default function Checkout() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const createAndPay = trpc.order.createAndPay.useMutation();
+  const { data: sessionUser } = trpc.auth.me.useQuery();
+
+  // 已登入時帶入帳號 Email／姓名，避免與會員中心訂單比對不一致
+  useEffect(() => {
+    const email = sessionUser?.email;
+    if (!email) return;
+    setForm((f) => ({
+      ...f,
+      buyerEmail: f.buyerEmail.trim() === "" ? email : f.buyerEmail,
+      buyerName:
+        f.buyerName.trim() === "" && sessionUser?.name?.trim()
+          ? sessionUser.name.trim()
+          : f.buyerName,
+    }));
+  }, [sessionUser?.email, sessionUser?.name]);
 
   // 監聽綠界選店視窗回傳的 postMessage（必須在 early return 之前呼叫 Hook）
   const cvsWindowRef = useRef<Window | null>(null);

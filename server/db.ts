@@ -1,4 +1,5 @@
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
+import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -92,7 +93,12 @@ export async function getUserByOpenId(openId: string) {
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const key = normalizeOrderEmail(email);
+  const result = await db
+    .select()
+    .from(users)
+    .where(sql`LOWER(TRIM(${users.email})) = ${key}`)
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -103,25 +109,27 @@ export async function createEmailUser(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
+  const emailNorm = normalizeOrderEmail(data.email);
   // 使用 email 作為 openId 前置，避免與 Manus OAuth openId 衝突
-  const openId = `email:${data.email}`;
+  const openId = `email:${emailNorm}`;
   await db.insert(users).values({
     openId,
-    email: data.email,
+    email: emailNorm,
     passwordHash: data.passwordHash,
     name: data.name,
     loginMethod: 'email',
     lastSignedIn: new Date(),
   });
-  return getUserByEmail(data.email);
+  return getUserByEmail(emailNorm);
 }
 
 export async function setResetToken(email: string, token: string, expiresAt: Date) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
+  const key = normalizeOrderEmail(email);
   await db.update(users)
     .set({ resetToken: token, resetTokenExpiresAt: expiresAt })
-    .where(eq(users.email, email));
+    .where(sql`LOWER(TRIM(${users.email})) = ${key}`);
 }
 
 export async function getUserByResetToken(token: string) {
@@ -145,9 +153,10 @@ export async function updatePasswordAndClearToken(userId: number, passwordHash: 
 export async function setVerifyToken(email: string, token: string, expiresAt: Date) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
+  const key = normalizeOrderEmail(email);
   await db.update(users)
     .set({ verifyToken: token, verifyTokenExpiresAt: expiresAt })
-    .where(eq(users.email, email));
+    .where(sql`LOWER(TRIM(${users.email})) = ${key}`);
 }
 
 export async function getUserByVerifyToken(token: string) {

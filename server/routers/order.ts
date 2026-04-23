@@ -28,6 +28,7 @@ import {
   createHomeLogisticsOrder,
 } from "../ecpayLogistics";
 import { getDb } from "../db";
+import { normalizeOrderEmail } from "../_core/emailNormalize";
 import { orders, logisticsOrders } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -79,6 +80,7 @@ export const orderRouter = router({
         .join("#");
 
       const isPreorder = input.items.some((i) => i.isPreorder);
+      const buyerEmail = normalizeOrderEmail(input.buyerEmail);
 
       // 建立訂單
       const orderId = await createOrder(
@@ -91,7 +93,7 @@ export const orderRouter = router({
           isPreorder,
           totalAmount,
           buyerName: input.buyerName,
-          buyerEmail: input.buyerEmail,
+          buyerEmail,
           buyerPhone: input.buyerPhone,
           cvsStoreId: input.cvsStoreId,
           cvsStoreName: input.cvsStoreName,

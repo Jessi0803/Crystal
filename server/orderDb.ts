@@ -2,6 +2,7 @@
  * 訂單資料庫查詢函式
  */
 import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { getDb } from "./db";
 import {
   orders,
@@ -337,10 +338,11 @@ export async function getOrdersByEmail(email: string) {
   const db = await getDb();
   if (!db) return [];
 
+  const key = normalizeOrderEmail(email);
   const memberOrders = await db
     .select()
     .from(orders)
-    .where(eq(orders.buyerEmail, email))
+    .where(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`)
     .orderBy(desc(orders.createdAt))
     .limit(50);
 

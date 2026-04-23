@@ -222,10 +222,10 @@ async function createHomeLogisticsOrder(opts) {
 }
 
 // server/orderDb.ts
-import { eq as eq2, desc, and as and2, gte, sql } from "drizzle-orm";
+import { eq as eq2, desc, and as and2, gte, sql as sql2 } from "drizzle-orm";
 
 // server/db.ts
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts

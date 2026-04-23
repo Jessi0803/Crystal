@@ -481,11 +481,16 @@ function buildCreditPaymentParams(opts) {
 }
 
 // server/orderDb.ts
-import { eq as eq2, desc, and as and2, gte, sql } from "drizzle-orm";
+import { eq as eq2, desc, and as and2, gte, sql as sql2 } from "drizzle-orm";
+
+// server/_core/emailNormalize.ts
+function normalizeOrderEmail(email) {
+  return email.trim().toLowerCase();
+}
 
 // server/db.ts
+import { eq, and, gt, sql } from "drizzle-orm";
 init_schema();
-import { eq, and, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 var _db = null;
 async function getDb() {
@@ -559,27 +564,30 @@ async function getUserByOpenId(openId) {
 async function getUserByEmail(email) {
   const db = await getDb();
   if (!db) return void 0;
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const key = normalizeOrderEmail(email);
+  const result = await db.select().from(users).where(sql`LOWER(TRIM(${users.email})) = ${key}`).limit(1);
   return result.length > 0 ? result[0] : void 0;
 }
 async function createEmailUser(data) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const openId = `email:${data.email}`;
+  const emailNorm = normalizeOrderEmail(data.email);
+  const openId = `email:${emailNorm}`;
   await db.insert(users).values({
     openId,
-    email: data.email,
+    email: emailNorm,
     passwordHash: data.passwordHash,
     name: data.name,
     loginMethod: "email",
     lastSignedIn: /* @__PURE__ */ new Date()
   });
-  return getUserByEmail(data.email);
+  return getUserByEmail(emailNorm);
 }
 async function setResetToken(email, token, expiresAt) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ resetToken: token, resetTokenExpiresAt: expiresAt }).where(eq(users.email, email));
+  const key = normalizeOrderEmail(email);
+  await db.update(users).set({ resetToken: token, resetTokenExpiresAt: expiresAt }).where(sql`LOWER(TRIM(${users.email})) = ${key}`);
 }
 async function getUserByResetToken(token) {
   const db = await getDb();
@@ -596,7 +604,8 @@ async function updatePasswordAndClearToken(userId, passwordHash) {
 async function setVerifyToken(email, token, expiresAt) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ verifyToken: token, verifyTokenExpiresAt: expiresAt }).where(eq(users.email, email));
+  const key = normalizeOrderEmail(email);
+  await db.update(users).set({ verifyToken: token, verifyTokenExpiresAt: expiresAt }).where(sql`LOWER(TRIM(${users.email})) = ${key}`);
 }
 async function getUserByVerifyToken(token) {
   const db = await getDb();
@@ -708,7 +717,7 @@ async function getMonthlyRevenue(months = 6) {
     const monthOrders = await db.select().from(orders).where(
       and2(
         gte(orders.paidAt, start),
-        sql`${orders.paidAt} <= ${end}`
+        sql2`${orders.paidAt} <= ${end}`
       )
     );
     const paidOrders = monthOrders.filter(
@@ -726,11 +735,11 @@ async function getTopProducts(limit = 10) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const paidOrders = await db.select({ id: orders.id }).from(orders).where(
-    sql`${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed')`
+    sql2`${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed')`
   );
   if (paidOrders.length === 0) return [];
   const orderIds = paidOrders.map((o) => o.id);
-  const allItems = await db.select().from(orderItems).where(sql`${orderItems.orderId} IN (${sql.join(orderIds.map((id) => sql`${id}`), sql`, `)})`);
+  const allItems = await db.select().from(orderItems).where(sql2`${orderItems.orderId} IN (${sql2.join(orderIds.map((id) => sql2`${id}`), sql2`, `)})`);
   const productMap = /* @__PURE__ */ new Map();
   for (const item of allItems) {
     const existing = productMap.get(item.productId);
@@ -758,7 +767,8 @@ async function createLogisticsOrder(data) {
 async function getOrdersByEmail(email) {
   const db = await getDb();
   if (!db) return [];
-  const memberOrders = await db.select().from(orders).where(eq2(orders.buyerEmail, email)).orderBy(desc(orders.createdAt)).limit(50);
+  const key = normalizeOrderEmail(email);
+  const memberOrders = await db.select().from(orders).where(sql2`LOWER(TRIM(${orders.buyerEmail})) = ${key}`).orderBy(desc(orders.createdAt)).limit(50);
   const ordersWithItems = await Promise.all(
     memberOrders.map(async (order) => {
       const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
@@ -967,6 +977,7 @@ var orderRouter = router({
     );
     const itemName = input.items.map((i) => `${i.name} x${i.quantity}`).join("#");
     const isPreorder = input.items.some((i) => i.isPreorder);
+    const buyerEmail = normalizeOrderEmail(input.buyerEmail);
     const orderId = await createOrder(
       {
         merchantTradeNo,
@@ -977,7 +988,7 @@ var orderRouter = router({
         isPreorder,
         totalAmount,
         buyerName: input.buyerName,
-        buyerEmail: input.buyerEmail,
+        buyerEmail,
         buyerPhone: input.buyerPhone,
         cvsStoreId: input.cvsStoreId,
         cvsStoreName: input.cvsStoreName,
@@ -1854,7 +1865,7 @@ ${c.content}`).join("\n\n");
 import { z as z4 } from "zod";
 
 // server/inventoryDb.ts
-import { eq as eq4, lt, and as and3, sql as sql2 } from "drizzle-orm";
+import { eq as eq4, lt, and as and3, sql as sql3 } from "drizzle-orm";
 init_schema();
 async function getProductInventory(productId) {
   const db = await getDb();
@@ -1885,7 +1896,7 @@ async function acquireInventoryLock(productId, quantity, sessionToken) {
   const activeLocks = await db.select().from(inventoryLocks).where(
     and3(
       eq4(inventoryLocks.productId, productId),
-      sql2`${inventoryLocks.expiresAt} > NOW()`
+      sql3`${inventoryLocks.expiresAt} > NOW()`
     )
   );
   const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
@@ -1934,7 +1945,7 @@ async function getProductAvailability(productId) {
   const activeLocks = await db.select().from(inventoryLocks).where(
     and3(
       eq4(inventoryLocks.productId, productId),
-      sql2`${inventoryLocks.expiresAt} > NOW()`
+      sql3`${inventoryLocks.expiresAt} > NOW()`
     )
   );
   const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
