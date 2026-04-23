@@ -91,7 +91,7 @@ export const memberRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const user = await db.getUserByEmail(input.email);
+      let user = await db.getUserByEmail(input.email);
 
       if (!user || !user.passwordHash) {
         throw new TRPCError({
@@ -106,6 +106,17 @@ export const memberRouter = router({
           code: "UNAUTHORIZED",
           message: "Email 或密碼錯誤",
         });
+      }
+
+      // 既有帳號若符合 admin 名單，登入時自動補齊 admin 權限。
+      if (db.shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+        const db2 = await db.getDb();
+        if (db2) {
+          const { users } = await import("../../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          await db2.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
+          user = { ...user, role: "admin" };
+        }
       }
 
       // 建立 session cookie

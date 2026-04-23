@@ -224,6 +224,11 @@ async function createHomeLogisticsOrder(opts) {
 // server/orderDb.ts
 import { eq as eq2, desc, and as and2, gte, sql as sql2 } from "drizzle-orm";
 
+// server/_core/emailNormalize.ts
+function normalizeOrderEmail(email) {
+  return email.trim().toLowerCase();
+}
+
 // server/db.ts
 import { eq, and, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
@@ -417,6 +422,12 @@ var logisticsOrders = mysqlTable("logisticsOrders", {
 });
 
 // server/db.ts
+var ADMIN_EMAIL_ALLOWLIST = new Set(
+  [
+    "goodaytarot@gmail.com",
+    ...process.env.ADMIN_EMAILS?.split(",") ?? []
+  ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
+);
 var _db = null;
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {

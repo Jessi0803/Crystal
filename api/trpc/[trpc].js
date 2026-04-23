@@ -492,6 +492,17 @@ function normalizeOrderEmail(email) {
 import { eq, and, gt, sql } from "drizzle-orm";
 init_schema();
 import { drizzle } from "drizzle-orm/mysql2";
+var ADMIN_EMAIL_ALLOWLIST = new Set(
+  [
+    "goodaytarot@gmail.com",
+    ...process.env.ADMIN_EMAILS?.split(",") ?? []
+  ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
+);
+function shouldGrantAdminRole(openId, email) {
+  if (openId === ENV.ownerOpenId) return true;
+  if (!email) return false;
+  return ADMIN_EMAIL_ALLOWLIST.has(normalizeOrderEmail(email));
+}
 var _db = null;
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -534,7 +545,7 @@ async function upsertUser(user) {
     if (user.role !== void 0) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (shouldGrantAdminRole(user.openId, user.email)) {
       values.role = "admin";
       updateSet.role = "admin";
     }
@@ -573,12 +584,14 @@ async function createEmailUser(data) {
   if (!db) throw new Error("Database not available");
   const emailNorm = normalizeOrderEmail(data.email);
   const openId = `email:${emailNorm}`;
+  const role = shouldGrantAdminRole(openId, emailNorm) ? "admin" : "user";
   await db.insert(users).values({
     openId,
     email: emailNorm,
     passwordHash: data.passwordHash,
     name: data.name,
     loginMethod: "email",
+    role,
     lastSignedIn: /* @__PURE__ */ new Date()
   });
   return getUserByEmail(emailNorm);
@@ -2479,7 +2492,7 @@ var memberRouter = router({
       password: z5.string().min(1, "\u8ACB\u8F38\u5165\u5BC6\u78BC")
     })
   ).mutation(async ({ input, ctx }) => {
-    const user = await getUserByEmail(input.email);
+    let user = await getUserByEmail(input.email);
     if (!user || !user.passwordHash) {
       throw new TRPCError3({
         code: "UNAUTHORIZED",
@@ -2492,6 +2505,15 @@ var memberRouter = router({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
+    }
+    if (shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+      const db2 = await getDb();
+      if (db2) {
+        const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const { eq: eq5 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq5(users2.id, user.id));
+        user = { ...user, role: "admin" };
+      }
     }
     const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
     const cookieOptions = getSessionCookieOptions(ctx.req);

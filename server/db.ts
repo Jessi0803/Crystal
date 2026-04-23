@@ -4,6 +4,22 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+const ADMIN_EMAIL_ALLOWLIST = new Set(
+  [
+    "goodaytarot@gmail.com",
+    ...(process.env.ADMIN_EMAILS?.split(",") ?? []),
+  ]
+    .map((email) => email.trim())
+    .filter(Boolean)
+    .map(normalizeOrderEmail)
+);
+
+export function shouldGrantAdminRole(openId: string, email?: string | null) {
+  if (openId === ENV.ownerOpenId) return true;
+  if (!email) return false;
+  return ADMIN_EMAIL_ALLOWLIST.has(normalizeOrderEmail(email));
+}
+
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
@@ -56,7 +72,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (shouldGrantAdminRole(user.openId, user.email)) {
       values.role = 'admin';
       updateSet.role = 'admin';
     }
@@ -112,12 +128,14 @@ export async function createEmailUser(data: {
   const emailNorm = normalizeOrderEmail(data.email);
   // 使用 email 作為 openId 前置，避免與 Manus OAuth openId 衝突
   const openId = `email:${emailNorm}`;
+  const role = shouldGrantAdminRole(openId, emailNorm) ? "admin" : "user";
   await db.insert(users).values({
     openId,
     email: emailNorm,
     passwordHash: data.passwordHash,
     name: data.name,
     loginMethod: 'email',
+    role,
     lastSignedIn: new Date(),
   });
   return getUserByEmail(emailNorm);
