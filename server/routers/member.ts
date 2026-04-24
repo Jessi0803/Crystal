@@ -242,9 +242,10 @@ export const memberRouter = router({
 
   /** 查詢自己的訂單 */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
+    const currentUser = await db.getUserByOpenId(ctx.user.openId);
     return getOrdersForMember({
-      userId: ctx.user.id,
-      email: ctx.user.email,
+      userId: currentUser?.id ?? ctx.user.id,
+      email: currentUser?.email ?? ctx.user.email,
     });
   }),
 });

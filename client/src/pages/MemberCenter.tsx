@@ -59,7 +59,7 @@ export default function MemberCenter() {
   const { data: user, isLoading: userLoading } = trpc.auth.me.useQuery();
 
   // 取得訂單列表
-  const { data: orders, isLoading: ordersLoading } = trpc.member.myOrders.useQuery(undefined, {
+  const { data: orders, isLoading: ordersLoading, error: ordersError } = trpc.member.myOrders.useQuery(undefined, {
     enabled: !!user,
   });
 
@@ -174,6 +174,11 @@ export default function MemberCenter() {
           <div>
             {ordersLoading ? (
               <p className="text-sm text-[oklch(0.55_0_0)] font-body text-center py-12">載入訂單中...</p>
+            ) : ordersError ? (
+              <div className="text-center py-16">
+                <p className="text-sm text-red-600 font-body mb-2">載入訂單失敗</p>
+                <p className="text-xs text-red-500 font-body break-all">{ordersError.message}</p>
+              </div>
             ) : !orders || orders.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-5xl mb-4">🛍️</div>
