@@ -601,7 +601,10 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
 
     return attachItemsAndLogisticsForOrders(db, memberOrders);
   } catch (error) {
-    if (!opts.email) throw error;
+    if (!opts.email) {
+      console.warn("[getOrdersForMember] no email available for legacy fallback:", error);
+      return [];
+    }
 
     console.warn("[getOrdersForMember] fallback to email-only legacy query:", error);
 
