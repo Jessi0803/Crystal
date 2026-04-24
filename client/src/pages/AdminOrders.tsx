@@ -164,7 +164,7 @@ export default function AdminOrders() {
 
   const getPaymentLabel = (method: string) => {
     if (method === "credit") return "信用卡";
-    if (method === "atm") return "銀行轉帳";
+    if (method === "atm") return "轉帳";
     if (method === "paypal") return "PayPal";
     return method;
   };
@@ -350,7 +350,7 @@ export default function AdminOrders() {
 
                       {/* 操作按鈕 */}
                       <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
-                        {/* 確認銀行轉帳收款 */}
+                        {/* 確認轉帳收款 */}
                         {order.paymentStatus === "transfer_pending" && (
                           <button
                             onClick={() => confirmTransfer.mutate({ orderId: order.id })}

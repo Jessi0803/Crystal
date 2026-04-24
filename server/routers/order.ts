@@ -1,6 +1,6 @@
 /**
  * 訂單 tRPC 路由
- * 處理：建立訂單、產生綠界付款表單參數、查詢訂單狀態、銀行轉帳確認
+ * 處理：建立訂單、產生綠界付款表單參數、查詢訂單狀態、轉帳確認
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -38,6 +38,10 @@ import {
   verifyPayPalOrderBelongsToMerchant,
   capturePayPalOrder,
 } from "../_core/paypal";
+import {
+  OVERSEAS_SHIP_COUNTRY_LABELS,
+  isOverseasShipCountryCode,
+} from "@shared/overseasShipping";
 
 const CartItemSchema = z.object({
   id: z.string(),
@@ -52,7 +56,7 @@ export const orderRouter = router({
   /**
    * 建立訂單並取得付款資訊
    * - credit：回傳綠界付款表單參數
-   * - atm：回傳銀行帳號資訊
+   * - atm：回傳轉帳帳號資訊
    */
   createAndPay: publicProcedure
     .input(
@@ -105,8 +109,13 @@ export const orderRouter = router({
             if (data.buyerPhone.trim().length < 8) {
               ctx.addIssue({ code: "custom", message: "請填寫聯絡電話", path: ["buyerPhone"] });
             }
-            if (!data.intlCountry?.trim()) {
-              ctx.addIssue({ code: "custom", message: "請填寫國家／地區", path: ["intlCountry"] });
+            const cc = data.intlCountry?.trim() ?? "";
+            if (!isOverseasShipCountryCode(cc)) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請選擇配送國家／地區（僅限開放地區）",
+                path: ["intlCountry"],
+              });
             }
             if (!data.intlPostalCode?.trim()) {
               ctx.addIssue({ code: "custom", message: "請填寫郵遞區號", path: ["intlPostalCode"] });
@@ -148,10 +157,15 @@ export const orderRouter = router({
         cvsStoreId = undefined;
         cvsStoreName = undefined;
         cvsType = undefined;
+        const countryCode = input.intlCountry!.trim();
+        if (!isOverseasShipCountryCode(countryCode)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "不支援的海外配送地區" });
+        }
+        const countryLabel = OVERSEAS_SHIP_COUNTRY_LABELS[countryCode];
         shippingAddress = [
           input.intlAddressLine!.trim(),
           `${input.intlCity!.trim()} ${input.intlPostalCode!.trim()}`,
-          input.intlCountry!.trim(),
+          countryLabel,
         ].join("\n");
         receiverZipCode = input.intlPostalCode!.trim().slice(0, 10);
       }
@@ -326,7 +340,7 @@ export const orderRouter = router({
     }),
 
   /**
-   * 客人填入銀行轉帳末五碼
+   * 客人填入轉帳匯款末五碼
    */
   submitTransferCode: publicProcedure
     .input(z.object({
@@ -339,7 +353,7 @@ export const orderRouter = router({
     }),
 
   /**
-   * 老闆確認銀行轉帳收款（管理後台）
+   * 老闆確認轉帳收款（管理後台）
    */
   confirmTransfer: adminProcedure
     .input(z.object({ orderId: z.number() }))

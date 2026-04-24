@@ -197,8 +197,8 @@ const SHIPPING_LABEL: Record<string, string> = {
 const PAYMENT_LABEL: Record<string, string> = {
   credit: "信用卡 / Apple Pay",
   credit_card: "信用卡 / Apple Pay",
-  atm: "銀行轉帳",
-  bank_transfer: "銀行轉帳",
+  atm: "轉帳",
+  bank_transfer: "轉帳",
   paypal: "PayPal",
 };
 
@@ -285,7 +285,7 @@ export async function sendOrderConfirmEmail(payload: OrderConfirmPayload) {
             ${
               paymentMethod === "bank_transfer"
                 ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbf5;border:1px solid #f0e8d8;padding:16px 20px;margin-top:24px;">
-                <tr><td style="font-size:12px;color:#b8936a;font-weight:600;padding-bottom:8px;">⚠ 銀行轉帳提醒</td></tr>
+                <tr><td style="font-size:12px;color:#b8936a;font-weight:600;padding-bottom:8px;">⚠ 轉帳提醒</td></tr>
                 <tr><td style="font-size:12px;color:#666;line-height:1.8;">
                   請於 <strong>3 天內</strong>完成轉帳，並在會員中心輸入轉帳末五碼，以便我們確認收款。
                   逾期未付款訂單將自動取消。

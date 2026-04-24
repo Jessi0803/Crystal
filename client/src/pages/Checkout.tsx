@@ -1,6 +1,6 @@
 /**
  * 結帳頁面
- * 流程：填寫購買人資料 → 選擇配送方式（超商/宅配）→ 選擇付款方式（信用卡/銀行轉帳）→ 送出訂單
+ * 流程：填寫購買人資料 → 選擇配送方式（超商/宅配）→ 選擇付款方式（信用卡/轉帳）→ 送出訂單
  * 物流類型：C2C 店到店（UNIMARTC2C / FAMIC2C）
  */
 import { useState, useEffect, useRef } from "react";
@@ -9,6 +9,7 @@ import { ArrowLeft, CreditCard, Store, ShieldCheck, Lock, Banknote, MapPin, Home
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { OVERSEAS_SHIP_COUNTRY_OPTIONS, isOverseasShipCountryCode } from "@shared/overseasShipping";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -119,7 +120,7 @@ export default function Checkout() {
     } else {
       if (!form.buyerPhone.trim() || form.buyerPhone.trim().length < 8)
         errs.buyerPhone = "請輸入聯絡電話（至少 8 碼）";
-      if (!form.intlCountry.trim()) errs.intlCountry = "請輸入國家／地區";
+      if (!isOverseasShipCountryCode(form.intlCountry)) errs.intlCountry = "請選擇配送國家／地區";
       if (!form.intlPostalCode.trim()) errs.intlPostalCode = "請輸入郵遞區號";
       if (!form.intlCity.trim()) errs.intlCity = "請輸入城市";
       if (!form.intlAddressLine.trim()) errs.intlAddressLine = "請輸入街道地址";
@@ -276,7 +277,7 @@ export default function Checkout() {
                   <Home className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
                   <div>
                     <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">台灣（國內）</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">7-11 取貨、宅配；信用卡／ATM</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">7-11 取貨、宅配；信用卡／轉帳</p>
                   </div>
                   <div
                     className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
@@ -311,7 +312,7 @@ export default function Checkout() {
               </div>
               {checkoutRegion === "overseas" && (
                 <p className="mt-3 text-xs font-body text-[oklch(0.45_0_0)] leading-relaxed">
-                  海外訂單僅提供國際宅配，並以 PayPal 付款。進口關稅或額外費用依當地海關規定，可能由收件人負擔。
+                  海外訂單僅提供國際宅配與 PayPal 付款；宅配僅限馬來西亞、香港、新加坡、美國、英國、澳洲。
                 </p>
               )}
             </section>
@@ -408,7 +409,9 @@ export default function Checkout() {
               {checkoutRegion === "overseas" && (
                 <div className="p-4 border border-[oklch(0.88_0_0)] bg-[oklch(0.99_0_0)] mb-4">
                   <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">國際宅配</p>
-                  <p className="text-xs font-body text-[oklch(0.5_0_0)]">出貨後將以 Email 通知，運送時間依目的地而異。</p>
+                  <p className="text-xs font-body text-[oklch(0.5_0_0)]">
+                    僅配送馬來西亞、香港、新加坡、美國、英國、澳洲。出貨後將以 Email 通知，運送時間依目的地而異。
+                  </p>
                 </div>
               )}
 
@@ -503,15 +506,20 @@ export default function Checkout() {
                 <div className="mt-4 space-y-3">
                   <div>
                     <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                      國家／地區 <span className="text-red-400">*</span>
+                      配送國家／地區 <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="例：United States、Japan"
+                    <select
                       value={form.intlCountry}
                       onChange={(e) => setForm((f) => ({ ...f, intlCountry: e.target.value }))}
                       className={inputClass("intlCountry")}
-                    />
+                    >
+                      <option value="">請選擇</option>
+                      {OVERSEAS_SHIP_COUNTRY_OPTIONS.map(({ code, label }) => (
+                        <option key={code} value={code}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
                     {errors.intlCountry && <p className="text-xs text-red-400 mt-1">{errors.intlCountry}</p>}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -587,7 +595,7 @@ export default function Checkout() {
                   </div>
                 </button>
 
-                {/* 銀行轉帳 */}
+                {/* 轉帳 */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("atm")}
@@ -599,8 +607,8 @@ export default function Checkout() {
                 >
                   <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
                   <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">銀行轉帳</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">轉帳後填入末五碼</p>
+                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">轉帳</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">匯款後填入末五碼</p>
                     <p className="text-xs font-body text-[oklch(0.5_0_0)]">老闆確認後出貨</p>
                   </div>
                   <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${

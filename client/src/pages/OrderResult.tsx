@@ -1,7 +1,7 @@
 /**
  * 訂單結果頁面
  * 路由：/order/:merchantTradeNo
- * 顯示訂單狀態：待付款 / 銀行轉帳待確認 / 已付款 / 付款失敗
+ * 顯示訂單狀態：待付款 / 轉帳待確認 / 已付款 / 付款失敗
  */
 import { useEffect, useState, useRef } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
@@ -91,8 +91,8 @@ export default function OrderResult() {
     if (order.paymentStatus === "transfer_pending") {
       return {
         icon: <Banknote className="w-12 h-12 text-blue-400" />,
-        title: "等待銀行轉帳確認",
-        desc: "請完成銀行轉帳，並在下方填入匯款末五碼，老闆確認後將為您處理出貨。",
+        title: "等待轉帳確認",
+        desc: "請完成匯款，並在下方填入匯款末五碼，老闆確認後將為您處理出貨。",
         color: "text-blue-600",
         bg: "bg-blue-50",
       };
@@ -155,7 +155,7 @@ export default function OrderResult() {
   const getPaymentMethodLabel = () => {
     if (!order) return "";
     if (order.paymentMethod === "credit") return "信用卡 / Apple Pay";
-    if (order.paymentMethod === "atm") return "銀行轉帳";
+    if (order.paymentMethod === "atm") return "轉帳";
     if (order.paymentMethod === "paypal") return "PayPal";
     return order.paymentMethod;
   };
@@ -231,13 +231,13 @@ export default function OrderResult() {
           )}
         </div>
 
-        {/* 銀行轉帳資訊 */}
+        {/* 轉帳資訊 */}
         {order.paymentMethod === "atm" && order.paymentStatus === "transfer_pending" && (
           <div className="border border-blue-200 bg-blue-50 p-5 mb-6">
             <div className="flex items-start gap-3">
               <Banknote className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
               <div className="w-full">
-                <p className="text-sm font-body font-medium text-blue-800 mb-3">銀行轉帳資訊</p>
+                <p className="text-sm font-body font-medium text-blue-800 mb-3">轉帳資訊</p>
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm font-body">
                     <span className="text-blue-700">銀行</span>
