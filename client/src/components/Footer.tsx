@@ -1,9 +1,13 @@
 // 日日好日 — Footer
 // Design: Vacanza-inspired — minimal footer, brand only + bottom bar
+import { useState } from "react";
 import { Link } from "wouter";
 import { Instagram, MessageCircle } from "lucide-react";
+import { BRAND_LOGO_SRC, BrandTextMark } from "./BrandMark";
 
 export default function Footer() {
+  const [footerLogoFailed, setFooterLogoFailed] = useState(false);
+
   return (
     <footer className="bg-[oklch(0.1_0_0)] text-white">
       {/* Main Footer — Brand Only */}
@@ -13,29 +17,19 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="mb-4">
-              <div className="flex items-baseline gap-1.5">
-                <span
-                  className="text-[1.5rem] leading-none text-white"
-                  style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300, letterSpacing: "0.05em" }}
-                >
-                  椛
-                </span>
-                <span
-                  className="text-[0.55rem] text-white/50"
-                  style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-                >
-                  ˙
-                </span>
-                <span
-                  className="text-[1.3rem] leading-none text-white italic"
-                  style={{ fontFamily: "'Cormorant Garamond', 'Georgia', serif", fontWeight: 300, letterSpacing: "0.08em" }}
-                >
-                  Crystal
-                </span>
-              </div>
-              <div className="text-[0.55rem] tracking-[0.3em] text-white/50 font-body mt-0.5">
-                CRYSTAL ENERGY
-              </div>
+              {footerLogoFailed ? (
+                <BrandTextMark variant="light" align="start" />
+              ) : (
+                <img
+                  src={BRAND_LOGO_SRC}
+                  alt="椛 Crystal 能量水晶"
+                  width={160}
+                  height={44}
+                  className="h-10 w-auto max-w-[200px] object-contain object-left opacity-95"
+                  onError={() => setFooterLogoFailed(true)}
+                  decoding="async"
+                />
+              )}
             </div>
             <p className="text-xs font-body font-light leading-relaxed text-white/60 max-w-[260px]">
               結合能量水晶 × 情緒療癒 × 個人轉運，讓每一天都成為好日子。

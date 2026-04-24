@@ -6,6 +6,7 @@ import { Search, ShoppingBag, Heart, User, Menu, X, ChevronDown } from "lucide-r
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { BRAND_LOGO_SRC, BrandTextMark } from "./BrandMark";
 
 const categorySubLinks = [
   { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
@@ -165,6 +166,7 @@ export default function Navbar() {
   const [mobileCatOpen, setMobileCatOpen] = useState(false);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [navLogoFailed, setNavLogoFailed] = useState(false);
   const { totalItems, setIsOpen } = useCart();
   const [location] = useLocation();
 
@@ -192,47 +194,20 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-8">
               {/* Left: Logo */}
-              <Link href="/">
-                <div className="flex flex-col items-center gap-0.5 select-none">
-                  <div className="flex items-baseline gap-1.5">
-                    <span
-                      className="text-[1.6rem] leading-none text-[oklch(0.1_0_0)]"
-                      style={{
-                        fontFamily: "'Noto Serif TC', serif",
-                        fontWeight: 300,
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      椛
-                    </span>
-                    <span
-                      className="text-[0.6rem] text-[oklch(0.55_0_0)]"
-                      style={{
-                        fontFamily: "'Noto Sans TC', sans-serif",
-                        fontWeight: 300,
-                        letterSpacing: "0.1em",
-                      }}
-                    >
-                      ˙
-                    </span>
-                    <span
-                      className="text-[1.4rem] leading-none text-[oklch(0.2_0_0)] italic"
-                      style={{
-                        fontFamily: "'Cormorant Garamond', 'Georgia', serif",
-                        fontWeight: 300,
-                        letterSpacing: "0.08em",
-                      }}
-                    >
-                      Crystal
-                    </span>
-                  </div>
-                  <span
-                    className="text-[0.45rem] tracking-[0.35em] text-[oklch(0.65_0_0)]"
-                    style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-                  >
-                    CRYSTAL ENERGY
-                  </span>
-                </div>
+              <Link href="/" className="flex items-center shrink-0">
+                {navLogoFailed ? (
+                  <BrandTextMark />
+                ) : (
+                  <img
+                    src={BRAND_LOGO_SRC}
+                    alt="椛 Crystal 能量水晶"
+                    width={148}
+                    height={40}
+                    className="h-9 w-auto max-h-9 max-w-[min(148px,40vw)] object-contain object-left"
+                    onError={() => setNavLogoFailed(true)}
+                    decoding="async"
+                  />
+                )}
               </Link>
 
               {/* Left nav: 最新商品、商品分類、購物說明、聯絡我們 */}

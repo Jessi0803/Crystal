@@ -433,7 +433,7 @@ export default function Checkout() {
                 <div className="p-4 border border-[oklch(0.88_0_0)] bg-[oklch(0.99_0_0)] mb-4">
                   <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">國際宅配</p>
                   <p className="text-xs font-body text-[oklch(0.5_0_0)]">
-                    僅配送馬來西亞、香港、新加坡、美國、英國、澳洲。出貨後將以 Email 通知，運送時間依目的地而異。
+                    僅配送馬來西亞、香港、新加坡、美國、英國、澳洲。
                   </p>
                 </div>
               )}
