@@ -7,7 +7,6 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   CheckCircle,
-  Clock,
   XCircle,
   Package,
   ChevronDown,
@@ -66,33 +65,6 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "cancelled", label: "已取消" },
 ];
 
-function PrintWaybillButton({ orderId }: { orderId: number }) {
-  const { data, isLoading, error } = trpc.order.getPrintURL.useQuery(
-    { orderId },
-    { retry: false }
-  );
-
-  if (isLoading) return (
-    <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-body text-[oklch(0.5_0_0)]">
-      <span className="animate-spin">⟳</span> 載入列印連結...
-    </div>
-  );
-
-  if (error || !data?.printURL) return null;
-
-  return (
-    <a
-      href={data.printURL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-xs font-body hover:bg-emerald-700 transition-colors"
-    >
-      <Truck className="w-3.5 h-3.5" />
-      列印託運單 PDF
-    </a>
-  );
-}
-
 function StatusBadge({ status }: { status: string }) {
   const cfg = ORDER_STATUS_CONFIG[status] ?? ORDER_STATUS_CONFIG.pending_payment;
   return (
@@ -100,6 +72,231 @@ function StatusBadge({ status }: { status: string }) {
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
+  );
+}
+
+type OrderSummary = {
+  id: number;
+  merchantTradeNo: string;
+  orderStatus: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  shippingMethod: string;
+  buyerName: string;
+  totalAmount: number;
+  isPreorder: boolean;
+  createdAt: Date | string;
+  itemCount: number;
+  hasLogistics: boolean;
+};
+
+function OrderRowCard({
+  order,
+  isExpanded,
+  onToggle,
+  getPaymentLabel,
+  getShippingLabel,
+  confirmTransfer,
+  createLogistics,
+  updateOrderStatus,
+}: {
+  order: OrderSummary;
+  isExpanded: boolean;
+  onToggle: () => void;
+  getPaymentLabel: (method: string) => string;
+  getShippingLabel: (method: string) => string;
+  confirmTransfer: ReturnType<typeof trpc.order.confirmTransfer.useMutation>;
+  createLogistics: ReturnType<typeof trpc.order.createLogistics.useMutation>;
+  updateOrderStatus: ReturnType<typeof trpc.order.updateOrderStatus.useMutation>;
+}) {
+  const { data: detail, isLoading: detailLoading } = trpc.order.getOrderDetail.useQuery(
+    { orderId: order.id },
+    {
+      enabled: isExpanded,
+      staleTime: 30_000,
+    }
+  );
+
+  const displayStatus = order.orderStatus;
+
+  return (
+    <div className="bg-white border border-[oklch(0.93_0_0)] overflow-hidden">
+      <button
+        className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-[oklch(0.98_0_0)] transition-colors"
+        onClick={onToggle}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <span className="text-xs font-mono text-[oklch(0.4_0_0)] tracking-wide">{order.merchantTradeNo}</span>
+            <StatusBadge status={displayStatus} />
+            {order.isPreorder && (
+              <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">預購</span>
+            )}
+          </div>
+          <div className="flex items-center gap-4 text-xs font-body text-[oklch(0.5_0_0)] flex-wrap">
+            <span className="flex items-center gap-1"><User className="w-3 h-3" />{order.buyerName}</span>
+            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(order.createdAt).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            <span className="flex items-center gap-1"><Package className="w-3 h-3" />{order.itemCount} 件</span>
+            <span>{getShippingLabel(order.shippingMethod ?? "")}</span>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-base font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+            NT$ {order.totalAmount.toLocaleString()}
+          </div>
+          <div className="text-xs font-body text-[oklch(0.6_0_0)]">{getPaymentLabel(order.paymentMethod)}</div>
+        </div>
+        <div className="shrink-0 text-[oklch(0.6_0_0)]">
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-[oklch(0.93_0_0)] px-5 py-5 bg-[oklch(0.985_0_0)]">
+          {detailLoading || !detail ? (
+            <div className="py-8 text-center">
+              <div className="w-6 h-6 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm font-body text-[oklch(0.5_0_0)]">載入訂單明細中...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-5">
+                <div>
+                  <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">購買人資訊</p>
+                  <div className="space-y-2">
+                    {[
+                      { icon: <User className="w-3.5 h-3.5" />, label: "姓名", value: detail.buyerName },
+                      { icon: <Mail className="w-3.5 h-3.5" />, label: "Email", value: detail.buyerEmail },
+                      { icon: <Phone className="w-3.5 h-3.5" />, label: "手機", value: detail.buyerPhone },
+                      { icon: <MapPin className="w-3.5 h-3.5" />, label: "配送", value: detail.cvsStoreName ? `${getShippingLabel(detail.shippingMethod ?? "")} — ${detail.cvsStoreName}` : (detail.shippingAddress ?? getShippingLabel(detail.shippingMethod ?? "")) },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-start gap-2 text-sm font-body">
+                        <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0">{row.icon}</span>
+                        <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">{row.label}</span>
+                        <span className="text-[oklch(0.1_0_0)] break-all">{row.value}</span>
+                      </div>
+                    ))}
+                    {detail.transferLastFive && (
+                      <div className="flex items-start gap-2 text-sm font-body">
+                        <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0"><Banknote className="w-3.5 h-3.5" /></span>
+                        <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">末五碼</span>
+                        <span className="text-blue-700 font-medium tracking-wider">{detail.transferLastFive}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">商品明細</p>
+                  <div className="space-y-2">
+                    {detail.items.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3">
+                        {item.productImage && (
+                          <img src={item.productImage} alt={item.productName} className="w-10 h-10 object-cover shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.productName}</p>
+                          <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
+                {detail.paymentStatus === "transfer_pending" && (
+                  <button
+                    onClick={() => confirmTransfer.mutate({ orderId: detail.id })}
+                    disabled={confirmTransfer.isPending}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-body hover:bg-blue-700 transition-colors disabled:opacity-60"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    確認收款
+                  </button>
+                )}
+
+                {(detail.orderStatus === "paid" || detail.orderStatus === "processing") && !detail.logistics && (
+                  <button
+                    onClick={() => createLogistics.mutate({ orderId: detail.id })}
+                    disabled={createLogistics.isPending}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[oklch(0.1_0_0)] text-white text-xs font-body hover:bg-[oklch(0.2_0_0)] transition-colors disabled:opacity-60"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    {createLogistics.isPending ? "建立中..." : "建立物流訂單"}
+                  </button>
+                )}
+
+                {detail.logistics && (
+                  <div className="flex flex-col gap-2">
+                    {detail.logistics.cvsPaymentNo ? (
+                      <div className="flex flex-col gap-1 px-4 py-2 bg-green-50 border border-green-300 text-xs font-body">
+                        <div className="flex items-center gap-1.5 text-green-700">
+                          <Truck className="w-3.5 h-3.5" />
+                          <span className="font-semibold">超商取件碼</span>
+                        </div>
+                        <span className="font-mono text-lg font-bold text-green-800 tracking-widest">{detail.logistics.cvsPaymentNo}</span>
+                        {detail.logistics.cvsValidationNo && (
+                          <span className="text-green-600">驗證碼：{detail.logistics.cvsValidationNo}</span>
+                        )}
+                        <span className="text-green-500 text-[10px]">物流編號：{detail.logistics.allPayLogisticsId ?? detail.logistics.logisticsMerchantTradeNo}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 border border-indigo-200 text-xs font-body text-indigo-700">
+                        <Truck className="w-3.5 h-3.5" />
+                        物流編號：{detail.logistics.allPayLogisticsId ?? detail.logistics.logisticsMerchantTradeNo}
+                        {detail.logistics.logisticsStatus === "failed" && (
+                          <span className="ml-2 text-red-600 font-semibold">建立失敗</span>
+                        )}
+                      </div>
+                    )}
+                    {detail.printURL && (
+                      <a
+                        href={detail.printURL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-xs font-body hover:bg-emerald-700 transition-colors"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        列印託運單 PDF
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {detail.orderStatus !== "completed" && detail.orderStatus !== "cancelled" && (
+                  <select
+                    className="px-3 py-2 border border-[oklch(0.88_0_0)] text-xs font-body text-[oklch(0.4_0_0)] bg-white focus:outline-none focus:border-[oklch(0.5_0_0)]"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateOrderStatus.mutate({ orderId: detail.id, status: e.target.value as any });
+                      e.target.value = "";
+                    }}
+                  >
+                    <option value="">更新狀態...</option>
+                    <option value="processing">備貨中</option>
+                    <option value="shipped">已出貨</option>
+                    <option value="arrived">已到店</option>
+                    <option value="completed">已完成</option>
+                    <option value="cancelled">取消訂單</option>
+                  </select>
+                )}
+              </div>
+
+              {detail.logistics && (
+                <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 text-xs font-body text-indigo-700">
+                  <p className="font-medium mb-1">物流資訊</p>
+                  <p>物流商：{detail.logistics.logisticsSubType}</p>
+                  {detail.logistics.bookingNote && <p>托運單號：{detail.logistics.bookingNote}</p>}
+                  {detail.logistics.cvsPaymentNo && <p>超商取件碼：{detail.logistics.cvsPaymentNo}</p>}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -290,181 +487,18 @@ export default function AdminOrders() {
         ) : (
           <div className="space-y-2">
             {allOrders.map((order) => {
-              const isExpanded = expandedId === order.id;
-              const displayStatus = order.orderStatus;
               return (
-                <div key={order.id} className="bg-white border border-[oklch(0.93_0_0)] overflow-hidden">
-                  {/* Row Header */}
-                  <button
-                    className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-[oklch(0.98_0_0)] transition-colors"
-                    onClick={() => setExpandedId(isExpanded ? null : order.id)}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <span className="text-xs font-mono text-[oklch(0.4_0_0)] tracking-wide">{order.merchantTradeNo}</span>
-                        <StatusBadge status={displayStatus} />
-                        {order.isPreorder && (
-                          <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">預購</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-xs font-body text-[oklch(0.5_0_0)] flex-wrap">
-                        <span className="flex items-center gap-1"><User className="w-3 h-3" />{order.buyerName}</span>
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(order.createdAt).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                        <span className="flex items-center gap-1"><Package className="w-3 h-3" />{(order as any).items?.length ?? 0} 件</span>
-                        <span>{getShippingLabel(order.shippingMethod ?? "")}</span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-base font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                        NT$ {order.totalAmount.toLocaleString()}
-                      </div>
-                      <div className="text-xs font-body text-[oklch(0.6_0_0)]">{getPaymentLabel(order.paymentMethod)}</div>
-                    </div>
-                    <div className="shrink-0 text-[oklch(0.6_0_0)]">
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </div>
-                  </button>
-
-                  {/* Expanded Detail */}
-                  {isExpanded && (
-                    <div className="border-t border-[oklch(0.93_0_0)] px-5 py-5 bg-[oklch(0.985_0_0)]">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-5">
-                        {/* 購買人資訊 */}
-                        <div>
-                          <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">購買人資訊</p>
-                          <div className="space-y-2">
-                            {[
-                              { icon: <User className="w-3.5 h-3.5" />, label: "姓名", value: order.buyerName },
-                              { icon: <Mail className="w-3.5 h-3.5" />, label: "Email", value: order.buyerEmail },
-                              { icon: <Phone className="w-3.5 h-3.5" />, label: "手機", value: order.buyerPhone },
-                              { icon: <MapPin className="w-3.5 h-3.5" />, label: "配送", value: order.cvsStoreName ? `${getShippingLabel(order.shippingMethod ?? "")} — ${order.cvsStoreName}` : (order.shippingAddress ?? getShippingLabel(order.shippingMethod ?? "")) },
-                            ].map((row) => (
-                              <div key={row.label} className="flex items-start gap-2 text-sm font-body">
-                                <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0">{row.icon}</span>
-                                <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">{row.label}</span>
-                                <span className="text-[oklch(0.1_0_0)] break-all">{row.value}</span>
-                              </div>
-                            ))}
-                            {order.transferLastFive && (
-                              <div className="flex items-start gap-2 text-sm font-body">
-                                <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0"><Banknote className="w-3.5 h-3.5" /></span>
-                                <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">末五碼</span>
-                                <span className="text-blue-700 font-medium tracking-wider">{order.transferLastFive}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 商品明細 */}
-                        <div>
-                          <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">商品明細</p>
-                          <div className="space-y-2">
-                            {((order as any).items ?? []).map((item: any) => (
-                              <div key={item.id} className="flex items-center gap-3">
-                                {item.productImage && (
-                                  <img src={item.productImage} alt={item.productName} className="w-10 h-10 object-cover shrink-0" />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.productName}</p>
-                                  <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 操作按鈕 */}
-                      <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
-                        {/* 確認銀行轉帳收款 */}
-                        {order.paymentStatus === "transfer_pending" && (
-                          <button
-                            onClick={() => confirmTransfer.mutate({ orderId: order.id })}
-                            disabled={confirmTransfer.isPending}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-body hover:bg-blue-700 transition-colors disabled:opacity-60"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            確認收款
-                          </button>
-                        )}
-
-                        {/* 建立物流訂單 */}
-                        {(order.orderStatus === "paid" || order.orderStatus === "processing") && !(order as any).logistics && (
-                          <button
-                            onClick={() => createLogistics.mutate({ orderId: order.id })}
-                            disabled={createLogistics.isPending}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-[oklch(0.1_0_0)] text-white text-xs font-body hover:bg-[oklch(0.2_0_0)] transition-colors disabled:opacity-60"
-                          >
-                            <Truck className="w-3.5 h-3.5" />
-                            {createLogistics.isPending ? "建立中..." : "建立物流訂單"}
-                          </button>
-                        )}
-
-                        {/* 顯示物流編號 */}
-                        {(order as any).logistics && (
-                          <div className="flex flex-col gap-2">
-                            {/* 超商取件碼 */}
-                            {(order as any).logistics?.cvsPaymentNo ? (
-                              <div className="flex flex-col gap-1 px-4 py-2 bg-green-50 border border-green-300 text-xs font-body">
-                                <div className="flex items-center gap-1.5 text-green-700">
-                                  <Truck className="w-3.5 h-3.5" />
-                                  <span className="font-semibold">超商取件碼</span>
-                                </div>
-                                <span className="font-mono text-lg font-bold text-green-800 tracking-widest">{(order as any).logistics.cvsPaymentNo}</span>
-                                {(order as any).logistics?.cvsValidationNo && (
-                                  <span className="text-green-600">驗證碼：{(order as any).logistics.cvsValidationNo}</span>
-                                )}
-                                <span className="text-green-500 text-[10px]">物流編號：{(order as any).logistics?.allPayLogisticsId ?? (order as any).logistics?.logisticsMerchantTradeNo}</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 border border-indigo-200 text-xs font-body text-indigo-700">
-                                <Truck className="w-3.5 h-3.5" />
-                                物流編號：{(order as any).logistics?.allPayLogisticsId ?? (order as any).logistics?.logisticsMerchantTradeNo}
-                                {(order as any).logistics?.logisticsStatus === "failed" && (
-                                  <span className="ml-2 text-red-600 font-semibold">建立失敗</span>
-                                )}
-                              </div>
-                            )}
-                            {/* 宅配託運單列印按鈕 */}
-                            {order.shippingMethod === "home" && (order as any).logistics?.allPayLogisticsId && (
-                              <PrintWaybillButton orderId={order.id} />
-                            )}
-                          </div>
-                        )}
-
-                        {/* 手動更新訂單狀態 */}
-                        {order.orderStatus !== "completed" && order.orderStatus !== "cancelled" && (
-                          <select
-                            className="px-3 py-2 border border-[oklch(0.88_0_0)] text-xs font-body text-[oklch(0.4_0_0)] bg-white focus:outline-none focus:border-[oklch(0.5_0_0)]"
-                            defaultValue=""
-                            onChange={(e) => {
-                              if (!e.target.value) return;
-                              updateOrderStatus.mutate({ orderId: order.id, status: e.target.value as any });
-                              e.target.value = "";
-                            }}
-                          >
-                            <option value="">更新狀態...</option>
-                            <option value="processing">備貨中</option>
-                            <option value="shipped">已出貨</option>
-                            <option value="arrived">已到店</option>
-                            <option value="completed">已完成</option>
-                            <option value="cancelled">取消訂單</option>
-                          </select>
-                        )}
-                      </div>
-
-                      {/* 物流資訊 */}
-                      {(order as any).logistics && (
-                        <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 text-xs font-body text-indigo-700">
-                          <p className="font-medium mb-1">物流資訊</p>
-                          <p>物流商：{(order as any).logistics.logisticsSubType}</p>
-                          {(order as any).logistics.bookingNote && <p>托運單號：{(order as any).logistics.bookingNote}</p>}
-                          {(order as any).logistics.cvsPaymentNo && <p>超商取件碼：{(order as any).logistics.cvsPaymentNo}</p>}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <OrderRowCard
+                  key={order.id}
+                  order={order}
+                  isExpanded={expandedId === order.id}
+                  onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
+                  getPaymentLabel={getPaymentLabel}
+                  getShippingLabel={getShippingLabel}
+                  confirmTransfer={confirmTransfer}
+                  createLogistics={createLogistics}
+                  updateOrderStatus={updateOrderStatus}
+                />
               );
             })}
           </div>

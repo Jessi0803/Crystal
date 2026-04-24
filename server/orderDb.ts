@@ -23,6 +23,11 @@ export type OrderWithItemsAndLogistics = OrderRow & {
   logistics: LogisticsRow | null;
 };
 
+export type AdminOrderListItem = OrderRow & {
+  itemCount: number;
+  hasLogistics: boolean;
+};
+
 /** 批次載入商品明細與物流，避免 N+1 查詢（管理後台 list、會員訂單） */
 async function attachItemsAndLogisticsForOrders(
   db: DbInstance,
@@ -242,6 +247,88 @@ export async function getAllOrders(
         .offset(offset);
 
   return attachItemsAndLogisticsForOrders(db, allOrders);
+}
+
+export async function getAdminOrderSummaries(
+  limit = 100,
+  offset = 0,
+  statusFilter?: string
+): Promise<AdminOrderListItem[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  let statusWhere: SQL | undefined;
+  if (statusFilter && statusFilter !== "all") {
+    statusWhere =
+      statusFilter === "transfer_pending"
+        ? eq(orders.paymentStatus, "transfer_pending")
+        : eq(orders.orderStatus, statusFilter as OrderRow["orderStatus"]);
+  }
+
+  const orderRows = statusWhere
+    ? await db
+        .select()
+        .from(orders)
+        .where(statusWhere)
+        .orderBy(desc(orders.createdAt))
+        .limit(limit)
+        .offset(offset)
+    : await db
+        .select()
+        .from(orders)
+        .orderBy(desc(orders.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+  if (orderRows.length === 0) return [];
+
+  const orderIds = orderRows.map((order) => order.id);
+  const itemCounts = await db
+    .select({
+      orderId: orderItems.orderId,
+      itemCount: sql<number>`CAST(COUNT(*) AS SIGNED)`,
+    })
+    .from(orderItems)
+    .where(inArray(orderItems.orderId, orderIds))
+    .groupBy(orderItems.orderId);
+
+  const logisticsRows = await db
+    .select({ orderId: logisticsOrders.orderId })
+    .from(logisticsOrders)
+    .where(inArray(logisticsOrders.orderId, orderIds));
+
+  const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
+  const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
+
+  return orderRows.map((order) => ({
+    ...order,
+    itemCount: itemCountByOrderId.get(order.id) ?? 0,
+    hasLogistics: logisticsOrderIds.has(order.id),
+  }));
+}
+
+export async function getAdminOrderDetail(orderId: number): Promise<OrderWithItemsAndLogistics | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!order) return null;
+
+  const [items, logistics] = await Promise.all([
+    db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
+    db.select().from(logisticsOrders).where(eq(logisticsOrders.orderId, order.id)).limit(1),
+  ]);
+
+  return {
+    ...order,
+    items,
+    logistics: logistics[0] ?? null,
+  };
 }
 
 export async function getOrderStats() {

@@ -13,7 +13,8 @@ import {
 import {
   createOrder,
   getOrderWithItems,
-  getAllOrders,
+  getAdminOrderDetail,
+  getAdminOrderSummaries,
   updateOrderTransferLastFive,
   confirmTransferPayment,
   getOrderStats,
@@ -553,7 +554,33 @@ export const orderRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return getAllOrders(input.limit, input.offset, input.status);
+      return getAdminOrderSummaries(input.limit, input.offset, input.status);
+    }),
+
+  /**
+   * 取得單筆訂單明細（管理後台展開卡片時才載入）
+   */
+  getOrderDetail: adminProcedure
+    .input(z.object({ orderId: z.number() }))
+    .query(async ({ input }) => {
+      const order = await getAdminOrderDetail(input.orderId);
+      if (!order) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+      }
+
+      const printURL =
+        order.shippingMethod === "home" &&
+        order.logistics?.logisticsType === "HOME" &&
+        order.logistics?.allPayLogisticsId
+          ? buildPrintTradeDocURL({
+              allPayLogisticsId: order.logistics.allPayLogisticsId,
+            })
+          : null;
+
+      return {
+        ...order,
+        printURL,
+      };
     }),
 
   /**

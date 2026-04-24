@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, json, boolean, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -129,7 +129,12 @@ export const orders = mysqlTable("orders", {
   confirmedAt: timestamp("confirmedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [
+  index("orders_created_at_idx").on(table.createdAt),
+  index("orders_order_status_created_at_idx").on(table.orderStatus, table.createdAt),
+  index("orders_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
+  index("orders_paid_at_idx").on(table.paidAt),
+]);
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
@@ -146,7 +151,9 @@ export const orderItems = mysqlTable("orderItems", {
   subtotal: int("subtotal").notNull(),
   // 是否為預購商品
   isPreorder: boolean("isPreorder").default(false).notNull(),
-});
+}, (table) => [
+  index("order_items_order_id_idx").on(table.orderId),
+]);
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = typeof orderItems.$inferInsert;
