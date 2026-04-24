@@ -37,7 +37,7 @@ import {
 } from "../ecpayLogistics";
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
-import { orders, logisticsOrders } from "../../drizzle/schema";
+import { orders, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
@@ -642,9 +642,6 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
       }
 
-      const { getDb } = await import("../db");
-      const { orderBalancePayments } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
