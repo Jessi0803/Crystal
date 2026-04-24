@@ -28,7 +28,7 @@ export default function OrderResult() {
   const [codeSubmitted, setCodeSubmitted] = useState(false);
   const paypalCaptureStarted = useRef(false);
 
-  const { data: order, isLoading, refetch } = trpc.order.getOrder.useQuery(
+  const { data: order, isLoading, isError, refetch } = trpc.order.getOrder.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
     {
       enabled: !!merchantTradeNo,
@@ -187,6 +187,29 @@ export default function OrderResult() {
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm font-body text-[oklch(0.5_0_0)]">查詢訂單中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+        <XCircle className="w-12 h-12 text-red-400 mb-4" />
+        <p className="text-xl mb-2" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+          查詢訂單失敗
+        </p>
+        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
+          訂單編號：{merchantTradeNo}
+          <br />伺服器暫時無法取得訂單資訊，請稍後重試。
+        </p>
+        <div className="flex gap-3">
+          <button className="btn-primary" onClick={() => refetch()}>
+            重新查詢
+          </button>
+          <button className="btn-outline" onClick={() => setLocation("/")}>
+            返回首頁
+          </button>
         </div>
       </div>
     );
