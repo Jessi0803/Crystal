@@ -1,7 +1,7 @@
 /**
  * 訂單資料庫查詢函式
  */
-import { eq, desc, and, gte, sql, inArray, SQL } from "drizzle-orm";
+import { eq, desc, and, gte, sql, inArray, SQL, or } from "drizzle-orm";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { getDb } from "./db";
 import {
@@ -567,6 +567,36 @@ export async function getOrdersByEmail(email: string) {
     .where(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`)
     .orderBy(desc(orders.createdAt))
     .limit(50);
+
+  return attachItemsAndLogisticsForOrders(db, memberOrders);
+}
+
+/** 依 userId 與 buyerEmail 合併查詢會員歷史訂單，避免舊匿名訂單漏掉 */
+export async function getOrdersForMember(opts: { userId?: number | null; email?: string | null }) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions: SQL[] = [];
+
+  if (opts.userId != null) {
+    conditions.push(eq(orders.userId, opts.userId));
+  }
+
+  if (opts.email) {
+    const key = normalizeOrderEmail(opts.email);
+    conditions.push(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`);
+  }
+
+  if (conditions.length === 0) return [];
+
+  const whereClause = conditions.length === 1 ? conditions[0] : or(...conditions)!;
+
+  const memberOrders = await db
+    .select()
+    .from(orders)
+    .where(whereClause)
+    .orderBy(desc(orders.createdAt))
+    .limit(100);
 
   return attachItemsAndLogisticsForOrders(db, memberOrders);
 }

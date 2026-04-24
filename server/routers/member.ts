@@ -18,7 +18,7 @@ import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { sdk } from "../_core/sdk";
 import * as crypto from "crypto";
 import * as db from "../db";
-import { getOrdersByEmail, getOrdersByUserId } from "../orderDb";
+import { getOrdersForMember } from "../orderDb";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
 
 const SALT_ROUNDS = 10;
@@ -242,15 +242,9 @@ export const memberRouter = router({
 
   /** 查詢自己的訂單 */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
-    try {
-      const ordersById = await getOrdersByUserId(ctx.user.id);
-      if (ordersById.length > 0) return ordersById;
-    } catch (e) {
-      console.warn("[member.myOrders] getOrdersByUserId failed (DB 是否已 migration userId？)", e);
-    }
-    if (ctx.user.email) {
-      return getOrdersByEmail(ctx.user.email);
-    }
-    return [];
+    return getOrdersForMember({
+      userId: ctx.user.id,
+      email: ctx.user.email,
+    });
   }),
 });
