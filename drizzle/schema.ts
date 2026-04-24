@@ -95,6 +95,7 @@ export const orders = mysqlTable("orders", {
   // 訂單狀態
   orderStatus: mysqlEnum("orderStatus", [
     "pending_payment",  // 待付款
+    "deposit_paid",     // 已付訂金（客製化）
     "paid",             // 已付款（待出貨）
     "processing",       // 處理中（備貨）
     "shipped",          // 已出貨
@@ -104,6 +105,8 @@ export const orders = mysqlTable("orders", {
   ]).default("pending_payment").notNull(),
   // 是否為預購訂單
   isPreorder: boolean("isPreorder").default(false).notNull(),
+  // 是否為客製化訂金訂單
+  isCustomOrder: boolean("isCustomOrder").default(false).notNull(),
   // 訂單金額
   totalAmount: int("totalAmount").notNull(),
   // 購買人資訊
@@ -157,6 +160,29 @@ export const orderItems = mysqlTable("orderItems", {
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = typeof orderItems.$inferInsert;
+
+export const orderBalancePayments = mysqlTable("orderBalancePayments", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull().unique(),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+  amount: int("amount").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", [
+    "pending",
+    "paid",
+    "failed",
+    "cancelled",
+  ]).default("pending").notNull(),
+  tradeNo: varchar("tradeNo", { length: 64 }),
+  ecpayNotifyData: json("ecpayNotifyData"),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("order_balance_payments_merchant_trade_no_idx").on(table.merchantTradeNo),
+]);
+
+export type OrderBalancePayment = typeof orderBalancePayments.$inferSelect;
+export type InsertOrderBalancePayment = typeof orderBalancePayments.$inferInsert;
 
 // ─── 物流訂單表 ───────────────────────────────────────────────────────────────
 export const logisticsOrders = mysqlTable("logisticsOrders", {

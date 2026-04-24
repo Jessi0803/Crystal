@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
+  deposit_paid: "已付訂金",
   paid: "已付款・待出貨",
   processing: "備貨中",
   shipped: "🚚 已出貨",
@@ -98,6 +99,15 @@ export default function OrderResult() {
       };
     }
     if (order.paymentStatus === "confirmed" || order.paymentStatus === "paid") {
+      if (order.orderStatus === "deposit_paid") {
+        return {
+          icon: <CheckCircle className="w-12 h-12 text-rose-500" />,
+          title: "訂金付款成功",
+          desc: "我們已收到您的訂金，接下來會由老闆建立尾款付款連結給您。",
+          color: "text-rose-600",
+          bg: "bg-rose-50",
+        };
+      }
       return {
         icon: <CheckCircle className="w-12 h-12 text-green-500" />,
         title: "付款成功！",

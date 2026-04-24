@@ -8,19 +8,24 @@ import {
   orders,
   orderItems,
   logisticsOrders,
+  orderBalancePayments,
   InsertOrder,
   InsertOrderItem,
+  InsertOrderBalancePayment,
   InsertLogisticsOrder,
 } from "../drizzle/schema";
+import { CUSTOM_PRODUCT_ID } from "../shared/const";
 
 type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type OrderRow = typeof orders.$inferSelect;
 type OrderItemRow = typeof orderItems.$inferSelect;
 type LogisticsRow = typeof logisticsOrders.$inferSelect;
+type BalancePaymentRow = typeof orderBalancePayments.$inferSelect;
 
 export type OrderWithItemsAndLogistics = OrderRow & {
   items: OrderItemRow[];
   logistics: LogisticsRow | null;
+  balancePayment?: BalancePaymentRow | null;
 };
 
 export type AdminOrderListItem = Pick<
@@ -32,6 +37,7 @@ export type AdminOrderListItem = Pick<
   | "shippingMethod"
   | "orderStatus"
   | "isPreorder"
+  | "isCustomOrder"
   | "totalAmount"
   | "buyerName"
   | "createdAt"
@@ -140,7 +146,13 @@ export async function getOrderWithItems(merchantTradeNo: string) {
     .where(eq(logisticsOrders.orderId, order.id))
     .limit(1);
 
-  return { ...order, items, logistics: logistics ?? null };
+  const [balancePayment] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.orderId, order.id))
+    .limit(1);
+
+  return { ...order, items, logistics: logistics ?? null, balancePayment: balancePayment ?? null };
 }
 
 /** PayPal Capture 成功後標記已付款 */
@@ -181,11 +193,22 @@ export async function updateOrderPaymentStatus(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const [order] = await db
+    .select({ isCustomOrder: orders.isCustomOrder })
+    .from(orders)
+    .where(eq(orders.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+
   await db
     .update(orders)
     .set({
       paymentStatus: status,
-      orderStatus: status === "paid" ? "paid" : "cancelled",
+      orderStatus:
+        status === "paid"
+          ? order?.isCustomOrder
+            ? "deposit_paid"
+            : "paid"
+          : "cancelled",
       tradeNo,
       ecpayNotifyData: notifyData,
       paidAt: status === "paid" ? new Date() : undefined,
@@ -210,11 +233,17 @@ export async function confirmTransferPayment(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const [order] = await db
+    .select({ isCustomOrder: orders.isCustomOrder })
+    .from(orders)
+    .where(eq(orders.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+
   await db
     .update(orders)
     .set({
       paymentStatus: "confirmed",
-      orderStatus: "paid",
+      orderStatus: order?.isCustomOrder ? "deposit_paid" : "paid",
       confirmedAt: new Date(),
       paidAt: new Date(),
     })
@@ -223,7 +252,15 @@ export async function confirmTransferPayment(merchantTradeNo: string) {
 
 export async function updateOrderStatus(
   merchantTradeNo: string,
-  orderStatus: "pending_payment" | "paid" | "processing" | "shipped" | "arrived" | "completed" | "cancelled"
+  orderStatus:
+    | "pending_payment"
+    | "deposit_paid"
+    | "paid"
+    | "processing"
+    | "shipped"
+    | "arrived"
+    | "completed"
+    | "cancelled"
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -294,6 +331,7 @@ export async function getAdminOrderSummaries(
     shippingMethod: orders.shippingMethod,
     orderStatus: orders.orderStatus,
     isPreorder: orders.isPreorder,
+    isCustomOrder: orders.isCustomOrder,
     totalAmount: orders.totalAmount,
     buyerName: orders.buyerName,
     createdAt: orders.createdAt,
@@ -377,15 +415,17 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
 
   if (!order) return null;
 
-  const [items, logistics] = await Promise.all([
+  const [items, logistics, balancePayment] = await Promise.all([
     db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
     db.select().from(logisticsOrders).where(eq(logisticsOrders.orderId, order.id)).limit(1),
+    db.select().from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
   ]);
 
   return {
     ...order,
     items,
     logistics: logistics[0] ?? null,
+    balancePayment: balancePayment[0] ?? null,
   };
 }
 
@@ -401,6 +441,7 @@ export async function getOrderStats() {
     .select({
       totalOrders: sql<number>`CAST(COUNT(*) AS SIGNED)`,
       pendingPayment: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'pending_payment' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      depositPaid: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'deposit_paid' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       transferPending: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.paymentStatus} = 'transfer_pending' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       toShip: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing') THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       paid: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'paid' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
@@ -416,6 +457,7 @@ export async function getOrderStats() {
   return {
     totalOrders: n(row?.totalOrders),
     pendingPayment: n(row?.pendingPayment),
+    depositPaid: n(row?.depositPaid),
     transferPending: n(row?.transferPending),
     toShip: n(row?.toShip),
     paid: n(row?.paid),
@@ -538,6 +580,145 @@ export async function updateLogisticsStatus(
       ...extra,
     })
     .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
+}
+
+function generateBalanceMerchantTradeNo() {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `CB${ts}${rand}`.substring(0, 20);
+}
+
+export async function createOrReplaceBalancePayment(opts: {
+  orderId: number;
+  amount: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, opts.orderId)).limit(1);
+  if (!order) throw new Error("Order not found");
+
+  const [existing] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.orderId, opts.orderId))
+    .limit(1);
+
+  if (existing?.paymentStatus === "paid") {
+    throw new Error("Balance already paid");
+  }
+
+  const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
+  const nextTotalAmount = Math.max(1, order.totalAmount - (existing?.amount ?? 0) + opts.amount);
+
+  await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq(orders.id, opts.orderId));
+
+  if (existing) {
+    await db
+      .update(orderBalancePayments)
+      .set({
+        merchantTradeNo: nextMerchantTradeNo,
+        amount: opts.amount,
+        paymentStatus: "pending",
+        tradeNo: null,
+        ecpayNotifyData: null,
+        paidAt: null,
+      })
+      .where(eq(orderBalancePayments.id, existing.id));
+
+    const [updated] = await db
+      .select()
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.id, existing.id))
+      .limit(1);
+    return updated!;
+  }
+
+  const insertData: InsertOrderBalancePayment = {
+    orderId: opts.orderId,
+    merchantTradeNo: nextMerchantTradeNo,
+    amount: opts.amount,
+    paymentStatus: "pending",
+  };
+
+  await db.insert(orderBalancePayments).values(insertData);
+
+  const [created] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, nextMerchantTradeNo))
+    .limit(1);
+  return created!;
+}
+
+export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [row] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function getBalancePaymentDetail(merchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [row] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!row) return null;
+
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, row.orderId))
+    .limit(1);
+  if (!order) return null;
+
+  return { ...row, order };
+}
+
+export async function updateBalancePaymentStatus(
+  merchantTradeNo: string,
+  status: "paid" | "failed",
+  tradeNo: string,
+  notifyData: Record<string, string>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [balance] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!balance) return null;
+
+  await db
+    .update(orderBalancePayments)
+    .set({
+      paymentStatus: status,
+      tradeNo,
+      ecpayNotifyData: notifyData,
+      paidAt: status === "paid" ? new Date() : null,
+    })
+    .where(eq(orderBalancePayments.id, balance.id));
+
+  if (status === "paid") {
+    await db.update(orders).set({ orderStatus: "paid" }).where(eq(orders.id, balance.orderId));
+  }
+
+  return balance;
+}
+
+export function isCustomDepositProduct(items: { id: string }[]) {
+  return items.some((item) => item.id === CUSTOM_PRODUCT_ID);
 }
 
 /** 依 userId 查詢該會員的所有訂單（含商品明細） */

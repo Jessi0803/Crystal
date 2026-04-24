@@ -18,6 +18,8 @@ import {
   updateOrderPaymentStatus,
   getOrderByMerchantTradeNo,
   updateLogisticsStatus,
+  getBalancePaymentByMerchantTradeNo,
+  updateBalancePaymentStatus,
 } from "./orderDb";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
@@ -44,18 +46,26 @@ export function registerECPayRoutes(app: Application) {
       const rtnCode = notifyData.RtnCode;
       const tradeNo = notifyData.TradeNo ?? "";
 
+      const status = rtnCode === "1" ? "paid" : "failed";
       const order = await getOrderByMerchantTradeNo(merchantTradeNo);
-      if (!order) {
-        console.error("[ECPay Notify] Order not found:", merchantTradeNo);
-        res.send("0|Order Not Found");
+      if (order) {
+        await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
+        res.send("1|OK");
         return;
       }
 
-      const status = rtnCode === "1" ? "paid" : "failed";
-      await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-      console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
+      const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
+      if (balancePayment) {
+        await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        console.log(`[ECPay Notify] Balance ${merchantTradeNo} → ${status}`);
+        res.send("1|OK");
+        return;
+      }
 
-      res.send("1|OK");
+      console.error("[ECPay Notify] Order not found:", merchantTradeNo);
+      res.send("0|Order Not Found");
+      return;
     } catch (err) {
       console.error("[ECPay Notify] Error:", err);
       res.send("0|Server Error");
@@ -80,6 +90,22 @@ export function registerECPayRoutes(app: Application) {
       res.redirect(302, `/order/${encodeURIComponent(merchantTradeNo)}`);
     } catch (err) {
       console.error("[ECPay OrderResult] Error:", err);
+      res.redirect(302, "/");
+    }
+  });
+
+  app.post("/api/ecpay/balance-result", (req: Request, res: Response) => {
+    try {
+      const data = req.body as Record<string, string>;
+      const merchantTradeNo = data?.MerchantTradeNo ?? "";
+      console.log("[ECPay BalanceResult]", { merchantTradeNo, RtnCode: data?.RtnCode });
+      if (!merchantTradeNo) {
+        res.redirect(302, "/");
+        return;
+      }
+      res.redirect(302, `/balance/${encodeURIComponent(merchantTradeNo)}`);
+    } catch (err) {
+      console.error("[ECPay BalanceResult] Error:", err);
       res.redirect(302, "/");
     }
   });

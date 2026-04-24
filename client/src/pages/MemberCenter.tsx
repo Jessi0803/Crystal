@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
+  deposit_paid: "已付訂金",
   paid: "已付款（待出貨）",
   processing: "備貨中",
   shipped: "已出貨",
@@ -31,6 +32,7 @@ const SHIPPING_LABEL: Record<string, string> = {
 function StatusBadge({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
     pending_payment: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    deposit_paid: "bg-rose-50 text-rose-700 border-rose-200",
     paid: "bg-blue-50 text-blue-700 border-blue-200",
     processing: "bg-purple-50 text-purple-700 border-purple-200",
     shipped: "bg-indigo-50 text-indigo-700 border-indigo-200",

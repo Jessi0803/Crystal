@@ -23,6 +23,9 @@ import {
   updateOrderStatus as dbUpdateOrderStatus,
   createLogisticsOrder,
   markOrderPaidPayPal,
+  isCustomDepositProduct,
+  createOrReplaceBalancePayment,
+  getBalancePaymentDetail,
 } from "../orderDb";
 import { acquireInventoryLock, releaseExpiredLocks } from "../inventoryDb";
 import {
@@ -44,6 +47,17 @@ import {
   formatOverseasShippingAddress,
   validateOverseasAddress,
 } from "@shared/overseasAddress";
+
+function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: string }) {
+  const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
+  if (fixed) return fixed;
+  const host = (req.get("x-forwarded-host") || req.get("host") || "").trim();
+  const protoHeader = req.get("x-forwarded-proto");
+  const proto =
+    (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader?.split(",")[0]?.trim()) ||
+    (req.protocol === "https" ? "https" : "http");
+  return `${proto}://${host}`;
+}
 
 const CartItemSchema = z.object({
   id: z.string(),
@@ -147,6 +161,7 @@ export const orderRouter = router({
         .join("#");
 
       const isPreorder = input.items.some((i) => i.isPreorder);
+      const isCustomOrder = isCustomDepositProduct(input.items);
       const buyerEmail = normalizeOrderEmail(input.buyerEmail);
 
       let shippingAddress = input.shippingAddress;
@@ -183,6 +198,7 @@ export const orderRouter = router({
         deliveryRegion: isOverseas ? "overseas" : "domestic",
         orderStatus: "pending_payment",
         isPreorder,
+        isCustomOrder,
         totalAmount,
         buyerName: input.buyerName,
         buyerEmail,
@@ -377,7 +393,7 @@ export const orderRouter = router({
   updateOrderStatus: adminProcedure
     .input(z.object({
       orderId: z.number(),
-      status: z.enum(["pending_payment", "paid", "processing", "shipped", "arrived", "completed", "cancelled"]),
+      status: z.enum(["pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "completed", "cancelled"]),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -386,6 +402,23 @@ export const orderRouter = router({
       if (!order) throw new Error("Order not found");
       await dbUpdateOrderStatus(order.merchantTradeNo, input.status);
       return { success: true };
+    }),
+
+  createBalancePaymentLink: adminProcedure
+    .input(
+      z.object({
+        orderId: z.number(),
+        amount: z.number().int().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const payment = await createOrReplaceBalancePayment(input);
+      const origin = siteBaseUrl(ctx.req);
+      return {
+        merchantTradeNo: payment.merchantTradeNo,
+        amount: payment.amount,
+        paymentLink: `${origin}/balance/${encodeURIComponent(payment.merchantTradeNo)}`,
+      };
     }),
 
   /**
@@ -548,7 +581,7 @@ export const orderRouter = router({
   listOrders: adminProcedure
     .input(
       z.object({
-        status: z.enum(["all", "pending_payment", "paid", "processing", "shipped", "arrived", "completed", "cancelled", "transfer_pending"]).optional().default("all"),
+        status: z.enum(["all", "pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "completed", "cancelled", "transfer_pending"]).optional().default("all"),
         limit: z.number().min(1).max(500).optional().default(100),
         offset: z.number().min(0).optional().default(0),
       })
@@ -580,6 +613,44 @@ export const orderRouter = router({
       return {
         ...order,
         printURL,
+      };
+    }),
+
+  getBalancePayment: publicProcedure
+    .input(z.object({ merchantTradeNo: z.string().min(1) }))
+    .query(async ({ input }) => {
+      return getBalancePaymentDetail(input.merchantTradeNo);
+    }),
+
+  getBalancePaymentCheckout: publicProcedure
+    .input(
+      z.object({
+        merchantTradeNo: z.string().min(1),
+        origin: z.string().url(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
+      if (!balancePayment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到尾款資料" });
+      }
+      if (balancePayment.paymentStatus === "paid") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
+      }
+
+      const paymentParams = buildCreditPaymentParams({
+        merchantTradeNo: balancePayment.merchantTradeNo,
+        tradeDesc: "椛Crystal客製化尾款",
+        itemName: `客製化商品尾款#${balancePayment.order.merchantTradeNo}`,
+        totalAmount: balancePayment.amount,
+        returnURL: `${input.origin}/api/ecpay/notify`,
+        orderResultURL: `${input.origin}/api/ecpay/balance-result`,
+        clientBackURL: `${input.origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
+      });
+
+      return {
+        paymentURL: ECPAY_CONFIG.PaymentURL,
+        paymentParams,
       };
     }),
 

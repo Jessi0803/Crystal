@@ -40,6 +40,7 @@ import {
 type StatusFilter =
   | "all"
   | "pending_payment"
+  | "deposit_paid"
   | "paid"
   | "transfer_pending"
   | "processing"
@@ -50,6 +51,7 @@ type StatusFilter =
 
 const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string; dot: string }> = {
   pending_payment: { label: "待付款", className: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
+  deposit_paid: { label: "已付訂金", className: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-400" },
   paid: { label: "已付款", className: "bg-green-50 text-green-700 border-green-200", dot: "bg-green-500" },
   transfer_pending: { label: "轉帳待確認", className: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-400" },
   processing: { label: "備貨中", className: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-400" },
@@ -65,6 +67,7 @@ const DEFAULT_PAGE_SIZE = 50;
 const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "transfer_pending", label: "轉帳待確認" },
+  { key: "deposit_paid", label: "已付訂金" },
   { key: "paid", label: "已付款" },
   { key: "processing", label: "備貨中" },
   { key: "shipped", label: "已出貨" },
@@ -94,6 +97,7 @@ type OrderSummary = {
   buyerName: string;
   totalAmount: number;
   isPreorder: boolean;
+  isCustomOrder: boolean;
   createdAt: Date | string;
   itemCount: number;
   hasLogistics: boolean;
@@ -118,6 +122,7 @@ function OrderRowCard({
   createLogistics: ReturnType<typeof trpc.order.createLogistics.useMutation>;
   updateOrderStatus: ReturnType<typeof trpc.order.updateOrderStatus.useMutation>;
 }) {
+  const utils = trpc.useUtils();
   const { data: detail, isLoading: detailLoading } = trpc.order.getOrderDetail.useQuery(
     { orderId: order.id },
     {
@@ -125,6 +130,21 @@ function OrderRowCard({
       staleTime: 30_000,
     }
   );
+
+  const createBalancePaymentLink = trpc.order.createBalancePaymentLink.useMutation({
+    onSuccess: async (data) => {
+      await utils.order.getOrderDetail.invalidate({ orderId: order.id });
+      await utils.order.listOrders.invalidate();
+      await utils.order.getStats.invalidate();
+      try {
+        await navigator.clipboard.writeText(data.paymentLink);
+        toast.success(`尾款連結已產生並複製，金額 NT$ ${data.amount.toLocaleString()}`);
+      } catch {
+        toast.success(`尾款連結已產生：${data.paymentLink}`);
+      }
+    },
+    onError: (err) => toast.error(err.message || "產生尾款連結失敗"),
+  });
 
   const displayStatus = order.orderStatus;
 
@@ -225,6 +245,27 @@ function OrderRowCard({
                   </button>
                 )}
 
+                {detail.isCustomOrder && detail.orderStatus === "deposit_paid" && (
+                  <button
+                    onClick={() => {
+                      const defaultAmount = detail.balancePayment?.amount?.toString() ?? "";
+                      const raw = window.prompt("請輸入尾款金額", defaultAmount);
+                      if (!raw) return;
+                      const amount = Number(raw);
+                      if (!Number.isInteger(amount) || amount < 1) {
+                        toast.error("請輸入大於 0 的整數金額");
+                        return;
+                      }
+                      createBalancePaymentLink.mutate({ orderId: detail.id, amount });
+                    }}
+                    disabled={createBalancePaymentLink.isPending}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 text-white text-xs font-body hover:bg-rose-700 transition-colors disabled:opacity-60"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    {createBalancePaymentLink.isPending ? "產生中..." : "產生尾款連結"}
+                  </button>
+                )}
+
                 {(detail.orderStatus === "paid" || detail.orderStatus === "processing") && !detail.logistics && (
                   <button
                     onClick={() => createLogistics.mutate({ orderId: detail.id })}
@@ -299,6 +340,30 @@ function OrderRowCard({
                   <p>物流商：{detail.logistics.logisticsSubType}</p>
                   {detail.logistics.bookingNote && <p>托運單號：{detail.logistics.bookingNote}</p>}
                   {detail.logistics.cvsPaymentNo && <p>超商取件碼：{detail.logistics.cvsPaymentNo}</p>}
+                </div>
+              )}
+
+              {detail.isCustomOrder && detail.balancePayment && (
+                <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-xs font-body text-rose-700">
+                  <p className="font-medium mb-1">尾款資訊</p>
+                  <p>尾款編號：{detail.balancePayment.merchantTradeNo}</p>
+                  <p>尾款金額：NT$ {detail.balancePayment.amount.toLocaleString()}</p>
+                  <p>尾款狀態：{detail.balancePayment.paymentStatus === "paid" ? "已付款" : detail.balancePayment.paymentStatus === "failed" ? "付款失敗" : "待付款"}</p>
+                  <button
+                    onClick={async () => {
+                      const link = `${window.location.origin}/balance/${encodeURIComponent(detail.balancePayment!.merchantTradeNo)}`;
+                      try {
+                        await navigator.clipboard.writeText(link);
+                        toast.success("尾款連結已複製");
+                      } catch {
+                        toast.success(link);
+                      }
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    複製尾款連結
+                  </button>
                 </div>
               )}
             </>
