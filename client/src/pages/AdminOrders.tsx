@@ -3,7 +3,7 @@
  * 路由：/admin/orders
  * 僅限 admin 角色存取
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   CheckCircle,
@@ -50,6 +50,8 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string; do
   completed: { label: "已完成", className: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
   cancelled: { label: "已取消", className: "bg-gray-50 text-gray-600 border-gray-200", dot: "bg-gray-400" },
 };
+
+const PAGE_SIZE = 100;
 
 const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "全部" },
@@ -104,31 +106,53 @@ export default function AdminOrders() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [page, setPage] = useState(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const { data: orders, isLoading, refetch, isFetching } = trpc.order.listOrders.useQuery(
-    { status: statusFilter },
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter]);
+
+  const { data: dashStats, isLoading: dashStatsLoading, isFetching: dashStatsFetching, refetch: refetchDashStats } =
+    trpc.order.getStats.useQuery(undefined, {
+      enabled: user?.role === "admin",
+      staleTime: 60_000,
+    });
+
+  const { data: orders, isLoading, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
+    { status: statusFilter, limit: PAGE_SIZE, offset: page * PAGE_SIZE },
     {
       enabled: user?.role === "admin",
       staleTime: 30_000,
     }
   );
 
+  const refetchListAndStats = () => {
+    void refetchOrders();
+    void refetchDashStats();
+  };
+
   const confirmTransfer = trpc.order.confirmTransfer.useMutation({
-    onSuccess: () => { toast.success("已確認收款，訂單更新為已付款"); refetch(); },
+    onSuccess: () => {
+      toast.success("已確認收款，訂單更新為已付款");
+      refetchListAndStats();
+    },
     onError: () => toast.error("操作失敗，請重試"),
   });
 
   const createLogistics = trpc.order.createLogistics.useMutation({
     onSuccess: (data) => {
       toast.success(`物流訂單建立成功！${data.logisticsId ? `物流編號：${data.logisticsId}` : ""}`);
-      refetch();
+      refetchListAndStats();
     },
     onError: (err) => toast.error(`建立物流失敗：${err.message}`),
   });
 
   const updateOrderStatus = trpc.order.updateOrderStatus.useMutation({
-    onSuccess: () => { toast.success("訂單狀態已更新"); refetch(); },
+    onSuccess: () => {
+      toast.success("訂單狀態已更新");
+      refetchListAndStats();
+    },
     onError: () => toast.error("更新失敗，請重試"),
   });
 
@@ -156,18 +180,15 @@ export default function AdminOrders() {
 
   const allOrders = orders ?? [];
   const stats = {
-    total: allOrders.length,
-    paid: allOrders.filter((o) => o.orderStatus === "paid" || o.orderStatus === "processing").length,
-    transferPending: allOrders.filter((o) => o.paymentStatus === "transfer_pending").length,
-    toShip: allOrders.filter((o) => o.orderStatus === "paid" || o.orderStatus === "processing").length,
-    revenue: allOrders
-      .filter((o) => o.paymentStatus === "paid" || o.paymentStatus === "confirmed")
-      .reduce((s, o) => s + o.totalAmount, 0),
+    total: dashStats?.totalOrders ?? 0,
+    transferPending: dashStats?.transferPending ?? 0,
+    toShip: dashStats?.toShip ?? 0,
+    revenue: dashStats?.totalRevenue ?? 0,
   };
 
   const getPaymentLabel = (method: string) => {
     if (method === "credit") return "信用卡";
-    if (method === "atm") return "轉帳";
+    if (method === "atm") return "銀行轉帳";
     if (method === "paypal") return "PayPal";
     return method;
   };
@@ -204,11 +225,13 @@ export default function AdminOrders() {
               營收報表
             </button>
             <button
-              onClick={() => refetch()}
-              disabled={isFetching}
+              onClick={() => refetchListAndStats()}
+              disabled={isFetching || dashStatsFetching}
               className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isFetching || dashStatsFetching ? "animate-spin" : ""}`}
+              />
               重新整理
             </button>
           </div>
@@ -230,7 +253,7 @@ export default function AdminOrders() {
                 <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">{stat.label}</span>
               </div>
               <div className={`text-2xl font-medium ${stat.color}`} style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                {stat.value}
+                {dashStatsLoading ? "…" : stat.value}
               </div>
             </div>
           ))}
@@ -260,12 +283,24 @@ export default function AdminOrders() {
             <p className="text-sm font-body text-[oklch(0.5_0_0)]">載入訂單中...</p>
           </div>
         ) : allOrders.length === 0 ? (
-          <div className="bg-white border border-[oklch(0.93_0_0)] p-16 text-center">
+          <div className="bg-white border border-[oklch(0.93_0_0)] p-16 text-center space-y-4">
             <ShoppingBag className="w-10 h-10 text-[oklch(0.85_0_0)] mx-auto mb-4" />
-            <p className="text-sm font-body text-[oklch(0.5_0_0)]">目前沒有符合條件的訂單</p>
+            <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+              {page > 0 ? "此頁沒有訂單，請返回上一頁或切換篩選。" : "目前沒有符合條件的訂單"}
+            </p>
+            {page > 0 && (
+              <button
+                type="button"
+                className="text-xs font-body text-[oklch(0.35_0_0)] underline"
+                onClick={() => setPage(0)}
+              >
+                回到第一頁
+              </button>
+            )}
           </div>
         ) : (
-          <div className="space-y-2">
+          <>
+            <div className="space-y-2">
             {allOrders.map((order) => {
               const isExpanded = expandedId === order.id;
               const displayStatus = order.orderStatus;
@@ -353,7 +388,7 @@ export default function AdminOrders() {
 
                       {/* 操作按鈕 */}
                       <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
-                        {/* 確認轉帳收款 */}
+                        {/* 確認銀行轉帳收款 */}
                         {order.paymentStatus === "transfer_pending" && (
                           <button
                             onClick={() => confirmTransfer.mutate({ orderId: order.id })}
@@ -444,7 +479,35 @@ export default function AdminOrders() {
                 </div>
               );
             })}
-          </div>
+            </div>
+            {(page > 0 || allOrders.length === PAGE_SIZE) && (
+              <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-body text-[oklch(0.45_0_0)]">
+                <p>
+                  本頁 {allOrders.length} 筆
+                  {allOrders.length === PAGE_SIZE ? "（可能還有下一頁）" : ""}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={page === 0 || isFetching}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className="px-3 py-2 border border-[oklch(0.88_0_0)] bg-white text-[oklch(0.25_0_0)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.98_0_0)]"
+                  >
+                    上一頁
+                  </button>
+                  <span className="px-2 tabular-nums">第 {page + 1} 頁</span>
+                  <button
+                    type="button"
+                    disabled={allOrders.length < PAGE_SIZE || isFetching}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-2 border border-[oklch(0.88_0_0)] bg-white text-[oklch(0.25_0_0)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.98_0_0)]"
+                  >
+                    下一頁
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

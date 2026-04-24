@@ -254,6 +254,8 @@ export async function getOrderStats() {
     totalOrders: allOrders.length,
     pendingPayment: allOrders.filter((o) => o.orderStatus === "pending_payment").length,
     transferPending: allOrders.filter((o) => o.paymentStatus === "transfer_pending").length,
+    /** 已付款／備貨中，後台「待出貨」統計用 */
+    toShip: allOrders.filter((o) => o.orderStatus === "paid" || o.orderStatus === "processing").length,
     paid: allOrders.filter((o) => o.orderStatus === "paid").length,
     shipped: allOrders.filter((o) => o.orderStatus === "shipped").length,
     completed: allOrders.filter((o) => o.orderStatus === "completed").length,

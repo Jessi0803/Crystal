@@ -488,7 +488,7 @@ function buildCreditPaymentParams(opts) {
 }
 
 // server/orderDb.ts
-import { eq as eq2, desc, and as and2, gte, sql as sql2 } from "drizzle-orm";
+import { eq as eq2, desc, and as and2, gte, sql as sql2, inArray } from "drizzle-orm";
 
 // server/_core/emailNormalize.ts
 function normalizeOrderEmail(email) {
@@ -650,6 +650,27 @@ async function markEmailVerified(userId) {
 
 // server/orderDb.ts
 init_schema();
+async function attachItemsAndLogisticsForOrders(db, orderRows) {
+  if (orderRows.length === 0) return [];
+  const orderIds = orderRows.map((o) => o.id);
+  const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds));
+  const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+  const itemsByOrder = /* @__PURE__ */ new Map();
+  for (const item of allItems) {
+    const arr = itemsByOrder.get(item.orderId) ?? [];
+    arr.push(item);
+    itemsByOrder.set(item.orderId, arr);
+  }
+  const logisticsByOrder = /* @__PURE__ */ new Map();
+  for (const log of allLogistics) {
+    logisticsByOrder.set(log.orderId, log);
+  }
+  return orderRows.map((order) => ({
+    ...order,
+    items: itemsByOrder.get(order.id) ?? [],
+    logistics: logisticsByOrder.get(order.id) ?? null
+  }));
+}
 async function createOrder(orderData, items) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -713,22 +734,12 @@ async function updateOrderStatus(merchantTradeNo, orderStatus) {
 async function getAllOrders(limit = 100, offset = 0, statusFilter) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  let allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
+  let statusWhere;
   if (statusFilter && statusFilter !== "all") {
-    if (statusFilter === "transfer_pending") {
-      allOrders = allOrders.filter((o) => o.paymentStatus === "transfer_pending");
-    } else {
-      allOrders = allOrders.filter((o) => o.orderStatus === statusFilter);
-    }
+    statusWhere = statusFilter === "transfer_pending" ? eq2(orders.paymentStatus, "transfer_pending") : eq2(orders.orderStatus, statusFilter);
   }
-  const ordersWithItems = await Promise.all(
-    allOrders.map(async (order) => {
-      const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
-      const [logistics] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1);
-      return { ...order, items, logistics: logistics ?? null };
-    })
-  );
-  return ordersWithItems;
+  const allOrders = statusWhere ? await db.select().from(orders).where(statusWhere).orderBy(desc(orders.createdAt)).limit(limit).offset(offset) : await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
+  return attachItemsAndLogisticsForOrders(db, allOrders);
 }
 async function getOrderStats() {
   const db = await getDb();
@@ -738,6 +749,8 @@ async function getOrderStats() {
     totalOrders: allOrders.length,
     pendingPayment: allOrders.filter((o) => o.orderStatus === "pending_payment").length,
     transferPending: allOrders.filter((o) => o.paymentStatus === "transfer_pending").length,
+    /** 已付款／備貨中，後台「待出貨」統計用 */
+    toShip: allOrders.filter((o) => o.orderStatus === "paid" || o.orderStatus === "processing").length,
     paid: allOrders.filter((o) => o.orderStatus === "paid").length,
     shipped: allOrders.filter((o) => o.orderStatus === "shipped").length,
     completed: allOrders.filter((o) => o.orderStatus === "completed").length,
@@ -814,28 +827,14 @@ async function getOrdersByUserId(userId) {
   const db = await getDb();
   if (!db) return [];
   const memberOrders = await db.select().from(orders).where(eq2(orders.userId, userId)).orderBy(desc(orders.createdAt)).limit(50);
-  const ordersWithItems = await Promise.all(
-    memberOrders.map(async (order) => {
-      const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
-      const [logistics] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1);
-      return { ...order, items, logistics: logistics ?? null };
-    })
-  );
-  return ordersWithItems;
+  return attachItemsAndLogisticsForOrders(db, memberOrders);
 }
 async function getOrdersByEmail(email) {
   const db = await getDb();
   if (!db) return [];
   const key = normalizeOrderEmail(email);
   const memberOrders = await db.select().from(orders).where(sql2`LOWER(TRIM(${orders.buyerEmail})) = ${key}`).orderBy(desc(orders.createdAt)).limit(50);
-  const ordersWithItems = await Promise.all(
-    memberOrders.map(async (order) => {
-      const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
-      const [logistics] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1);
-      return { ...order, items, logistics: logistics ?? null };
-    })
-  );
-  return ordersWithItems;
+  return attachItemsAndLogisticsForOrders(db, memberOrders);
 }
 
 // server/ecpayLogistics.ts
