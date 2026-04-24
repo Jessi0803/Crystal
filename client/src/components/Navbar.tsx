@@ -6,7 +6,7 @@ import { Search, ShoppingBag, Heart, User, Menu, X, ChevronDown } from "lucide-r
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { BRAND_LOGO_SRC, BrandTextMark } from "./BrandMark";
+import { BrandTextMark } from "./BrandMark";
 
 const categorySubLinks = [
   { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
@@ -166,7 +166,6 @@ export default function Navbar() {
   const [mobileCatOpen, setMobileCatOpen] = useState(false);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [navLogoFailed, setNavLogoFailed] = useState(false);
   const { totalItems, setIsOpen } = useCart();
   const [location] = useLocation();
 
@@ -195,19 +194,7 @@ export default function Navbar() {
             <div className="flex items-center gap-8">
               {/* Left: Logo */}
               <Link href="/" className="flex items-center shrink-0">
-                {navLogoFailed ? (
-                  <BrandTextMark />
-                ) : (
-                  <img
-                    src={BRAND_LOGO_SRC}
-                    alt="椛 Crystal 能量水晶"
-                    width={148}
-                    height={40}
-                    className="h-9 w-auto max-h-9 max-w-[min(148px,40vw)] object-contain object-left"
-                    onError={() => setNavLogoFailed(true)}
-                    decoding="async"
-                  />
-                )}
+                <BrandTextMark />
               </Link>
 
               {/* Left nav: 最新商品、商品分類、購物說明、聯絡我們 */}
