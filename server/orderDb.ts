@@ -717,6 +717,37 @@ export async function updateBalancePaymentStatus(
   return balance;
 }
 
+export async function updateBalancePaymentTransferCode(
+  merchantTradeNo: string,
+  lastFive: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(orderBalancePayments)
+    .set({ transferLastFive: lastFive, paymentStatus: "transfer_pending" })
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo));
+}
+
+export async function confirmBalanceTransfer(merchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [balance] = await db
+    .select()
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!balance) throw new Error("Balance payment not found");
+
+  await db
+    .update(orderBalancePayments)
+    .set({ paymentStatus: "paid", paidAt: new Date() })
+    .where(eq(orderBalancePayments.id, balance.id));
+
+  await db.update(orders).set({ orderStatus: "paid" }).where(eq(orders.id, balance.orderId));
+}
+
 export function isCustomDepositProduct(items: { id: string; baseProductId?: string }[]) {
   return items.some((item) => (item.baseProductId ?? item.id) === CUSTOM_PRODUCT_ID);
 }

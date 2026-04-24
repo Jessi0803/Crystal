@@ -146,6 +146,14 @@ function OrderRowCard({
     onError: (err) => toast.error(err.message || "產生尾款連結失敗"),
   });
 
+  const confirmBalanceTransfer = trpc.order.confirmBalanceTransfer.useMutation({
+    onSuccess: async () => {
+      await utils.order.getOrderDetail.invalidate({ orderId: order.id });
+      toast.success("尾款已確認收款，訂單狀態已更新");
+    },
+    onError: (err) => toast.error(err.message || "確認失敗"),
+  });
+
   const displayStatus = order.orderStatus;
 
   return (
@@ -348,22 +356,47 @@ function OrderRowCard({
                   <p className="font-medium mb-1">尾款資訊</p>
                   <p>尾款編號：{detail.balancePayment.merchantTradeNo}</p>
                   <p>尾款金額：NT$ {detail.balancePayment.amount.toLocaleString()}</p>
-                  <p>尾款狀態：{detail.balancePayment.paymentStatus === "paid" ? "已付款" : detail.balancePayment.paymentStatus === "failed" ? "付款失敗" : "待付款"}</p>
-                  <button
-                    onClick={async () => {
-                      const link = `${window.location.origin}/balance/${encodeURIComponent(detail.balancePayment!.merchantTradeNo)}`;
-                      try {
-                        await navigator.clipboard.writeText(link);
-                        toast.success("尾款連結已複製");
-                      } catch {
-                        toast.success(link);
-                      }
-                    }}
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    複製尾款連結
-                  </button>
+                  <p>付款方式：{(detail.balancePayment as any).paymentMethod === "atm" ? "轉帳" : "信用卡"}</p>
+                  <p>尾款狀態：{
+                    detail.balancePayment.paymentStatus === "paid" ? "✅ 已付款"
+                    : (detail.balancePayment.paymentStatus as string) === "transfer_pending" ? "⏳ 轉帳待確認"
+                    : detail.balancePayment.paymentStatus === "failed" ? "❌ 付款失敗"
+                    : "待付款"
+                  }</p>
+                  {(detail.balancePayment as any).transferLastFive && (
+                    <p>匯款末五碼：<strong>{(detail.balancePayment as any).transferLastFive}</strong></p>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <button
+                      onClick={async () => {
+                        const link = `${window.location.origin}/balance/${encodeURIComponent(detail.balancePayment!.merchantTradeNo)}`;
+                        try {
+                          await navigator.clipboard.writeText(link);
+                          toast.success("尾款連結已複製");
+                        } catch {
+                          toast.success(link);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      複製尾款連結
+                    </button>
+                    {(detail.balancePayment.paymentStatus as string) === "transfer_pending" && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm("確認已收到尾款轉帳？")) {
+                            confirmBalanceTransfer.mutate({ merchantTradeNo: detail.balancePayment!.merchantTradeNo });
+                          }
+                        }}
+                        disabled={confirmBalanceTransfer.isPending}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-60"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        確認收到尾款
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </>

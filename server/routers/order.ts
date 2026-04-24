@@ -26,6 +26,8 @@ import {
   isCustomDepositProduct,
   createOrReplaceBalancePayment,
   getBalancePaymentDetail,
+  updateBalancePaymentTransferCode,
+  confirmBalanceTransfer,
 } from "../orderDb";
 import { acquireInventoryLock, releaseExpiredLocks } from "../inventoryDb";
 import {
@@ -627,6 +629,7 @@ export const orderRouter = router({
     .input(
       z.object({
         merchantTradeNo: z.string().min(1),
+        paymentMethod: z.enum(["credit", "atm"]),
         origin: z.string().url(),
       })
     )
@@ -637,6 +640,27 @@ export const orderRouter = router({
       }
       if (balancePayment.paymentStatus === "paid") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
+      }
+
+      const { getDb } = await import("../db");
+      const { orderBalancePayments } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      await db.update(orderBalancePayments)
+        .set({ paymentMethod: input.paymentMethod })
+        .where(eq(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
+
+      if (input.paymentMethod === "atm") {
+        return {
+          kind: "atm" as const,
+          bankInfo: {
+            bankName: process.env.BANK_NAME ?? "",
+            accountName: process.env.BANK_ACCOUNT_NAME ?? "",
+            accountNumber: process.env.BANK_ACCOUNT_NUMBER ?? "",
+          },
+        };
       }
 
       const paymentParams = buildCreditPaymentParams({
@@ -650,9 +674,27 @@ export const orderRouter = router({
       });
 
       return {
+        kind: "credit" as const,
         paymentURL: ECPAY_CONFIG.PaymentURL,
         paymentParams,
       };
+    }),
+
+  submitBalanceTransferCode: publicProcedure
+    .input(z.object({
+      merchantTradeNo: z.string().min(1),
+      lastFive: z.string().length(5).regex(/^\d+$/),
+    }))
+    .mutation(async ({ input }) => {
+      await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive);
+      return { success: true };
+    }),
+
+  confirmBalanceTransfer: adminProcedure
+    .input(z.object({ merchantTradeNo: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      await confirmBalanceTransfer(input.merchantTradeNo);
+      return { success: true };
     }),
 
   /**
