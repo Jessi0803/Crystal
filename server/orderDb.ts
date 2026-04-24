@@ -23,7 +23,19 @@ export type OrderWithItemsAndLogistics = OrderRow & {
   logistics: LogisticsRow | null;
 };
 
-export type AdminOrderListItem = OrderRow & {
+export type AdminOrderListItem = Pick<
+  OrderRow,
+  | "id"
+  | "merchantTradeNo"
+  | "paymentStatus"
+  | "paymentMethod"
+  | "shippingMethod"
+  | "orderStatus"
+  | "isPreorder"
+  | "totalAmount"
+  | "buyerName"
+  | "createdAt"
+> & {
   itemCount: number;
   hasLogistics: boolean;
 };
@@ -265,16 +277,29 @@ export async function getAdminOrderSummaries(
         : eq(orders.orderStatus, statusFilter as OrderRow["orderStatus"]);
   }
 
+  const summarySelect = {
+    id: orders.id,
+    merchantTradeNo: orders.merchantTradeNo,
+    paymentStatus: orders.paymentStatus,
+    paymentMethod: orders.paymentMethod,
+    shippingMethod: orders.shippingMethod,
+    orderStatus: orders.orderStatus,
+    isPreorder: orders.isPreorder,
+    totalAmount: orders.totalAmount,
+    buyerName: orders.buyerName,
+    createdAt: orders.createdAt,
+  };
+
   const orderRows = statusWhere
     ? await db
-        .select()
+        .select(summarySelect)
         .from(orders)
         .where(statusWhere)
         .orderBy(desc(orders.createdAt))
         .limit(limit)
         .offset(offset)
     : await db
-        .select()
+        .select(summarySelect)
         .from(orders)
         .orderBy(desc(orders.createdAt))
         .limit(limit)

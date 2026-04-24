@@ -50,8 +50,8 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string; do
   cancelled: { label: "已取消", className: "bg-gray-50 text-gray-600 border-gray-200", dot: "bg-gray-400" },
 };
 
-/** 後台列表單次載入上限（與 API zod max 一致）；統計改走聚合 SQL，不再全表載入 */
-const LIST_LIMIT = 500;
+/** 後台列表單次載入上限；先壓低單次 payload，避免 tab 切換卡住 */
+const LIST_LIMIT = 100;
 
 const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "全部" },
@@ -312,7 +312,7 @@ export default function AdminOrders() {
       staleTime: 60_000,
     });
 
-  const { data: orders, isLoading, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
+  const { data: orders, isLoading, error: ordersError, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
     { status: statusFilter, limit: LIST_LIMIT, offset: 0 },
     {
       enabled: user?.role === "admin",
@@ -478,6 +478,12 @@ export default function AdminOrders() {
           <div className="bg-white border border-[oklch(0.93_0_0)] p-12 text-center">
             <div className="w-8 h-8 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm font-body text-[oklch(0.5_0_0)]">載入訂單中...</p>
+          </div>
+        ) : ordersError ? (
+          <div className="bg-white border border-red-200 p-12 text-center">
+            <XCircle className="w-10 h-10 text-red-400 mx-auto mb-4" />
+            <p className="text-sm font-body text-red-700 mb-2">載入訂單失敗</p>
+            <p className="text-xs font-body text-red-500 break-all">{ordersError.message}</p>
           </div>
         ) : allOrders.length === 0 ? (
           <div className="bg-white border border-[oklch(0.93_0_0)] p-16 text-center">
