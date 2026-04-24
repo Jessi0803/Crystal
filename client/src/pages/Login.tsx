@@ -11,7 +11,7 @@ export default function Login() {
   const loginMutation = trpc.member.login.useMutation({
     onSuccess: () => {
       toast.success("登入成功，歡迎回來！");
-      navigate("/member");
+      navigate("/products");
     },
     onError: (err) => {
       toast.error(err.message || "登入失敗，請稍後再試");
