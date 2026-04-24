@@ -108,7 +108,10 @@ export default function AdminOrders() {
 
   const { data: orders, isLoading, refetch, isFetching } = trpc.order.listOrders.useQuery(
     { status: statusFilter },
-    { enabled: user?.role === "admin" }
+    {
+      enabled: user?.role === "admin",
+      staleTime: 30_000,
+    }
   );
 
   const confirmTransfer = trpc.order.confirmTransfer.useMutation({

@@ -1,7 +1,7 @@
 /**
  * 訂單資料庫查詢函式
  */
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, sql, inArray, SQL } from "drizzle-orm";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { getDb } from "./db";
 import {
@@ -12,6 +12,46 @@ import {
   InsertOrderItem,
   InsertLogisticsOrder,
 } from "../drizzle/schema";
+
+type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type OrderRow = typeof orders.$inferSelect;
+type OrderItemRow = typeof orderItems.$inferSelect;
+type LogisticsRow = typeof logisticsOrders.$inferSelect;
+
+export type OrderWithItemsAndLogistics = OrderRow & {
+  items: OrderItemRow[];
+  logistics: LogisticsRow | null;
+};
+
+/** 批次載入商品明細與物流，避免 N+1 查詢（管理後台 list、會員訂單） */
+async function attachItemsAndLogisticsForOrders(
+  db: DbInstance,
+  orderRows: OrderRow[]
+): Promise<OrderWithItemsAndLogistics[]> {
+  if (orderRows.length === 0) return [];
+
+  const orderIds = orderRows.map((o) => o.id);
+  const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds));
+  const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+
+  const itemsByOrder = new Map<number, OrderItemRow[]>();
+  for (const item of allItems) {
+    const arr = itemsByOrder.get(item.orderId) ?? [];
+    arr.push(item);
+    itemsByOrder.set(item.orderId, arr);
+  }
+
+  const logisticsByOrder = new Map<number, LogisticsRow>();
+  for (const log of allLogistics) {
+    logisticsByOrder.set(log.orderId, log);
+  }
+
+  return orderRows.map((order) => ({
+    ...order,
+    items: itemsByOrder.get(order.id) ?? [],
+    logistics: logisticsByOrder.get(order.id) ?? null,
+  }));
+}
 
 export async function createOrder(
   orderData: InsertOrder,
@@ -178,40 +218,30 @@ export async function getAllOrders(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  let allOrders = await db
-    .select()
-    .from(orders)
-    .orderBy(desc(orders.createdAt))
-    .limit(limit)
-    .offset(offset);
-
-  // 篩選：transfer_pending 對應 paymentStatus，其他對應 orderStatus
+  let statusWhere: SQL | undefined;
   if (statusFilter && statusFilter !== "all") {
-    if (statusFilter === "transfer_pending") {
-      allOrders = allOrders.filter((o) => o.paymentStatus === "transfer_pending");
-    } else {
-      allOrders = allOrders.filter((o) => o.orderStatus === statusFilter);
-    }
+    statusWhere =
+      statusFilter === "transfer_pending"
+        ? eq(orders.paymentStatus, "transfer_pending")
+        : eq(orders.orderStatus, statusFilter as OrderRow["orderStatus"]);
   }
 
-  const ordersWithItems = await Promise.all(
-    allOrders.map(async (order) => {
-      const items = await db!
+  const allOrders = statusWhere
+    ? await db
         .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, order.id));
-
-      const [logistics] = await db!
+        .from(orders)
+        .where(statusWhere)
+        .orderBy(desc(orders.createdAt))
+        .limit(limit)
+        .offset(offset)
+    : await db
         .select()
-        .from(logisticsOrders)
-        .where(eq(logisticsOrders.orderId, order.id))
-        .limit(1);
+        .from(orders)
+        .orderBy(desc(orders.createdAt))
+        .limit(limit)
+        .offset(offset);
 
-      return { ...order, items, logistics: logistics ?? null };
-    })
-  );
-
-  return ordersWithItems;
+  return attachItemsAndLogisticsForOrders(db, allOrders);
 }
 
 export async function getOrderStats() {
@@ -374,24 +404,7 @@ export async function getOrdersByUserId(userId: number) {
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
-  const ordersWithItems = await Promise.all(
-    memberOrders.map(async (order) => {
-      const items = await db!
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, order.id));
-
-      const [logistics] = await db!
-        .select()
-        .from(logisticsOrders)
-        .where(eq(logisticsOrders.orderId, order.id))
-        .limit(1);
-
-      return { ...order, items, logistics: logistics ?? null };
-    })
-  );
-
-  return ordersWithItems;
+  return attachItemsAndLogisticsForOrders(db, memberOrders);
 }
 
 /** 依 buyerEmail 查詢該會員的所有訂單（含商品明細） */
@@ -407,22 +420,5 @@ export async function getOrdersByEmail(email: string) {
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
-  const ordersWithItems = await Promise.all(
-    memberOrders.map(async (order) => {
-      const items = await db!
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, order.id));
-
-      const [logistics] = await db!
-        .select()
-        .from(logisticsOrders)
-        .where(eq(logisticsOrders.orderId, order.id))
-        .limit(1);
-
-      return { ...order, items, logistics: logistics ?? null };
-    })
-  );
-
-  return ordersWithItems;
+  return attachItemsAndLogisticsForOrders(db, memberOrders);
 }
