@@ -3,7 +3,7 @@
  * 路由：/admin/orders
  * 僅限 admin 角色存取
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import {
   CheckCircle,
@@ -27,6 +27,15 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 type StatusFilter =
   | "all"
@@ -50,8 +59,8 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string; do
   cancelled: { label: "已取消", className: "bg-gray-50 text-gray-600 border-gray-200", dot: "bg-gray-400" },
 };
 
-/** 後台列表單次載入上限；先壓低單次 payload，避免 tab 切換卡住 */
-const LIST_LIMIT = 100;
+const PAGE_SIZE_OPTIONS = [50, 100] as const;
+const DEFAULT_PAGE_SIZE = 50;
 
 const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "全部" },
@@ -305,6 +314,8 @@ export default function AdminOrders() {
   const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   const { data: dashStats, isLoading: dashStatsLoading, isFetching: dashStatsFetching, refetch: refetchDashStats } =
     trpc.order.getStats.useQuery(undefined, {
@@ -313,12 +324,17 @@ export default function AdminOrders() {
     });
 
   const { data: orders, isLoading, error: ordersError, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
-    { status: statusFilter, limit: LIST_LIMIT, offset: 0 },
+    { status: statusFilter, limit: pageSize, offset: (page - 1) * pageSize },
     {
       enabled: user?.role === "admin",
       staleTime: 30_000,
     }
   );
+
+  useEffect(() => {
+    setPage(1);
+    setExpandedId(null);
+  }, [statusFilter, pageSize]);
 
   const refetchListAndStats = () => {
     void refetchOrders();
@@ -371,7 +387,12 @@ export default function AdminOrders() {
     );
   }
 
-  const allOrders = orders ?? [];
+  const allOrders = orders?.items ?? [];
+  const totalOrders = orders?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startItem = totalOrders === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endItem = totalOrders === 0 ? 0 : Math.min(currentPage * pageSize, totalOrders);
   const stats = {
     total: dashStats?.totalOrders ?? 0,
     transferPending: dashStats?.transferPending ?? 0,
@@ -391,6 +412,25 @@ export default function AdminOrders() {
     if (method === "cvs_family") return "全家超商";
     if (method === "home") return "宅配";
     return method;
+  };
+
+  const getPageNumbers = () => {
+    const pages: Array<number | "ellipsis"> = [];
+    const addPage = (value: number | "ellipsis") => pages.push(value);
+
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) addPage(i);
+      return pages;
+    }
+
+    addPage(1);
+    if (currentPage > 3) addPage("ellipsis");
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      addPage(i);
+    }
+    if (currentPage < totalPages - 2) addPage("ellipsis");
+    addPage(totalPages);
+    return pages;
   };
 
   return (
@@ -470,7 +510,7 @@ export default function AdminOrders() {
         </div>
 
         <p className="text-[11px] font-body text-[oklch(0.5_0_0)] mb-4 -mt-2">
-          列表依建立時間顯示最多 {LIST_LIMIT} 筆（目前篩選）；上方數字為全站統計。超過 {LIST_LIMIT} 筆時請用狀態分頁查看。
+          目前顯示第 {currentPage} / {totalPages} 頁，共 {totalOrders} 筆；本頁 {startItem}-{endItem} 筆。
         </p>
 
         {/* Orders List */}
@@ -507,6 +547,81 @@ export default function AdminOrders() {
                 />
               );
             })}
+          </div>
+        )}
+
+        {!isLoading && !ordersError && totalOrders > 0 && (
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3 text-sm font-body text-[oklch(0.5_0_0)]">
+              <span>每頁</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="px-3 py-2 border border-[oklch(0.88_0_0)] bg-white text-sm text-[oklch(0.4_0_0)] focus:outline-none focus:border-[oklch(0.5_0_0)]"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} 筆
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentPage > 1) {
+                        setExpandedId(null);
+                        setPage(currentPage - 1);
+                      }
+                    }}
+                    aria-disabled={currentPage === 1}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+
+                {getPageNumbers().map((pageNumber, index) => (
+                  pageNumber === "ellipsis" ? (
+                    <PaginationItem key={`ellipsis-${index}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        href="#"
+                        isActive={pageNumber === currentPage}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setExpandedId(null);
+                          setPage(pageNumber);
+                        }}
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentPage < totalPages) {
+                        setExpandedId(null);
+                        setPage(currentPage + 1);
+                      }
+                    }}
+                    aria-disabled={currentPage === totalPages}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
         )}
       </div>

@@ -40,6 +40,13 @@ export type AdminOrderListItem = Pick<
   hasLogistics: boolean;
 };
 
+export type AdminOrdersPage = {
+  items: AdminOrderListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 /** 批次載入商品明細與物流，避免 N+1 查詢（管理後台 list、會員訂單） */
 async function attachItemsAndLogisticsForOrders(
   db: DbInstance,
@@ -261,21 +268,23 @@ export async function getAllOrders(
   return attachItemsAndLogisticsForOrders(db, allOrders);
 }
 
+function buildOrderStatusWhere(statusFilter?: string): SQL | undefined {
+  if (!statusFilter || statusFilter === "all") return undefined;
+
+  return statusFilter === "transfer_pending"
+    ? eq(orders.paymentStatus, "transfer_pending")
+    : eq(orders.orderStatus, statusFilter as OrderRow["orderStatus"]);
+}
+
 export async function getAdminOrderSummaries(
   limit = 100,
   offset = 0,
   statusFilter?: string
-): Promise<AdminOrderListItem[]> {
+): Promise<AdminOrdersPage> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  let statusWhere: SQL | undefined;
-  if (statusFilter && statusFilter !== "all") {
-    statusWhere =
-      statusFilter === "transfer_pending"
-        ? eq(orders.paymentStatus, "transfer_pending")
-        : eq(orders.orderStatus, statusFilter as OrderRow["orderStatus"]);
-  }
+  const statusWhere = buildOrderStatusWhere(statusFilter);
 
   const summarySelect = {
     id: orders.id,
@@ -305,7 +314,26 @@ export async function getAdminOrderSummaries(
         .limit(limit)
         .offset(offset);
 
-  if (orderRows.length === 0) return [];
+  const [totalRow] = statusWhere
+    ? await db
+        .select({ count: sql<number>`CAST(COUNT(*) AS SIGNED)` })
+        .from(orders)
+        .where(statusWhere)
+    : await db
+        .select({ count: sql<number>`CAST(COUNT(*) AS SIGNED)` })
+        .from(orders);
+
+  const total = Number(totalRow?.count ?? 0);
+  const page = Math.floor(offset / limit) + 1;
+
+  if (orderRows.length === 0) {
+    return {
+      items: [],
+      total,
+      page,
+      pageSize: limit,
+    };
+  }
 
   const orderIds = orderRows.map((order) => order.id);
   const itemCounts = await db
@@ -325,11 +353,16 @@ export async function getAdminOrderSummaries(
   const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
   const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
 
-  return orderRows.map((order) => ({
-    ...order,
-    itemCount: itemCountByOrderId.get(order.id) ?? 0,
-    hasLogistics: logisticsOrderIds.has(order.id),
-  }));
+  return {
+    items: orderRows.map((order) => ({
+      ...order,
+      itemCount: itemCountByOrderId.get(order.id) ?? 0,
+      hasLogistics: logisticsOrderIds.has(order.id),
+    })),
+    total,
+    page,
+    pageSize: limit,
+  };
 }
 
 export async function getAdminOrderDetail(orderId: number): Promise<OrderWithItemsAndLogistics | null> {
