@@ -248,36 +248,37 @@ export async function getOrderStats() {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const allOrders = await db.select().from(orders);
-
-  const stats = {
-    totalOrders: allOrders.length,
-    pendingPayment: allOrders.filter((o) => o.orderStatus === "pending_payment").length,
-    transferPending: allOrders.filter((o) => o.paymentStatus === "transfer_pending").length,
-    /** 已付款／備貨中，後台「待出貨」統計用 */
-    toShip: allOrders.filter((o) => o.orderStatus === "paid" || o.orderStatus === "processing").length,
-    paid: allOrders.filter((o) => o.orderStatus === "paid").length,
-    shipped: allOrders.filter((o) => o.orderStatus === "shipped").length,
-    completed: allOrders.filter((o) => o.orderStatus === "completed").length,
-    totalRevenue: allOrders
-      .filter((o) => ["paid", "processing", "shipped", "arrived", "completed"].includes(o.orderStatus))
-      .reduce((sum, o) => sum + o.totalAmount, 0),
-    monthRevenue: 0,
-  };
-
-  // 本月營收
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  stats.monthRevenue = allOrders
-    .filter(
-      (o) =>
-        ["paid", "processing", "shipped", "arrived", "completed"].includes(o.orderStatus) &&
-        o.paidAt &&
-        o.paidAt >= monthStart
-    )
-    .reduce((sum, o) => sum + o.totalAmount, 0);
 
-  return stats;
+  /** 單次聚合，避免載入整張 orders 表（訂單多時後台／營收頁會極慢） */
+  const [row] = await db
+    .select({
+      totalOrders: sql<number>`CAST(COUNT(*) AS SIGNED)`,
+      pendingPayment: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'pending_payment' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      transferPending: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.paymentStatus} = 'transfer_pending' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      toShip: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing') THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      paid: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'paid' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      shipped: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'shipped' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      completed: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'completed' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      totalRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed') THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
+      monthRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
+    })
+    .from(orders);
+
+  const n = (v: unknown) => Number(v ?? 0);
+
+  return {
+    totalOrders: n(row?.totalOrders),
+    pendingPayment: n(row?.pendingPayment),
+    transferPending: n(row?.transferPending),
+    toShip: n(row?.toShip),
+    paid: n(row?.paid),
+    shipped: n(row?.shipped),
+    completed: n(row?.completed),
+    totalRevenue: n(row?.totalRevenue),
+    monthRevenue: n(row?.monthRevenue),
+  };
 }
 
 export async function getMonthlyRevenue(months = 6) {

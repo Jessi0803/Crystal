@@ -3,7 +3,7 @@
  * 路由：/admin/orders
  * 僅限 admin 角色存取
  */
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   CheckCircle,
@@ -51,7 +51,8 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string; do
   cancelled: { label: "已取消", className: "bg-gray-50 text-gray-600 border-gray-200", dot: "bg-gray-400" },
 };
 
-const PAGE_SIZE = 100;
+/** 後台列表單次載入上限（與 API zod max 一致）；統計改走聚合 SQL，不再全表載入 */
+const LIST_LIMIT = 500;
 
 const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "全部" },
@@ -106,12 +107,7 @@ export default function AdminOrders() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [page, setPage] = useState(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  useEffect(() => {
-    setPage(0);
-  }, [statusFilter]);
 
   const { data: dashStats, isLoading: dashStatsLoading, isFetching: dashStatsFetching, refetch: refetchDashStats } =
     trpc.order.getStats.useQuery(undefined, {
@@ -120,7 +116,7 @@ export default function AdminOrders() {
     });
 
   const { data: orders, isLoading, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
-    { status: statusFilter, limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+    { status: statusFilter, limit: LIST_LIMIT, offset: 0 },
     {
       enabled: user?.role === "admin",
       staleTime: 30_000,
@@ -276,6 +272,10 @@ export default function AdminOrders() {
           ))}
         </div>
 
+        <p className="text-[11px] font-body text-[oklch(0.5_0_0)] mb-4 -mt-2">
+          列表依建立時間顯示最多 {LIST_LIMIT} 筆（目前篩選）；上方數字為全站統計。超過 {LIST_LIMIT} 筆時請用狀態分頁查看。
+        </p>
+
         {/* Orders List */}
         {isLoading || authLoading ? (
           <div className="bg-white border border-[oklch(0.93_0_0)] p-12 text-center">
@@ -283,24 +283,12 @@ export default function AdminOrders() {
             <p className="text-sm font-body text-[oklch(0.5_0_0)]">載入訂單中...</p>
           </div>
         ) : allOrders.length === 0 ? (
-          <div className="bg-white border border-[oklch(0.93_0_0)] p-16 text-center space-y-4">
+          <div className="bg-white border border-[oklch(0.93_0_0)] p-16 text-center">
             <ShoppingBag className="w-10 h-10 text-[oklch(0.85_0_0)] mx-auto mb-4" />
-            <p className="text-sm font-body text-[oklch(0.5_0_0)]">
-              {page > 0 ? "此頁沒有訂單，請返回上一頁或切換篩選。" : "目前沒有符合條件的訂單"}
-            </p>
-            {page > 0 && (
-              <button
-                type="button"
-                className="text-xs font-body text-[oklch(0.35_0_0)] underline"
-                onClick={() => setPage(0)}
-              >
-                回到第一頁
-              </button>
-            )}
+            <p className="text-sm font-body text-[oklch(0.5_0_0)]">目前沒有符合條件的訂單</p>
           </div>
         ) : (
-          <>
-            <div className="space-y-2">
+          <div className="space-y-2">
             {allOrders.map((order) => {
               const isExpanded = expandedId === order.id;
               const displayStatus = order.orderStatus;
@@ -479,35 +467,7 @@ export default function AdminOrders() {
                 </div>
               );
             })}
-            </div>
-            {(page > 0 || allOrders.length === PAGE_SIZE) && (
-              <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-body text-[oklch(0.45_0_0)]">
-                <p>
-                  本頁 {allOrders.length} 筆
-                  {allOrders.length === PAGE_SIZE ? "（可能還有下一頁）" : ""}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={page === 0 || isFetching}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className="px-3 py-2 border border-[oklch(0.88_0_0)] bg-white text-[oklch(0.25_0_0)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.98_0_0)]"
-                  >
-                    上一頁
-                  </button>
-                  <span className="px-2 tabular-nums">第 {page + 1} 頁</span>
-                  <button
-                    type="button"
-                    disabled={allOrders.length < PAGE_SIZE || isFetching}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="px-3 py-2 border border-[oklch(0.88_0_0)] bg-white text-[oklch(0.25_0_0)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.98_0_0)]"
-                  >
-                    下一頁
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
       </div>
     </div>
