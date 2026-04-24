@@ -717,8 +717,8 @@ export async function updateBalancePaymentStatus(
   return balance;
 }
 
-export function isCustomDepositProduct(items: { id: string }[]) {
-  return items.some((item) => item.id === CUSTOM_PRODUCT_ID);
+export function isCustomDepositProduct(items: { id: string; baseProductId?: string }[]) {
+  return items.some((item) => (item.baseProductId ?? item.id) === CUSTOM_PRODUCT_ID);
 }
 
 /** 依 userId 查詢該會員的所有訂單（含商品明細） */

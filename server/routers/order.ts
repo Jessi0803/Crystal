@@ -61,6 +61,7 @@ function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: st
 
 const CartItemSchema = z.object({
   id: z.string(),
+  baseProductId: z.string().optional(),
   name: z.string(),
   price: z.number(),
   quantity: z.number(),
@@ -217,7 +218,7 @@ export const orderRouter = router({
         orderRow,
         input.items.map((item) => ({
           orderId: 0,
-          productId: item.id,
+          productId: item.baseProductId ?? item.id,
           productName: item.name,
           productImage: item.image ?? "",
           quantity: item.quantity,

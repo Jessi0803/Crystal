@@ -180,6 +180,7 @@ export default function Checkout() {
         items: items
           .map((i) => ({
             id: i.id,
+            baseProductId: i.product.id,
             name: `${i.product.name}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}`,
             price: i.unitPrice,
             quantity: i.quantity,
@@ -187,7 +188,7 @@ export default function Checkout() {
           }))
           .concat(
             shippingFee > 0
-              ? [{ id: "shipping", name: "運費", price: shippingFee, quantity: 1, image: "" }]
+              ? [{ id: "shipping", baseProductId: "shipping", name: "運費", price: shippingFee, quantity: 1, image: "" }]
               : []
           ),
         origin: window.location.origin,
