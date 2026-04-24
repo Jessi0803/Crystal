@@ -195,8 +195,11 @@ const SHIPPING_LABEL: Record<string, string> = {
 };
 
 const PAYMENT_LABEL: Record<string, string> = {
+  credit: "信用卡 / Apple Pay",
   credit_card: "信用卡 / Apple Pay",
+  atm: "銀行轉帳",
   bank_transfer: "銀行轉帳",
+  paypal: "PayPal",
 };
 
 export async function sendOrderConfirmEmail(payload: OrderConfirmPayload) {

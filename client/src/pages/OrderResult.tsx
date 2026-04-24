@@ -3,17 +3,29 @@
  * 路由：/order/:merchantTradeNo
  * 顯示訂單狀態：待付款 / 銀行轉帳待確認 / 已付款 / 付款失敗
  */
-import { useEffect, useState } from "react";
-import { useParams, useLocation } from "wouter";
+import { useEffect, useState, useRef } from "react";
+import { useParams, useLocation, useSearch } from "wouter";
 import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending_payment: "待付款",
+  paid: "已付款・待出貨",
+  processing: "備貨中",
+  shipped: "🚚 已出貨",
+  arrived: "📦 已到店",
+  completed: "✅ 已完成",
+  cancelled: "已取消",
+};
+
 export default function OrderResult() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [transferCode, setTransferCode] = useState("");
   const [codeSubmitted, setCodeSubmitted] = useState(false);
+  const paypalCaptureStarted = useRef(false);
 
   const { data: order, isLoading, refetch } = trpc.order.getOrder.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
@@ -31,6 +43,39 @@ export default function OrderResult() {
     },
     onError: () => toast.error("送出失敗，請重試"),
   });
+
+  const capturePayPal = trpc.order.capturePayPal.useMutation({
+    onSuccess: (data) => {
+      refetch();
+      if (merchantTradeNo) {
+        window.history.replaceState({}, "", `/order/${merchantTradeNo}`);
+      }
+      if (!data.alreadyPaid) {
+        toast.success("付款完成");
+      }
+    },
+    onError: (e) => {
+      paypalCaptureStarted.current = false;
+      toast.error(e.message || "PayPal 扣款失敗");
+    },
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("paypal_cancel") === "1") {
+      toast.info("已取消 PayPal 付款");
+      if (merchantTradeNo) {
+        window.history.replaceState({}, "", `/order/${merchantTradeNo}`);
+      }
+      return;
+    }
+    if (params.get("paypal_return") !== "1" || !merchantTradeNo) return;
+    const token = params.get("token");
+    if (!token) return;
+    if (paypalCaptureStarted.current) return;
+    paypalCaptureStarted.current = true;
+    capturePayPal.mutate({ merchantTradeNo, paypalOrderId: token });
+  }, [search, merchantTradeNo, capturePayPal.mutate]);
 
   const handleSubmitCode = () => {
     if (transferCode.length !== 5 || !/^\d+$/.test(transferCode)) {
@@ -111,6 +156,7 @@ export default function OrderResult() {
     if (!order) return "";
     if (order.paymentMethod === "credit") return "信用卡 / Apple Pay";
     if (order.paymentMethod === "atm") return "銀行轉帳";
+    if (order.paymentMethod === "paypal") return "PayPal";
     return order.paymentMethod;
   };
 
@@ -118,7 +164,10 @@ export default function OrderResult() {
     if (!order) return "";
     if (order.shippingMethod === "cvs_711") return `7-11 超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
     if (order.shippingMethod === "cvs_family") return `全家超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
-    if (order.shippingMethod === "home") return `宅配${order.shippingAddress ? `（${order.shippingAddress}）` : ""}`;
+    if (order.shippingMethod === "home") {
+      const addr = order.shippingAddress?.replace(/\n/g, " ") ?? "";
+      return `宅配${addr ? `（${addr}）` : ""}`;
+    }
     return order.shippingMethod ?? "";
   };
 
@@ -160,6 +209,11 @@ export default function OrderResult() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-8 py-12">
+        {capturePayPal.isPending && (
+          <div className="mb-6 p-4 border border-amber-200 bg-amber-50 text-sm font-body text-amber-900 text-center">
+            正在完成 PayPal 扣款，請勿關閉此頁面…
+          </div>
+        )}
         {/* Status Card */}
         <div className={`${statusConfig.bg} p-8 text-center mb-8`}>
           <div className="flex justify-center mb-4">{statusConfig.icon}</div>
@@ -261,15 +315,7 @@ export default function OrderResult() {
               },
               {
                 label: "訂單狀態",
-                value: {
-                  pending_payment: "待付款",
-                  paid: "已付款・待出貨",
-                  processing: "備貨中",
-                  shipped: "🚚 已出貨",
-                  arrived: "📦 已到店",
-                  completed: "✅ 已完成",
-                  cancelled: "已取消",
-                }[order.orderStatus] ?? order.orderStatus,
+                value: ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus,
               },
               { label: "訂單金額", value: `NT$ ${order.totalAmount.toLocaleString()}` },
               { label: "購買人", value: order.buyerName },

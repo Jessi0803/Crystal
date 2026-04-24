@@ -165,6 +165,7 @@ export default function AdminOrders() {
   const getPaymentLabel = (method: string) => {
     if (method === "credit") return "信用卡";
     if (method === "atm") return "銀行轉帳";
+    if (method === "paypal") return "PayPal";
     return method;
   };
 

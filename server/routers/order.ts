@@ -3,6 +3,7 @@
  * 處理：建立訂單、產生綠界付款表單參數、查詢訂單狀態、銀行轉帳確認
  */
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   generateMerchantTradeNo,
@@ -20,6 +21,7 @@ import {
   getTopProducts,
   updateOrderStatus as dbUpdateOrderStatus,
   createLogisticsOrder,
+  markOrderPaidPayPal,
 } from "../orderDb";
 import { acquireInventoryLock, releaseExpiredLocks } from "../inventoryDb";
 import {
@@ -31,6 +33,11 @@ import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
 import { orders, logisticsOrders } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import {
+  createPayPalCheckoutOrder,
+  verifyPayPalOrderBelongsToMerchant,
+  capturePayPalOrder,
+} from "../_core/paypal";
 
 const CartItemSchema = z.object({
   id: z.string(),
@@ -49,26 +56,75 @@ export const orderRouter = router({
    */
   createAndPay: publicProcedure
     .input(
-      z.object({
-        buyerName: z.string().min(1),
-        buyerEmail: z.string().email(),
-        buyerPhone: z.string().min(8),
-        paymentMethod: z.enum(["credit", "atm"]),
-        shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
-        // 超商取貨資訊
-        cvsStoreId: z.string().optional(),
-        cvsStoreName: z.string().optional(),
-        cvsType: z.string().optional(),
-        // 宅配地址
-        shippingAddress: z.string().optional(),
-        receiverZipCode: z.string().optional(),
-        items: z.array(CartItemSchema).min(1),
-        origin: z.string(),
-        // 庫存鎖定 session token
-        sessionToken: z.string().optional(),
-      })
+      z
+        .object({
+          buyerName: z.string().min(1),
+          buyerEmail: z.string().email(),
+          buyerPhone: z.string().min(8),
+          checkoutRegion: z.enum(["domestic", "overseas"]),
+          paymentMethod: z.enum(["credit", "atm"]),
+          shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
+          cvsStoreId: z.string().optional(),
+          cvsStoreName: z.string().optional(),
+          cvsType: z.string().optional(),
+          shippingAddress: z.string().optional(),
+          receiverZipCode: z.string().optional(),
+          intlCountry: z.string().optional(),
+          intlPostalCode: z.string().optional(),
+          intlCity: z.string().optional(),
+          intlAddressLine: z.string().optional(),
+          items: z.array(CartItemSchema).min(1),
+          origin: z.string(),
+          sessionToken: z.string().optional(),
+        })
+        .superRefine((data, ctx) => {
+          if (data.checkoutRegion === "domestic") {
+            const phone = data.buyerPhone.replace(/\s/g, "");
+            if (!/^09\d{8}$/.test(phone)) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請輸入台灣手機格式（09 開頭共 10 碼）",
+                path: ["buyerPhone"],
+              });
+            }
+            if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
+              if (!data.cvsStoreId?.trim()) {
+                ctx.addIssue({ code: "custom", message: "請選擇超商門市", path: ["cvsStoreId"] });
+              }
+            }
+            if (data.shippingMethod === "home") {
+              if (!data.shippingAddress?.trim()) {
+                ctx.addIssue({ code: "custom", message: "請填寫收件地址", path: ["shippingAddress"] });
+              }
+              const zip = data.receiverZipCode?.trim() ?? "";
+              if (!/^\d{3,6}$/.test(zip)) {
+                ctx.addIssue({ code: "custom", message: "請填寫郵遞區號", path: ["receiverZipCode"] });
+              }
+            }
+          } else {
+            if (data.buyerPhone.trim().length < 8) {
+              ctx.addIssue({ code: "custom", message: "請填寫聯絡電話", path: ["buyerPhone"] });
+            }
+            if (!data.intlCountry?.trim()) {
+              ctx.addIssue({ code: "custom", message: "請填寫國家／地區", path: ["intlCountry"] });
+            }
+            if (!data.intlPostalCode?.trim()) {
+              ctx.addIssue({ code: "custom", message: "請填寫郵遞區號", path: ["intlPostalCode"] });
+            }
+            if (!data.intlCity?.trim()) {
+              ctx.addIssue({ code: "custom", message: "請填寫城市", path: ["intlCity"] });
+            }
+            if (!data.intlAddressLine?.trim()) {
+              ctx.addIssue({ code: "custom", message: "請填寫街道地址", path: ["intlAddressLine"] });
+            }
+          }
+        })
     )
     .mutation(async ({ input, ctx }) => {
+      const isOverseas = input.checkoutRegion === "overseas";
+      const shippingMethod = isOverseas ? ("home" as const) : input.shippingMethod;
+      const paymentMethod = isOverseas ? ("paypal" as const) : input.paymentMethod;
+
       const merchantTradeNo = generateMerchantTradeNo();
       const totalAmount = input.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -82,29 +138,47 @@ export const orderRouter = router({
       const isPreorder = input.items.some((i) => i.isPreorder);
       const buyerEmail = normalizeOrderEmail(input.buyerEmail);
 
-      // 建立訂單（userId 僅在已登入時寫入；需 DB 已執行 migration 0006_orders_user_id）
+      let shippingAddress = input.shippingAddress;
+      let receiverZipCode = input.receiverZipCode;
+      let cvsStoreId = input.cvsStoreId;
+      let cvsStoreName = input.cvsStoreName;
+      let cvsType = input.cvsType;
+
+      if (isOverseas) {
+        cvsStoreId = undefined;
+        cvsStoreName = undefined;
+        cvsType = undefined;
+        shippingAddress = [
+          input.intlAddressLine!.trim(),
+          `${input.intlCity!.trim()} ${input.intlPostalCode!.trim()}`,
+          input.intlCountry!.trim(),
+        ].join("\n");
+        receiverZipCode = input.intlPostalCode!.trim().slice(0, 10);
+      }
+
       const orderRow: Parameters<typeof createOrder>[0] = {
         merchantTradeNo,
-        paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
-        paymentMethod: input.paymentMethod,
-        shippingMethod: input.shippingMethod,
+        paymentStatus: paymentMethod === "atm" ? "transfer_pending" : "pending",
+        paymentMethod,
+        shippingMethod,
+        deliveryRegion: isOverseas ? "overseas" : "domestic",
         orderStatus: "pending_payment",
         isPreorder,
         totalAmount,
         buyerName: input.buyerName,
         buyerEmail,
         buyerPhone: input.buyerPhone,
-        cvsStoreId: input.cvsStoreId,
-        cvsStoreName: input.cvsStoreName,
-        cvsType: input.cvsType,
-        shippingAddress: input.shippingAddress,
-        receiverZipCode: input.receiverZipCode,
+        cvsStoreId,
+        cvsStoreName,
+        cvsType,
+        shippingAddress,
+        receiverZipCode,
       };
       if (ctx.user?.id != null) {
         orderRow.userId = ctx.user.id;
       }
 
-      const orderId = await createOrder(
+      await createOrder(
         orderRow,
         input.items.map((item) => ({
           orderId: 0,
@@ -118,9 +192,37 @@ export const orderRouter = router({
         }))
       );
 
-      // 銀行轉帳：直接回傳帳號資訊
-      if (input.paymentMethod === "atm") {
+      if (paymentMethod === "paypal") {
+        const returnUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
+        const cancelUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
+        try {
+          const { approvalUrl } = await createPayPalCheckoutOrder({
+            merchantTradeNo,
+            totalAmountTwd: totalAmount,
+            returnUrl,
+            cancelUrl,
+          });
+          return {
+            kind: "paypal" as const,
+            merchantTradeNo,
+            approvalUrl,
+          };
+        } catch (e) {
+          console.error("[createAndPay paypal]", e);
+          const missing =
+            e instanceof Error && e.message === "PAYPAL_CREDENTIALS_MISSING";
+          throw new TRPCError({
+            code: missing ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+            message: missing
+              ? "海外 PayPal 付款尚未完成商店設定，請改選國內結帳或聯絡客服。"
+              : "建立 PayPal 付款失敗，請稍後再試。",
+          });
+        }
+      }
+
+      if (paymentMethod === "atm") {
         return {
+          kind: "atm" as const,
           paymentMethod: "atm" as const,
           merchantTradeNo,
           bankInfo: {
@@ -131,7 +233,6 @@ export const orderRouter = router({
         };
       }
 
-      // 信用卡/Apple Pay：產生綠界付款表單
       const returnURL = `${input.origin}/api/ecpay/notify`;
       const orderResultURL = `${input.origin}/api/ecpay/order-result`;
       const clientBackURL = `${input.origin}/products`;
@@ -147,11 +248,70 @@ export const orderRouter = router({
       });
 
       return {
+        kind: "ecpay_credit" as const,
         paymentMethod: "credit" as const,
         merchantTradeNo,
         paymentURL: ECPAY_CONFIG.PaymentURL,
         paymentParams,
       };
+    }),
+
+  /**
+   * PayPal 核准後於 return 頁呼叫：驗證訂單與 PayPal Order 後 Capture
+   */
+  capturePayPal: publicProcedure
+    .input(
+      z.object({
+        merchantTradeNo: z.string().min(1),
+        paypalOrderId: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const order = await getOrderWithItems(input.merchantTradeNo);
+      if (!order) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
+      }
+      if (order.paymentMethod !== "paypal") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單無需 PayPal 扣款" });
+      }
+      if (order.paymentStatus === "paid" || order.paymentStatus === "confirmed") {
+        return { success: true as const, alreadyPaid: true as const };
+      }
+      if (order.paymentStatus !== "pending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "訂單狀態無法完成付款" });
+      }
+
+      try {
+        await verifyPayPalOrderBelongsToMerchant(input.paypalOrderId, input.merchantTradeNo);
+      } catch (e) {
+        console.error("[capturePayPal verify]", e);
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            e instanceof Error && e.message === "PAYPAL_ORDER_MISMATCH"
+              ? "付款資料與訂單不符"
+              : "無法驗證 PayPal 訂單",
+        });
+      }
+
+      try {
+        const cap = await capturePayPalOrder(input.paypalOrderId);
+        if (cap.status !== "completed") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: cap.message ?? "PayPal 扣款失敗",
+          });
+        }
+        await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
+        return { success: true as const, alreadyPaid: false as const };
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        console.error("[capturePayPal]", e);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : "PayPal 扣款發生錯誤",
+        });
+      }
     }),
 
   /**

@@ -96,9 +96,13 @@ var init_schema = __esm({
       paymentMethod: mysqlEnum("paymentMethod", [
         "credit",
         // 信用卡 / Apple Pay
-        "atm"
+        "atm",
         // 銀行轉帳（私帳）
+        "paypal"
+        // PayPal（海外）
       ]).default("credit").notNull(),
+      // 結帳配送地區（國內超商／綠界；海外僅國際宅配 + PayPal）
+      deliveryRegion: varchar("deliveryRegion", { length: 16 }).default("domestic").notNull(),
       // 配送方式
       shippingMethod: mysqlEnum("shippingMethod", [
         "cvs_711",
@@ -426,6 +430,7 @@ var systemRouter = router({
 
 // server/routers/order.ts
 import { z as z2 } from "zod";
+import { TRPCError as TRPCError3 } from "@trpc/server";
 
 // server/ecpay.ts
 import crypto from "crypto";
@@ -666,6 +671,24 @@ async function getOrderWithItems(merchantTradeNo) {
   const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
   const [logistics] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1);
   return { ...order, items, logistics: logistics ?? null };
+}
+async function markOrderPaidPayPal(merchantTradeNo, paypalCaptureId, capturePayload) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.update(orders).set({
+    paymentStatus: "paid",
+    orderStatus: "paid",
+    tradeNo: paypalCaptureId,
+    ecpayNotifyData: capturePayload,
+    paidAt: /* @__PURE__ */ new Date()
+  }).where(
+    and2(
+      eq2(orders.merchantTradeNo, merchantTradeNo),
+      eq2(orders.paymentMethod, "paypal"),
+      eq2(orders.paymentStatus, "pending")
+    )
+  );
+  return result;
 }
 async function updateOrderTransferLastFive(merchantTradeNo, lastFive) {
   const db = await getDb();
@@ -972,6 +995,121 @@ function buildPrintTradeDocURL(opts) {
 // server/routers/order.ts
 init_schema();
 import { eq as eq3 } from "drizzle-orm";
+
+// server/_core/paypal.ts
+function getApiBase() {
+  if (process.env.PAYPAL_SANDBOX === "1") {
+    return "https://api-m.sandbox.paypal.com";
+  }
+  return "https://api-m.paypal.com";
+}
+async function getAccessToken() {
+  const id = process.env.PAYPAL_CLIENT_ID;
+  const secret = process.env.PAYPAL_CLIENT_SECRET;
+  if (!id || !secret) {
+    throw new Error("PAYPAL_CREDENTIALS_MISSING");
+  }
+  const auth = Buffer.from(`${id}:${secret}`).toString("base64");
+  const res = await fetch(`${getApiBase()}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: "grant_type=client_credentials"
+  });
+  const data = await res.json();
+  if (!res.ok || !data.access_token) {
+    throw new Error(data.error_description ?? `PayPal token HTTP ${res.status}`);
+  }
+  return data.access_token;
+}
+async function createPayPalCheckoutOrder(params) {
+  const token = await getAccessToken();
+  const value = String(Math.max(1, Math.round(params.totalAmountTwd)));
+  const res = await fetch(`${getApiBase()}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": params.merchantTradeNo
+    },
+    body: JSON.stringify({
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          reference_id: params.merchantTradeNo,
+          custom_id: params.merchantTradeNo,
+          description: "\u691BCrystal\u80FD\u91CF\u6C34\u6676",
+          amount: {
+            currency_code: "TWD",
+            value
+          }
+        }
+      ],
+      application_context: {
+        return_url: params.returnUrl,
+        cancel_url: params.cancelUrl,
+        shipping_preference: "NO_SHIPPING"
+      }
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.id) {
+    throw new Error(data.message ?? `PayPal create order HTTP ${res.status}`);
+  }
+  const approval = data.links?.find((l) => l.rel === "approve")?.href;
+  if (!approval) {
+    throw new Error("PayPal create order: missing approve link");
+  }
+  return { paypalOrderId: data.id, approvalUrl: approval };
+}
+async function verifyPayPalOrderBelongsToMerchant(paypalOrderId, merchantTradeNo) {
+  const token = await getAccessToken();
+  const res = await fetch(`${getApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message ?? `PayPal get order HTTP ${res.status}`);
+  }
+  const customId = data.purchase_units?.[0]?.custom_id;
+  if (customId !== merchantTradeNo) {
+    throw new Error("PAYPAL_ORDER_MISMATCH");
+  }
+}
+async function capturePayPalOrder(paypalOrderId) {
+  const token = await getAccessToken();
+  const res = await fetch(`${getApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: "{}"
+  });
+  const raw = await res.json();
+  if (!res.ok) {
+    return {
+      status: "failed",
+      message: raw.message ?? `PayPal capture HTTP ${res.status}`,
+      raw
+    };
+  }
+  const capture = raw.purchase_units?.[0]?.payments?.captures?.[0];
+  const captureId = capture?.id;
+  const capStatus = capture?.status;
+  if (capStatus === "COMPLETED" && captureId) {
+    return { status: "completed", captureId, raw };
+  }
+  return {
+    status: "failed",
+    message: capStatus ? `Capture status: ${capStatus}` : "PayPal capture incomplete",
+    raw
+  };
+}
+
+// server/routers/order.ts
 var CartItemSchema = z2.object({
   id: z2.string(),
   name: z2.string(),
@@ -991,21 +1129,67 @@ var orderRouter = router({
       buyerName: z2.string().min(1),
       buyerEmail: z2.string().email(),
       buyerPhone: z2.string().min(8),
+      checkoutRegion: z2.enum(["domestic", "overseas"]),
       paymentMethod: z2.enum(["credit", "atm"]),
       shippingMethod: z2.enum(["cvs_711", "cvs_family", "home"]),
-      // 超商取貨資訊
       cvsStoreId: z2.string().optional(),
       cvsStoreName: z2.string().optional(),
       cvsType: z2.string().optional(),
-      // 宅配地址
       shippingAddress: z2.string().optional(),
       receiverZipCode: z2.string().optional(),
+      intlCountry: z2.string().optional(),
+      intlPostalCode: z2.string().optional(),
+      intlCity: z2.string().optional(),
+      intlAddressLine: z2.string().optional(),
       items: z2.array(CartItemSchema).min(1),
       origin: z2.string(),
-      // 庫存鎖定 session token
       sessionToken: z2.string().optional()
+    }).superRefine((data, ctx) => {
+      if (data.checkoutRegion === "domestic") {
+        const phone = data.buyerPhone.replace(/\s/g, "");
+        if (!/^09\d{8}$/.test(phone)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "\u8ACB\u8F38\u5165\u53F0\u7063\u624B\u6A5F\u683C\u5F0F\uFF0809 \u958B\u982D\u5171 10 \u78BC\uFF09",
+            path: ["buyerPhone"]
+          });
+        }
+        if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
+          if (!data.cvsStoreId?.trim()) {
+            ctx.addIssue({ code: "custom", message: "\u8ACB\u9078\u64C7\u8D85\u5546\u9580\u5E02", path: ["cvsStoreId"] });
+          }
+        }
+        if (data.shippingMethod === "home") {
+          if (!data.shippingAddress?.trim()) {
+            ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u6536\u4EF6\u5730\u5740", path: ["shippingAddress"] });
+          }
+          const zip = data.receiverZipCode?.trim() ?? "";
+          if (!/^\d{3,6}$/.test(zip)) {
+            ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u90F5\u905E\u5340\u865F", path: ["receiverZipCode"] });
+          }
+        }
+      } else {
+        if (data.buyerPhone.trim().length < 8) {
+          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u806F\u7D61\u96FB\u8A71", path: ["buyerPhone"] });
+        }
+        if (!data.intlCountry?.trim()) {
+          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u570B\u5BB6\uFF0F\u5730\u5340", path: ["intlCountry"] });
+        }
+        if (!data.intlPostalCode?.trim()) {
+          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u90F5\u905E\u5340\u865F", path: ["intlPostalCode"] });
+        }
+        if (!data.intlCity?.trim()) {
+          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u57CE\u5E02", path: ["intlCity"] });
+        }
+        if (!data.intlAddressLine?.trim()) {
+          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u8857\u9053\u5730\u5740", path: ["intlAddressLine"] });
+        }
+      }
     })
   ).mutation(async ({ input, ctx }) => {
+    const isOverseas = input.checkoutRegion === "overseas";
+    const shippingMethod = isOverseas ? "home" : input.shippingMethod;
+    const paymentMethod = isOverseas ? "paypal" : input.paymentMethod;
     const merchantTradeNo = generateMerchantTradeNo();
     const totalAmount = input.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -1014,27 +1198,44 @@ var orderRouter = router({
     const itemName = input.items.map((i) => `${i.name} x${i.quantity}`).join("#");
     const isPreorder = input.items.some((i) => i.isPreorder);
     const buyerEmail = normalizeOrderEmail(input.buyerEmail);
+    let shippingAddress = input.shippingAddress;
+    let receiverZipCode = input.receiverZipCode;
+    let cvsStoreId = input.cvsStoreId;
+    let cvsStoreName = input.cvsStoreName;
+    let cvsType = input.cvsType;
+    if (isOverseas) {
+      cvsStoreId = void 0;
+      cvsStoreName = void 0;
+      cvsType = void 0;
+      shippingAddress = [
+        input.intlAddressLine.trim(),
+        `${input.intlCity.trim()} ${input.intlPostalCode.trim()}`,
+        input.intlCountry.trim()
+      ].join("\n");
+      receiverZipCode = input.intlPostalCode.trim().slice(0, 10);
+    }
     const orderRow = {
       merchantTradeNo,
-      paymentStatus: input.paymentMethod === "atm" ? "transfer_pending" : "pending",
-      paymentMethod: input.paymentMethod,
-      shippingMethod: input.shippingMethod,
+      paymentStatus: paymentMethod === "atm" ? "transfer_pending" : "pending",
+      paymentMethod,
+      shippingMethod,
+      deliveryRegion: isOverseas ? "overseas" : "domestic",
       orderStatus: "pending_payment",
       isPreorder,
       totalAmount,
       buyerName: input.buyerName,
       buyerEmail,
       buyerPhone: input.buyerPhone,
-      cvsStoreId: input.cvsStoreId,
-      cvsStoreName: input.cvsStoreName,
-      cvsType: input.cvsType,
-      shippingAddress: input.shippingAddress,
-      receiverZipCode: input.receiverZipCode
+      cvsStoreId,
+      cvsStoreName,
+      cvsType,
+      shippingAddress,
+      receiverZipCode
     };
     if (ctx.user?.id != null) {
       orderRow.userId = ctx.user.id;
     }
-    const orderId = await createOrder(
+    await createOrder(
       orderRow,
       input.items.map((item) => ({
         orderId: 0,
@@ -1047,8 +1248,33 @@ var orderRouter = router({
         isPreorder: item.isPreorder ?? false
       }))
     );
-    if (input.paymentMethod === "atm") {
+    if (paymentMethod === "paypal") {
+      const returnUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
+      const cancelUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
+      try {
+        const { approvalUrl } = await createPayPalCheckoutOrder({
+          merchantTradeNo,
+          totalAmountTwd: totalAmount,
+          returnUrl,
+          cancelUrl
+        });
+        return {
+          kind: "paypal",
+          merchantTradeNo,
+          approvalUrl
+        };
+      } catch (e) {
+        console.error("[createAndPay paypal]", e);
+        const missing = e instanceof Error && e.message === "PAYPAL_CREDENTIALS_MISSING";
+        throw new TRPCError3({
+          code: missing ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+          message: missing ? "\u6D77\u5916 PayPal \u4ED8\u6B3E\u5C1A\u672A\u5B8C\u6210\u5546\u5E97\u8A2D\u5B9A\uFF0C\u8ACB\u6539\u9078\u570B\u5167\u7D50\u5E33\u6216\u806F\u7D61\u5BA2\u670D\u3002" : "\u5EFA\u7ACB PayPal \u4ED8\u6B3E\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002"
+        });
+      }
+    }
+    if (paymentMethod === "atm") {
       return {
+        kind: "atm",
         paymentMethod: "atm",
         merchantTradeNo,
         bankInfo: {
@@ -1071,11 +1297,62 @@ var orderRouter = router({
       clientBackURL
     });
     return {
+      kind: "ecpay_credit",
       paymentMethod: "credit",
       merchantTradeNo,
       paymentURL: ECPAY_CONFIG.PaymentURL,
       paymentParams
     };
+  }),
+  /**
+   * PayPal 核准後於 return 頁呼叫：驗證訂單與 PayPal Order 後 Capture
+   */
+  capturePayPal: publicProcedure.input(
+    z2.object({
+      merchantTradeNo: z2.string().min(1),
+      paypalOrderId: z2.string().min(1)
+    })
+  ).mutation(async ({ input }) => {
+    const order = await getOrderWithItems(input.merchantTradeNo);
+    if (!order) {
+      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
+    }
+    if (order.paymentMethod !== "paypal") {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u7121\u9700 PayPal \u6263\u6B3E" });
+    }
+    if (order.paymentStatus === "paid" || order.paymentStatus === "confirmed") {
+      return { success: true, alreadyPaid: true };
+    }
+    if (order.paymentStatus !== "pending") {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8A02\u55AE\u72C0\u614B\u7121\u6CD5\u5B8C\u6210\u4ED8\u6B3E" });
+    }
+    try {
+      await verifyPayPalOrderBelongsToMerchant(input.paypalOrderId, input.merchantTradeNo);
+    } catch (e) {
+      console.error("[capturePayPal verify]", e);
+      throw new TRPCError3({
+        code: "FORBIDDEN",
+        message: e instanceof Error && e.message === "PAYPAL_ORDER_MISMATCH" ? "\u4ED8\u6B3E\u8CC7\u6599\u8207\u8A02\u55AE\u4E0D\u7B26" : "\u7121\u6CD5\u9A57\u8B49 PayPal \u8A02\u55AE"
+      });
+    }
+    try {
+      const cap = await capturePayPalOrder(input.paypalOrderId);
+      if (cap.status !== "completed") {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: cap.message ?? "PayPal \u6263\u6B3E\u5931\u6557"
+        });
+      }
+      await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
+      return { success: true, alreadyPaid: false };
+    } catch (e) {
+      if (e instanceof TRPCError3) throw e;
+      console.error("[capturePayPal]", e);
+      throw new TRPCError3({
+        code: "INTERNAL_SERVER_ERROR",
+        message: e instanceof Error ? e.message : "PayPal \u6263\u6B3E\u767C\u751F\u932F\u8AA4"
+      });
+    }
   }),
   /**
    * 查詢訂單（含商品明細）
@@ -1619,11 +1896,11 @@ var products = [
     name: "\u6708\u4E0B\u5BC6\u8A9E\u624B\u934A",
     subtitle: "\u6DE8\u5316\u58D3\u529B\uFF0C\u559A\u9192\u5167\u5728\u5E73\u975C\u8207\u9B45\u529B",
     category: "healing",
-    categoryLabel: "D \u8A2D\u8A08\u6B3E",
+    categoryLabel: "\u7642\u7652\u7CFB\u5217",
     price: 1480,
     originalPrice: 1880,
     image: "/images/d-design/d001.jpg",
-    tags: ["D\u8A2D\u8A08\u6B3E", "\u6DE8\u5316", "\u5E73\u8861"],
+    tags: ["\u6DE8\u5316", "\u5E73\u8861"],
     description: "\u6C34\u6676\uFF1A\u767D\u5E7D\u9748\u3001\u85CD\u6708\u5149\u3001\u7070\u6708\u5149\u3001\u85CD\u91DD\u3001\u73CD\u73E0",
     story: "",
     benefits: [
@@ -1650,11 +1927,11 @@ var products = [
     name: "\u871C\u5149\u4E4B\u5883\u624B\u934A",
     subtitle: "\u8CA1\u5BCC\u3001\u4EBA\u7DE3\u8207\u4FDD\u8B77\u80FD\u91CF\u4E00\u6B21\u5230\u4F4D",
     category: "wealth",
-    categoryLabel: "D \u8A2D\u8A08\u6B3E",
+    categoryLabel: "\u8CA1\u904B\u4E8B\u696D",
     price: 1580,
     originalPrice: 1880,
     image: "/images/d-design/d002.jpg",
-    tags: ["D\u8A2D\u8A08\u6B3E", "\u62DB\u8CA1", "\u4EBA\u7DE3"],
+    tags: ["\u62DB\u8CA1", "\u4EBA\u7DE3"],
     description: "\u7D50\u5408\u9285\u9AEE\u6676\u3001\u9EC3\u6C34\u6676\u3001\u8349\u8393\u6676\u3001\u8461\u8404\u77F3\u3001\u592A\u967D\u77F3\u7B49\u591A\u7A2E\u6676\u77F3\uFF0C\u6253\u9020\u8C50\u76DB\u4E14\u7A69\u5B9A\u7684\u80FD\u91CF\u5834\u3002",
     story: "\u871C\u5149\u4E4B\u5883\u662F\u4E00\u6B3E\u8907\u65B9\u8A2D\u8A08\uFF0C\u517C\u9867\u884C\u52D5\u529B\u3001\u8CA1\u5BCC\u904B\u8207\u60C5\u7DD2\u5E73\u8861\u3002\u9069\u5408\u60F3\u52A0\u901F\u57F7\u884C\u76EE\u6A19\uFF0C\u540C\u6642\u7DAD\u6301\u5167\u5728\u7A69\u5B9A\u8207\u4EBA\u969B\u548C\u8AE7\u8005\u3002\u5546\u54C1\u6703\u56E0\u624B\u570D\u4E0D\u540C\u800C\u6709\u4E9B\u5FAE\u8B8A\u5316\uFF1B\u82E5\u9700\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\uFF0C\u9700\u52A0\u6536 200 \u5143\u5DE5\u672C\u8CBB\u3002",
     benefits: [
@@ -1681,10 +1958,10 @@ var products = [
     name: "\u7DAD\u7D0D\u65AF Venus",
     subtitle: "\u559A\u9192\u81EA\u4FE1\u8207\u5438\u5F15\u529B\u7684\u65E5\u5E38\u914D\u6234\u6B3E",
     category: "pendant",
-    categoryLabel: "D \u8A2D\u8A08\u6B3E",
+    categoryLabel: "\u540A\u98FE",
     price: 950,
     image: "/images/d-design/d003.jpg",
-    tags: ["D\u8A2D\u8A08\u6B3E", "\u81EA\u4FE1", "\u9B45\u529B"],
+    tags: ["\u81EA\u4FE1", "\u9B45\u529B"],
     description: "\u4EE5\u592A\u967D\u77F3\u3001\u9226\u6676\u3001\u85CD\u6708\u5149\u3001\u767D\u6C34\u6676\u8207\u73CD\u73E0\u642D\u914D\uFF0C\u5916\u89C0\u4FD0\u843D\u4E14\u9069\u5408\u65E5\u5E38\u3002",
     story: "\u7DAD\u7D0D\u65AF Venus \u8A2D\u8A08\u805A\u7126\u5728\u81EA\u4FE1\u3001\u884C\u52D5\u8207\u67D4\u548C\u9B45\u529B\u3002\u9069\u5408\u60F3\u63D0\u5347\u6C23\u5834\u3001\u7A69\u5B9A\u60C5\u7DD2\uFF0C\u4E26\u7DAD\u6301\u6E05\u6670\u5224\u65B7\u8207\u76F4\u89BA\u7684\u4EBA\u3002",
     benefits: [
@@ -1709,11 +1986,11 @@ var products = [
     name: "\u6668\u5149\u8F15\u8A9E\u624B\u934A",
     subtitle: "\u5728\u6EAB\u67D4\u4E2D\u5EFA\u7ACB\u4FDD\u8B77\u8207\u611B\u7684\u5E73\u8861",
     category: "love",
-    categoryLabel: "D \u8A2D\u8A08\u6B3E",
+    categoryLabel: "\u611B\u60C5\u6843\u82B1",
     price: 1800,
     originalPrice: 2100,
     image: "/images/d-design/d004.jpg",
-    tags: ["D\u8A2D\u8A08\u6B3E", "\u4EBA\u7DE3", "\u5E73\u8861"],
+    tags: ["\u4EBA\u7DE3", "\u5E73\u8861"],
     description: "\u7531\u767D\u5E7D\u9748\u3001\u7D05\u5154\u6BDB\u3001\u85CD\u6708\u5149\u3001\u767D\u5154\u6BDB\u3001\u7C89\u78A7\u74BD\u7B49\u6676\u77F3\u69CB\u6210\uFF0C\u5C64\u6B21\u67D4\u548C\u4E14\u6C23\u5834\u98FD\u6EFF\u3002",
     story: "\u6668\u5149\u8F15\u8A9E\u9069\u5408\u5728\u95DC\u4FC2\u8207\u81EA\u6211\u4E4B\u9593\u5C0B\u627E\u5E73\u8861\u7684\u4EBA\u3002\u5B83\u5C07\u6DE8\u5316\u3001\u9632\u8B77\u8207\u67D4\u548C\u611B\u80FD\u91CF\u878D\u5408\u5728\u540C\u4E00\u689D\u624B\u934A\u4E2D\u3002\u5546\u54C1\u6703\u56E0\u624B\u570D\u4E0D\u540C\u800C\u6709\u4E9B\u5FAE\u8B8A\u5316\uFF1B\u82E5\u9700\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\uFF0C\u9700\u52A0\u6536 200 \u5143\u5DE5\u672C\u8CBB\u3002",
     benefits: [
@@ -1738,11 +2015,11 @@ var products = [
     name: "\u6708\u6620\u6DE8\u5FC3\u624B\u934A",
     subtitle: "\u67D4\u548C\u6DE8\u5316\uFF0C\u56DE\u5230\u7A69\u5B9A\u4E14\u88AB\u611B\u7684\u72C0\u614B",
     category: "healing",
-    categoryLabel: "D \u8A2D\u8A08\u6B3E",
+    categoryLabel: "\u7642\u7652\u7CFB\u5217",
     price: 1500,
     originalPrice: 1800,
     image: "/images/d-design/d005.jpg",
-    tags: ["D\u8A2D\u8A08\u6B3E", "\u6DE8\u5316", "\u611B\u60C5"],
+    tags: ["\u6DE8\u5316", "\u611B\u60C5"],
     description: "\u4EE5\u7C89\u6676\u3001\u767D\u6708\u5149\u3001\u85CD\u6708\u5149\u8207\u767D\u6C34\u6676\u70BA\u4E3B\u8EF8\uFF0C\u642D\u914D\u73CD\u73E0\u5448\u73FE\u6EAB\u67D4\u5B89\u5B9A\u7684\u6708\u5149\u7CFB\u8A2D\u8A08\u3002",
     story: "\u6708\u6620\u6DE8\u5FC3\u8457\u91CD\u5728\u60C5\u7DD2\u5B89\u64AB\u8207\u95DC\u4FC2\u80FD\u91CF\u4FEE\u5FA9\u3002\u9069\u5408\u5728\u9AD8\u654F\u611F\u6216\u75B2\u618A\u6642\u671F\u914D\u6234\uFF0C\u63D0\u9192\u81EA\u5DF1\u56DE\u5230\u7A69\u5B9A\u7BC0\u594F\u3002\u5546\u54C1\u6703\u56E0\u624B\u570D\u4E0D\u540C\u800C\u6709\u4E9B\u5FAE\u8B8A\u5316\uFF1B\u82E5\u9700\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\uFF0C\u9700\u52A0\u6536 200 \u5143\u5DE5\u672C\u8CBB\u3002",
     benefits: [
@@ -2085,7 +2362,7 @@ var inventoryRouter = router({
 });
 
 // server/routers/member.ts
-import { TRPCError as TRPCError3 } from "@trpc/server";
+import { TRPCError as TRPCError4 } from "@trpc/server";
 import * as bcrypt from "bcryptjs";
 import { z as z5 } from "zod";
 
@@ -2479,7 +2756,7 @@ var memberRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const existing = await getUserByEmail(input.email);
     if (existing) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "CONFLICT",
         message: "\u6B64 Email \u5DF2\u88AB\u8A3B\u518A\uFF0C\u8ACB\u76F4\u63A5\u767B\u5165\u6216\u4F7F\u7528\u5FD8\u8A18\u5BC6\u78BC"
       });
@@ -2491,7 +2768,7 @@ var memberRouter = router({
       name: input.name
     });
     if (!user) {
-      throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "\u8A3B\u518A\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
+      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "\u8A3B\u518A\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
     }
     const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
     const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -2521,14 +2798,14 @@ var memberRouter = router({
   ).mutation(async ({ input, ctx }) => {
     let user = await getUserByEmail(input.email);
     if (!user || !user.passwordHash) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
     }
     const valid = await bcrypt.compare(input.password, user.passwordHash);
     if (!valid) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
@@ -2551,7 +2828,7 @@ var memberRouter = router({
   verifyEmail: publicProcedure.input(z5.object({ token: z5.string().min(1) })).mutation(async ({ input }) => {
     const user = await getUserByVerifyToken(input.token);
     if (!user) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "BAD_REQUEST",
         message: "\u9A57\u8B49\u9023\u7D50\u5DF2\u5931\u6548\u6216\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u767C\u9001\u9A57\u8B49\u4FE1"
       });
@@ -2562,10 +2839,10 @@ var memberRouter = router({
   /** 重新發送驗證信 */
   resendVerification: protectedProcedure.input(z5.object({ origin: z5.string().optional() })).mutation(async ({ input, ctx }) => {
     if (!ctx.user.email) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u7121\u6CD5\u53D6\u5F97 Email" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u7121\u6CD5\u53D6\u5F97 Email" });
     }
     const user = await getUserByEmail(ctx.user.email);
-    if (!user) throw new TRPCError3({ code: "NOT_FOUND", message: "\u5E33\u865F\u4E0D\u5B58\u5728" });
+    if (!user) throw new TRPCError4({ code: "NOT_FOUND", message: "\u5E33\u865F\u4E0D\u5B58\u5728" });
     if (user.emailVerified) {
       return { success: true, message: "Email \u5DF2\u7D93\u9A57\u8B49\u904E" };
     }
@@ -2618,7 +2895,7 @@ var memberRouter = router({
   ).mutation(async ({ input }) => {
     const user = await getUserByResetToken(input.token);
     if (!user) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "BAD_REQUEST",
         message: "\u91CD\u8A2D\u9023\u7D50\u5DF2\u5931\u6548\u6216\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u7533\u8ACB"
       });
@@ -2630,7 +2907,7 @@ var memberRouter = router({
   /** 更新會員姓名 */
   updateProfile: protectedProcedure.input(z5.object({ name: z5.string().min(1).max(50) })).mutation(async ({ input, ctx }) => {
     const db2 = await getDb();
-    if (!db2) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db2) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
     const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const { eq: eq5 } = await import("drizzle-orm");
     await db2.update(users2).set({ name: input.name }).where(eq5(users2.openId, ctx.user.openId));

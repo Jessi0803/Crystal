@@ -79,6 +79,35 @@ export async function getOrderWithItems(merchantTradeNo: string) {
   return { ...order, items, logistics: logistics ?? null };
 }
 
+/** PayPal Capture 成功後標記已付款 */
+export async function markOrderPaidPayPal(
+  merchantTradeNo: string,
+  paypalCaptureId: string,
+  capturePayload: Record<string, unknown>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .update(orders)
+    .set({
+      paymentStatus: "paid",
+      orderStatus: "paid",
+      tradeNo: paypalCaptureId,
+      ecpayNotifyData: capturePayload,
+      paidAt: new Date(),
+    })
+    .where(
+      and(
+        eq(orders.merchantTradeNo, merchantTradeNo),
+        eq(orders.paymentMethod, "paypal"),
+        eq(orders.paymentStatus, "pending")
+      )
+    );
+
+  return result;
+}
+
 export async function updateOrderPaymentStatus(
   merchantTradeNo: string,
   status: "paid" | "failed",

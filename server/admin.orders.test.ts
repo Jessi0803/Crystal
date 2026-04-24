@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 
 // Mock orderDb module
 vi.mock("./orderDb", () => ({
+  markOrderPaidPayPal: vi.fn(),
   getAllOrders: vi.fn().mockResolvedValue([
     {
       id: 1,

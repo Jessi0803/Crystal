@@ -283,6 +283,8 @@ var inventoryLocks = mysqlTable("inventoryLocks", {
 });
 var orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),
+  // 關聯會員（若為匿名購買則為 null）
+  userId: int("userId"),
   // 綠界交易編號（MerchantTradeNo）
   merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
   // 綠界回傳的交易序號
@@ -306,9 +308,13 @@ var orders = mysqlTable("orders", {
   paymentMethod: mysqlEnum("paymentMethod", [
     "credit",
     // 信用卡 / Apple Pay
-    "atm"
+    "atm",
     // 銀行轉帳（私帳）
+    "paypal"
+    // PayPal（海外）
   ]).default("credit").notNull(),
+  // 結帳配送地區（國內超商／綠界；海外僅國際宅配 + PayPal）
+  deliveryRegion: varchar("deliveryRegion", { length: 16 }).default("domestic").notNull(),
   // 配送方式
   shippingMethod: mysqlEnum("shippingMethod", [
     "cvs_711",

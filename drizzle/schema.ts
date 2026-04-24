@@ -82,7 +82,10 @@ export const orders = mysqlTable("orders", {
   paymentMethod: mysqlEnum("paymentMethod", [
     "credit",        // 信用卡 / Apple Pay
     "atm",           // 銀行轉帳（私帳）
+    "paypal",        // PayPal（海外）
   ]).default("credit").notNull(),
+  // 結帳配送地區（國內超商／綠界；海外僅國際宅配 + PayPal）
+  deliveryRegion: varchar("deliveryRegion", { length: 16 }).default("domestic").notNull(),
   // 配送方式
   shippingMethod: mysqlEnum("shippingMethod", [
     "cvs_711",       // 7-11 超商取貨
