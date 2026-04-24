@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -86,11 +86,11 @@ export default function MemberCenter() {
     onError: (err) => toast.error(err.message),
   });
 
-  // 未登入時導向登入頁
-  if (!userLoading && !user) {
-    navigate("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!userLoading && !user) {
+      navigate("/login");
+    }
+  }, [navigate, user, userLoading]);
 
   if (userLoading) {
     return (
@@ -99,6 +99,8 @@ export default function MemberCenter() {
       </div>
     );
   }
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-[oklch(0.98_0.005_60)]">
