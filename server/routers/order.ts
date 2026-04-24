@@ -38,10 +38,11 @@ import {
   verifyPayPalOrderBelongsToMerchant,
   capturePayPalOrder,
 } from "../_core/paypal";
+import { isOverseasShipCountryCode } from "@shared/overseasShipping";
 import {
-  OVERSEAS_SHIP_COUNTRY_LABELS,
-  isOverseasShipCountryCode,
-} from "@shared/overseasShipping";
+  formatOverseasShippingAddress,
+  validateOverseasAddress,
+} from "@shared/overseasAddress";
 
 const CartItemSchema = z.object({
   id: z.string(),
@@ -74,9 +75,11 @@ export const orderRouter = router({
           shippingAddress: z.string().optional(),
           receiverZipCode: z.string().optional(),
           intlCountry: z.string().optional(),
-          intlPostalCode: z.string().optional(),
+          intlAddrLine1: z.string().optional(),
+          intlAddrLine2: z.string().optional(),
           intlCity: z.string().optional(),
-          intlAddressLine: z.string().optional(),
+          intlState: z.string().optional(),
+          intlPostalCode: z.string().optional(),
           items: z.array(CartItemSchema).min(1),
           origin: z.string(),
           sessionToken: z.string().optional(),
@@ -109,22 +112,20 @@ export const orderRouter = router({
             if (data.buyerPhone.trim().length < 8) {
               ctx.addIssue({ code: "custom", message: "請填寫聯絡電話", path: ["buyerPhone"] });
             }
-            const cc = data.intlCountry?.trim() ?? "";
-            if (!isOverseasShipCountryCode(cc)) {
+            const payload = {
+              intlCountry: data.intlCountry ?? "",
+              intlAddrLine1: data.intlAddrLine1 ?? "",
+              intlAddrLine2: data.intlAddrLine2 ?? "",
+              intlCity: data.intlCity ?? "",
+              intlState: data.intlState ?? "",
+              intlPostalCode: data.intlPostalCode ?? "",
+            };
+            for (const it of validateOverseasAddress(payload)) {
               ctx.addIssue({
                 code: "custom",
-                message: "請選擇配送國家／地區（僅限開放地區）",
-                path: ["intlCountry"],
+                message: it.message,
+                path: [it.path as string],
               });
-            }
-            if (!data.intlPostalCode?.trim()) {
-              ctx.addIssue({ code: "custom", message: "請填寫郵遞區號", path: ["intlPostalCode"] });
-            }
-            if (!data.intlCity?.trim()) {
-              ctx.addIssue({ code: "custom", message: "請填寫城市", path: ["intlCity"] });
-            }
-            if (!data.intlAddressLine?.trim()) {
-              ctx.addIssue({ code: "custom", message: "請填寫街道地址", path: ["intlAddressLine"] });
             }
           }
         })
@@ -161,13 +162,16 @@ export const orderRouter = router({
         if (!isOverseasShipCountryCode(countryCode)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "不支援的海外配送地區" });
         }
-        const countryLabel = OVERSEAS_SHIP_COUNTRY_LABELS[countryCode];
-        shippingAddress = [
-          input.intlAddressLine!.trim(),
-          `${input.intlCity!.trim()} ${input.intlPostalCode!.trim()}`,
-          countryLabel,
-        ].join("\n");
-        receiverZipCode = input.intlPostalCode!.trim().slice(0, 10);
+        const formatted = formatOverseasShippingAddress({
+          countryCode,
+          line1: input.intlAddrLine1!.trim(),
+          line2: input.intlAddrLine2 ?? "",
+          city: input.intlCity!.trim(),
+          state: input.intlState ?? "",
+          postal: input.intlPostalCode ?? "",
+        });
+        shippingAddress = formatted.shippingAddress;
+        receiverZipCode = formatted.receiverZipCode;
       }
 
       const orderRow: Parameters<typeof createOrder>[0] = {

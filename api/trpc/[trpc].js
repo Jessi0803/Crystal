@@ -1109,6 +1109,187 @@ async function capturePayPalOrder(paypalOrderId) {
   };
 }
 
+// shared/overseasShipping.ts
+var OVERSEAS_SHIP_COUNTRY_CODES = ["MY", "HK", "SG", "US", "GB", "AU"];
+var OVERSEAS_SHIP_COUNTRY_LABELS = {
+  MY: "\u99AC\u4F86\u897F\u4E9E",
+  HK: "\u9999\u6E2F",
+  SG: "\u65B0\u52A0\u5761",
+  US: "\u7F8E\u570B",
+  GB: "\u82F1\u570B",
+  AU: "\u6FB3\u6D32"
+};
+function isOverseasShipCountryCode(v) {
+  return OVERSEAS_SHIP_COUNTRY_CODES.includes(v);
+}
+var OVERSEAS_SHIP_COUNTRY_OPTIONS = OVERSEAS_SHIP_COUNTRY_CODES.map((code) => ({
+  code,
+  label: OVERSEAS_SHIP_COUNTRY_LABELS[code]
+}));
+
+// shared/overseasAddress.ts
+var OVERSEAS_COUNTRY_EN = {
+  MY: "Malaysia",
+  HK: "Hong Kong",
+  SG: "Singapore",
+  US: "United States",
+  GB: "United Kingdom",
+  AU: "Australia"
+};
+var US_STATE_OPTIONS = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "DC", name: "District of Columbia" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" }
+];
+var AU_STATE_OPTIONS = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"];
+var US_STATE_CODES = new Set(US_STATE_OPTIONS.map((s) => s.code));
+function hasNonEnglishScript(s) {
+  return /[\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u0E00-\u0E7F\u0600-\u06FF\u0590-\u05FF]/.test(s);
+}
+function isValidUKPostcode(pc) {
+  const s = pc.replace(/\s+/g, " ").trim().toUpperCase();
+  if (!s) return false;
+  return /^([A-Z]{1,2}\d[A-Z0-9]?\s*\d[A-Z]{2}|GIR\s*0A{2})$/i.test(s);
+}
+function overseasStateRequired(country) {
+  return country === "US" || country === "AU";
+}
+function validateOverseasAddress(p) {
+  const issues = [];
+  const ccRaw = p.intlCountry.trim();
+  if (!isOverseasShipCountryCode(ccRaw)) {
+    issues.push({ path: "intlCountry", message: "Please select a country." });
+    return issues;
+  }
+  const cc = ccRaw;
+  const line1 = p.intlAddrLine1.trim();
+  const line2 = p.intlAddrLine2.trim();
+  const city = p.intlCity.trim();
+  const state = p.intlState.trim();
+  const postal = p.intlPostalCode.trim();
+  if (!line1) issues.push({ path: "intlAddrLine1", message: "Address Line 1 is required." });
+  if (!city) issues.push({ path: "intlCity", message: "City is required." });
+  const textFields = [
+    [line1, "intlAddrLine1"],
+    [line2, "intlAddrLine2"],
+    [city, "intlCity"],
+    [state, "intlState"]
+  ];
+  for (const [t2, path] of textFields) {
+    if (t2 && hasNonEnglishScript(t2)) {
+      issues.push({ path, message: "Please use English only (no Chinese or other scripts)." });
+    }
+  }
+  if (postal && hasNonEnglishScript(postal)) {
+    issues.push({ path: "intlPostalCode", message: "Postal code must use English letters and digits only." });
+  }
+  if (overseasStateRequired(cc) && !state) {
+    issues.push({
+      path: "intlState",
+      message: cc === "US" ? "State is required." : "State / territory is required (e.g. NSW)."
+    });
+  }
+  if (cc !== "HK" && !postal) {
+    issues.push({ path: "intlPostalCode", message: "Postal code is required." });
+  }
+  if (cc === "US") {
+    if (state && !US_STATE_CODES.has(state)) {
+      issues.push({ path: "intlState", message: "Please select a valid US state." });
+    }
+    if (postal && !/^\d{5}(-\d{4})?$/.test(postal)) {
+      issues.push({ path: "intlPostalCode", message: "ZIP code must be 5 digits or ZIP+4 (e.g. 12345 or 12345-6789)." });
+    }
+  } else if (cc === "AU") {
+    if (state && !AU_STATE_OPTIONS.includes(state)) {
+      issues.push({ path: "intlState", message: "Please select a valid Australian state/territory." });
+    }
+    if (postal && !/^\d{4}$/.test(postal)) {
+      issues.push({ path: "intlPostalCode", message: "Australian postcode must be 4 digits." });
+    }
+  } else if (cc === "GB") {
+    if (postal && !isValidUKPostcode(postal)) {
+      issues.push({
+        path: "intlPostalCode",
+        message: "Please enter a valid UK postcode (e.g. SW1A 1AA)."
+      });
+    }
+  } else if (cc === "MY") {
+    if (postal && !/^\d{5}$/.test(postal)) {
+      issues.push({ path: "intlPostalCode", message: "Malaysia postcode must be 5 digits." });
+    }
+  } else if (cc === "SG") {
+    if (postal && !/^\d{6}$/.test(postal)) {
+      issues.push({ path: "intlPostalCode", message: "Singapore postal code must be 6 digits." });
+    }
+  } else if (cc === "HK") {
+    if (postal && !/^[A-Za-z0-9\s-]{1,12}$/.test(postal)) {
+      issues.push({ path: "intlPostalCode", message: "If provided, use digits/letters only (optional for Hong Kong)." });
+    }
+  }
+  return issues;
+}
+function formatOverseasShippingAddress(p) {
+  const en = OVERSEAS_COUNTRY_EN[p.countryCode];
+  const lines = [p.line1.trim()];
+  if (p.line2.trim()) lines.push(p.line2.trim());
+  const parts = [p.city.trim()];
+  if (p.state.trim()) parts.push(p.state.trim());
+  if (p.postal.trim()) parts.push(p.postal.trim());
+  lines.push(parts.join(", "));
+  lines.push(`${en} (${p.countryCode})`);
+  const postalSlice = p.postal.trim().slice(0, 10);
+  const receiverZipCode = postalSlice || (p.countryCode === "HK" ? "HK-NONE" : "");
+  return { shippingAddress: lines.join("\n"), receiverZipCode };
+}
+
 // server/routers/order.ts
 var CartItemSchema = z2.object({
   id: z2.string(),
@@ -1122,7 +1303,7 @@ var orderRouter = router({
   /**
    * 建立訂單並取得付款資訊
    * - credit：回傳綠界付款表單參數
-   * - atm：回傳銀行帳號資訊
+   * - atm：回傳轉帳帳號資訊
    */
   createAndPay: publicProcedure.input(
     z2.object({
@@ -1138,9 +1319,11 @@ var orderRouter = router({
       shippingAddress: z2.string().optional(),
       receiverZipCode: z2.string().optional(),
       intlCountry: z2.string().optional(),
-      intlPostalCode: z2.string().optional(),
+      intlAddrLine1: z2.string().optional(),
+      intlAddrLine2: z2.string().optional(),
       intlCity: z2.string().optional(),
-      intlAddressLine: z2.string().optional(),
+      intlState: z2.string().optional(),
+      intlPostalCode: z2.string().optional(),
       items: z2.array(CartItemSchema).min(1),
       origin: z2.string(),
       sessionToken: z2.string().optional()
@@ -1172,17 +1355,20 @@ var orderRouter = router({
         if (data.buyerPhone.trim().length < 8) {
           ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u806F\u7D61\u96FB\u8A71", path: ["buyerPhone"] });
         }
-        if (!data.intlCountry?.trim()) {
-          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u570B\u5BB6\uFF0F\u5730\u5340", path: ["intlCountry"] });
-        }
-        if (!data.intlPostalCode?.trim()) {
-          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u90F5\u905E\u5340\u865F", path: ["intlPostalCode"] });
-        }
-        if (!data.intlCity?.trim()) {
-          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u57CE\u5E02", path: ["intlCity"] });
-        }
-        if (!data.intlAddressLine?.trim()) {
-          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u8857\u9053\u5730\u5740", path: ["intlAddressLine"] });
+        const payload = {
+          intlCountry: data.intlCountry ?? "",
+          intlAddrLine1: data.intlAddrLine1 ?? "",
+          intlAddrLine2: data.intlAddrLine2 ?? "",
+          intlCity: data.intlCity ?? "",
+          intlState: data.intlState ?? "",
+          intlPostalCode: data.intlPostalCode ?? ""
+        };
+        for (const it of validateOverseasAddress(payload)) {
+          ctx.addIssue({
+            code: "custom",
+            message: it.message,
+            path: [it.path]
+          });
         }
       }
     })
@@ -1207,12 +1393,20 @@ var orderRouter = router({
       cvsStoreId = void 0;
       cvsStoreName = void 0;
       cvsType = void 0;
-      shippingAddress = [
-        input.intlAddressLine.trim(),
-        `${input.intlCity.trim()} ${input.intlPostalCode.trim()}`,
-        input.intlCountry.trim()
-      ].join("\n");
-      receiverZipCode = input.intlPostalCode.trim().slice(0, 10);
+      const countryCode = input.intlCountry.trim();
+      if (!isOverseasShipCountryCode(countryCode)) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u4E0D\u652F\u63F4\u7684\u6D77\u5916\u914D\u9001\u5730\u5340" });
+      }
+      const formatted = formatOverseasShippingAddress({
+        countryCode,
+        line1: input.intlAddrLine1.trim(),
+        line2: input.intlAddrLine2 ?? "",
+        city: input.intlCity.trim(),
+        state: input.intlState ?? "",
+        postal: input.intlPostalCode ?? ""
+      });
+      shippingAddress = formatted.shippingAddress;
+      receiverZipCode = formatted.receiverZipCode;
     }
     const orderRow = {
       merchantTradeNo,
@@ -1363,7 +1557,7 @@ var orderRouter = router({
     return order;
   }),
   /**
-   * 客人填入銀行轉帳末五碼
+   * 客人填入轉帳匯款末五碼
    */
   submitTransferCode: publicProcedure.input(z2.object({
     merchantTradeNo: z2.string(),
@@ -1373,7 +1567,7 @@ var orderRouter = router({
     return { success: true };
   }),
   /**
-   * 老闆確認銀行轉帳收款（管理後台）
+   * 老闆確認轉帳收款（管理後台）
    */
   confirmTransfer: adminProcedure.input(z2.object({ orderId: z2.number() })).mutation(async ({ input }) => {
     const db = await getDb();
@@ -2062,14 +2256,14 @@ var products = [
   },
   {
     id: "test-atm-16",
-    name: "[\u6E2C\u8A66\u7528] ATM\u6E2C\u8A66\u5546\u54C1 16\u5143",
-    subtitle: "ATM\u6700\u4F4E\u91D1\u984D\u6E2C\u8A66\uFF0C\u8ACB\u52FF\u771F\u5BE6\u8CFC\u8CB7",
+    name: "[\u6E2C\u8A66\u7528] \u8F49\u5E33\u6E2C\u8A66\u5546\u54C1 16\u5143",
+    subtitle: "\u8F49\u5E33\u6700\u4F4E\u91D1\u984D\u6E2C\u8A66\uFF0C\u8ACB\u52FF\u771F\u5BE6\u8CFC\u8CB7",
     category: "test",
     categoryLabel: "\u6E2C\u8A66",
     price: 16,
     image: "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/product-rose-quartz-Cyp9uT5H6cB8cyt34mmWeU.webp",
     tags: ["\u6E2C\u8A66"],
-    description: "\u6E2C\u8A66\u7528\u5546\u54C1\uFF0C\u50C5\u4F9B\u6E2C\u8A66 ATM \u8F49\u5E33\u91D1\u6D41\u6D41\u7A0B\u7528\u3002",
+    description: "\u6E2C\u8A66\u7528\u5546\u54C1\uFF0C\u50C5\u4F9B\u6E2C\u8A66\u8F49\u5E33\u91D1\u6D41\u6D41\u7A0B\u7528\u3002",
     story: "\u6E2C\u8A66\u7528\u5546\u54C1\u3002",
     benefits: ["\u6E2C\u8A66\u7528"],
     suitableFor: ["\u6E2C\u8A66\u7528"],

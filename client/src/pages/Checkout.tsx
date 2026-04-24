@@ -9,7 +9,18 @@ import { ArrowLeft, CreditCard, Store, ShieldCheck, Lock, Banknote, MapPin, Home
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { OVERSEAS_SHIP_COUNTRY_OPTIONS, isOverseasShipCountryCode } from "@shared/overseasShipping";
+import {
+  AU_STATE_OPTIONS,
+  OVERSEAS_COUNTRY_EN,
+  overseasPostalRequired,
+  US_STATE_OPTIONS,
+  validateOverseasAddress,
+} from "@shared/overseasAddress";
+import {
+  OVERSEAS_SHIP_COUNTRY_LABELS,
+  OVERSEAS_SHIP_COUNTRY_OPTIONS,
+  isOverseasShipCountryCode,
+} from "@shared/overseasShipping";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -48,9 +59,11 @@ export default function Checkout() {
     shippingDistrict: "",
     shippingDetail: "",
     intlCountry: "",
-    intlPostalCode: "",
+    intlAddrLine1: "",
+    intlAddrLine2: "",
     intlCity: "",
-    intlAddressLine: "",
+    intlState: "",
+    intlPostalCode: "",
   });
   // 超商選店資訊（由綠界地圖回傳）
   const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
@@ -90,6 +103,8 @@ export default function Checkout() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
+
   // 購物車空時導回
   if (items.length === 0) {
     return (
@@ -120,10 +135,16 @@ export default function Checkout() {
     } else {
       if (!form.buyerPhone.trim() || form.buyerPhone.trim().length < 8)
         errs.buyerPhone = "請輸入聯絡電話（至少 8 碼）";
-      if (!isOverseasShipCountryCode(form.intlCountry)) errs.intlCountry = "請選擇配送國家／地區";
-      if (!form.intlPostalCode.trim()) errs.intlPostalCode = "請輸入郵遞區號";
-      if (!form.intlCity.trim()) errs.intlCity = "請輸入城市";
-      if (!form.intlAddressLine.trim()) errs.intlAddressLine = "請輸入街道地址";
+      for (const it of validateOverseasAddress({
+        intlCountry: form.intlCountry,
+        intlAddrLine1: form.intlAddrLine1,
+        intlAddrLine2: form.intlAddrLine2,
+        intlCity: form.intlCity,
+        intlState: form.intlState,
+        intlPostalCode: form.intlPostalCode,
+      })) {
+        errs[it.path as string] = it.message;
+      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -151,9 +172,11 @@ export default function Checkout() {
         receiverZipCode:
           checkoutRegion === "domestic" && shippingMethod === "home" ? form.shippingZip : undefined,
         intlCountry: checkoutRegion === "overseas" ? form.intlCountry : undefined,
-        intlPostalCode: checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
+        intlAddrLine1: checkoutRegion === "overseas" ? form.intlAddrLine1 : undefined,
+        intlAddrLine2: checkoutRegion === "overseas" ? form.intlAddrLine2 : undefined,
         intlCity: checkoutRegion === "overseas" ? form.intlCity : undefined,
-        intlAddressLine: checkoutRegion === "overseas" ? form.intlAddressLine : undefined,
+        intlState: checkoutRegion === "overseas" ? form.intlState : undefined,
+        intlPostalCode: checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
         items: items
           .map((i) => ({
             id: i.id,
@@ -501,65 +524,177 @@ export default function Checkout() {
                 </div>
               )}
 
-              {/* 國際地址 */}
+              {/* 國際地址（英文；依國家驗證） */}
               {checkoutRegion === "overseas" && (
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 space-y-4">
+                  <p className="text-xs font-body text-[oklch(0.45_0_0)] leading-relaxed border border-amber-200 bg-amber-50/80 px-3 py-2">
+                    Please fill in all address fields below in <strong>English</strong> only. Labels follow international shipping forms.
+                  </p>
                   <div>
-                    <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                      配送國家／地區 <span className="text-red-400">*</span>
+                    <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      Country <span className="text-red-400">*</span>
                     </label>
                     <select
                       value={form.intlCountry}
-                      onChange={(e) => setForm((f) => ({ ...f, intlCountry: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          intlCountry: e.target.value,
+                          intlState: "",
+                          intlPostalCode: "",
+                        }))
+                      }
                       className={inputClass("intlCountry")}
                     >
-                      <option value="">請選擇</option>
-                      {OVERSEAS_SHIP_COUNTRY_OPTIONS.map(({ code, label }) => (
+                      <option value="">Select country</option>
+                      {OVERSEAS_SHIP_COUNTRY_OPTIONS.map(({ code }) => (
                         <option key={code} value={code}>
-                          {label}
+                          {OVERSEAS_COUNTRY_EN[code]} ({OVERSEAS_SHIP_COUNTRY_LABELS[code]})
                         </option>
                       ))}
                     </select>
                     {errors.intlCountry && <p className="text-xs text-red-400 mt-1">{errors.intlCountry}</p>}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                        郵遞區號 <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={form.intlPostalCode}
-                        onChange={(e) => setForm((f) => ({ ...f, intlPostalCode: e.target.value }))}
-                        className={inputClass("intlPostalCode")}
-                      />
-                      {errors.intlPostalCode && <p className="text-xs text-red-400 mt-1">{errors.intlPostalCode}</p>}
-                    </div>
-                    <div>
-                      <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                        城市 <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={form.intlCity}
-                        onChange={(e) => setForm((f) => ({ ...f, intlCity: e.target.value }))}
-                        className={inputClass("intlCity")}
-                      />
-                      {errors.intlCity && <p className="text-xs text-red-400 mt-1">{errors.intlCity}</p>}
-                    </div>
-                  </div>
                   <div>
-                    <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                      街道地址 <span className="text-red-400">*</span>
+                    <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      Address Line 1 <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="路名、門牌、單元／樓層等"
-                      value={form.intlAddressLine}
-                      onChange={(e) => setForm((f) => ({ ...f, intlAddressLine: e.target.value }))}
-                      className={inputClass("intlAddressLine")}
+                      placeholder="Street number, street name"
+                      value={form.intlAddrLine1}
+                      onChange={(e) => setForm((f) => ({ ...f, intlAddrLine1: e.target.value }))}
+                      className={inputClass("intlAddrLine1")}
                     />
-                    {errors.intlAddressLine && <p className="text-xs text-red-400 mt-1">{errors.intlAddressLine}</p>}
+                    {errors.intlAddrLine1 && <p className="text-xs text-red-400 mt-1">{errors.intlAddrLine1}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      Address Line 2 <span className="text-[oklch(0.45_0_0)] font-normal">(optional)</span>
+                    </label>
+                    <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">Building / unit / floor</p>
+                    <input
+                      type="text"
+                      placeholder="Apt, suite, floor (optional)"
+                      value={form.intlAddrLine2}
+                      onChange={(e) => setForm((f) => ({ ...f, intlAddrLine2: e.target.value }))}
+                      className={inputClass("intlAddrLine2")}
+                    />
+                    {errors.intlAddrLine2 && <p className="text-xs text-red-400 mt-1">{errors.intlAddrLine2}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      City <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="City"
+                      value={form.intlCity}
+                      onChange={(e) => setForm((f) => ({ ...f, intlCity: e.target.value }))}
+                      className={inputClass("intlCity")}
+                    />
+                    {errors.intlCity && <p className="text-xs text-red-400 mt-1">{errors.intlCity}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      State / Province{" "}
+                      {overseasCode === "US" || overseasCode === "AU" ? (
+                        <span className="text-red-400">*</span>
+                      ) : (
+                        <span className="text-[oklch(0.45_0_0)] font-normal">(optional where N/A)</span>
+                      )}
+                    </label>
+                    {overseasCode === "US" ? (
+                      <select
+                        value={form.intlState}
+                        onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                        className={inputClass("intlState")}
+                      >
+                        <option value="">Select state</option>
+                        {US_STATE_OPTIONS.map((s) => (
+                          <option key={s.code} value={s.code}>
+                            {s.name} ({s.code})
+                          </option>
+                        ))}
+                      </select>
+                    ) : overseasCode === "AU" ? (
+                      <select
+                        value={form.intlState}
+                        onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                        className={inputClass("intlState")}
+                      >
+                        <option value="">Select state / territory</option>
+                        {AU_STATE_OPTIONS.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="State / province (if applicable)"
+                        value={form.intlState}
+                        onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                        className={inputClass("intlState")}
+                      />
+                    )}
+                    {errors.intlState && <p className="text-xs text-red-400 mt-1">{errors.intlState}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      Postal Code{" "}
+                      {!overseasCode || overseasPostalRequired(overseasCode) ? (
+                        <span className="text-red-400">*</span>
+                      ) : (
+                        <span className="text-[oklch(0.45_0_0)] font-normal">(optional)</span>
+                      )}
+                    </label>
+                    {overseasCode === "HK" && (
+                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        Hong Kong has no postal code — leave blank if not applicable.
+                      </p>
+                    )}
+                    {overseasCode === "US" && (
+                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        ZIP Code: 5 digits or ZIP+4 (e.g. 10001 or 10001-1234).
+                      </p>
+                    )}
+                    {overseasCode === "GB" && (
+                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        UK postcode format is strictly validated (e.g. SW1A 1AA).
+                      </p>
+                    )}
+                    {overseasCode === "AU" && (
+                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        4-digit postcode; state required (e.g. NSW, VIC).
+                      </p>
+                    )}
+                    {(overseasCode === "MY" || overseasCode === "SG") && (
+                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        {overseasCode === "MY" ? "5-digit postcode." : "6-digit postcode."}
+                      </p>
+                    )}
+                    <input
+                      type="text"
+                      placeholder={
+                        overseasCode === "US"
+                          ? "ZIP Code"
+                          : overseasCode === "AU"
+                            ? "Postcode"
+                            : overseasCode === "GB"
+                              ? "Postcode"
+                              : overseasCode === "SG"
+                                ? "Postal code (6 digits)"
+                                : overseasCode === "MY"
+                                  ? "Postal code (5 digits)"
+                                  : "Postal code"
+                      }
+                      value={form.intlPostalCode}
+                      onChange={(e) => setForm((f) => ({ ...f, intlPostalCode: e.target.value }))}
+                      className={inputClass("intlPostalCode")}
+                    />
+                    {errors.intlPostalCode && <p className="text-xs text-red-400 mt-1">{errors.intlPostalCode}</p>}
                   </div>
                 </div>
               )}
