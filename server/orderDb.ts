@@ -591,12 +591,59 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
 
   const whereClause = conditions.length === 1 ? conditions[0] : or(...conditions)!;
 
-  const memberOrders = await db
-    .select()
-    .from(orders)
-    .where(whereClause)
-    .orderBy(desc(orders.createdAt))
-    .limit(100);
+  try {
+    const memberOrders = await db
+      .select()
+      .from(orders)
+      .where(whereClause)
+      .orderBy(desc(orders.createdAt))
+      .limit(100);
 
-  return attachItemsAndLogisticsForOrders(db, memberOrders);
+    return attachItemsAndLogisticsForOrders(db, memberOrders);
+  } catch (error) {
+    if (!opts.email) throw error;
+
+    console.warn("[getOrdersForMember] fallback to email-only legacy query:", error);
+
+    const key = normalizeOrderEmail(opts.email);
+    const legacyOrders = await db
+      .select({
+        id: orders.id,
+        merchantTradeNo: orders.merchantTradeNo,
+        tradeNo: orders.tradeNo,
+        paymentStatus: orders.paymentStatus,
+        paymentMethod: orders.paymentMethod,
+        shippingMethod: orders.shippingMethod,
+        orderStatus: orders.orderStatus,
+        isPreorder: orders.isPreorder,
+        totalAmount: orders.totalAmount,
+        buyerName: orders.buyerName,
+        buyerEmail: orders.buyerEmail,
+        buyerPhone: orders.buyerPhone,
+        cvsStoreId: orders.cvsStoreId,
+        cvsStoreName: orders.cvsStoreName,
+        cvsType: orders.cvsType,
+        shippingAddress: orders.shippingAddress,
+        transferLastFive: orders.transferLastFive,
+        adminNote: orders.adminNote,
+        ecpayNotifyData: orders.ecpayNotifyData,
+        paidAt: orders.paidAt,
+        confirmedAt: orders.confirmedAt,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+      })
+      .from(orders)
+      .where(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`)
+      .orderBy(desc(orders.createdAt))
+      .limit(100);
+
+    const normalizedOrders = legacyOrders.map((order) => ({
+      ...order,
+      userId: null,
+      deliveryRegion: "domestic" as const,
+      receiverZipCode: null,
+    }));
+
+    return attachItemsAndLogisticsForOrders(db, normalizedOrders as OrderRow[]);
+  }
 }
