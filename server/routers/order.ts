@@ -30,7 +30,7 @@ import {
   updateBalancePaymentTransferCode,
   confirmBalanceTransfer,
 } from "../orderDb";
-import { acquireInventoryLock, releaseExpiredLocks, releaseSessionLocks } from "../inventoryDb";
+import { acquireInventoryLock, releaseExpiredLocks, releaseSessionLocks, deductInventoryAfterPayment } from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
   createCVSLogisticsOrder,
@@ -259,8 +259,8 @@ export const orderRouter = router({
         orderRow.userId = ctx.user.id;
       }
 
-      // 信用卡結帳：先鎖定庫存（10 分鐘），付款未完成則自動釋放
-      if (paymentMethod === "credit") {
+      // 信用卡／PayPal 結帳：先鎖定庫存（10 分鐘），付款未完成則自動釋放
+      if (paymentMethod === "credit" || paymentMethod === "paypal") {
         for (const item of submittedItems) {
           const productId = item.baseProductId ?? item.id;
           const result = await acquireInventoryLock(productId, item.quantity, merchantTradeNo);
@@ -396,6 +396,7 @@ export const orderRouter = router({
           });
         }
         await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
+        await deductInventoryAfterPayment(input.merchantTradeNo);
         return { success: true as const, alreadyPaid: false as const };
       } catch (e) {
         if (e instanceof TRPCError) throw e;
