@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { searchKnowledge } from "../crystalKnowledge";
@@ -57,7 +58,13 @@ export const chatbotRouter = router({
       // 1. embed 用戶問題（加入最近一輪對話提升語意準確度）
       const lastTurn = input.history.slice(-2).map((h) => h.content).join(" ");
       const queryText = lastTurn ? `${lastTurn} ${input.message}` : input.message;
-      const queryVector = await embedQuery(queryText);
+      let queryVector: number[];
+      try {
+        queryVector = await embedQuery(queryText);
+      } catch (e) {
+        console.error("[chatbot] embed error:", e);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Embed failed: ${e instanceof Error ? e.message : String(e)}` });
+      }
 
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryVector, 3, 0.6);

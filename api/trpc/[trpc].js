@@ -2045,6 +2045,7 @@ var orderRouter = router({
 
 // server/routers/chatbot.ts
 import { z as z3 } from "zod";
+import { TRPCError as TRPCError4 } from "@trpc/server";
 
 // server/_core/llm.ts
 var ensureArray = (value) => Array.isArray(value) ? value : [value];
@@ -30290,7 +30291,13 @@ var chatbotRouter = router({
   ).mutation(async ({ input }) => {
     const lastTurn = input.history.slice(-2).map((h) => h.content).join(" ");
     const queryText = lastTurn ? `${lastTurn} ${input.message}` : input.message;
-    const queryVector = await embedQuery(queryText);
+    let queryVector;
+    try {
+      queryVector = await embedQuery(queryText);
+    } catch (e) {
+      console.error("[chatbot] embed error:", e);
+      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: `Embed failed: ${e instanceof Error ? e.message : String(e)}` });
+    }
     const relevantChunks = await searchKnowledge(queryVector, 3, 0.6);
     const relatedProductIds = new Set(
       relevantChunks.flatMap((c) => c.relatedProductIds ?? [])
@@ -30512,7 +30519,7 @@ var inventoryRouter = router({
 });
 
 // server/routers/member.ts
-import { TRPCError as TRPCError4 } from "@trpc/server";
+import { TRPCError as TRPCError5 } from "@trpc/server";
 import * as bcrypt from "bcryptjs";
 import { z as z5 } from "zod";
 
@@ -30906,7 +30913,7 @@ var memberRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const existing = await getUserByEmail(input.email);
     if (existing) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "CONFLICT",
         message: "\u6B64 Email \u5DF2\u88AB\u8A3B\u518A\uFF0C\u8ACB\u76F4\u63A5\u767B\u5165\u6216\u4F7F\u7528\u5FD8\u8A18\u5BC6\u78BC"
       });
@@ -30918,7 +30925,7 @@ var memberRouter = router({
       name: input.name
     });
     if (!user) {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "\u8A3B\u518A\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "\u8A3B\u518A\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
     }
     const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
     const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -30948,14 +30955,14 @@ var memberRouter = router({
   ).mutation(async ({ input, ctx }) => {
     let user = await getUserByEmail(input.email);
     if (!user || !user.passwordHash) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
     }
     const valid = await bcrypt.compare(input.password, user.passwordHash);
     if (!valid) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
@@ -30978,7 +30985,7 @@ var memberRouter = router({
   verifyEmail: publicProcedure.input(z5.object({ token: z5.string().min(1) })).mutation(async ({ input }) => {
     const user = await getUserByVerifyToken(input.token);
     if (!user) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "BAD_REQUEST",
         message: "\u9A57\u8B49\u9023\u7D50\u5DF2\u5931\u6548\u6216\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u767C\u9001\u9A57\u8B49\u4FE1"
       });
@@ -30989,10 +30996,10 @@ var memberRouter = router({
   /** 重新發送驗證信 */
   resendVerification: protectedProcedure.input(z5.object({ origin: z5.string().optional() })).mutation(async ({ input, ctx }) => {
     if (!ctx.user.email) {
-      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u7121\u6CD5\u53D6\u5F97 Email" });
+      throw new TRPCError5({ code: "BAD_REQUEST", message: "\u7121\u6CD5\u53D6\u5F97 Email" });
     }
     const user = await getUserByEmail(ctx.user.email);
-    if (!user) throw new TRPCError4({ code: "NOT_FOUND", message: "\u5E33\u865F\u4E0D\u5B58\u5728" });
+    if (!user) throw new TRPCError5({ code: "NOT_FOUND", message: "\u5E33\u865F\u4E0D\u5B58\u5728" });
     if (user.emailVerified) {
       return { success: true, message: "Email \u5DF2\u7D93\u9A57\u8B49\u904E" };
     }
@@ -31045,7 +31052,7 @@ var memberRouter = router({
   ).mutation(async ({ input }) => {
     const user = await getUserByResetToken(input.token);
     if (!user) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "BAD_REQUEST",
         message: "\u91CD\u8A2D\u9023\u7D50\u5DF2\u5931\u6548\u6216\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u7533\u8ACB"
       });
@@ -31057,7 +31064,7 @@ var memberRouter = router({
   /** 更新會員姓名 */
   updateProfile: protectedProcedure.input(z5.object({ name: z5.string().min(1).max(50) })).mutation(async ({ input, ctx }) => {
     const db2 = await getDb();
-    if (!db2) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db2) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const { eq: eq5 } = await import("drizzle-orm");
     await db2.update(users2).set({ name: input.name }).where(eq5(users2.openId, ctx.user.openId));
