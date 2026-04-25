@@ -26,7 +26,10 @@ async function generateAnswer(
   userMessage: string,
   maxTokens = 500
 ): Promise<string> {
+  // v1 API does not support system_instruction; inject it as the first turn
   const contents = [
+    { role: "user", parts: [{ text: `[系統指示]\n${systemPrompt}` }] },
+    { role: "model", parts: [{ text: "好的，我明白了，我會按照指示回答。" }] },
     ...history.map((h) => ({
       role: h.role === "assistant" ? "model" : "user",
       parts: [{ text: h.content }],
@@ -35,12 +38,11 @@ async function generateAnswer(
   ];
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${ENV.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${ENV.geminiApiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: { maxOutputTokens: maxTokens },
       }),
