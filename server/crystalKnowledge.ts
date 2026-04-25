@@ -132,6 +132,8 @@ export async function searchKnowledge(
   threshold = 0.45
 ): Promise<KnowledgeChunk[]> {
   const embeddings = loadEmbeddings();
+
+  const vectorResults: KnowledgeChunk[] = [];
   if (embeddings.length > 0) {
     const scored = embeddings.map(({ id, vector }) => ({
       id,
@@ -142,12 +144,16 @@ export async function searchKnowledge(
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
       .map((s) => s.id);
-    const vectorResults = topIds
-      .map((id) => knowledgeChunks.find((c) => c.id === id))
-      .filter((c): c is KnowledgeChunk => !!c);
-    if (vectorResults.length > 0) return vectorResults;
+    vectorResults.push(
+      ...topIds
+        .map((id) => knowledgeChunks.find((c) => c.id === id))
+        .filter((c): c is KnowledgeChunk => !!c)
+    );
   }
 
-  // keyword fallback：向量搜尋無結果時用關鍵字補撈
-  return keywordSearch(query, topK);
+  // keyword 永遠跑，補上向量搜尋沒找到的結果
+  const seen = new Set(vectorResults.map((c) => c.id));
+  const kwResults = keywordSearch(query, topK).filter((c) => !seen.has(c.id));
+
+  return [...vectorResults, ...kwResults].slice(0, topK);
 }
