@@ -112,26 +112,42 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+function keywordSearch(query: string, topK: number): KnowledgeChunk[] {
+  const q = query.toLowerCase();
+  const scored = knowledgeChunks.map((c) => ({
+    chunk: c,
+    hits: c.keywords.filter((k) => q.includes(k.toLowerCase()) || k.toLowerCase().includes(q)).length,
+  }));
+  return scored
+    .filter((s) => s.hits > 0)
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, topK)
+    .map((s) => s.chunk);
+}
+
 export async function searchKnowledge(
+  query: string,
   queryVector: number[],
   topK = 3,
-  threshold = 0.6
+  threshold = 0.45
 ): Promise<KnowledgeChunk[]> {
   const embeddings = loadEmbeddings();
-  if (embeddings.length === 0) return [];
+  if (embeddings.length > 0) {
+    const scored = embeddings.map(({ id, vector }) => ({
+      id,
+      score: cosineSimilarity(queryVector, vector),
+    }));
+    const topIds = scored
+      .filter((s) => s.score >= threshold)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK)
+      .map((s) => s.id);
+    const vectorResults = topIds
+      .map((id) => knowledgeChunks.find((c) => c.id === id))
+      .filter((c): c is KnowledgeChunk => !!c);
+    if (vectorResults.length > 0) return vectorResults;
+  }
 
-  const scored = embeddings.map(({ id, vector }) => ({
-    id,
-    score: cosineSimilarity(queryVector, vector),
-  }));
-
-  const topIds = scored
-    .filter((s) => s.score >= threshold)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
-    .map((s) => s.id);
-
-  return topIds
-    .map((id) => knowledgeChunks.find((c) => c.id === id))
-    .filter((c): c is KnowledgeChunk => !!c);
+  // keyword fallback：向量搜尋無結果時用關鍵字補撈
+  return keywordSearch(query, topK);
 }
