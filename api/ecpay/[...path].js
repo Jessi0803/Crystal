@@ -14,6 +14,8 @@ var ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   // 綠界金流
   ecpayMerchantId: process.env.ECPAY_MERCHANT_ID ?? "",
@@ -222,7 +224,7 @@ async function createHomeLogisticsOrder(opts) {
 }
 
 // server/orderDb.ts
-import { eq as eq2, desc, and as and2, gte, sql as sql2 } from "drizzle-orm";
+import { eq as eq2, desc, and as and2, gte, sql as sql2, inArray, or } from "drizzle-orm";
 
 // server/_core/emailNormalize.ts
 function normalizeOrderEmail(email) {
@@ -234,7 +236,7 @@ import { eq, and, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
 var users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -328,6 +330,8 @@ var orders = mysqlTable("orders", {
   orderStatus: mysqlEnum("orderStatus", [
     "pending_payment",
     // 待付款
+    "deposit_paid",
+    // 已付訂金（客製化）
     "paid",
     // 已付款（待出貨）
     "processing",
@@ -343,6 +347,8 @@ var orders = mysqlTable("orders", {
   ]).default("pending_payment").notNull(),
   // 是否為預購訂單
   isPreorder: boolean("isPreorder").default(false).notNull(),
+  // 是否為客製化訂金訂單
+  isCustomOrder: boolean("isCustomOrder").default(false).notNull(),
   // 訂單金額
   totalAmount: int("totalAmount").notNull(),
   // 購買人資訊
@@ -368,7 +374,12 @@ var orders = mysqlTable("orders", {
   confirmedAt: timestamp("confirmedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-});
+}, (table) => [
+  index("orders_created_at_idx").on(table.createdAt),
+  index("orders_order_status_created_at_idx").on(table.orderStatus, table.createdAt),
+  index("orders_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
+  index("orders_paid_at_idx").on(table.paidAt)
+]);
 var orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull(),
@@ -380,7 +391,31 @@ var orderItems = mysqlTable("orderItems", {
   subtotal: int("subtotal").notNull(),
   // 是否為預購商品
   isPreorder: boolean("isPreorder").default(false).notNull()
-});
+}, (table) => [
+  index("order_items_order_id_idx").on(table.orderId)
+]);
+var orderBalancePayments = mysqlTable("orderBalancePayments", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull().unique(),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+  amount: int("amount").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["credit", "atm"]).default("credit").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", [
+    "pending",
+    "transfer_pending",
+    "paid",
+    "failed",
+    "cancelled"
+  ]).default("pending").notNull(),
+  transferLastFive: varchar("transferLastFive", { length: 5 }),
+  tradeNo: varchar("tradeNo", { length: 64 }),
+  ecpayNotifyData: json("ecpayNotifyData"),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+}, (table) => [
+  index("order_balance_payments_merchant_trade_no_idx").on(table.merchantTradeNo)
+]);
 var logisticsOrders = mysqlTable("logisticsOrders", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull().unique(),
@@ -447,6 +482,9 @@ async function getDb() {
   return _db;
 }
 
+// shared/const.ts
+var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+
 // server/orderDb.ts
 async function getOrderByMerchantTradeNo(merchantTradeNo) {
   const db = await getDb();
@@ -457,9 +495,10 @@ async function getOrderByMerchantTradeNo(merchantTradeNo) {
 async function updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const [order] = await db.select({ isCustomOrder: orders.isCustomOrder }).from(orders).where(eq2(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   await db.update(orders).set({
     paymentStatus: status,
-    orderStatus: status === "paid" ? "paid" : "cancelled",
+    orderStatus: status === "paid" ? order?.isCustomOrder ? "deposit_paid" : "paid" : "cancelled",
     tradeNo,
     ecpayNotifyData: notifyData,
     paidAt: status === "paid" ? /* @__PURE__ */ new Date() : void 0
@@ -472,6 +511,28 @@ async function updateLogisticsStatus(logisticsMerchantTradeNo, status, extra) {
     logisticsStatus: status,
     ...extra
   }).where(eq2(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
+}
+async function getBalancePaymentByMerchantTradeNo(merchantTradeNo) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db.select().from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
+  return row ?? null;
+}
+async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [balance] = await db.select().from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!balance) return null;
+  await db.update(orderBalancePayments).set({
+    paymentStatus: status,
+    tradeNo,
+    ecpayNotifyData: notifyData,
+    paidAt: status === "paid" ? /* @__PURE__ */ new Date() : null
+  }).where(eq2(orderBalancePayments.id, balance.id));
+  if (status === "paid") {
+    await db.update(orders).set({ orderStatus: "paid" }).where(eq2(orders.id, balance.orderId));
+  }
+  return balance;
 }
 
 // server/ecpayRoutes.ts
@@ -490,16 +551,24 @@ function registerECPayRoutes(app2) {
       const merchantTradeNo = notifyData.MerchantTradeNo;
       const rtnCode = notifyData.RtnCode;
       const tradeNo = notifyData.TradeNo ?? "";
+      const status = rtnCode === "1" ? "paid" : "failed";
       const order = await getOrderByMerchantTradeNo(merchantTradeNo);
-      if (!order) {
-        console.error("[ECPay Notify] Order not found:", merchantTradeNo);
-        res.send("0|Order Not Found");
+      if (order) {
+        await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
+        res.send("1|OK");
         return;
       }
-      const status = rtnCode === "1" ? "paid" : "failed";
-      await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-      console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
-      res.send("1|OK");
+      const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
+      if (balancePayment) {
+        await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        console.log(`[ECPay Notify] Balance ${merchantTradeNo} \u2192 ${status}`);
+        res.send("1|OK");
+        return;
+      }
+      console.error("[ECPay Notify] Order not found:", merchantTradeNo);
+      res.send("0|Order Not Found");
+      return;
     } catch (err) {
       console.error("[ECPay Notify] Error:", err);
       res.send("0|Server Error");
@@ -517,6 +586,21 @@ function registerECPayRoutes(app2) {
       res.redirect(302, `/order/${encodeURIComponent(merchantTradeNo)}`);
     } catch (err) {
       console.error("[ECPay OrderResult] Error:", err);
+      res.redirect(302, "/");
+    }
+  });
+  app2.post("/api/ecpay/balance-result", (req, res) => {
+    try {
+      const data = req.body;
+      const merchantTradeNo = data?.MerchantTradeNo ?? "";
+      console.log("[ECPay BalanceResult]", { merchantTradeNo, RtnCode: data?.RtnCode });
+      if (!merchantTradeNo) {
+        res.redirect(302, "/");
+        return;
+      }
+      res.redirect(302, `/balance/${encodeURIComponent(merchantTradeNo)}`);
+    } catch (err) {
+      console.error("[ECPay BalanceResult] Error:", err);
       res.redirect(302, "/");
     }
   });
