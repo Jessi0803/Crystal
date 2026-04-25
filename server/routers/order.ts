@@ -30,7 +30,7 @@ import {
   updateBalancePaymentTransferCode,
   confirmBalanceTransfer,
 } from "../orderDb";
-import { acquireInventoryLock, releaseExpiredLocks } from "../inventoryDb";
+import { acquireInventoryLock, releaseExpiredLocks, releaseSessionLocks } from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
   createCVSLogisticsOrder,
@@ -257,6 +257,18 @@ export const orderRouter = router({
       };
       if (ctx.user?.id != null) {
         orderRow.userId = ctx.user.id;
+      }
+
+      // 信用卡結帳：先鎖定庫存（10 分鐘），付款未完成則自動釋放
+      if (paymentMethod === "credit") {
+        for (const item of submittedItems) {
+          const productId = item.baseProductId ?? item.id;
+          const result = await acquireInventoryLock(productId, item.quantity, merchantTradeNo);
+          if (!result.success) {
+            await releaseSessionLocks(merchantTradeNo);
+            throw new TRPCError({ code: "BAD_REQUEST", message: result.reason ?? "庫存不足，請稍後再試" });
+          }
+        }
       }
 
       await createOrder(

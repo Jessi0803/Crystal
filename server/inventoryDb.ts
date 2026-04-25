@@ -6,6 +6,8 @@ import { getDb } from "./db";
 import {
   productInventory,
   inventoryLocks,
+  orders,
+  orderItems,
   InsertInventoryLock,
   InsertProductInventory,
 } from "../drizzle/schema";
@@ -131,6 +133,42 @@ export async function releaseSessionLocks(sessionToken: string) {
   await db
     .delete(inventoryLocks)
     .where(eq(inventoryLocks.sessionToken, sessionToken));
+}
+
+/**
+ * 付款成功後：扣減實際庫存 + 釋放鎖定
+ * sessionToken 使用 merchantTradeNo
+ */
+export async function deductInventoryAfterPayment(merchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!order) return;
+
+  const items = await db
+    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id));
+
+  for (const item of items) {
+    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    await db
+      .update(productInventory)
+      .set({ stock: sql`GREATEST(0, ${productInventory.stock} - ${item.quantity})` })
+      .where(
+        and(
+          eq(productInventory.productId, item.productId),
+          sql`${productInventory.stock} != -1`
+        )
+      );
+  }
+
+  await releaseSessionLocks(merchantTradeNo);
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   getBalancePaymentByMerchantTradeNo,
   updateBalancePaymentStatus,
 } from "./orderDb";
+import { deductInventoryAfterPayment } from "./inventoryDb";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -50,6 +51,9 @@ export function registerECPayRoutes(app: Application) {
       const order = await getOrderByMerchantTradeNo(merchantTradeNo);
       if (order) {
         await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        if (status === "paid") {
+          await deductInventoryAfterPayment(merchantTradeNo);
+        }
         console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
         res.send("1|OK");
         return;
