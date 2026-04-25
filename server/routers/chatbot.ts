@@ -35,7 +35,7 @@ async function generateAnswer(
   ];
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ENV.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${ENV.geminiApiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,6 +48,7 @@ async function generateAnswer(
   );
   if (!res.ok) {
     const err = await res.text();
+    console.error("[chatbot] generateContent error:", res.status, err);
     throw new Error(`Gemini generateContent failed: ${res.status} – ${err}`);
   }
   const data = await res.json() as {
