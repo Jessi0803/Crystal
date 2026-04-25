@@ -103,7 +103,7 @@ export const chatbotRouter = router({
       }
 
       // 2. RAG 檢索
-      const relevantChunks = await searchKnowledge(queryVector, 3, 0.6);
+      const relevantChunks = await searchKnowledge(queryVector, 3, 0.45);
 
       // 3. 找出關聯商品
       const relatedProductIds = new Set(
