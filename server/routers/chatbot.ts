@@ -26,10 +26,7 @@ async function generateAnswer(
   userMessage: string,
   maxTokens = 500
 ): Promise<string> {
-  // v1 API does not support system_instruction; inject it as the first turn
   const contents = [
-    { role: "user", parts: [{ text: `[系統指示]\n${systemPrompt}` }] },
-    { role: "model", parts: [{ text: "好的，我明白了，我會按照指示回答。" }] },
     ...history.map((h) => ({
       role: h.role === "assistant" ? "model" : "user",
       parts: [{ text: h.content }],
@@ -38,11 +35,12 @@ async function generateAnswer(
   ];
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${ENV.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${ENV.geminiApiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: { maxOutputTokens: maxTokens },
       }),
@@ -51,13 +49,6 @@ async function generateAnswer(
   if (!res.ok) {
     const err = await res.text();
     console.error("[chatbot] generateContent error:", res.status, err);
-    // debug: list available models for this key
-    try {
-      const lr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${ENV.geminiApiKey}`);
-      const ld = await lr.json() as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
-      const chat = ld.models?.filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
-      console.error("[chatbot] models supporting generateContent:", JSON.stringify(chat));
-    } catch (e) { console.error("[chatbot] listModels error:", e); }
     throw new Error(`Gemini generateContent failed: ${res.status} – ${err}`);
   }
   const data = await res.json() as {
