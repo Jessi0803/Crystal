@@ -52,13 +52,12 @@ async function generateAnswer(
     const err = await res.text();
     console.error("[chatbot] generateContent error:", res.status, err);
     // debug: list available models for this key
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${ENV.geminiApiKey}`)
-      .then((r) => r.json())
-      .then((d: { models?: { name: string; supportedGenerationMethods?: string[] }[] }) => {
-        const chat = d.models?.filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
-        console.error("[chatbot] models supporting generateContent:", JSON.stringify(chat));
-      })
-      .catch((e) => console.error("[chatbot] listModels error:", e));
+    try {
+      const lr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${ENV.geminiApiKey}`);
+      const ld = await lr.json() as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+      const chat = ld.models?.filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
+      console.error("[chatbot] models supporting generateContent:", JSON.stringify(chat));
+    } catch (e) { console.error("[chatbot] listModels error:", e); }
     throw new Error(`Gemini generateContent failed: ${res.status} – ${err}`);
   }
   const data = await res.json() as {
