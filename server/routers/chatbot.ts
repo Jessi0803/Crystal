@@ -134,7 +134,7 @@ export const chatbotRouter = router({
         SYSTEM_PROMPT + ragContext,
         input.history.slice(-10),
         input.message,
-        500
+        1024
       );
 
       return {
