@@ -93,51 +93,52 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   },
 ];
 
-// ─── 關鍵字搜尋（暫用，待換成 embedding 向量搜尋）───────────────────────────
-export function searchKnowledge(query: string, topK = 3): KnowledgeChunk[] {
-  const queryTokens = tokenize(query);
+// ─── Embedding 向量搜尋 ──────────────────────────────────────────────────────
 
-  const scored = knowledgeChunks.map((chunk) => {
-    const chunkTokens = tokenize(
-      chunk.embedText + " " + chunk.answer
-    );
+let _embeddings: { id: string; vector: number[] }[] | null = null;
 
-    let score = 0;
-    for (const qt of queryTokens) {
-      for (const ct of chunkTokens) {
-        if (ct.includes(qt) || qt.includes(ct)) {
-          score += qt.length >= 2 ? 2 : 1;
-        }
-      }
-      if (chunk.keywords.some((kw) => kw.includes(qt) || qt.includes(kw))) {
-        score += 3;
-      }
-    }
-
-    return { chunk, score };
-  });
-
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
-    .map((s) => s.chunk);
+function loadEmbeddings() {
+  if (_embeddings) return _embeddings;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const data = require("./faqEmbeddings.json");
+    _embeddings = data;
+    return _embeddings!;
+  } catch {
+    return [];
+  }
 }
 
-function tokenize(text: string): string[] {
-  const tokens: string[] = [];
-
-  for (let len = 4; len >= 2; len--) {
-    for (let i = 0; i <= text.length - len; i++) {
-      const token = text.slice(i, i + len);
-      if (/[一-鿿]/.test(token)) {
-        tokens.push(token);
-      }
-    }
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
   }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
-  const englishWords = text.match(/[a-zA-Z]+/g) || [];
-  tokens.push(...englishWords.map((w) => w.toLowerCase()));
+export async function searchKnowledge(
+  queryVector: number[],
+  topK = 3,
+  threshold = 0.6
+): Promise<KnowledgeChunk[]> {
+  const embeddings = loadEmbeddings();
+  if (embeddings.length === 0) return [];
 
-  return Array.from(new Set(tokens));
+  const scored = embeddings.map(({ id, vector }) => ({
+    id,
+    score: cosineSimilarity(queryVector, vector),
+  }));
+
+  const topIds = scored
+    .filter((s) => s.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((s) => s.id);
+
+  return topIds
+    .map((id) => knowledgeChunks.find((c) => c.id === id))
+    .filter((c): c is KnowledgeChunk => !!c);
 }
