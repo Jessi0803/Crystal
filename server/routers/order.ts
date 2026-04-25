@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import type { OverseasShipCountryCode } from "@shared/overseasShipping";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   generateMerchantTradeNo,
@@ -44,11 +45,12 @@ import {
   verifyPayPalOrderBelongsToMerchant,
   capturePayPalOrder,
 } from "../_core/paypal";
-import { isOverseasShipCountryCode } from "@shared/overseasShipping";
+import { isOverseasShipCountryCode, OVERSEAS_SHIP_COUNTRY_LABELS } from "@shared/overseasShipping";
 import {
   formatOverseasShippingAddress,
   validateOverseasAddress,
 } from "@shared/overseasAddress";
+import { calcCheckoutFees } from "@shared/checkoutFees";
 
 function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: string }) {
   const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
@@ -152,19 +154,17 @@ export const orderRouter = router({
       const isOverseas = input.checkoutRegion === "overseas";
       const shippingMethod = isOverseas ? ("home" as const) : input.shippingMethod;
       const paymentMethod = isOverseas ? ("paypal" as const) : input.paymentMethod;
+      const submittedItems = input.items.filter((item) => {
+        const productId = item.baseProductId ?? item.id;
+        return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
+      });
+      if (submittedItems.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "購物車沒有可結帳商品" });
+      }
 
       const merchantTradeNo = generateMerchantTradeNo();
-      const totalAmount = input.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
-
-      const itemName = input.items
-        .map((i) => `${i.name} x${i.quantity}`)
-        .join("#");
-
-      const isPreorder = input.items.some((i) => i.isPreorder);
-      const isCustomOrder = isCustomDepositProduct(input.items);
+      const isPreorder = submittedItems.some((i) => i.isPreorder);
+      const isCustomOrder = isCustomDepositProduct(submittedItems);
       const buyerEmail = normalizeOrderEmail(input.buyerEmail);
 
       let shippingAddress = input.shippingAddress;
@@ -172,6 +172,7 @@ export const orderRouter = router({
       let cvsStoreId = input.cvsStoreId;
       let cvsStoreName = input.cvsStoreName;
       let cvsType = input.cvsType;
+      let overseasCountry: OverseasShipCountryCode | null = null;
 
       if (isOverseas) {
         cvsStoreId = undefined;
@@ -181,6 +182,7 @@ export const orderRouter = router({
         if (!isOverseasShipCountryCode(countryCode)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "不支援的海外配送地區" });
         }
+        overseasCountry = countryCode;
         const formatted = formatOverseasShippingAddress({
           countryCode,
           line1: input.intlAddrLine1!.trim(),
@@ -192,6 +194,47 @@ export const orderRouter = router({
         shippingAddress = formatted.shippingAddress;
         receiverZipCode = formatted.receiverZipCode;
       }
+
+      const feeSummary = calcCheckoutFees({
+        items: submittedItems,
+        checkoutRegion: input.checkoutRegion,
+        shippingMethod,
+        paymentMethod,
+        overseasCountry,
+      });
+      const feeItems: typeof submittedItems = [];
+      if (feeSummary.shippingFee > 0) {
+        feeItems.push({
+          id: "shipping-fee",
+          baseProductId: "shipping-fee",
+          name: isOverseas
+            ? `海外運費 - ${OVERSEAS_SHIP_COUNTRY_LABELS[overseasCountry!]}`
+            : shippingMethod === "home"
+              ? "運費 - 黑貓宅急便"
+              : shippingMethod === "cvs_711"
+                ? "運費 - 7-11店到店"
+                : "運費 - 全家店到店",
+          price: feeSummary.shippingFee,
+          quantity: 1,
+          image: "",
+        });
+      }
+      if (feeSummary.paymentFee > 0) {
+        feeItems.push({
+          id: "payment-fee",
+          baseProductId: "payment-fee",
+          name: paymentMethod === "paypal" ? "海外付款手續費（6%）" : "刷卡手續費（2%）",
+          price: feeSummary.paymentFee,
+          quantity: 1,
+          image: "",
+        });
+      }
+      const orderItems = submittedItems.concat(feeItems);
+      const totalAmount = feeSummary.total;
+
+      const itemName = orderItems
+        .map((i) => `${i.name} x${i.quantity}`)
+        .join("#");
 
       const orderRow: Parameters<typeof createOrder>[0] = {
         merchantTradeNo,
@@ -218,7 +261,7 @@ export const orderRouter = router({
 
       await createOrder(
         orderRow,
-        input.items.map((item) => ({
+        orderItems.map((item) => ({
           orderId: 0,
           productId: item.baseProductId ?? item.id,
           productName: item.name,

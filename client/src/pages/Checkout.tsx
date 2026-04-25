@@ -21,22 +21,11 @@ import {
   OVERSEAS_SHIP_COUNTRY_OPTIONS,
   isOverseasShipCountryCode,
 } from "@shared/overseasShipping";
+import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
 type CheckoutRegion = "domestic" | "overseas";
-
-// 運費設定
-const SHIPPING_FEES: Record<ShippingMethod, number> = {
-  cvs_711: 0,
-  home: 0,
-};
-
-// 計算運費（2件以上免運）
-function calcShippingFee(method: ShippingMethod, totalQty: number): number {
-  if (totalQty >= 2) return 0;
-  return SHIPPING_FEES[method];
-}
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
@@ -46,10 +35,6 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("home");
 
-  // 計算總件數與運費
-  const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
-  const shippingFee = calcShippingFee(shippingMethod, totalQty);
-  const finalTotal = totalPrice + shippingFee;
   const [form, setForm] = useState({
     buyerName: "",
     buyerEmail: "",
@@ -65,6 +50,24 @@ export default function Checkout() {
     intlState: "",
     intlPostalCode: "",
   });
+  // 計算總件數與費用
+  const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
+  const feeSummary = calcCheckoutFees({
+    items: items.map((i) => ({
+      id: i.id,
+      baseProductId: i.product.id,
+      name: i.product.name,
+      price: i.unitPrice,
+      quantity: i.quantity,
+    })),
+    checkoutRegion,
+    shippingMethod,
+    paymentMethod: checkoutRegion === "overseas" ? "paypal" : paymentMethod,
+    overseasCountry: overseasCode,
+  });
+  const shippingFee = feeSummary.shippingFee;
+  const paymentFee = feeSummary.paymentFee;
+  const finalTotal = feeSummary.total;
   // 超商選店資訊（由綠界地圖回傳）
   const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -102,8 +105,6 @@ export default function Checkout() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
-
-  const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
 
   // 購物車空時導回
   if (items.length === 0) {
@@ -177,20 +178,14 @@ export default function Checkout() {
         intlCity: checkoutRegion === "overseas" ? form.intlCity : undefined,
         intlState: checkoutRegion === "overseas" ? form.intlState : undefined,
         intlPostalCode: checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
-        items: items
-          .map((i) => ({
-            id: i.id,
-            baseProductId: i.product.id,
-            name: `${i.product.name}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}`,
-            price: i.unitPrice,
-            quantity: i.quantity,
-            image: i.product.image,
-          }))
-          .concat(
-            shippingFee > 0
-              ? [{ id: "shipping", baseProductId: "shipping", name: "運費", price: shippingFee, quantity: 1, image: "" }]
-              : []
-          ),
+        items: items.map((i) => ({
+          id: i.id,
+          baseProductId: i.product.id,
+          name: `${i.product.name}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}`,
+          price: i.unitPrice,
+          quantity: i.quantity,
+          image: i.product.image,
+        })),
         origin: window.location.origin,
       });
 
@@ -394,16 +389,11 @@ export default function Checkout() {
               <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
                 {checkoutRegion === "overseas" ? "收件地址（國際宅配）" : "配送方式"}
               </h2>
-              {checkoutRegion === "domestic" && totalQty >= 2 && (
-                <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 text-xs font-body text-green-700">
-                  🎉 購買 2 件以上，享免運費優惠！
-                </div>
-              )}
               {checkoutRegion === "domestic" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { key: "home" as ShippingMethod, icon: <Home className="w-5 h-5" />, title: "宅配到府", desc: "黑貓宅急便（免運）" },
-                  { key: "cvs_711" as ShippingMethod, icon: <Store className="w-5 h-5" />, title: "7-11 取貨", desc: "超商取貨，先付款再取貨（免運）" },
+                  { key: "home" as ShippingMethod, icon: <Home className="w-5 h-5" />, title: "宅配到府", desc: "黑貓宅急便（NT$ 100）" },
+                  { key: "cvs_711" as ShippingMethod, icon: <Store className="w-5 h-5" />, title: "7-11 取貨", desc: "超商取貨，先付款再取貨（NT$ 60）" },
                 ].map((opt) => (
                   <button
                     key={opt.key}
@@ -550,7 +540,8 @@ export default function Checkout() {
                       <option value="">Select country</option>
                       {OVERSEAS_SHIP_COUNTRY_OPTIONS.map(({ code }) => (
                         <option key={code} value={code}>
-                          {OVERSEAS_COUNTRY_EN[code]} ({OVERSEAS_SHIP_COUNTRY_LABELS[code]})
+                          {OVERSEAS_COUNTRY_EN[code]} ({OVERSEAS_SHIP_COUNTRY_LABELS[code]}) NT${" "}
+                          {OVERSEAS_SHIPPING_FEES[code]}
                         </option>
                       ))}
                     </select>
@@ -722,7 +713,7 @@ export default function Checkout() {
                   <div>
                     <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">信用卡 / Apple Pay</p>
                     <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">VISA / Master / JCB</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)]">即時扣款，支援分期</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)]">即時扣款，另加 2% 手續費</p>
                   </div>
                   <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                     paymentMethod === "credit" ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.8_0_0)]"
@@ -760,7 +751,7 @@ export default function Checkout() {
             {checkoutRegion === "overseas" && (
               <section className="border border-[oklch(0.88_0_0)] p-4 bg-[oklch(0.985_0_0)]">
                 <h2 className="text-sm tracking-[0.2em] font-body mb-2">付款方式</h2>
-                <p className="text-sm font-body text-[oklch(0.25_0_0)]">PayPal（送出後將前往 PayPal 安全付款頁面）</p>
+                <p className="text-sm font-body text-[oklch(0.25_0_0)]">PayPal（另加 6% 手續費，送出後將前往 PayPal 安全付款頁面）</p>
               </section>
             )}
 
@@ -841,9 +832,20 @@ export default function Checkout() {
                 <div className="flex justify-between text-sm font-body">
                   <span className="text-[oklch(0.5_0_0)]">運費</span>
                   {shippingFee === 0 ? (
-                    <span className="text-green-600">{totalQty >= 2 ? "免費（2件以上免運）" : "免費"}</span>
+                    <span className="text-green-600">免收</span>
                   ) : (
                     <span>NT$ {shippingFee}</span>
+                  )}
+                </div>
+                <div className="flex justify-between text-sm font-body">
+                  <span className="text-[oklch(0.5_0_0)]">
+                    手續費
+                    {checkoutRegion === "overseas" ? "（6%）" : paymentMethod === "credit" ? "（2%）" : ""}
+                  </span>
+                  {paymentFee === 0 ? (
+                    <span className="text-green-600">免收</span>
+                  ) : (
+                    <span>NT$ {paymentFee.toLocaleString()}</span>
                   )}
                 </div>
                 <div className="flex justify-between text-base font-medium border-t border-[oklch(0.93_0_0)] pt-3 mt-3">
