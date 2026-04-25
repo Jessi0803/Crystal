@@ -51,9 +51,9 @@ export const chatbotRouter = router({
       let ragContext = "";
       if (relevantChunks.length > 0) {
         ragContext =
-          "\n\n【相關知識庫資料】\n" +
+          "\n\n【相關常見問題】\n" +
           relevantChunks
-            .map((c) => `## ${c.title}\n${c.content}`)
+            .map((c) => `Q: ${c.question}\nA: ${c.answer}`)
             .join("\n\n");
       }
 
@@ -99,7 +99,7 @@ export const chatbotRouter = router({
           image: p.image,
           href: `/products/${p.id}`,
         })),
-        retrievedChunks: relevantChunks.map((c) => c.title), // 用於 debug
+        retrievedChunks: relevantChunks.map((c) => c.question), // 用於 debug
       };
     }),
 });
