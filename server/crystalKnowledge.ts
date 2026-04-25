@@ -95,18 +95,11 @@ export const knowledgeChunks: KnowledgeChunk[] = [
 
 // ─── Embedding 向量搜尋 ──────────────────────────────────────────────────────
 
-let _embeddings: { id: string; vector: number[] }[] | null = null;
+import rawEmbeddings from "./faqEmbeddings.json";
+const _embeddings = rawEmbeddings as { id: string; vector: number[] }[];
 
 function loadEmbeddings() {
-  if (_embeddings) return _embeddings;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require("./faqEmbeddings.json");
-    _embeddings = data;
-    return _embeddings!;
-  } catch {
-    return [];
-  }
+  return _embeddings;
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
