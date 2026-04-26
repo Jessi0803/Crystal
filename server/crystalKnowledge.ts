@@ -91,6 +91,56 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     keywords: ["手圍", "尺寸", "測量", "皮尺", "淨手圍", "鬆緊", "怎麼量"],
     category: "常見問題",
   },
+  {
+    id: "rec-confidence",
+    question: "哪款手鍊適合提升自信、魅力或吸引力？",
+    answer:
+      "推薦「維納斯 Venus」（提升自信與行動力、招財聚能、穩定情緒，輕量日常款，NT$950）和「蜜光之境」（增強自信、吸引人緣、穩定氣場，NT$1,580）。兩款都適合想建立自信氣場的你！",
+    embedText: "提升自信 自信心 魅力 吸引力 氣場 行動力 增強自信 建立自信 想變自信 自我提升",
+    keywords: ["自信", "魅力", "吸引力", "氣場", "行動力", "提升自信"],
+    category: "商品推薦",
+    relatedProductIds: ["d003-venus", "d002-honey-realm"],
+  },
+  {
+    id: "rec-wealth",
+    question: "哪款手鍊適合招財、提升財運或事業運？",
+    answer:
+      "推薦「蜜光之境」（招財聚能、提升行動力、財富人緣一次到位，NT$1,580）和「維納斯 Venus」（招財放大正向能量、提升自信行動力，NT$950）。",
+    embedText: "招財 財運 財富 錢財 事業 工作 升遷 行動力 提升財運 招財手鍊 賺錢",
+    keywords: ["招財", "財運", "財富", "事業", "工作", "升遷", "賺錢"],
+    category: "商品推薦",
+    relatedProductIds: ["d002-honey-realm", "d003-venus"],
+  },
+  {
+    id: "rec-love",
+    question: "哪款手鍊適合提升愛情、桃花或人緣？",
+    answer:
+      "推薦「晨光輕語」（提升愛情人緣、柔化情緒增加安全感，NT$1,800）、「月映淨心」（吸引愛情、安撫情緒、帶來溫柔安全感，NT$1,500）和「蜜光之境」（吸引愛情與好人緣，NT$1,580）。",
+    embedText: "愛情 桃花 人緣 感情 戀愛 交友 吸引異性 提升桃花 正緣 好人緣 脫單",
+    keywords: ["愛情", "桃花", "人緣", "感情", "戀愛", "正緣", "交友", "脫單"],
+    category: "商品推薦",
+    relatedProductIds: ["d004-morning-whisper", "d005-moon-clear-heart", "d002-honey-realm"],
+  },
+  {
+    id: "rec-healing",
+    question: "哪款手鍊適合療癒、釋放壓力或安撫情緒？",
+    answer:
+      "推薦「月下密語」（淨化負能量、釋放壓力焦慮、增強直覺靈感，NT$1,480）和「月映淨心」（安撫情緒、淨化放大正向能量、帶來溫柔安全感，NT$1,500）。",
+    embedText: "療癒 壓力 焦慮 情緒 安撫 紓壓 放鬆 不安 釋放壓力 情緒穩定 心情不好 負面情緒",
+    keywords: ["療癒", "壓力", "焦慮", "情緒", "安撫", "紓壓", "放鬆", "心情不好"],
+    category: "商品推薦",
+    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart"],
+  },
+  {
+    id: "rec-protection",
+    question: "哪款手鍊適合防護負能量、保護氣場？",
+    answer:
+      "推薦「月下密語」（淨化並防護外在負能量、平衡身心靈，NT$1,480）和「蜜光之境」（強化保護力與穩定氣場、放大個人能量，NT$1,580）。",
+    embedText: "防護 負能量 保護 氣場 淨化 穩定 防小人 避邪 保護能量 驅邪",
+    keywords: ["防護", "負能量", "保護", "氣場", "淨化", "防小人", "驅邪"],
+    category: "商品推薦",
+    relatedProductIds: ["d001-moon-secret", "d002-honey-realm"],
+  },
 ];
 
 // ─── Embedding 向量搜尋 ──────────────────────────────────────────────────────
