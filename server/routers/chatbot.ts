@@ -106,11 +106,21 @@ export const chatbotRouter = router({
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
 
-      // 3. 找出關聯商品
-      const relatedProductIds = new Set(
-        relevantChunks.flatMap((c) => c.relatedProductIds ?? [])
-      );
-      const relatedProducts = products.filter((p) => relatedProductIds.has(p.id));
+      // 3. 找出關聯商品（依 chunk 相關性排序，最多 3 款）
+      const orderedProductIds: string[] = [];
+      const seenProductIds = new Set<string>();
+      for (const chunk of relevantChunks) {
+        for (const id of chunk.relatedProductIds ?? []) {
+          if (!seenProductIds.has(id)) {
+            orderedProductIds.push(id);
+            seenProductIds.add(id);
+          }
+        }
+      }
+      const relatedProducts = orderedProductIds
+        .slice(0, 3)
+        .map((id) => products.find((p) => p.id === id))
+        .filter((p): p is (typeof products)[number] => !!p);
 
       // 4. 組建 RAG 上下文
       let ragContext = "";
