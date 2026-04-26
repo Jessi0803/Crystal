@@ -106,8 +106,8 @@ export const chatbotRouter = router({
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
 
-      // 3. 找出關聯商品：只取最相關且有 relatedProductIds 的那筆 chunk
-      const topChunk = relevantChunks.find((c) => c.relatedProductIds && c.relatedProductIds.length > 0);
+      // 3. 找出關聯商品：只有 category === "商品推薦" 的 chunk 才顯示商品卡
+      const topChunk = relevantChunks.find((c) => c.category === "商品推薦" && c.relatedProductIds && c.relatedProductIds.length > 0);
       const relatedProducts = (topChunk?.relatedProductIds ?? [])
         .map((id) => products.find((p) => p.id === id))
         .filter((p): p is (typeof products)[number] => !!p);
