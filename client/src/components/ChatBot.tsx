@@ -18,10 +18,10 @@ interface Message {
 const QUICK_QUESTIONS = [
   "我想提升自信，推薦哪款？",
   "我想招財，推薦哪款？",
-  "我想提升愛情桃花，推薦哪款？",
-  "我壓力很大想療癒，推薦哪款？",
+  "手鍊怎麼淨化？",
   "手鍊有保固嗎？",
   "手圍怎麼量？",
+  "如何開啟水晶能量？",
 ];
 
 const WELCOME_MESSAGE: Message = {
