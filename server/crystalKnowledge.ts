@@ -175,35 +175,37 @@ function keywordSearch(query: string, topK: number): KnowledgeChunk[] {
     .map((s) => s.chunk);
 }
 
+export type ScoredChunk = KnowledgeChunk & { score: number };
+
 export async function searchKnowledge(
   query: string,
   queryVector: number[],
   topK = 3,
   threshold = 0.45
-): Promise<KnowledgeChunk[]> {
+): Promise<ScoredChunk[]> {
   const embeddings = loadEmbeddings();
 
-  const vectorResults: KnowledgeChunk[] = [];
+  const vectorResults: ScoredChunk[] = [];
   if (embeddings.length > 0) {
     const scored = embeddings.map(({ id, vector }) => ({
       id,
       score: cosineSimilarity(queryVector, vector),
     }));
-    const topIds = scored
+    const top = scored
       .filter((s) => s.score >= threshold)
       .sort((a, b) => b.score - a.score)
-      .slice(0, topK)
-      .map((s) => s.id);
-    vectorResults.push(
-      ...topIds
-        .map((id) => knowledgeChunks.find((c) => c.id === id))
-        .filter((c): c is KnowledgeChunk => !!c)
-    );
+      .slice(0, topK);
+    for (const { id, score } of top) {
+      const chunk = knowledgeChunks.find((c) => c.id === id);
+      if (chunk) vectorResults.push({ ...chunk, score });
+    }
   }
 
-  // keyword 永遠跑，補上向量搜尋沒找到的結果
+  // keyword 永遠跑，補上向量搜尋沒找到的結果（score = 0）
   const seen = new Set(vectorResults.map((c) => c.id));
-  const kwResults = keywordSearch(query, topK).filter((c) => !seen.has(c.id));
+  const kwResults = keywordSearch(query, topK)
+    .filter((c) => !seen.has(c.id))
+    .map((c) => ({ ...c, score: 0 }));
 
   return [...vectorResults, ...kwResults].slice(0, topK);
 }
