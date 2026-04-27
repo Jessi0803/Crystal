@@ -12,6 +12,7 @@ import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Quiz from "./pages/Quiz";
 import Custom from "./pages/Custom";
+import CustomForm from "./pages/CustomForm";
 import Knowledge from "./pages/Knowledge";
 import ShoppingGuide from "./pages/ShoppingGuide";
 import Contact from "./pages/Contact";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/products/:id" component={ProductDetail} />
       <Route path="/quiz" component={Quiz} />
       <Route path="/custom" component={Custom} />
+      <Route path="/custom/form" component={CustomForm} />
       <Route path="/knowledge" component={Knowledge} />
       <Route path="/shopping-guide" component={ShoppingGuide} />
       <Route path="/crystal-workshop" component={CrystalWorkshop} />

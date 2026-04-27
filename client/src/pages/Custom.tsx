@@ -1,10 +1,6 @@
 // 椛 ˙Crystal — 客製化方案頁面
-import { useState } from "react";
-import { ExternalLink, ChevronRight, ChevronLeft, Check } from "lucide-react";
-import { useLocation } from "wouter";
-import { useCart } from "@/contexts/CartContext";
-import { products } from "@/lib/data";
-import { toast } from "sonner";
+import { ExternalLink, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -21,7 +17,7 @@ const plans = [
       "提供初版免費修改 1 次。",
     ],
     accent: "oklch(0.72 0.09 70)",
-    hasForm: true,
+    formPath: "/custom/form",
   },
   {
     id: "B",
@@ -35,7 +31,7 @@ const plans = [
       "提供初版免費修改 1 次。",
     ],
     accent: "oklch(0.65 0.12 290)",
-    hasForm: false,
+    formPath: null,
   },
   {
     id: "C",
@@ -50,7 +46,7 @@ const plans = [
       "提供初版免費修改 1 次。",
     ],
     accent: "oklch(0.62 0.14 200)",
-    hasForm: false,
+    formPath: null,
   },
   {
     id: "D",
@@ -65,355 +61,11 @@ const plans = [
       "提供初版免費修改 1 次。",
     ],
     accent: "oklch(0.68 0.11 30)",
-    hasForm: false,
+    formPath: null,
   },
 ];
 
-interface FormData {
-  effect: string;
-  wristSize: string;
-  fitPreference: "" | "just-right" | "loose";
-  metalPreference: "" | "gold" | "silver" | "either";
-  silverTube: "" | "yes" | "no";
-  beadFrame: "" | "yes" | "no";
-  colorPreference: string;
-  specialRequests: string;
-}
-
-const EMPTY_FORM: FormData = {
-  effect: "",
-  wristSize: "",
-  fitPreference: "",
-  metalPreference: "",
-  silverTube: "",
-  beadFrame: "",
-  colorPreference: "",
-  specialRequests: "",
-};
-
-function buildNote(form: FormData): string {
-  const lines = [
-    `【純客製水晶手鍊諮詢表單】`,
-    ``,
-    `想要的功效：${form.effect || "（未填）"}`,
-    `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
-    `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
-    `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
-    `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
-    `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
-    `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
-    `其餘特殊需求：${form.specialRequests || "無"}`,
-  ];
-  return lines.join("\n");
-}
-
-function CustomForm({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const [step, setStep] = useState(0);
-  const [, navigate] = useLocation();
-  const { addToCart, setIsOpen } = useCart();
-
-  const depositProduct = products.find((p) => p.id === "custom-deposit-product");
-
-  const steps = [
-    {
-      title: "想要什麼功效？",
-      subtitle: "例如：提升自信、招財、愛情、療癒、保護氣場……可以自由描述",
-      field: (
-        <textarea
-          value={form.effect}
-          onChange={(e) => setForm({ ...form, effect: e.target.value })}
-          placeholder="寫下你想要的功效或願望，越詳細越好"
-          rows={4}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
-        />
-      ),
-    },
-    {
-      title: "手圍尺寸",
-      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減",
-      field: (
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            value={form.wristSize}
-            onChange={(e) => setForm({ ...form, wristSize: e.target.value })}
-            placeholder="例如：15.5"
-            step="0.5"
-            min="10"
-            max="25"
-            className="w-40 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
-          />
-          <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
-        </div>
-      ),
-    },
-    {
-      title: "手圍的鬆緊偏好",
-      subtitle: "這會影響手鍊的實際製作尺寸",
-      field: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            { id: "just-right" as const, label: "剛好", desc: "會有水晶壓痕但不掐肉" },
-            { id: "loose" as const, label: "微鬆", desc: "可輕微滑動" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, fitPreference: opt.id })}
-              className={`px-4 py-3 text-sm font-body border text-left transition-colors ${
-                form.fitPreference === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              <span className="block font-medium">{opt.label}</span>
-              <span className="block text-xs mt-0.5 opacity-70">{opt.desc}</span>
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "喜歡金飾還是銀飾？",
-      subtitle: "這會影響配件（銀管、珠框等）的材質選擇",
-      field: (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { id: "gold" as const, label: "金飾", img: "/golden.jpg" },
-              { id: "silver" as const, label: "銀飾", img: "/silver.jpg" },
-            ].map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setForm({ ...form, metalPreference: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${
-                  form.metalPreference === opt.id
-                    ? "border-[oklch(0.1_0_0)]"
-                    : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
-                }`}
-              >
-                <img src={opt.img} alt={opt.label} className="w-full h-32 object-cover" />
-                <p className={`text-xs font-body text-center py-2 ${
-                  form.metalPreference === opt.id ? "bg-[oklch(0.97_0_0)] font-medium" : "text-[oklch(0.45_0_0)]"
-                }`}>
-                  {opt.label}
-                </p>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, metalPreference: "either" })}
-            className={`w-full px-4 py-2.5 text-sm font-body border transition-colors ${
-              form.metalPreference === "either"
-                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-            }`}
-          >
-            都可以
-          </button>
-        </div>
-      ),
-    },
-    {
-      title: "要加銀管嗎？",
-      subtitle: "銀管是穿在水晶珠之間的小金屬管，可增加層次感",
-      field: (
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { id: "yes" as const, label: "要" },
-            { id: "no" as const, label: "不要" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, silverTube: opt.id })}
-              className={`px-4 py-3 text-sm font-body border transition-colors ${
-                form.silverTube === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "要加珠框嗎？",
-      subtitle: "珠框是套在主石外的金屬框，可突顯主石",
-      field: (
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { id: "yes" as const, label: "要" },
-            { id: "no" as const, label: "不要" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, beadFrame: opt.id })}
-              className={`px-4 py-3 text-sm font-body border transition-colors ${
-                form.beadFrame === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "有想要的水晶顏色嗎？",
-      subtitle: "例如：偏粉色系、紫色、透明……或是沒有指定也沒關係",
-      field: (
-        <textarea
-          value={form.colorPreference}
-          onChange={(e) => setForm({ ...form, colorPreference: e.target.value })}
-          placeholder="寫下喜歡的顏色或色系，沒有指定可以留空"
-          rows={3}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
-        />
-      ),
-    },
-    {
-      title: "其餘特殊需求",
-      subtitle: "任何其他想告訴老闆的事情，例如過敏材質、特別風格、紀念意義……",
-      field: (
-        <textarea
-          value={form.specialRequests}
-          onChange={(e) => setForm({ ...form, specialRequests: e.target.value })}
-          placeholder="有任何其他想說的都可以寫在這裡，沒有的話留空即可"
-          rows={4}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
-        />
-      ),
-    },
-  ];
-
-  const isLast = step === steps.length - 1;
-
-  const handleNext = () => {
-    if (step === 0 && !form.effect.trim()) {
-      toast.error("請填寫想要的功效");
-      return;
-    }
-    if (step === 1 && !form.wristSize) {
-      toast.error("請填寫手圍尺寸");
-      return;
-    }
-    if (step === 2 && !form.fitPreference) {
-      toast.error("請選擇鬆緊偏好");
-      return;
-    }
-    if (step === 3 && !form.metalPreference) {
-      toast.error("請選擇金飾 / 銀飾偏好");
-      return;
-    }
-    if (step === 4 && !form.silverTube) {
-      toast.error("請選擇是否加銀管");
-      return;
-    }
-    if (step === 5 && !form.beadFrame) {
-      toast.error("請選擇是否加珠框");
-      return;
-    }
-    setStep((s) => s + 1);
-  };
-
-  const handleSubmit = () => {
-    if (!depositProduct) {
-      toast.error("找不到訂金商品，請聯繫客服");
-      return;
-    }
-    const note = buildNote(form);
-    sessionStorage.setItem("customConsultationNote", note);
-    addToCart(depositProduct);
-    setIsOpen(false);
-    navigate("/checkout");
-    toast.success("諮詢內容已儲存，請完成結帳以預約訂金");
-  };
-
-  return (
-    <div className="mt-8 bg-white border border-[oklch(0.9_0_0)] rounded-sm overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 bg-[oklch(0.97_0.01_70)] border-b border-[oklch(0.92_0_0)]">
-        <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase mb-1">
-          純客製水晶手鍊 · 報名表單
-        </p>
-        <div className="flex items-center gap-1.5 mt-3">
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                i <= step ? "bg-[oklch(0.72_0.09_70)]" : "bg-[oklch(0.88_0_0)]"
-              }`}
-            />
-          ))}
-        </div>
-        <p className="text-[0.65rem] text-[oklch(0.55_0_0)] mt-2 font-body">
-          步驟 {step + 1} / {steps.length}
-        </p>
-      </div>
-
-      {/* Step Content */}
-      <div className="px-6 py-6">
-        <h3
-          className="text-base font-medium text-[oklch(0.1_0_0)] mb-1"
-          style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-        >
-          {steps[step].title}
-        </h3>
-        <p className="text-xs text-[oklch(0.55_0_0)] mb-4 font-body leading-relaxed">
-          {steps[step].subtitle}
-        </p>
-        {steps[step].field}
-      </div>
-
-      {/* Navigation */}
-      <div className="px-6 pb-6 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={step === 0 ? onClose : () => setStep((s) => s - 1)}
-          className="flex items-center gap-1.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {step === 0 ? "取消" : "上一步"}
-        </button>
-
-        {isLast ? (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="flex items-center gap-2 px-6 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "oklch(0.72 0.09 70)" }}
-          >
-            <Check className="w-4 h-4" />
-            確認，前往下訂金
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleNext}
-            className="flex items-center gap-2 px-6 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "oklch(0.72 0.09 70)" }}
-          >
-            下一步
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function Custom() {
-  const [showForm, setShowForm] = useState(false);
-
   return (
     <div className="min-h-screen bg-[oklch(0.98_0.005_240)] page-enter">
       {/* ── Hero ── */}
@@ -498,7 +150,7 @@ export default function Custom() {
                 >
                   服務內容
                 </p>
-                <div className="space-y-1">
+                <div className="space-y-1 mb-6">
                   {plan.description.map((line, i) => (
                     <p
                       key={i}
@@ -510,25 +162,29 @@ export default function Custom() {
                   ))}
                 </div>
 
-                {plan.hasForm && (
-                  <div className="mt-6 text-center">
+                {plan.formPath ? (
+                  <Link href={plan.formPath}>
                     <button
-                      onClick={() => setShowForm((v) => !v)}
-                      className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90"
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-body text-white transition-opacity hover:opacity-90"
                       style={{ backgroundColor: plan.accent }}
                     >
-                      {showForm ? "收起表單" : "填寫報名表單"}
-                      <ChevronRight className={`w-4 h-4 transition-transform ${showForm ? "rotate-90" : ""}`} />
+                      填寫報名表單
+                      <ChevronRight className="w-4 h-4" />
                     </button>
-                  </div>
+                  </Link>
+                ) : (
+                  <a
+                    href={LINE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-body text-white transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: "#06C755" }}
+                  >
+                    透過 LINE 預約
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 )}
               </div>
-
-              {plan.hasForm && showForm && (
-                <div className="px-8 pb-8">
-                  <CustomForm onClose={() => setShowForm(false)} />
-                </div>
-              )}
             </div>
           ))}
         </div>
