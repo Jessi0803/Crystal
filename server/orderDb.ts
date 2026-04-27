@@ -723,10 +723,24 @@ export async function updateBalancePaymentTransferCode(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  const [balance] = await db
+    .select({ orderId: orderBalancePayments.orderId })
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+
   await db
     .update(orderBalancePayments)
     .set({ transferLastFive: lastFive, paymentStatus: "transfer_pending" })
     .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo));
+
+  if (balance) {
+    await db
+      .update(orders)
+      .set({ paymentStatus: "transfer_pending" })
+      .where(eq(orders.id, balance.orderId));
+  }
 }
 
 export async function confirmBalanceTransfer(merchantTradeNo: string) {
@@ -745,7 +759,10 @@ export async function confirmBalanceTransfer(merchantTradeNo: string) {
     .set({ paymentStatus: "paid", paidAt: new Date() })
     .where(eq(orderBalancePayments.id, balance.id));
 
-  await db.update(orders).set({ orderStatus: "paid" }).where(eq(orders.id, balance.orderId));
+  await db
+    .update(orders)
+    .set({ orderStatus: "paid", paymentStatus: "confirmed", paidAt: new Date() })
+    .where(eq(orders.id, balance.orderId));
 }
 
 export function isCustomDepositProduct(items: { id: string; baseProductId?: string }[]) {
