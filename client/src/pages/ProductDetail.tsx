@@ -164,22 +164,40 @@ export default function ProductDetail() {
                 </div>
                 <div>
                   <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">扣件類型</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {claspOptions.map((opt) => (
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    {[
+                      { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
+                      { id: "magnetic" as const, label: "磁扣", price: "+NT$200", img: "/magnet-clasp.jpg" },
+                    ].map((opt) => (
                       <button
                         type="button"
                         key={opt.id}
                         onClick={() => setSelectedClaspType(opt.id)}
-                        className={`px-3 py-2 text-xs font-body border transition-colors ${
+                        className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${
                           selectedClaspType === opt.id
-                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                            : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                            ? "border-[oklch(0.1_0_0)]"
+                            : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
                         }`}
                       >
-                        {opt.label}
+                        <img src={opt.img} alt={opt.label} className="w-full h-24 object-cover" />
+                        <div className={`px-2 py-1.5 text-center ${selectedClaspType === opt.id ? "bg-[oklch(0.97_0_0)]" : ""}`}>
+                          <p className="text-xs font-body font-medium text-[oklch(0.15_0_0)]">{opt.label}</p>
+                          <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)]">{opt.price}</p>
+                        </div>
                       </button>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClaspType("elastic")}
+                    className={`w-full px-3 py-2 text-xs font-body border-2 transition-colors rounded-sm ${
+                      selectedClaspType === "elastic"
+                        ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                        : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                    }`}
+                  >
+                    彈力繩（預設）
+                  </button>
                 </div>
                 <div>
                   <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
