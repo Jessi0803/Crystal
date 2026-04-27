@@ -14,7 +14,8 @@ import Quiz from "./pages/Quiz";
 import Custom from "./pages/Custom";
 import CustomForm from "./pages/CustomForm"
 import CustomFormB from "./pages/CustomFormB"
-import CustomFormC from "./pages/CustomFormC";
+import CustomFormC from "./pages/CustomFormC"
+import CustomFormD from "./pages/CustomFormD";
 import Knowledge from "./pages/Knowledge";
 import ShoppingGuide from "./pages/ShoppingGuide";
 import Contact from "./pages/Contact";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/custom/form" component={CustomForm} />
       <Route path="/custom/form-b" component={CustomFormB} />
       <Route path="/custom/form-c" component={CustomFormC} />
+      <Route path="/custom/form-d" component={CustomFormD} />
       <Route path="/knowledge" component={Knowledge} />
       <Route path="/shopping-guide" component={ShoppingGuide} />
       <Route path="/crystal-workshop" component={CrystalWorkshop} />

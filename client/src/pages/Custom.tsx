@@ -61,7 +61,7 @@ const plans = [
       "提供初版免費修改 1 次。",
     ],
     accent: "oklch(0.68 0.11 30)",
-    formPath: null,
+    formPath: "/custom/form-d",
   },
 ];
 
