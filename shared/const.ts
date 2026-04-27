@@ -6,4 +6,5 @@ export const NOT_ADMIN_ERR_MSG = 'You do not have required permission (10002)';
 export const CUSTOM_PRODUCT_ID = "custom-deposit-product";
 export const CUSTOM_PRODUCT_NAME = "客製化商品";
 export const CUSTOM_TAROT_PRODUCT_ID = "tarot-crystal-deposit-product";
-export const CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID];
+export const CUSTOM_CHAKRA_PRODUCT_ID = "chakra-crystal-deposit-product";
+export const CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID, CUSTOM_CHAKRA_PRODUCT_ID];
