@@ -15,6 +15,7 @@ interface FormData {
   metalPreference: "" | "gold" | "silver" | "either";
   silverTube: "" | "yes" | "no";
   beadFrame: "" | "yes" | "no";
+  claspType: "" | "lobster" | "magnet" | "elastic";
   colorPreference: string;
   specialRequests: string;
   igHandle: string;
@@ -29,6 +30,7 @@ const EMPTY_FORM: FormData = {
   metalPreference: "",
   silverTube: "",
   beadFrame: "",
+  claspType: "",
   colorPreference: "",
   specialRequests: "",
   igHandle: "",
@@ -46,6 +48,7 @@ function buildNote(form: FormData): string {
     `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
     `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
     `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
+    `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
     `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
     `其餘特殊需求：${form.specialRequests || "無"}`,
     `Instagram 帳號：${form.igHandle || "（未提供）"}`,
@@ -252,6 +255,44 @@ export default function CustomFormD() {
               {opt.label}
             </button>
           ))}
+        </div>
+      ),
+    },
+    {
+      title: "要換龍蝦扣或磁扣嗎？",
+      subtitle: "預設為彈力繩；若更換扣具需額外加收 200 元",
+      required: false,
+      field: (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { id: "lobster" as const, label: "龍蝦扣", img: "/lobster-clasp.jpg" },
+              { id: "magnet" as const, label: "磁扣", img: "/magnet-clasp.jpg" },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setForm({ ...form, claspType: opt.id })}
+                className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${
+                  form.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
+                }`}
+              >
+                <img src={opt.img} alt={opt.label} className="w-full h-40 object-cover" />
+                <p className={`text-sm font-body text-center py-2.5 ${form.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
+                  {opt.label} <span className="text-xs text-[oklch(0.55_0_0)]">（+200元）</span>
+                </p>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, claspType: "elastic" })}
+            className={`w-full px-4 py-3 text-sm font-body border-2 transition-colors rounded-sm ${
+              form.claspType === "elastic" ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+            }`}
+          >
+            不用，彈力繩就好
+          </button>
         </div>
       ),
     },
