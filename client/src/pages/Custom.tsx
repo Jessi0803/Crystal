@@ -31,7 +31,7 @@ const plans = [
       "提供初版免費修改 1 次。",
     ],
     accent: "oklch(0.65 0.12 290)",
-    formPath: null,
+    formPath: "/custom/form-b",
   },
   {
     id: "C",

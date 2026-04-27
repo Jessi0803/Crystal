@@ -14,7 +14,7 @@ import {
   InsertOrderBalancePayment,
   InsertLogisticsOrder,
 } from "../drizzle/schema";
-import { CUSTOM_PRODUCT_ID } from "../shared/const";
+import { CUSTOM_PRODUCT_IDS } from "../shared/const";
 
 type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type OrderRow = typeof orders.$inferSelect;
@@ -766,7 +766,7 @@ export async function confirmBalanceTransfer(merchantTradeNo: string) {
 }
 
 export function isCustomDepositProduct(items: { id: string; baseProductId?: string }[]) {
-  return items.some((item) => (item.baseProductId ?? item.id) === CUSTOM_PRODUCT_ID);
+  return items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id));
 }
 
 /** 依 userId 查詢該會員的所有訂單（含商品明細） */
