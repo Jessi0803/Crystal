@@ -127,7 +127,7 @@ function OrderRowCard({
     { orderId: order.id },
     {
       enabled: isExpanded,
-      staleTime: 30_000,
+      staleTime: 0,
     }
   );
 
