@@ -434,14 +434,17 @@ export default function AdminOrders() {
     setExpandedId(null);
   }, [statusFilter, pageSize]);
 
+  const utils = trpc.useUtils();
+
   const refetchListAndStats = () => {
     void refetchOrders();
     void refetchDashStats();
   };
 
   const confirmTransfer = trpc.order.confirmTransfer.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("已確認收款，訂單更新為已付款");
+      await utils.order.getOrderDetail.invalidate();
       refetchListAndStats();
     },
     onError: () => toast.error("操作失敗，請重試"),
