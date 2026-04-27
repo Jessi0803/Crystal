@@ -59,7 +59,7 @@ export default function CartDrawer() {
             </div>
           ) : (
             <div className="divide-y divide-[oklch(0.95_0_0)]">
-              {items.map(({ id, product, quantity, unitPrice, wristSize, claspType }) => (
+              {items.map(({ id, product, quantity, unitPrice, wristSize, claspType, fitPreference }) => (
                 <div key={id} className="flex gap-4 px-6 py-5">
                   {/* Image */}
                   <div className="w-20 h-24 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
@@ -78,11 +78,13 @@ export default function CartDrawer() {
                     <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-3">
                       {product.categoryLabel}
                     </p>
-                    {(wristSize || claspType) && (
+                    {(wristSize || claspType || fitPreference) && (
                       <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mb-2">
                         {wristSize ? `手圍 ${wristSize} cm` : ""}
                         {wristSize && claspType ? " · " : ""}
                         {claspType === "elastic" ? "彈力繩" : claspType === "lobster" ? "龍蝦扣" : claspType === "magnetic" ? "磁扣" : ""}
+                        {(wristSize || claspType) && fitPreference ? " · " : ""}
+                        {fitPreference === "just-right" ? "剛好" : fitPreference === "loose" ? "微鬆" : ""}
                       </p>
                     )}
                     <div className="flex items-center justify-between">

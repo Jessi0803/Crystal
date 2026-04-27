@@ -20,6 +20,11 @@ export default function ProductDetail() {
   ];
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
+  const [selectedFitPreference, setSelectedFitPreference] = useState<"just-right" | "loose">("just-right");
+  const fitOptions = [
+    { id: "just-right" as const, label: "剛好", desc: "會有水晶壓痕但不掐肉" },
+    { id: "loose" as const, label: "微鬆", desc: "可輕微滑動" },
+  ];
   const { addToCart, setIsOpen } = useCart();
 
   useEffect(() => {
@@ -61,8 +66,8 @@ export default function ProductDetail() {
       addToCart(
         product,
         isCustomizableProduct
-          ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType }
-          : undefined
+          ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType, fitPreference: selectedFitPreference }
+          : { fitPreference: selectedFitPreference }
       );
     }
     toast.success(`已加入購物袋：${product.name} × ${qty}`);
@@ -175,6 +180,49 @@ export default function ProductDetail() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {fitOptions.map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() => setSelectedFitPreference(opt.id)}
+                        className={`px-3 py-2.5 text-xs font-body border transition-colors text-left ${
+                          selectedFitPreference === opt.id
+                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                            : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                        }`}
+                      >
+                        <span className="block font-medium">{opt.label}</span>
+                        <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isCustomizableProduct && (
+              <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
+                <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {fitOptions.map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.id}
+                      onClick={() => setSelectedFitPreference(opt.id)}
+                      className={`px-3 py-2.5 text-xs font-body border transition-colors text-left ${
+                        selectedFitPreference === opt.id
+                          ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                          : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                      }`}
+                    >
+                      <span className="block font-medium">{opt.label}</span>
+                      <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.desc}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
