@@ -213,7 +213,7 @@ function OrderRowCard({
                         <span className="text-[oklch(0.1_0_0)] break-all">{row.value}</span>
                       </div>
                     ))}
-                    {detail.transferLastFive && (
+                    {detail.transferLastFive && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
                       <div className="flex items-start gap-2 text-sm font-body">
                         <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0"><Banknote className="w-3.5 h-3.5" /></span>
                         <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">末五碼</span>
@@ -242,7 +242,7 @@ function OrderRowCard({
               </div>
 
               <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
-                {detail.paymentStatus === "transfer_pending" && (
+                {detail.paymentStatus === "transfer_pending" && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
                   <button
                     onClick={() => confirmTransfer.mutate({ orderId: detail.id })}
                     disabled={confirmTransfer.isPending}
@@ -253,7 +253,9 @@ function OrderRowCard({
                   </button>
                 )}
 
-                {detail.isCustomOrder && detail.orderStatus === "deposit_paid" && (
+                {detail.isCustomOrder && detail.orderStatus === "deposit_paid" &&
+                  detail.balancePayment?.paymentStatus !== "transfer_pending" &&
+                  detail.balancePayment?.paymentStatus !== "paid" && (
                   <button
                     onClick={() => {
                       const defaultAmount = detail.balancePayment?.amount?.toString() ?? "";
