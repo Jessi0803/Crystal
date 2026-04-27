@@ -369,6 +369,7 @@ function OrderRowCard({
                     <p>匯款末五碼：<strong>{(detail.balancePayment as any).transferLastFive}</strong></p>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
+                    {(detail.balancePayment.paymentStatus as string) !== "transfer_pending" && detail.balancePayment.paymentStatus !== "paid" && (
                     <button
                       onClick={async () => {
                         const link = `${window.location.origin}/balance/${encodeURIComponent(detail.balancePayment!.merchantTradeNo)}`;
@@ -384,6 +385,7 @@ function OrderRowCard({
                       <CreditCard className="w-3.5 h-3.5" />
                       複製尾款連結
                     </button>
+                    )}
                     {(detail.balancePayment.paymentStatus as string) === "transfer_pending" && (
                       <button
                         onClick={() => {
