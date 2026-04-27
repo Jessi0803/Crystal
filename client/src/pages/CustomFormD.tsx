@@ -64,7 +64,7 @@ export default function CustomFormD() {
 
   const steps = [
     {
-      title: "你的姓名是？",
+      title: "您的姓名是？",
       subtitle: "請填寫真實姓名，老闆將用於生命靈數能量解讀",
       required: true,
       field: (
@@ -78,7 +78,7 @@ export default function CustomFormD() {
       ),
     },
     {
-      title: "你的西元生日是？",
+      title: "您的西元生日是？",
       subtitle: "老闆將透過出生年月日計算天賦數、生命數、先天數、星座數，找出缺數並做能量搭配",
       required: true,
       field: (
@@ -93,7 +93,7 @@ export default function CustomFormD() {
     },
     {
       title: "有想額外指定的功效嗎？",
-      subtitle: "老闆會以你的生命靈數分析結果為主，但你也可以許願想加強的能量！沒有的話留空即可",
+      subtitle: "老闆會以您的生命靈數分析結果為主，但您也可以許願想加強的能量！沒有的話留空即可",
       required: false,
       field: (
         <textarea
@@ -107,7 +107,7 @@ export default function CustomFormD() {
     },
     {
       title: "手圍尺寸是多少？",
-      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減，我們會幫你調整鬆緊",
+      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減，我們會幫您調整鬆緊",
       required: true,
       field: (
         <div className="space-y-4">
@@ -285,7 +285,7 @@ export default function CustomFormD() {
     },
     {
       title: "完成！付完訂金後記得加入 LINE",
-      subtitle: "傳送「訂單編號＋姓名」給老闆，才能收到客製化水晶成品圖",
+      subtitle: "",
       required: false,
       field: (
         <div className="space-y-6">
@@ -293,7 +293,7 @@ export default function CustomFormD() {
             <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
               付完訂金後，請加入官方 LINE 並傳送<br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
-              老闆才能將客製化水晶的<strong>成品圖</strong>傳送給你！
+              老闆才能將客製化水晶的<strong>成品圖</strong>傳送給您！
             </p>
             <a
               href="https://line.me/R/ti/p/@011tymeh"
@@ -320,7 +320,7 @@ export default function CustomFormD() {
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
             />
             <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
-              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡你
+              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡您
             </p>
           </div>
         </div>

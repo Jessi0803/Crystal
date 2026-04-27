@@ -56,14 +56,14 @@ export default function CustomForm() {
 
   const steps = [
     {
-      title: "你想要什麼功效？",
+      title: "您想要什麼功效？",
       subtitle: "例如：提升自信、招財、愛情、療癒、保護氣場……可以自由描述，越詳細越好",
       required: true,
       field: (
         <textarea
           value={form.effect}
           onChange={(e) => setForm({ ...form, effect: e.target.value })}
-          placeholder="寫下你想要的功效或願望，也可以描述目前的困境或期待的改變"
+          placeholder="寫下您想要的功效或願望，也可以描述目前的困境或期待的改變"
           rows={6}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
         />
@@ -71,7 +71,7 @@ export default function CustomForm() {
     },
     {
       title: "手圍尺寸是多少？",
-      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減，我們會幫你調整鬆緊",
+      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減，我們會幫您調整鬆緊",
       required: true,
       field: (
         <div className="space-y-4">
@@ -249,7 +249,7 @@ export default function CustomForm() {
     },
     {
       title: "完成！付完訂金後記得加入 LINE",
-      subtitle: "傳送「訂單編號＋姓名」給老闆，才能收到客製化水晶成品圖",
+      subtitle: "",
       required: false,
       field: (
         <div className="space-y-6">
@@ -257,7 +257,7 @@ export default function CustomForm() {
             <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
               付完訂金後，請加入官方 LINE 並傳送<br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
-              老闆才能將客製化水晶的<strong>成品圖</strong>傳送給你！
+              老闆才能將客製化水晶的<strong>成品圖</strong>傳送給您！
             </p>
             <a
               href="https://line.me/R/ti/p/@011tymeh"
@@ -284,7 +284,7 @@ export default function CustomForm() {
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
             />
             <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
-              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡你
+              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡您
             </p>
           </div>
         </div>

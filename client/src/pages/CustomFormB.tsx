@@ -309,7 +309,7 @@ export default function CustomFormB() {
             <div>
               <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">為什麼想占卜？</label>
               <textarea value={tarot.reason} onChange={(e) => setTarot({ ...tarot, reason: e.target.value })}
-                placeholder="說說你的想法" rows={3} className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none" />
+                placeholder="說說您的想法" rows={3} className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none" />
             </div>
           </>
         )}
@@ -317,7 +317,7 @@ export default function CustomFormB() {
           <div>
             <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">內心想療癒的內容</label>
             <textarea value={tarot.healingContent} onChange={(e) => setTarot({ ...tarot, healingContent: e.target.value })}
-              placeholder="說說你想療癒的事情……" rows={4} className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none" />
+              placeholder="說說您想療癒的事情……" rows={4} className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none" />
           </div>
         )}
         {g === "past_life_2" && (
@@ -450,7 +450,7 @@ export default function CustomFormB() {
     },
     {
       title: "完成！付完訂金後記得加入 LINE",
-      subtitle: "傳送「訂單編號＋姓名」給老闆，才能收到客製化水晶成品圖",
+      subtitle: "",
       required: false,
       field: (
         <div className="space-y-6">
@@ -458,7 +458,7 @@ export default function CustomFormB() {
             <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
               付完訂金後，請加入官方 LINE 並傳送<br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
-              老闆才能將客製化水晶的<strong>成品圖</strong>傳送給你！
+              老闆才能將客製化水晶的<strong>成品圖</strong>傳送給您！
             </p>
             <a href="https://line.me/R/ti/p/@011tymeh" target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-sm transition-opacity hover:opacity-90"
@@ -478,7 +478,7 @@ export default function CustomFormB() {
               placeholder="例如：@your_ig_handle"
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]" />
             <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
-              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡你
+              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡您
             </p>
           </div>
         </div>
@@ -617,7 +617,7 @@ export default function CustomFormB() {
               想占卜哪個主題？
             </h2>
             <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
-              選擇後我們會請你填入對應的資料，如需搭配多個題組，完成後可再次填寫（搭配手鍊的題組享 9 折優惠）
+              選擇後我們會請您填入對應的資料，如需搭配多個題組，完成後可再次填寫（搭配手鍊的題組享 9 折優惠）
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {tarotTopics.map((t) => (
@@ -664,7 +664,7 @@ export default function CustomFormB() {
             <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-1" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
               {tarot.topic} — 占卜所需資料
             </h2>
-            <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">請填寫以下資料，讓老闆為你進行解析</p>
+            <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">請填寫以下資料，讓老闆為您進行解析</p>
             {tarotDataFields()}
           </div>
         )}
