@@ -178,25 +178,42 @@ function CustomForm({ onClose }: { onClose: () => void }) {
       title: "喜歡金飾還是銀飾？",
       subtitle: "這會影響配件（銀管、珠框等）的材質選擇",
       field: (
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { id: "gold" as const, label: "金飾" },
-            { id: "silver" as const, label: "銀飾" },
-            { id: "either" as const, label: "都可以" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, metalPreference: opt.id })}
-              className={`px-4 py-3 text-sm font-body border transition-colors ${
-                form.metalPreference === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { id: "gold" as const, label: "金飾", img: "/golden.jpg" },
+              { id: "silver" as const, label: "銀飾", img: "/silver.jpg" },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setForm({ ...form, metalPreference: opt.id })}
+                className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${
+                  form.metalPreference === opt.id
+                    ? "border-[oklch(0.1_0_0)]"
+                    : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
+                }`}
+              >
+                <img src={opt.img} alt={opt.label} className="w-full h-32 object-cover" />
+                <p className={`text-xs font-body text-center py-2 ${
+                  form.metalPreference === opt.id ? "bg-[oklch(0.97_0_0)] font-medium" : "text-[oklch(0.45_0_0)]"
+                }`}>
+                  {opt.label}
+                </p>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, metalPreference: "either" })}
+            className={`w-full px-4 py-2.5 text-sm font-body border transition-colors ${
+              form.metalPreference === "either"
+                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
+                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+            }`}
+          >
+            都可以
+          </button>
         </div>
       ),
     },
