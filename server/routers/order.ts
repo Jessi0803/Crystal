@@ -103,6 +103,7 @@ export const orderRouter = router({
           items: z.array(CartItemSchema).min(1),
           origin: z.string(),
           sessionToken: z.string().optional(),
+          customerNote: z.string().max(2000).optional(),
         })
         .superRefine((data, ctx) => {
           if (data.checkoutRegion === "domestic") {
@@ -254,6 +255,7 @@ export const orderRouter = router({
         cvsType,
         shippingAddress,
         receiverZipCode,
+        customerNote: input.customerNote ?? null,
       };
       if (ctx.user?.id != null) {
         orderRow.userId = ctx.user.id;

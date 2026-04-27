@@ -122,6 +122,8 @@ export const orders = mysqlTable("orders", {
   receiverZipCode: varchar("receiverZipCode", { length: 10 }),
   // 銀行轉帳末五碼（客人填入）
   transferLastFive: varchar("transferLastFive", { length: 5 }),
+  // 顧客諮詢備註（客製化報名表單填寫內容）
+  customerNote: text("customerNote"),
   // 老闆備註
   adminNote: text("adminNote"),
   // 綠界回傳的完整通知資料（JSON）

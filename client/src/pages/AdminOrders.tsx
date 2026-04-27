@@ -353,6 +353,15 @@ function OrderRowCard({
                 </div>
               )}
 
+              {(detail as any).customerNote && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-100 text-xs font-body text-amber-800">
+                  <p className="font-medium mb-2">客製化諮詢內容</p>
+                  <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    {(detail as any).customerNote}
+                  </pre>
+                </div>
+              )}
+
               {detail.isCustomOrder && detail.balancePayment && (
                 <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-xs font-body text-rose-700">
                   <p className="font-medium mb-1">尾款資訊</p>

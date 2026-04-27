@@ -30,6 +30,7 @@ type CheckoutRegion = "domestic" | "overseas";
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { items, totalPrice, clearCart } = useCart();
+  const customConsultationNote = sessionStorage.getItem("customConsultationNote") ?? undefined;
 
   const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
@@ -187,9 +188,11 @@ export default function Checkout() {
           image: i.product.image,
         })),
         origin: window.location.origin,
+        customerNote: customConsultationNote,
       });
 
       clearCart();
+      sessionStorage.removeItem("customConsultationNote");
 
       if (result.kind === "atm") {
         setLocation(`/order/${result.merchantTradeNo}`);
