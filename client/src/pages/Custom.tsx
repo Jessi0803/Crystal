@@ -1,5 +1,20 @@
-// 椛 ˙Crystal — 客製化方案頁面
-import { ExternalLink, ChevronRight } from "lucide-react";
+import { useEffect } from "react";
+import {
+  Sparkles,
+  Wand2,
+  Fingerprint,
+  Waves,
+  ChevronDown,
+  MessageCircle,
+  ArrowRight,
+  Flower2,
+  Gem,
+  Heart,
+  Coins,
+  ShieldCheck,
+  Star,
+  Zap,
+} from "lucide-react";
 import { Link } from "wouter";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
@@ -9,225 +24,282 @@ const plans = [
     id: "A",
     title: "純客製水晶手鍊",
     price: "1,500$ ± 300$",
-    addons: [],
-    description: [
+    icon: <Gem className="w-5 h-5" />,
+    features: [
       "可提供想要的功效、色系、款式",
       "或是也可以跟我討論",
       "如愛情、溝通能力、財運、疾病等等，",
       "提供初版免費修改 1 次。",
     ],
-    accent: "oklch(0.72 0.09 70)",
+    bgColor: "bg-[#FDF9F0]/60",
     formPath: "/custom/form",
   },
   {
     id: "B",
     title: "塔羅 × 水晶手鍊",
     price: "2,399$ ± 300$",
-    addons: [],
-    description: [
-      "提供塔羅解析，並且我將透過解析，分",
-      "析出缺失的能量，利用水晶能量補足。",
-      "（也可以許願想額外加強的能量！）",
-      "提供初版免費修改 1 次。",
+    icon: <Sparkles className="w-5 h-5" />,
+    features: [
+      "選擇想要搭配的塔羅方案，我會提供解析並透過解析去分析出你缺失的能量是什麼並進行水晶搭配！",
+      "題組搭配Top5 「流年運勢、守護神、進化人生、戀愛指南、職涯探索」",
+      "解析以文字訊息提供，無需雙方同時在線上，也方便日後反覆審閱🤍",
+      "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
     ],
-    accent: "oklch(0.65 0.12 290)",
+    bgColor: "bg-[#F5F5FF]/60",
     formPath: "/custom/form-b",
   },
   {
     id: "C",
     title: "脈輪檢測 × 水晶手鍊",
     price: "2,000$ ± 300$",
-    addons: [],
-    description: [
-      "以靈擺與塔羅測出你的七脈輪能量狀",
-      "況，並提供一份專屬脈輪檢測報告，利",
-      "用水晶能量去補足你的脈輪能量缺失。",
-      "（也可以許願想額外加強的能量！）",
-      "提供初版免費修改 1 次。",
+    icon: <Zap className="w-5 h-5" />,
+    features: [
+      "使用塔羅、靈擺，連結你的能量與高我對談，逐一分析七大脈輪個別能量。我會提供一份文字訊息報告，並透過此檢測分析出缺失的脈輪能量進行水晶搭配。",
+      "解析以文字訊息提供，無需雙方同時在線上，也方便日後反覆審閱🤍",
+      "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
     ],
-    accent: "oklch(0.62 0.14 200)",
+    bgColor: "bg-[#F0FDFD]/60",
     formPath: "/custom/form-c",
   },
   {
     id: "D",
     title: "生命靈數 × 水晶手鍊",
     price: "2,000$ ± 300$",
-    addons: [],
-    description: [
-      "會透過西元出生年月日去找出天賦數、",
-      "生命數、先天數、星座數，去找出缺數",
-      "並透過生命數與缺數去做能量搭配。",
-      "（也可以許願想額外加強的能量！）",
-      "提供初版免費修改 1 次。",
+    icon: <Fingerprint className="w-5 h-5" />,
+    features: [
+      "透過你的生命數、天賦數、星座數、先天數，去找到你的空缺數，並透過你的生命靈數與空缺數去搭配水晶，增強優勢，改善缺點",
+      "解析以文字訊息提供，無需雙方同時在線上，也方便日後反覆審閱🤍",
+      "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
     ],
-    accent: "oklch(0.68 0.11 30)",
+    bgColor: "bg-[#FFF5F5]/60",
     formPath: "/custom/form-d",
   },
 ];
 
 export default function Custom() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("opacity-100", "translate-y-0");
+            entry.target.classList.remove("opacity-0", "translate-y-10");
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_240)] page-enter">
-      {/* ── Hero ── */}
-      <section className="pt-16 pb-10 text-center px-4">
-        <p className="text-[0.6rem] tracking-[0.3em] text-[oklch(0.55_0_0)] uppercase mb-4">
-          CUSTOM CRYSTAL · 客製化服務
-        </p>
-        <h1
-          className="text-3xl sm:text-4xl font-light text-[oklch(0.1_0_0)] mb-4"
-          style={{
-            fontFamily: "'Noto Serif TC', serif",
-            letterSpacing: "0.06em",
-            lineHeight: 1.4,
-          }}
-        >
-          專屬於你的<br />
-          <em className="not-italic" style={{ color: "oklch(0.72 0.09 70)", fontWeight: 400 }}>
-            能量水晶手鍊
-          </em>
-        </h1>
-        <p
-          className="text-sm text-[oklch(0.45_0_0)] leading-relaxed max-w-md mx-auto"
-          style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-        >
-          每一顆水晶都有獨特的能量頻率，<br />
-          讓我根據你的需求，為你量身打造最適合的手鍊。
-        </p>
+    <div className="bg-[#FAF9F6] text-[#4A4A4A] min-h-screen font-sans selection:bg-[#D8C3BD] selection:text-white overflow-x-hidden">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Noto+Serif+TC:wght@200;300;400;500&display=swap');
+        .font-serif-en { font-family: 'Cormorant Garamond', serif; }
+        .font-serif-zh { font-family: 'Noto Serif TC', serif; }
+        .letter-spacing-huge { letter-spacing: 0.5em; }
+        .letter-spacing-wide { letter-spacing: 0.2em; }
+      `}</style>
+
+      {/* 背景柔和光暈 */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[70%] bg-[#E8E2DE] opacity-40 rounded-full blur-[120px] animate-pulse" />
+        <div
+          className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-[#D8C3BD] opacity-20 rounded-full blur-[100px] animate-pulse"
+          style={{ animationDelay: "3s" }}
+        />
+      </div>
+
+      {/* Hero Section */}
+      <section className="relative h-screen flex flex-col items-center justify-center text-center px-6">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-[1500ms] ease-out">
+          <span className="font-serif-zh text-xs letter-spacing-huge text-[#8E735B] mb-8 block font-light">
+            椛．crystal
+          </span>
+          <h1 className="text-4xl md:text-5xl font-serif-zh font-light leading-relaxed text-[#333] mb-10 tracking-[0.3em]">
+            遇見您的 <br />
+            <span className="italic text-[#8E735B]">專屬能量對話</span>
+          </h1>
+          <p className="text-[#666] max-w-xl mx-auto leading-[2.2] font-serif-zh font-light tracking-widest text-sm md:text-base">
+            我們透過不同維度的媒介，<br />
+            為您的當下狀態找尋最合適的礦石震動。
+          </p>
+        </div>
+        <div className="absolute bottom-12 animate-bounce opacity-30 text-[#8E735B]">
+          <ChevronDown size={28} strokeWidth={1} />
+        </div>
       </section>
 
-      {/* ── Plans Grid ── */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 pb-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {plans.map((plan) => (
+      {/* 四大方案 */}
+      <section className="max-w-7xl mx-auto px-6 py-32 relative">
+        <div className="text-center mb-24 reveal opacity-0 translate-y-10 transition-all duration-1000">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Star size={14} className="text-[#D8C3BD] fill-[#D8C3BD]" />
+            <h2 className="text-2xl font-serif-zh text-[#333] tracking-[0.4em] font-light italic">
+              四大客製方案
+            </h2>
+            <Star size={14} className="text-[#D8C3BD] fill-[#D8C3BD]" />
+          </div>
+          <p className="text-[10px] text-[#8E735B] tracking-[0.3em] uppercase opacity-60">
+            Professional Consultation
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-5xl mx-auto">
+          {plans.map((plan, i) => (
             <div
-              key={plan.id}
-              className="bg-white border border-[oklch(0.92_0_0)] rounded-sm overflow-hidden hover:shadow-md transition-shadow duration-300"
+              key={i}
+              className={`reveal opacity-0 translate-y-10 transition-all duration-1000 rounded-[3rem] border border-white shadow-[0_15px_45px_rgba(216,195,189,0.06)] hover:shadow-[0_30px_80px_rgba(216,195,189,0.15)] duration-700 group relative overflow-hidden ${plan.bgColor} backdrop-blur-xl flex flex-col`}
+              style={{ transitionDelay: `${i * 150}ms` }}
             >
-              {/* Card Header */}
-              <div
-                className="px-8 pt-8 pb-5 text-center"
-                style={{
-                  background: `linear-gradient(135deg, oklch(0.97 0.01 240) 0%, oklch(0.95 0.02 240) 100%)`,
-                }}
-              >
-                <div
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-full text-white text-sm font-medium mb-4"
-                  style={{ backgroundColor: plan.accent }}
-                >
-                  {plan.id}
-                </div>
-                <h2
-                  className="text-xl font-medium text-[oklch(0.15_0_0)] mb-3"
-                  style={{
-                    fontFamily: "'Noto Sans TC', sans-serif",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {plan.title}
-                </h2>
-                <p
-                  className="text-base font-medium"
-                  style={{ color: plan.accent, fontFamily: "'Noto Sans TC', sans-serif" }}
-                >
-                  費用：{plan.price}
-                </p>
-                {plan.addons.map((addon, i) => (
-                  <p
-                    key={i}
-                    className="text-xs text-[oklch(0.45_0_0)] mt-1 leading-relaxed"
-                    style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-                  >
-                    {addon}
-                  </p>
-                ))}
+              {/* 背景編號 */}
+              <div className="absolute top-[-10px] right-4 text-[12rem] font-serif-en font-light text-[#8E735B] opacity-[0.03] pointer-events-none italic select-none">
+                {plan.id}
               </div>
 
-              {/* Card Body */}
-              <div className="px-8 py-6">
-                <p
-                  className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.55_0_0)] uppercase mb-3"
-                  style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-                >
-                  服務內容
-                </p>
-                <div className="space-y-1 mb-6">
-                  {plan.description.map((line, i) => (
-                    <p
-                      key={i}
-                      className="text-sm text-[oklch(0.3_0_0)] leading-relaxed text-center"
-                      style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-                    >
-                      {line}
-                    </p>
-                  ))}
+              <div className="p-10 md:p-14 flex flex-col h-full relative z-10">
+                {/* Header */}
+                <div className="mb-8 text-center">
+                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#8E735B] shadow-sm mx-auto mb-6 group-hover:scale-110 transition-transform duration-700">
+                    {plan.icon}
+                  </div>
+                  <h3 className="text-2xl font-serif-zh text-[#333] mb-4 tracking-[0.15em] font-medium">
+                    {plan.title}
+                  </h3>
+                  <p className="text-lg font-serif-en text-[#8E735B] tracking-[0.1em] font-light italic">
+                    費用：{plan.price}
+                  </p>
                 </div>
 
-                {plan.formPath ? (
+                <div className="w-10 h-px bg-[#8E735B]/10 mx-auto mb-10" />
+
+                {/* 服務內容 */}
+                <div className="flex-grow">
+                  <span className="text-[9px] text-[#8E735B]/50 tracking-[0.5em] uppercase block mb-8 text-center font-medium">
+                    服務內容
+                  </span>
+                  <ul className="space-y-6">
+                    {plan.features.map((feature, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-4 text-sm text-[#555] leading-relaxed font-light tracking-widest text-justify"
+                      >
+                        <div className="mt-2.5 w-1 h-1 rounded-full bg-[#D8C3BD]/60 shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* 按鈕 */}
+                <div className="mt-12 pt-8 border-t border-[#8E735B]/5">
                   <Link href={plan.formPath}>
-                    <button
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-body text-white transition-opacity hover:opacity-90"
-                      style={{ backgroundColor: plan.accent }}
-                    >
-                      填寫報名表單
-                      <ChevronRight className="w-4 h-4" />
+                    <button className="w-full py-5 rounded-2xl bg-white/50 border border-[#D8C3BD]/20 text-[#8E735B] text-xs tracking-[0.5em] uppercase hover:bg-[#8E735B] hover:text-white hover:border-[#8E735B] transition-all duration-500 shadow-sm flex items-center justify-center gap-3 group/btn">
+                      填寫報名表單{" "}
+                      <ArrowRight
+                        size={14}
+                        className="group-hover/btn:translate-x-2 transition-transform"
+                      />
                     </button>
                   </Link>
-                ) : (
-                  <a
-                    href={LINE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-body text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: "#06C755" }}
-                  >
-                    透過 LINE 預約
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
+                </div>
               </div>
             </div>
           ))}
         </div>
+      </section>
 
-        {/* ── LINE CTA ── */}
-        <div className="mt-12 text-center">
-          <div className="inline-block bg-white border border-[oklch(0.9_0_0)] rounded-sm px-10 py-8 max-w-md w-full">
-            <p className="text-[0.6rem] tracking-[0.25em] text-[oklch(0.55_0_0)] uppercase mb-3">
-              CONTACT US
-            </p>
-            <h3
-              className="text-lg font-light text-[oklch(0.1_0_0)] mb-2"
-              style={{ fontFamily: "'Noto Serif TC', serif", letterSpacing: "0.05em" }}
-            >
-              想了解更多？
-            </h3>
-            <p
-              className="text-sm text-[oklch(0.45_0_0)] leading-relaxed mb-6"
-              style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
-            >
-              歡迎透過 LINE 客服與我們聯繫，<br />
-              我們將為你提供專屬的客製化諮詢服務。
-            </p>
+      {/* 流程說明 */}
+      <section className="py-40 px-6 relative bg-[#FDFCFB]/50 border-t border-[#E8E2DE]/30">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-28 reveal opacity-0 translate-y-10 transition-all duration-1000">
+            <Flower2 size={24} className="mx-auto text-[#D8C3BD] mb-6 opacity-60" />
+            <h2 className="text-2xl font-serif-zh text-[#333] mb-4 tracking-[0.4em] font-light italic">
+              手鍊誕生的儀式感
+            </h2>
+            <div className="w-8 h-px bg-[#8E735B] mx-auto opacity-30" />
+          </div>
+
+          <div className="space-y-32 relative">
+            <div className="absolute left-[20px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[#D8C3BD]/40 to-transparent hidden md:block" />
+            {[
+              {
+                step: "I",
+                title: "訴說願望與初衷",
+                content:
+                  "填寫客製表單，讓我們了解您現階段最想被照看的能量。",
+              },
+              {
+                step: "II",
+                title: "靈數與頻率規劃",
+                content:
+                  "計算您的生命靈數，挑選出能與您當下頻率產生共振的礦石。",
+              },
+              {
+                step: "III",
+                title: "設計初稿與對視",
+                content:
+                  "拍攝初步排列的設計圖與您確認。這是一個直覺對話的過程。",
+              },
+              {
+                step: "IV",
+                title: "淨化編織與送抵",
+                content:
+                  "完成編織後，透過頌缽與鼠尾草深度淨化，將祝福寄出。",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className={`reveal opacity-0 translate-y-10 transition-all duration-1000 flex flex-col md:flex-row items-center ${
+                  i % 2 !== 0 ? "md:flex-row-reverse" : ""
+                }`}
+              >
+                <div className="w-full md:w-1/2 flex justify-center md:justify-end md:px-16 mb-8 md:mb-0">
+                  <div className="w-10 h-10 rounded-full border border-[#D8C3BD] flex items-center justify-center text-[#8E735B] font-serif-en text-xs bg-white z-10 shadow-sm">
+                    {item.step}
+                  </div>
+                </div>
+                <div className="w-full md:w-1/2 text-center md:text-left md:px-16">
+                  <h4 className="text-lg font-serif-zh text-[#444] mb-4 tracking-widest">
+                    {item.title}
+                  </h4>
+                  <p className="text-xs text-[#888] font-light leading-loose tracking-wider">
+                    {item.content}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 底部導引 */}
+      <section className="py-48 px-6 text-center relative">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-1000 max-w-2xl mx-auto">
+          <Sparkles className="mx-auto text-[#D8C3BD] mb-10 opacity-60" size={32} />
+          <h2 className="text-3xl font-serif-zh text-[#8E735B] mb-12 tracking-[0.3em] leading-relaxed font-light italic">
+            讓水晶，指引您回到最好的頻率
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <a
               href={LINE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-8 py-3 text-white text-sm tracking-[0.1em] transition-opacity hover:opacity-90"
-              style={{
-                backgroundColor: "#06C755",
-                fontFamily: "'Noto Sans TC', sans-serif",
-                fontWeight: 400,
-              }}
+              className="px-12 py-5 bg-[#8E735B] text-white rounded-full transition-all shadow-[0_15px_35px_rgba(142,115,91,0.15)] hover:shadow-[0_20px_45px_rgba(142,115,91,0.25)] hover:-translate-y-1 flex items-center gap-3 tracking-widest text-sm font-serif-zh"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.630 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-              </svg>
-              聯繫 LINE 客服
-              <ExternalLink className="w-3.5 h-3.5" />
+              私訊店長 Mina <MessageCircle size={18} />
             </a>
           </div>
         </div>
       </section>
+
+      <footer className="py-16 text-center border-t border-[#E8E2DE]/30 bg-white/20">
+        <span className="font-serif-zh text-[10px] letter-spacing-huge text-[#8E735B] opacity-60">
+          椛．crystal
+        </span>
+      </footer>
     </div>
   );
 }
