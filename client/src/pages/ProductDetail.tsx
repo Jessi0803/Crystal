@@ -174,7 +174,7 @@ export default function ProductDetail() {
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     {[
                       { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
-                      { id: "magnetic" as const, label: "磁扣", price: "+NT$200", img: "/magnet-clasp.jpg" },
+                      { id: "magnetic" as const, label: "磁扣", price: "+NT$200", img: "/magnet-clasp.png" },
                     ].map((opt) => (
                       <button
                         type="button"

@@ -216,7 +216,7 @@ export default function CustomForm() {
           <div className="grid grid-cols-2 gap-4">
             {[
               { id: "lobster" as const, label: "龍蝦扣", img: "/lobster-clasp.jpg" },
-              { id: "magnet" as const, label: "磁扣", img: "/magnet-clasp.jpg" },
+              { id: "magnet" as const, label: "磁扣", img: "/magnet-clasp.png" },
             ].map((opt) => (
               <button
                 key={opt.id}

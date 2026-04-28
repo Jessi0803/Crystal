@@ -446,7 +446,7 @@ export default function CustomFormB() {
           <div className="grid grid-cols-2 gap-4">
             {[
               { id: "lobster" as const, label: "龍蝦扣", img: "/lobster-clasp.jpg" },
-              { id: "magnet" as const, label: "磁扣", img: "/magnet-clasp.jpg" },
+              { id: "magnet" as const, label: "磁扣", img: "/magnet-clasp.png" },
             ].map((opt) => (
               <button key={opt.id} type="button" onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
                 className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
