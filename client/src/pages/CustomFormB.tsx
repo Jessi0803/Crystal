@@ -23,6 +23,29 @@ type TarotGroup =
   | "past_life_2"   // 雙方姓名 + 雙方生日 + 今生關係
   | "single_q";     // 單題制 → 導向 LINE
 
+// 各主題對應的說明圖片
+const TOPIC_IMAGE: Record<string, string> = {
+  "戀愛指南":   "/tarot/tarot1.jpg",
+  "感情復合":   "/tarot/tarot1.jpg",
+  "緣來暗戀":   "/tarot/tarot1.jpg",
+  "旺桃花運":   "/tarot/tarot1.jpg",
+  "財富密碼":   "/tarot/tarot2.jpg",
+  "創業衝衝":   "/tarot/tarot2.jpg",
+  "職涯探索":   "/tarot/tarot2.jpg",
+  "面試勝經":   "/tarot/tarot2.jpg",
+  "進化人生":   "/tarot/tarot3.jpg",
+  "雙向之路":   "/tarot/tarot3.jpg",
+  "友情可貴":   "/tarot/tarot3.jpg",
+  "心靈療癒":   "/tarot/tarot3.jpg",
+  "前世今生1":  "/tarot/tarot4.jpg",
+  "前世今生2":  "/tarot/tarot5.jpg",
+  "前世今生3":  "/tarot/tarot5.jpg",
+  "流年運勢1":  "/tarot/tarot6.jpg",
+  "流年運勢2":  "/tarot/tarot7.jpg",
+  "流年運勢3":  "/tarot/tarot7.jpg",
+  "守護神":     "/tarot/tarot8.jpg",
+};
+
 // 各主題相對於基本方案的價格調整（訂金同步調整）
 const TOPIC_PRICE_ADJUST: Record<string, number> = {
   "前世今生1": 260,
@@ -666,13 +689,15 @@ export default function CustomFormB() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {tarotTopics.map((t) => {
                 const adj = TOPIC_PRICE_ADJUST[t.label] ?? 0;
+                const hasImage = !!TOPIC_IMAGE[t.label];
+                const isSelected = tarot.topic === t.label;
                 return (
                   <button
                     key={t.label}
                     type="button"
                     onClick={() => setTarot({ ...EMPTY_TAROT, topic: t.label, group: t.group })}
                     className={`px-3 py-2.5 text-sm font-body border-2 transition-colors rounded-sm text-center ${
-                      tarot.topic === t.label
+                      isSelected
                         ? "border-[oklch(0.65_0.12_290)] bg-[oklch(0.97_0_0)] font-semibold text-[oklch(0.1_0_0)]"
                         : t.group === "single_q"
                         ? "border-[oklch(0.88_0_0)] text-[oklch(0.6_0_0)] hover:border-[oklch(0.6_0_0)]"
@@ -685,10 +710,26 @@ export default function CustomFormB() {
                         {adj > 0 ? `+${adj}元` : `${adj}元`}
                       </span>
                     )}
+                    {hasImage && (
+                      <span className="block text-[0.6rem] mt-1 text-[oklch(0.65_0.12_290)] font-normal">
+                        點選查看內容
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
+
+            {/* 主題說明圖片預覽 */}
+            {tarot.topic && TOPIC_IMAGE[tarot.topic] && (
+              <div className="mt-5 rounded-sm overflow-hidden border border-[oklch(0.9_0_0)]">
+                <img
+                  src={TOPIC_IMAGE[tarot.topic]}
+                  alt={`${tarot.topic} 說明`}
+                  className="w-full object-contain"
+                />
+              </div>
+            )}
 
             {/* 單題制提示 */}
             {tarot.group === "single_q" && (
