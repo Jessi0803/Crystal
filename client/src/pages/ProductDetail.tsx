@@ -150,6 +150,11 @@ export default function ProductDetail() {
               <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                 NT$ {currentPrice.toLocaleString()}
               </span>
+              {product.category === "custom" && (
+                <span className="text-xs font-body text-[oklch(0.55_0_0)] bg-[oklch(0.95_0_0)] px-2 py-0.5">
+                  此為訂金價格
+                </span>
+              )}
               {product.originalPrice && (
                 <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
                   NT$ {product.originalPrice.toLocaleString()}
