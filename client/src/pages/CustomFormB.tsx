@@ -451,7 +451,7 @@ export default function CustomFormB() {
             <button key={opt.id} type="button" onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
               className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
               <div className="bg-[oklch(0.97_0_0)] p-1">
-                <img src={opt.img} alt={opt.label} className="w-full h-44 object-contain" />
+                <img src={opt.img} alt={opt.label} className="w-full h-60 object-contain" />
               </div>
               <p className={`text-xs font-body py-2 ${bracelet.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
                 {opt.label}<br /><span className="text-[0.6rem] text-[oklch(0.55_0_0)]">（{opt.sub}）</span>

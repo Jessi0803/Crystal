@@ -263,7 +263,7 @@ export default function CustomFormD() {
               }`}
             >
               <div className="bg-[oklch(0.97_0_0)] p-1">
-                <img src={opt.img} alt={opt.label} className="w-full h-44 object-contain" />
+                <img src={opt.img} alt={opt.label} className="w-full h-60 object-contain" />
               </div>
               <p className={`text-xs font-body py-2 ${form.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
                 {opt.label}<br /><span className="text-[0.6rem] text-[oklch(0.55_0_0)]">（{opt.sub}）</span>
