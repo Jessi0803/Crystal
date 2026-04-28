@@ -442,25 +442,22 @@ export default function CustomFormB() {
       subtitle: "預設為彈力繩；若更換扣具需額外加收 200 元",
       required: false,
       field: (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { id: "lobster" as const, label: "龍蝦扣", img: "/lobster-clasp.jpg" },
-              { id: "magnet" as const, label: "磁扣", img: "/magnet-clasp.png" },
-            ].map((opt) => (
-              <button key={opt.id} type="button" onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
-                <img src={opt.img} alt={opt.label} className="w-full h-40 object-cover" />
-                <p className={`text-sm font-body text-center py-2.5 ${bracelet.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
-                  {opt.label} <span className="text-xs text-[oklch(0.55_0_0)]">（+200元）</span>
-                </p>
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={() => setBracelet({ ...bracelet, claspType: "elastic" })}
-            className={`w-full px-4 py-3 text-sm font-body border-2 transition-colors rounded-sm ${bracelet.claspType === "elastic" ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
-            不用，彈力繩就好
-          </button>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { id: "lobster" as const, label: "龍蝦扣", sub: "+200元", img: "/lobster-clasp.jpg" },
+            { id: "magnet" as const, label: "磁扣", sub: "+200元", img: "/magnet-clasp.png" },
+            { id: "elastic" as const, label: "彈力繩", sub: "免費", img: "/elastic-cord.jpg" },
+          ].map((opt) => (
+            <button key={opt.id} type="button" onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
+              className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
+              <div className="bg-[oklch(0.97_0_0)] p-1">
+                <img src={opt.img} alt={opt.label} className="w-full h-28 object-contain" />
+              </div>
+              <p className={`text-xs font-body py-2 ${bracelet.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
+                {opt.label}<br /><span className="text-[0.6rem] text-[oklch(0.55_0_0)]">（{opt.sub}）</span>
+              </p>
+            </button>
+          ))}
         </div>
       ),
     },
