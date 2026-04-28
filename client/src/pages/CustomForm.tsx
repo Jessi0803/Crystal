@@ -177,8 +177,8 @@ export default function CustomForm() {
       field: (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
-            <img src="/bead-frame-1.jpg" alt="珠框銀管參考1" className="w-full h-36 object-cover rounded-sm" />
-            <img src="/bead-frame-2.jpg" alt="珠框銀管參考2" className="w-full h-36 object-cover rounded-sm" />
+            <img src="/bead-frame-1.jpg" alt="珠框銀管參考1" className="w-full h-56 object-cover rounded-sm" />
+            <img src="/bead-frame-2.jpg" alt="珠框銀管參考2" className="w-full h-56 object-cover rounded-sm" />
           </div>
           <div>
             <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">銀管</p>
