@@ -23,6 +23,16 @@ type TarotGroup =
   | "past_life_2"   // 雙方姓名 + 雙方生日 + 今生關係
   | "single_q";     // 單題制 → 導向 LINE
 
+// 各主題相對於基本方案的價格調整（訂金同步調整）
+const TOPIC_PRICE_ADJUST: Record<string, number> = {
+  "前世今生1": 260,
+  "前世今生3": -179,
+  "流年運勢1": 260,
+  "流年運勢2": 530,
+  "流年運勢3": 80,
+  "守護神": 80,
+};
+
 const tarotTopics: { label: string; group: TarotGroup }[] = [
   { label: "戀愛指南", group: "couple" },
   { label: "感情復合", group: "couple" },
@@ -565,7 +575,9 @@ export default function CustomFormB() {
   function handleSubmit() {
     if (!depositProduct) { toast.error("找不到訂金商品，請聯繫客服"); return; }
     sessionStorage.setItem("customConsultationNote", buildNote(tarot, bracelet));
-    addToCart(depositProduct);
+    const priceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
+    const unitPrice = depositProduct.price + priceAdjust;
+    addToCart(depositProduct, { unitPrice });
     setIsOpen(false);
     navigate("/checkout");
     toast.success("諮詢內容已儲存，請完成結帳以預約訂金");
@@ -652,22 +664,30 @@ export default function CustomFormB() {
               選擇後我們會請您填入對應的資料，如需搭配多個題組，完成後可再次填寫（搭配手鍊的題組享 9 折優惠）
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {tarotTopics.map((t) => (
-                <button
-                  key={t.label}
-                  type="button"
-                  onClick={() => setTarot({ ...EMPTY_TAROT, topic: t.label, group: t.group })}
-                  className={`px-3 py-2.5 text-sm font-body border-2 transition-colors rounded-sm text-center ${
-                    tarot.topic === t.label
-                      ? "border-[oklch(0.65_0.12_290)] bg-[oklch(0.97_0_0)] font-semibold text-[oklch(0.1_0_0)]"
-                      : t.group === "single_q"
-                      ? "border-[oklch(0.88_0_0)] text-[oklch(0.6_0_0)] hover:border-[oklch(0.6_0_0)]"
-                      : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+              {tarotTopics.map((t) => {
+                const adj = TOPIC_PRICE_ADJUST[t.label] ?? 0;
+                return (
+                  <button
+                    key={t.label}
+                    type="button"
+                    onClick={() => setTarot({ ...EMPTY_TAROT, topic: t.label, group: t.group })}
+                    className={`px-3 py-2.5 text-sm font-body border-2 transition-colors rounded-sm text-center ${
+                      tarot.topic === t.label
+                        ? "border-[oklch(0.65_0.12_290)] bg-[oklch(0.97_0_0)] font-semibold text-[oklch(0.1_0_0)]"
+                        : t.group === "single_q"
+                        ? "border-[oklch(0.88_0_0)] text-[oklch(0.6_0_0)] hover:border-[oklch(0.6_0_0)]"
+                        : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+                    }`}
+                  >
+                    <span className="block">{t.label}</span>
+                    {adj !== 0 && (
+                      <span className={`block text-[0.65rem] mt-0.5 font-normal ${adj > 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                        {adj > 0 ? `+${adj}` : adj}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* 單題制提示 */}
