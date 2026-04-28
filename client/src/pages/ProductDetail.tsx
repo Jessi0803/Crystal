@@ -120,13 +120,15 @@ export default function ProductDetail() {
           {/* Right: Info */}
           <div className="flex flex-col justify-center">
             {/* Category + Tags */}
-            <div className="flex items-center gap-2 mb-5 flex-wrap">
-              <span className="eyebrow">{product.categoryLabel}</span>
-              {visibleTags.length > 0 && <span className="text-[oklch(0.7_0_0)]">·</span>}
-              {visibleTags.slice(0, 2).map((tag) => (
-                <span key={tag} className="tag">{tag}</span>
-              ))}
-            </div>
+            {product.category !== "custom" && (
+              <div className="flex items-center gap-2 mb-5 flex-wrap">
+                <span className="eyebrow">{product.categoryLabel}</span>
+                {visibleTags.length > 0 && <span className="text-[oklch(0.7_0_0)]">·</span>}
+                {visibleTags.slice(0, 2).map((tag) => (
+                  <span key={tag} className="tag">{tag}</span>
+                ))}
+              </div>
+            )}
 
             {/* Name */}
             <h1 className="heading-lg mb-2">{product.name}</h1>
