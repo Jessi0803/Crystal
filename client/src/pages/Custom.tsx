@@ -22,7 +22,7 @@ const plans = [
   {
     id: "B",
     title: "塔羅 × 水晶手鍊",
-    price: "1,500$ ± 300$",
+    price: "2,399$ ± 300$",
     addons: [],
     description: [
       "提供塔羅解析，並且我將透過解析，分",
@@ -36,7 +36,7 @@ const plans = [
   {
     id: "C",
     title: "脈輪檢測 × 水晶手鍊",
-    price: "1,500$ ± 300$",
+    price: "2,000$ ± 300$",
     addons: [],
     description: [
       "以靈擺與塔羅測出你的七脈輪能量狀",
@@ -51,7 +51,7 @@ const plans = [
   {
     id: "D",
     title: "生命靈數 × 水晶手鍊",
-    price: "1,500$ ± 300$",
+    price: "2,000$ ± 300$",
     addons: [],
     description: [
       "會透過西元出生年月日去找出天賦數、",
