@@ -235,7 +235,7 @@ export default function Custom() {
                 step: "II",
                 title: "靈數與頻率規劃",
                 content:
-                  "計算您的生命靈數，挑選出能與您當下頻率產生共振的礦石。",
+                  "感應您的能量狀態，挑選出能與您當下頻率產生共振的礦石。",
               },
               {
                 step: "III",
