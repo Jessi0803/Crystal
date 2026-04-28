@@ -11,7 +11,9 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
-  const [activeTab, setActiveTab] = useState<"benefits" | "content" | "howto">("benefits");
+  const [activeTab, setActiveTab] = useState<"benefits" | "content" | "howto">(
+    (product?.benefits?.length ?? 0) > 0 ? "benefits" : "content"
+  );
   const wristSizes = ["12", "12.5", "13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
   const claspOptions = [
     { id: "elastic" as const, label: "彈力繩" },
@@ -31,7 +33,7 @@ export default function ProductDetail() {
     window.scrollTo(0, 0);
   }, [id]);
   useEffect(() => {
-    setActiveTab("benefits");
+    setActiveTab((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   }, [id]);
 
   if (!product) {
@@ -78,10 +80,13 @@ export default function ProductDetail() {
 
   const showHowToTab = product.id !== "d003-venus";
   const tabs = [
-    { id: "benefits" as const, label: "功效說明" },
+    ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
     ...(showHowToTab ? [{ id: "howto" as const, label: "客製調整" }] : []),
   ];
+  const contentItems = product.crystalType.includes("｜")
+    ? product.crystalType.split("｜")
+    : product.crystalType.split("、");
 
   return (
     <div className="min-h-screen bg-white page-enter">
@@ -315,7 +320,7 @@ export default function ProductDetail() {
               )}
               {activeTab === "content" && (
                 <ul className="space-y-2">
-                  {product.crystalType.split("、").map((item) => (
+                  {contentItems.map((item) => (
                     <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
                       <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
                       {item}
