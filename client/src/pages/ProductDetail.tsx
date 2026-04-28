@@ -18,7 +18,7 @@ export default function ProductDetail() {
   const claspChoices = [
     { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
     { id: "magnetic" as const, label: "磁扣", price: "+NT$200", img: "/magnet-clasp.png" },
-    { id: "elastic" as const, label: "彈力繩", price: "預設", img: "/elastic-cord.jpg" },
+    { id: "elastic" as const, label: "彈力繩", price: "免費", img: "/elastic-cord.jpg" },
   ];
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
@@ -173,7 +173,10 @@ export default function ProductDetail() {
                   </select>
                 </div>
                 <div>
-                  <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">扣件類型</p>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">扣件類型</p>
+                    <p className="text-[0.6rem] font-body text-[oklch(0.65_0_0)]">點選看示意圖</p>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     {claspChoices.map((opt) => (
                       <button
@@ -192,11 +195,11 @@ export default function ProductDetail() {
                     ))}
                   </div>
                   {hasSelectedClasp && (
-                    <div className="mt-3">
+                    <div className="mt-3 bg-[oklch(0.97_0_0)] rounded-sm p-2">
                       <img
                         src={claspChoices.find((o) => o.id === selectedClaspType)!.img}
                         alt={selectedClaspType}
-                        className="w-full h-40 object-cover rounded-sm"
+                        className="w-full max-h-56 object-contain rounded-sm"
                       />
                     </div>
                   )}
