@@ -207,54 +207,39 @@ export default function CustomFormD() {
       ),
     },
     {
-      title: "要加銀管嗎？",
-      subtitle: "銀管是穿在水晶珠之間的小金屬管，可增加層次感與精緻度",
+      title: "要加銀管或珠框嗎？",
+      subtitle: "可分開選擇，以下附上參考圖片",
       required: true,
       field: (
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { id: "yes" as const, label: "要" },
-            { id: "no" as const, label: "不要" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, silverTube: opt.id })}
-              className={`px-4 py-5 text-base font-body border-2 transition-colors rounded-sm ${
-                form.silverTube === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "要加珠框嗎？",
-      subtitle: "珠框是套在主石外的金屬框，可突顯主石、增加立體感",
-      required: true,
-      field: (
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { id: "yes" as const, label: "要" },
-            { id: "no" as const, label: "不要" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, beadFrame: opt.id })}
-              className={`px-4 py-5 text-base font-body border-2 transition-colors rounded-sm ${
-                form.beadFrame === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            <img src="/bead-frame-1.jpg" alt="珠框銀管參考1" className="w-full h-36 object-cover rounded-sm" />
+            <img src="/bead-frame-2.jpg" alt="珠框銀管參考2" className="w-full h-36 object-cover rounded-sm" />
+          </div>
+          <div>
+            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">銀管</p>
+            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">穿在水晶珠之間的小金屬管，可增加層次感與精緻度</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[{ id: "yes" as const, label: "要" }, { id: "no" as const, label: "不要" }].map((opt) => (
+                <button key={opt.id} type="button" onClick={() => setForm({ ...form, silverTube: opt.id })}
+                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.silverTube === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">珠框</p>
+            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">套在主石外的金屬框，可突顯主石、增加立體感</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[{ id: "yes" as const, label: "要" }, { id: "no" as const, label: "不要" }].map((opt) => (
+                <button key={opt.id} type="button" onClick={() => setForm({ ...form, beadFrame: opt.id })}
+                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.beadFrame === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -377,8 +362,7 @@ export default function CustomFormD() {
     if (step === 3 && !form.wristSize) { toast.error("請填寫手圍尺寸"); return; }
     if (step === 4 && !form.fitPreference) { toast.error("請選擇鬆緊偏好"); return; }
     if (step === 5 && !form.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return; }
-    if (step === 6 && !form.silverTube) { toast.error("請選擇是否加銀管"); return; }
-    if (step === 7 && !form.beadFrame) { toast.error("請選擇是否加珠框"); return; }
+    if (step === 6 && (!form.silverTube || !form.beadFrame)) { toast.error("請選擇銀管和珠框的偏好"); return; }
     setStep((s) => s + 1);
   };
 
