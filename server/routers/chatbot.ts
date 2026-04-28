@@ -106,11 +106,17 @@ export const chatbotRouter = router({
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
 
-      // 3. 找出關聯商品：只有 category === "商品推薦" 的 chunk 才顯示商品卡
-      const topChunk = relevantChunks.find((c) => c.category === "商品推薦" && c.score >= 0.6 && c.relatedProductIds && c.relatedProductIds.length > 0);
-      const relatedProducts = (topChunk?.relatedProductIds ?? [])
-        .map((id) => products.find((p) => p.id === id))
-        .filter((p): p is (typeof products)[number] => !!p);
+      // 3. 找出關聯商品：只有當最高分的結果本身就是「商品推薦」且分數 ≥ 0.72 才顯示商品卡
+      const topChunk = relevantChunks[0];
+      const isProductQuery =
+        topChunk?.category === "商品推薦" &&
+        topChunk.score >= 0.72 &&
+        (topChunk.relatedProductIds?.length ?? 0) > 0;
+      const relatedProducts = isProductQuery
+        ? (topChunk.relatedProductIds ?? [])
+            .map((id) => products.find((p) => p.id === id))
+            .filter((p): p is (typeof products)[number] => !!p)
+        : [];
 
       // 4. 組建 RAG 上下文
       let ragContext = "";
