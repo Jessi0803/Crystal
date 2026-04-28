@@ -303,6 +303,21 @@ export default function ProductDetail() {
               </button>
             </div>}
 
+            {/* LINE contact for custom products */}
+            {product.category === "custom" && (
+              <p className="text-xs font-body text-[oklch(0.5_0_0)] mb-6 leading-relaxed">
+                有任何問題請私訊官方 LINE：
+                <a
+                  href="https://line.me/R/ti/p/@011tymeh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[oklch(0.45_0.12_155)] underline underline-offset-2 hover:opacity-80"
+                >
+                  @011tymeh
+                </a>
+              </p>
+            )}
+
             {/* Suitable For */}
             <div className="mb-6 pb-6 border-b border-[oklch(0.93_0_0)]">
               <p className="eyebrow mb-3">SUITABLE FOR · 適合族群</p>
