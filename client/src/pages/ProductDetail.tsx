@@ -141,9 +141,11 @@ export default function ProductDetail() {
 
             {/* Name */}
             <h1 className="heading-lg mb-2">{product.name}</h1>
-            <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] mb-6 leading-relaxed">
-              {product.subtitle}
-            </p>
+            {product.category !== "custom" && (
+              <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] mb-6 leading-relaxed">
+                {product.subtitle}
+              </p>
+            )}
 
             {/* Price */}
             <div className="flex items-baseline gap-3 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
@@ -319,16 +321,18 @@ export default function ProductDetail() {
             )}
 
             {/* Suitable For */}
-            <div className="mb-6 pb-6 border-b border-[oklch(0.93_0_0)]">
-              <p className="eyebrow mb-3">SUITABLE FOR · 適合族群</p>
-              <div className="flex flex-wrap gap-2">
-                {product.suitableFor.map((s) => (
-                  <span key={s} className="text-[0.65rem] font-body text-[oklch(0.4_0_0)] bg-[oklch(0.97_0_0)] px-3 py-1.5">
-                    {s}
-                  </span>
-                ))}
+            {product.category !== "custom" && (
+              <div className="mb-6 pb-6 border-b border-[oklch(0.93_0_0)]">
+                <p className="eyebrow mb-3">SUITABLE FOR · 適合族群</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.suitableFor.map((s) => (
+                    <span key={s} className="text-[0.65rem] font-body text-[oklch(0.4_0_0)] bg-[oklch(0.97_0_0)] px-3 py-1.5">
+                      {s}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Tabs */}
             <div>
