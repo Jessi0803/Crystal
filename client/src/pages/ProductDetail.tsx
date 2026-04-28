@@ -79,6 +79,12 @@ export default function ProductDetail() {
   };
 
   const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
+  const customFormPaths: Record<string, string> = {
+    "custom-deposit-product": "/custom/form",
+    "tarot-crystal-deposit-product": "/custom/form-b",
+    "chakra-crystal-deposit-product": "/custom/form-c",
+    "numerology-crystal-deposit-product": "/custom/form-d",
+  };
 
   const showHowToTab = product.id !== "d003-venus";
   const tabs = [
@@ -247,6 +253,20 @@ export default function ProductDetail() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Custom product: form CTA */}
+            {product.category === "custom" && customFormPaths[product.id] && (
+              <div className="mb-4">
+                <Link href={customFormPaths[product.id]}>
+                  <button className="w-full py-3.5 text-sm font-body tracking-widest text-white transition-opacity hover:opacity-90 bg-[oklch(0.25_0_0)]">
+                    填寫諮詢表單並下訂
+                  </button>
+                </Link>
+                <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] text-center mt-2">
+                  填寫完畢後將自動導入結帳頁面
+                </p>
               </div>
             )}
 
