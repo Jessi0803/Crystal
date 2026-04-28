@@ -82,7 +82,7 @@ export default function ProductDetail() {
   const tabs = [
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
-    ...(showHowToTab ? [{ id: "howto" as const, label: "客製調整" }] : []),
+    ...(showHowToTab ? [{ id: "howto" as const, label: "下單流程" }] : []),
   ];
   const contentItems = product.crystalType.includes("｜")
     ? product.crystalType.split("｜")
