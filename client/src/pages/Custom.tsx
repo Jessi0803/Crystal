@@ -31,7 +31,7 @@ const plans = [
       "如愛情、溝通能力、財運、疾病等等，",
       "提供初版免費修改 1 次。",
     ],
-    bgColor: "bg-[#FDF9F0]/60",
+    bgColor: "bg-[#F5EDD8]",
     formPath: "/custom/form",
   },
   {
@@ -45,7 +45,7 @@ const plans = [
       "解析以文字訊息提供，無需雙方同時在線上，也方便日後反覆審閱🤍",
       "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
     ],
-    bgColor: "bg-[#F5F5FF]/60",
+    bgColor: "bg-[#E8E6F5]",
     formPath: "/custom/form-b",
   },
   {
@@ -58,7 +58,7 @@ const plans = [
       "解析以文字訊息提供，無需雙方同時在線上，也方便日後反覆審閱🤍",
       "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
     ],
-    bgColor: "bg-[#F0FDFD]/60",
+    bgColor: "bg-[#D8EFED]",
     formPath: "/custom/form-c",
   },
   {
@@ -71,7 +71,7 @@ const plans = [
       "解析以文字訊息提供，無需雙方同時在線上，也方便日後反覆審閱🤍",
       "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
     ],
-    bgColor: "bg-[#FFF5F5]/60",
+    bgColor: "bg-[#F0DEDE]",
     formPath: "/custom/form-d",
   },
 ];
