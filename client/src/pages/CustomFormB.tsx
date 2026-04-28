@@ -682,7 +682,7 @@ export default function CustomFormB() {
                     <span className="block">{t.label}</span>
                     {adj !== 0 && (
                       <span className={`block text-[0.65rem] mt-0.5 font-normal ${adj > 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                        {adj > 0 ? `+${adj}` : adj}
+                        {adj > 0 ? `+${adj}元` : `${adj}元`}
                       </span>
                     )}
                   </button>
