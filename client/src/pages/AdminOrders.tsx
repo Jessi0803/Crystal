@@ -501,9 +501,9 @@ export default function AdminOrders() {
   const startItem = totalOrders === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = totalOrders === 0 ? 0 : Math.min(currentPage * pageSize, totalOrders);
   const stats = {
-    total: dashStats?.totalOrders ?? 0,
+    paid: (dashStats as any)?.paid ?? 0,
     transferPending: dashStats?.transferPending ?? 0,
-    toShip: dashStats?.toShip ?? 0,
+    depositPaid: (dashStats as any)?.depositPaid ?? 0,
     revenue: dashStats?.totalRevenue ?? 0,
   };
 
@@ -582,9 +582,9 @@ export default function AdminOrders() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "總訂單數", value: stats.total, icon: <Package className="w-4 h-4" />, color: "text-[oklch(0.4_0_0)]" },
+            { label: "已付款", value: stats.paid, icon: <Package className="w-4 h-4" />, color: "text-[oklch(0.4_0_0)]" },
             { label: "轉帳待確認", value: stats.transferPending, icon: <Banknote className="w-4 h-4" />, color: "text-blue-600" },
-            { label: "待出貨", value: stats.toShip, icon: <Truck className="w-4 h-4" />, color: "text-amber-600" },
+            { label: "已付訂金", value: stats.depositPaid, icon: <Truck className="w-4 h-4" />, color: "text-amber-600" },
             { label: "總營收", value: `NT$ ${stats.revenue.toLocaleString()}`, icon: <CreditCard className="w-4 h-4" />, color: "text-[oklch(0.72_0.09_70)]" },
           ].map((stat) => (
             <div key={stat.label} className="bg-white border border-[oklch(0.93_0_0)] p-5">
