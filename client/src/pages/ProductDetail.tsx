@@ -227,7 +227,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {!isCustomizableProduct && (
+            {!isCustomizableProduct && product.category !== "custom" && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
                 <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
                 <div className="grid grid-cols-2 gap-2">
