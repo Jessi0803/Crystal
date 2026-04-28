@@ -30,6 +30,26 @@ const WELCOME_MESSAGE: Message = {
     "你好！我是椛小助 ✨\n\n我是椛˙Crystal 的 AI 水晶顧問，可以幫你解答水晶相關問題、推薦適合你的水晶，或介紹客製化方案。\n\n有什麼想問的嗎？",
 };
 
+function renderWithLinks(text: string) {
+  const urlRegex = /(https?:\/\/[^\s，。、！？「」\]）)]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "#9b59b6", textDecoration: "underline", wordBreak: "break-all" }}
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 // 水晶訊息 SVG Icon（訊息泡泡 + 水晶菱形）
 function CrystalChatIcon({ className }: { className?: string }) {
   return (
@@ -289,7 +309,7 @@ export default function ChatBot() {
                           }
                     }
                   >
-                    {msg.content}
+                    {msg.role === "assistant" ? renderWithLinks(msg.content) : msg.content}
                   </div>
                 </div>
 
