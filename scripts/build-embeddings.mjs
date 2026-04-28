@@ -54,6 +54,126 @@ const knowledgeChunks = [
     id: "faq-wrist-size",
     embedText: "手圍怎麼量 尺寸 測量 皮尺 淨手圍 鬆緊",
   },
+  {
+    id: "faq-what-is-custom",
+    embedText: "什麼是客製化手鍊 客製化 量身設計 專屬 獨一無二 功效 塔羅 脈輪 生命靈數",
+  },
+  {
+    id: "faq-what-is-numerology",
+    embedText: "什麼是生命靈數 生命靈數 數字學 出生年月日 天賦數 生命數 先天數 星座數 缺數",
+  },
+  {
+    id: "faq-what-is-chakra",
+    embedText: "什麼是脈輪 脈輪 七脈輪 海底輪 頂輪 能量中心 靈擺 能量平衡",
+  },
+  {
+    id: "faq-how-to-order-custom",
+    embedText: "客製化手鍊怎麼下單 下單 訂購 填寫表單 訂金 付款 LINE",
+  },
+  {
+    id: "faq-custom-plans-diff",
+    embedText: "客製化方案差別 四個方案 純客製 塔羅方案 脈輪方案 生命靈數方案 ABCD 比較",
+  },
+  {
+    id: "faq-deposit-price",
+    embedText: "訂金多少 訂金 尾款 費用 付款 多少錢 價格 方案費用",
+  },
+  {
+    id: "faq-production-time",
+    embedText: "製作多久 製作時間 等多久 完成時間 交貨 出貨時間 需要多久",
+  },
+  {
+    id: "faq-free-revision",
+    embedText: "可以免費修改嗎 修改 免費修改 改設計 不滿意 修改幾次",
+  },
+  {
+    id: "faq-dislike-design",
+    embedText: "不喜歡成品圖 成品圖 不滿意設計 修改 改款 設計不好看",
+  },
+  {
+    id: "faq-refund",
+    embedText: "可以退款嗎 退款 退貨 換貨 退換貨 不能退 瑕疵 損壞",
+  },
+  {
+    id: "faq-fit-preference",
+    embedText: "手鍊鬆緊 尺寸鬆緊 剛好 微鬆 鬆緊偏好 寬鬆 緊",
+  },
+  {
+    id: "faq-default-clasp",
+    embedText: "手鍊預設扣具 彈力繩 龍蝦扣 磁扣 扣具 預設 免費",
+  },
+  {
+    id: "faq-clasp-diff",
+    embedText: "龍蝦扣磁扣差別 龍蝦扣 磁扣 彈力繩 差別 比較 魚線 耐用",
+  },
+  {
+    id: "faq-silver-tube-bead",
+    embedText: "銀管 珠框 加銀管 加珠框 配件 裝飾",
+  },
+  {
+    id: "faq-payment-methods",
+    embedText: "付款方式 支付 信用卡 轉帳 ATM Apple Pay Paypal 海外付款",
+  },
+  {
+    id: "faq-contact",
+    embedText: "有問題怎麼聯絡 聯絡 客服 LINE 私訊 詢問 問題 聯繫",
+  },
+  {
+    id: "faq-experience-course",
+    embedText: "體驗課 生命靈數體驗課 課程內容 費用 報名 小班制 桃園 手作",
+  },
+  {
+    id: "faq-workshop-who",
+    embedText: "水晶創業班 適合誰 創業 手作 水晶事業 創業思維 SOP",
+  },
+  {
+    id: "faq-workshop-price",
+    embedText: "水晶創業全能班費用 創業班費用 課程內容 大綱 12888 桃園 報名",
+  },
+  {
+    id: "faq-crystal-energy-real",
+    embedText: "水晶能量真實嗎 水晶能量 是否有效 有用嗎 頻率 礦石 真的有效",
+  },
+  {
+    id: "faq-wear-always",
+    embedText: "一直戴著 睡覺戴 24小時 一直戴 睡眠時 配戴時間 可以一直戴嗎",
+  },
+  {
+    id: "faq-broken-crystal",
+    embedText: "水晶斷掉 水晶斷了 脫落 掉了 斷裂 代表什麼 不好的預兆",
+  },
+  {
+    id: "faq-natural-crystal",
+    embedText: "天然水晶嗎 是否天然 真的水晶 假的 合成 天然礦石 品質",
+  },
+  {
+    id: "faq-see-design-first",
+    embedText: "先看成品圖 成品圖確認 先看設計 看圖再付款 設計確認",
+  },
+  {
+    id: "faq-ready-stock",
+    embedText: "現貨 直接購買 馬上買 不用等 現成 有現貨嗎",
+  },
+  {
+    id: "faq-shipping-methods",
+    embedText: "配送方式 運送 黑貓 7-11 店到店 宅配 免運 寄送",
+  },
+  {
+    id: "faq-shipping-fee",
+    embedText: "運費多少 運費 宅配費 免運 運費計算",
+  },
+  {
+    id: "faq-overseas-shipping",
+    embedText: "海外寄送 寄到國外 海外配送 馬來西亞 香港 新加坡 美國 英國 澳洲 國際",
+  },
+  {
+    id: "faq-dispatch-time",
+    embedText: "出貨多久 出貨時間 何時出貨 幾天到 幾天出貨 快速出貨",
+  },
+  {
+    id: "faq-tarot-topics",
+    embedText: "塔羅可以問什麼 塔羅主題 占卜 感情 財運 職涯 療癒 前世今生 守護神 流年",
+  },
 ];
 
 async function embed(text) {
