@@ -175,7 +175,7 @@ export default function ProductDetail() {
                 <div>
                   <div className="flex items-baseline gap-2 mb-2">
                     <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">扣件類型</p>
-                    <p className="text-[0.6rem] font-body text-[oklch(0.65_0_0)]">點選看示意圖</p>
+                    <p className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2">點選看示意圖</p>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {claspChoices.map((opt) => (
