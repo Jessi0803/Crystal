@@ -23,27 +23,27 @@ type TarotGroup =
   | "past_life_2"   // 雙方姓名 + 雙方生日 + 今生關係
   | "single_q";     // 單題制 → 導向 LINE
 
-// 各主題對應的說明圖片
-const TOPIC_IMAGE: Record<string, string> = {
-  "戀愛指南":   "/tarot/tarot1.jpg",
-  "感情復合":   "/tarot/tarot1.jpg",
-  "緣來暗戀":   "/tarot/tarot1.jpg",
-  "旺桃花運":   "/tarot/tarot1.jpg",
-  "財富密碼":   "/tarot/tarot2.jpg",
-  "創業衝衝":   "/tarot/tarot2.jpg",
-  "職涯探索":   "/tarot/tarot2.jpg",
-  "面試勝經":   "/tarot/tarot2.jpg",
-  "進化人生":   "/tarot/tarot3.jpg",
-  "雙向之路":   "/tarot/tarot3.jpg",
-  "友情可貴":   "/tarot/tarot3.jpg",
-  "心靈療癒":   "/tarot/tarot3.jpg",
-  "前世今生1":  "/tarot/tarot4.jpg",
-  "前世今生2":  "/tarot/tarot5.jpg",
-  "前世今生3":  "/tarot/tarot5.jpg",
-  "流年運勢1":  "/tarot/tarot6.jpg",
-  "流年運勢2":  "/tarot/tarot7.jpg",
-  "流年運勢3":  "/tarot/tarot7.jpg",
-  "守護神":     "/tarot/tarot8.jpg",
+// 各主題對應的方案說明文字
+const TOPIC_CONTENT: Record<string, { desc?: string; items: string[] }> = {
+  "戀愛指南": { items: ["他對你的想法", "你們適合嗎", "相處上的建議", "未來三個月你和他的感情運勢", "如何突破過往在愛情中的盲點"] },
+  "感情復合": { items: ["他對復合的態度", "他對你的想法", "未來三個月有機會復合嗎", "你需要改善的點", "若要復合，你們的阻礙是甚麼"] },
+  "緣來暗戀": { items: ["他喜歡你嗎", "他是我得正緣嗎", "他理想中的愛情是怎麼樣的", "他現在是否有喜歡的人", "是否要展開追求"] },
+  "旺桃花運": { items: ["未來三個月的感情運勢", "如何提升感情運", "怎樣的人適合你", "你需要改善的點", "如何突破過往在愛情中的盲點"] },
+  "財富密碼": { items: ["求財面對的阻礙", "支出風險", "有利於增加財富的條件", "暗示生活中帶來財富的機遇", "影響財運的原因"] },
+  "創業衝衝": { items: ["現在的你適合創業嗎", "創業會成功嗎", "創業需注意的事", "如何解決困難", "創業會對你的生活帶來的影響"] },
+  "職涯探索": { items: ["你適合什麼工作", "如何提升自己的工作能力", "你的優勢是什麼", "未來三個月的工作運勢", "如何獲得他人支持或幫助"] },
+  "面試勝經": { items: ["內心糾結的問題", "眼前的工作機會適合自己嗎", "有機率成功嗎", "目前的阻礙", "這份工作機會最終的結果"] },
+  "進化人生": { items: ["如何提升自信", "你的優勢與缺點", "你的人生使命", "未來三個月的整體運勢", "與他人相處上的建議或提醒"] },
+  "雙向之路": { items: ["你當前的狀態", "選擇A的未來三個月發展", "選擇B的未來三個月發展", "選擇A的結果", "選擇B的結果"] },
+  "友情可貴": { items: ["他對你的想法", "你們之間產生的問題", "問題如何解決", "對方隱藏的心結", "未來三個月的友情運勢"] },
+  "心靈療癒": { items: ["痛苦真正的根源", "這件事帶給生活的影響", "如何讓自己平靜", "為了療癒自己，你要採取的行動", "療癒完能獲得的成長與改變"] },
+  "前世今生1": { desc: "每一世，都有需要經歷的課題，你的靈魂造就了現在的你。讓塔羅帶領你探討前世今生的奧妙。", items: ["為何轉世來到今生", "前世的外在印象 / 外表個性特質", "前世的內心世界", "前世的家庭生活", "前世的情感與愛人", "前世的職涯方向", "今生的課題 / 想得到的一個目標"] },
+  "前世今生2": { desc: "你曾覺得和他人莫名的有熟悉感？你們的前世有什麼聯繫…", items: ["你和他前世的關係", "你和他前世如何相遇 / 發生了什麼事", "今生你們在這段關係的課題", "如何跨過你們今生的課題", "神諭卡祝福"] },
+  "前世今生3": { desc: "前世的你是誰，住在哪，過著怎麼樣的生活，遇到了什麼事…", items: ["以故事的模式闡述前世的一生（約 500–1000 字）"] },
+  "流年運勢1": { desc: "以黃道十二宮幫助了解未來一年各個領域的運勢", items: ["第一宮：整體運勢", "第二宮：財運", "第三宮：溝通、學習、交通", "第四宮：家庭、親情、房產", "第五宮：感情、創意、娛樂", "第六宮：健康、工作、日常事務", "第七宮：人際、合作、婚姻", "第八宮：潛意識、轉化、死亡", "第九宮：信仰、遠方、旅行", "第十宮：事業、社會地位、名聲", "第十一宮：友誼、理想、團體", "第十二宮：自我犧牲、困境、隱藏"] },
+  "流年運勢2": { desc: "未來一年，每個月會遇到的事情、阻礙、建議", items: ["未來一年 主要會是怎樣的狀態", "未來一年 每月會遇到的事與建議", "未來一年 神諭卡祝福"] },
+  "流年運勢3": { desc: "未來一年，每個季節會遇到的事情、阻礙、建議", items: ["未來一年主要會是怎樣的狀態", "春夏秋冬 每季會遇到的事與建議", "神諭卡祝福"] },
+  "守護神":    { desc: "你的守護神是誰？它想提醒你甚麼…讓能量帶領你與守護神進行連結，帶你認識自己的守護神。", items: ["我的守護星", "我的守護神", "守護神的過去與故事", "守護神與你之間的連結", "守護神想提醒你的事", "要如何與守護神有更深刻的感應"] },
 };
 
 // 各主題相對於基本方案的價格調整（訂金同步調整）
@@ -689,7 +689,7 @@ export default function CustomFormB() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {tarotTopics.map((t) => {
                 const adj = TOPIC_PRICE_ADJUST[t.label] ?? 0;
-                const hasImage = !!TOPIC_IMAGE[t.label];
+                const hasImage = !!TOPIC_CONTENT[t.label];
                 const isSelected = tarot.topic === t.label;
                 return (
                   <button
@@ -710,9 +710,9 @@ export default function CustomFormB() {
                         {adj > 0 ? `+${adj}元` : `${adj}元`}
                       </span>
                     )}
-                    {hasImage && (
+                    {hasImage && !isSelected && (
                       <span className="block text-[0.6rem] mt-1 text-[oklch(0.65_0.12_290)] font-normal">
-                        點選查看內容
+                        點選查看內容 ↓
                       </span>
                     )}
                   </button>
@@ -720,14 +720,25 @@ export default function CustomFormB() {
               })}
             </div>
 
-            {/* 主題說明圖片預覽 */}
-            {tarot.topic && TOPIC_IMAGE[tarot.topic] && (
-              <div className="mt-5 rounded-sm overflow-hidden border border-[oklch(0.9_0_0)]">
-                <img
-                  src={TOPIC_IMAGE[tarot.topic]}
-                  alt={`${tarot.topic} 說明`}
-                  className="w-full object-contain"
-                />
+            {/* 主題說明文字預覽 */}
+            {tarot.topic && TOPIC_CONTENT[tarot.topic] && (
+              <div className="mt-5 p-5 rounded-sm border border-[oklch(0.88_0.04_290)] bg-[oklch(0.97_0.01_290)]">
+                <p className="text-xs font-body font-semibold text-[oklch(0.55_0.12_290)] tracking-widest uppercase mb-3">
+                  {tarot.topic} ── 占卜內容
+                </p>
+                {TOPIC_CONTENT[tarot.topic].desc && (
+                  <p className="text-sm font-body text-[oklch(0.4_0_0)] leading-relaxed mb-3">
+                    {TOPIC_CONTENT[tarot.topic].desc}
+                  </p>
+                )}
+                <ul className="space-y-1.5">
+                  {TOPIC_CONTENT[tarot.topic].items.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm font-body text-[oklch(0.25_0_0)]">
+                      <span className="text-[oklch(0.65_0.12_290)] mt-0.5 shrink-0">·</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
