@@ -209,7 +209,7 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
       clearStateCookie();
       const sessionCookieOpts = { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS };
       res.cookie(COOKIE_NAME, sessionToken, sessionCookieOpts);
-      res.redirect(302, "/products");
+      res.redirect(302, "/products?line_welcome=1");
     } catch (err) {
       console.error("[LINE OAuth] callback failed", err);
       clearStateCookie();
