@@ -271,7 +271,7 @@ export default function ProductDetail() {
             )}
 
             {/* Qty + Add to Cart */}
-            <div className="flex items-center gap-4 mb-6">
+            {product.category !== "custom" && <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center border border-[oklch(0.9_0_0)]">
                 <button
                   onClick={() => setQty(Math.max(1, qty - 1))}
@@ -296,7 +296,7 @@ export default function ProductDetail() {
                 <ShoppingBag className="w-4 h-4" />
                 加入購物袋
               </button>
-            </div>
+            </div>}
 
             {/* Suitable For */}
             <div className="mb-6 pb-6 border-b border-[oklch(0.93_0_0)]">
