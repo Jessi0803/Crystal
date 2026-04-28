@@ -11,7 +11,7 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
-  const [activeTab, setActiveTab] = useState<"benefits" | "content" | "howto">(
+  const [activeTab, setActiveTab] = useState<"benefits" | "content" | "howto" | "pricing">(
     (product?.benefits?.length ?? 0) > 0 ? "benefits" : "content"
   );
   const wristSizes = ["12", "12.5", "13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
@@ -85,6 +85,7 @@ export default function ProductDetail() {
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
     ...(showHowToTab ? [{ id: "howto" as const, label: "下單流程" }] : []),
+    ...(product.category === "custom" ? [{ id: "pricing" as const, label: "價格說明" }] : []),
   ];
   const contentItems = product.crystalType.includes("｜")
     ? product.crystalType.split("｜")
@@ -330,6 +331,19 @@ export default function ProductDetail() {
                     <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
                       <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5 font-body">{i + 1}.</span>
                       {h}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {product.category === "custom" && activeTab === "pricing" && (
+                <ul className="space-y-2">
+                  {[
+                    "手鍊費用：1,500$ ± 300$",
+                    "若選擇龍蝦扣或磁扣：額外 +200$",
+                  ].map((line) => (
+                    <li key={line} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
+                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                      {line}
                     </li>
                   ))}
                 </ul>
