@@ -177,14 +177,14 @@ export default function Custom() {
 
                 {/* 服務內容 */}
                 <div className="flex-grow">
-                  <span className="text-[9px] text-[#8E735B]/50 tracking-[0.5em] uppercase block mb-8 text-center font-medium">
+                  <span className="text-xs text-[#8E735B]/60 tracking-[0.5em] uppercase block mb-8 text-center font-medium">
                     服務內容
                   </span>
                   <ul className="space-y-6">
                     {plan.features.map((feature, idx) => (
                       <li
                         key={idx}
-                        className="flex items-start gap-4 text-sm text-[#555] leading-relaxed font-light tracking-widest text-justify"
+                        className="flex items-start gap-4 text-base text-[#555] leading-relaxed font-light tracking-widest text-justify"
                       >
                         <div className="mt-2.5 w-1 h-1 rounded-full bg-[#D8C3BD]/60 shrink-0" />
                         <span>{feature}</span>
