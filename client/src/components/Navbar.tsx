@@ -15,6 +15,7 @@ const effectSeriesLinks = [
   { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: "🧘" },
   { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: "📿" },
   { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: "🧿" },
+  { label: "能量香水", href: "/products?category=energy-perfume", desc: "香氣能量・即將推出", icon: "🌙" },
   { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: "✨" },
 ];
 
@@ -217,11 +218,11 @@ export default function Navbar() {
                 <BrandTextMark />
               </Link>
 
-              {/* Left nav: 最新商品、商品分類、購物說明、聯絡我們 */}
+              {/* Left nav: 每月限量、商品分類、購物說明、聯絡我們 */}
               <nav className="hidden lg:flex items-center gap-6">
-                <Link href="/products?sort=new">
+                <Link href="/products?category=monthly">
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                    最新商品
+                    每月限量
                   </span>
                 </Link>
                 <CategoryDropdown />
@@ -291,9 +292,9 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
             <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
-              <Link href="/products?sort=newest">
+              <Link href="/products?category=monthly">
                 <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
-                  最新商品
+                  每月限量
                 </span>
               </Link>
 
