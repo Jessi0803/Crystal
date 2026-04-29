@@ -114,9 +114,9 @@ export default function Home() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* ─── HERO SPLIT ─── */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 min-h-[75vh]">
+      <section className="grid grid-cols-1 lg:grid-cols-2 min-h-[85vh]">
         {/* Left: Image */}
-        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] min-h-[42vw] lg:min-h-[75vh]">
+        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] min-h-[50vw] lg:min-h-[85vh]">
           <img
             src={HERO_SPLIT_IMG}
             alt="日日好日能量水晶"
