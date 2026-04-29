@@ -1,4 +1,4 @@
-import { CUSTOM_PRODUCT_ID } from "./const";
+import { CUSTOM_PRODUCT_IDS } from "./const";
 import type { OverseasShipCountryCode } from "./overseasShipping";
 
 export type CheckoutRegion = "domestic" | "overseas";
@@ -36,7 +36,7 @@ export type CheckoutFeeItem = {
 export function isCheckoutFeeExemptProduct(item: { id: string; baseProductId?: string; name?: string }) {
   const productId = item.baseProductId ?? item.id;
   return (
-    productId === CUSTOM_PRODUCT_ID ||
+    CUSTOM_PRODUCT_IDS.includes(productId) ||
     productId.startsWith("test-") ||
     item.id.startsWith("test-") ||
     item.name?.includes("測試用") === true
