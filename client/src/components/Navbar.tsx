@@ -443,17 +443,10 @@ function MobileMemberLinks() {
   }
 
   return (
-    <>
-      <Link href="/login">
-        <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
-          會員登入
-        </span>
-      </Link>
-      <Link href="/register">
-        <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
-          註冊帳號
-        </span>
-      </Link>
-    </>
+    <Link href="/login">
+      <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+        會員登入
+      </span>
+    </Link>
   );
 }
