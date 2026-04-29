@@ -79,6 +79,7 @@ function ShoppingGuideDropdown() {
 // 商品分類下拉選單
 function CategoryDropdown() {
   const [open, setOpen] = useState(false);
+  const [effectOpen, setEffectOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -139,27 +140,41 @@ function CategoryDropdown() {
             </Link>
           </div>
           <div className="py-2">
-            <div className="px-5 pt-2 pb-1">
-              <p className="text-[0.6rem] tracking-[0.18em] text-[oklch(0.55_0_0)]">功效系列</p>
-            </div>
-            {effectSeriesLinks.map((cat) => (
-              <Link key={cat.href} href={cat.href}>
-                <div
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.97_0_0)] transition-colors group cursor-pointer"
-                >
-                  <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-[0.75rem] font-medium text-[oklch(0.1_0_0)] tracking-[0.05em] group-hover:text-[oklch(0.3_0_0)] transition-colors">
-                      {cat.label}
-                    </p>
-                    <p className="text-[0.6rem] text-[oklch(0.6_0_0)] mt-0.5 tracking-wide">
-                      {cat.desc}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+            <button
+              type="button"
+              onClick={() => setEffectOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.97_0_0)] transition-colors group"
+            >
+              <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.4_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">
+                功效系列
+              </span>
+              <ChevronDown
+                className={`w-3 h-3 text-[oklch(0.6_0_0)] transition-transform duration-200 ${effectOpen ? "rotate-180" : ""}`}
+                strokeWidth={1.5}
+              />
+            </button>
+            {effectOpen && (
+              <div className="pb-1">
+                {effectSeriesLinks.map((cat) => (
+                  <Link key={cat.href} href={cat.href}>
+                    <div
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-[oklch(0.97_0_0)] transition-colors group cursor-pointer"
+                    >
+                      <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-[0.75rem] font-medium text-[oklch(0.1_0_0)] tracking-[0.05em] group-hover:text-[oklch(0.3_0_0)] transition-colors">
+                          {cat.label}
+                        </p>
+                        <p className="text-[0.6rem] text-[oklch(0.6_0_0)] mt-0.5 tracking-wide">
+                          {cat.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
             <div className="mt-1 px-5 pt-3 pb-1 border-t border-[oklch(0.95_0_0)]">
               <p className="text-[0.6rem] tracking-[0.18em] text-[oklch(0.55_0_0)]">商品類型</p>
             </div>
@@ -191,6 +206,7 @@ function CategoryDropdown() {
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileCatOpen, setMobileCatOpen] = useState(false);
+  const [mobileEffectOpen, setMobileEffectOpen] = useState(false);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { totalItems, setIsOpen } = useCart();
@@ -205,6 +221,7 @@ export default function Navbar() {
   useEffect(() => {
     setMobileOpen(false);
     setMobileCatOpen(false);
+    setMobileEffectOpen(false);
     setMobileGuideOpen(false);
   }, [location]);
 
@@ -327,20 +344,29 @@ export default function Navbar() {
                         <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
                       </div>
                     </Link>
-                    <div className="px-5 pt-4 pb-1">
-                      <p className="text-[0.65rem] tracking-[0.14em] text-[oklch(0.55_0_0)]">功效系列</p>
-                    </div>
-                    {effectSeriesLinks.map((cat) => (
-                      <Link key={cat.href} href={cat.href}>
-                        <div className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
-                          <span className="text-base w-5 shrink-0">{cat.icon}</span>
-                          <div>
-                            <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
-                            <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setMobileEffectOpen((v) => !v)}
+                      className="w-full flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors"
+                    >
+                      <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">功效系列</span>
+                      <ChevronDown className={`w-4 h-4 text-[oklch(0.6_0_0)] transition-transform duration-200 ${mobileEffectOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
+                    </button>
+                    {mobileEffectOpen && (
+                      <div className="pb-1">
+                        {effectSeriesLinks.map((cat) => (
+                          <Link key={cat.href} href={cat.href}>
+                            <div className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                              <span className="text-base w-5 shrink-0">{cat.icon}</span>
+                              <div>
+                                <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
+                                <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                     <div className="px-5 pt-4 pb-1 border-t border-[oklch(0.95_0_0)]">
                       <p className="text-[0.65rem] tracking-[0.14em] text-[oklch(0.55_0_0)]">商品類型</p>
                     </div>
