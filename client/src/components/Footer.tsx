@@ -30,7 +30,7 @@ export default function Footer() {
             </Link>
             <div className="flex items-center gap-3">
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/gooday_tarot_"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
@@ -39,7 +39,7 @@ export default function Footer() {
                 <Instagram className="w-3.5 h-3.5 text-white/70" />
               </a>
               <a
-                href="https://line.me"
+                href="https://line.me/R/ti/p/@011tymeh"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
