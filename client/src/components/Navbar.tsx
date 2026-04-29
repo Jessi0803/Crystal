@@ -8,11 +8,14 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { BrandTextMark } from "./BrandMark";
 
-const categorySubLinks = [
+const effectSeriesLinks = [
   { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
   { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: "💰" },
   { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: "🛡️" },
   { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: "🧘" },
+];
+
+const categorySubLinks = [
   { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: "📿" },
   { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: "🧿" },
   { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: "✨" },
@@ -136,6 +139,30 @@ function CategoryDropdown() {
             </Link>
           </div>
           <div className="py-2">
+            <div className="px-5 pt-2 pb-1">
+              <p className="text-[0.6rem] tracking-[0.18em] text-[oklch(0.55_0_0)]">功效系列</p>
+            </div>
+            {effectSeriesLinks.map((cat) => (
+              <Link key={cat.href} href={cat.href}>
+                <div
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.97_0_0)] transition-colors group cursor-pointer"
+                >
+                  <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-[0.75rem] font-medium text-[oklch(0.1_0_0)] tracking-[0.05em] group-hover:text-[oklch(0.3_0_0)] transition-colors">
+                      {cat.label}
+                    </p>
+                    <p className="text-[0.6rem] text-[oklch(0.6_0_0)] mt-0.5 tracking-wide">
+                      {cat.desc}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+            <div className="mt-1 px-5 pt-3 pb-1 border-t border-[oklch(0.95_0_0)]">
+              <p className="text-[0.6rem] tracking-[0.18em] text-[oklch(0.55_0_0)]">商品類型</p>
+            </div>
             {categorySubLinks.map((cat) => (
               <Link key={cat.href} href={cat.href}>
                 <div
@@ -300,6 +327,23 @@ export default function Navbar() {
                         <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
                       </div>
                     </Link>
+                    <div className="px-5 pt-4 pb-1">
+                      <p className="text-[0.65rem] tracking-[0.14em] text-[oklch(0.55_0_0)]">功效系列</p>
+                    </div>
+                    {effectSeriesLinks.map((cat) => (
+                      <Link key={cat.href} href={cat.href}>
+                        <div className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                          <span className="text-base w-5 shrink-0">{cat.icon}</span>
+                          <div>
+                            <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
+                            <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                    <div className="px-5 pt-4 pb-1 border-t border-[oklch(0.95_0_0)]">
+                      <p className="text-[0.65rem] tracking-[0.14em] text-[oklch(0.55_0_0)]">商品類型</p>
+                    </div>
                     {categorySubLinks.map((cat) => (
                       <Link key={cat.href} href={cat.href}>
                         <div className="flex items-center gap-3 px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
