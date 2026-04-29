@@ -16,6 +16,7 @@ const categories = [
   { id: "healing", label: "療癒系列" },
   { id: "necklace", label: "項鍊" },
   { id: "pendant", label: "吊飾" },
+  { id: "energy-perfume", label: "能量香水" },
   { id: "other", label: "其他" },
 ];
 
@@ -47,7 +48,7 @@ export default function Products() {
     .filter((p) =>
       activeCategory === "all" ||
       p.category === activeCategory ||
-      (activeCategory === "effect" && ["love", "wealth", "protect", "healing"].includes(p.category))
+      (activeCategory === "effect" && ["love", "wealth", "protect", "healing", "necklace", "pendant", "energy-perfume", "other"].includes(p.category))
     )
     .sort((a, b) => {
       if (sortBy === "price-asc") return a.price - b.price;
@@ -118,7 +119,14 @@ export default function Products() {
         {/* Product Grid */}
         {filtered.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-2xl font-light text-[oklch(0.7_0_0)] mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>暫無商品</p>
+            <p className="text-2xl font-light text-[oklch(0.7_0_0)] mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+              {activeCategory === "energy-perfume" ? "商品即將推出" : "暫無商品"}
+            </p>
+            {activeCategory === "energy-perfume" && (
+              <p className="text-sm font-body text-[oklch(0.55_0_0)] tracking-[0.08em] mb-6">
+                敬請期待
+              </p>
+            )}
             <button onClick={() => setActiveCategory("all")} className="btn-ghost">
               查看全部商品
             </button>
