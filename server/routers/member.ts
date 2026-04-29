@@ -124,7 +124,7 @@ export const memberRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
 
-      return { success: true, user: { id: user.id, name: user.name, email: user.email } };
+      return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
     }),
 
   /** 驗證 Email */

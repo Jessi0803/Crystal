@@ -9,9 +9,9 @@ export default function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const loginMutation = trpc.member.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("登入成功，歡迎回來！");
-      navigate("/products");
+      navigate(data.user.role === "admin" ? "/admin/orders" : "/products");
     },
     onError: (err) => {
       toast.error(err.message || "登入失敗，請稍後再試");
