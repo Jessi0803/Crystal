@@ -130,7 +130,7 @@ function CategoryDropdown() {
                 className="flex items-center justify-between cursor-pointer group"
               >
                 <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.55_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors font-medium">
-                  ✦ 客製化方案
+                  客製化方案
                 </span>
                 <span className="text-[0.65rem] text-[oklch(0.65_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors">→</span>
               </div>
@@ -316,7 +316,7 @@ export default function Navbar() {
                     </Link>
                     <Link href="/custom">
                       <div className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer" style={{background: "oklch(0.97 0.01 70)"}}>
-                        <span className="text-xs tracking-[0.1em] text-[oklch(0.55_0.08_70)] font-medium">✦ 客製化方案</span>
+                        <span className="text-xs tracking-[0.1em] text-[oklch(0.55_0.08_70)] font-medium">客製化方案</span>
                         <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
                       </div>
                     </Link>
