@@ -390,10 +390,10 @@ export default function Navbar() {
       </header>
 
       {/* ── 跑馬燈公告 ── */}
-      <div className="bg-[oklch(0.97_0.01_70)] border-b border-[oklch(0.92_0.02_70)] py-2 overflow-hidden">
+      <div className="bg-[oklch(0.96_0_0)] border-b border-[oklch(0.92_0_0)] py-2 overflow-hidden">
         <div className="marquee-track">
           {Array(8).fill(null).map((_, i) => (
-            <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0.05_70)] uppercase">
+            <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
               任選兩條手鍊免運 ·&nbsp;
             </span>
           ))}
