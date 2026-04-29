@@ -73,6 +73,7 @@ function useScrollReveal() {
 export default function Home() {
   const { addToCart } = useCart();
   const sliderRef = useRef<HTMLDivElement>(null);
+  const [isSliderPaused, setIsSliderPaused] = useState(false);
   const [quote] = useState(() => dailyQuotes[new Date().getDay() % dailyQuotes.length]);
   useScrollReveal();
 
@@ -81,6 +82,26 @@ export default function Home() {
     const w = sliderRef.current.clientWidth;
     sliderRef.current.scrollBy({ left: dir === "right" ? w * 0.8 : -w * 0.8, behavior: "smooth" });
   };
+
+  useEffect(() => {
+    if (isSliderPaused) return;
+    const timer = window.setInterval(() => {
+      const slider = sliderRef.current;
+      if (!slider) return;
+
+      const maxScrollLeft = slider.scrollWidth - slider.clientWidth;
+      if (maxScrollLeft <= 0) return;
+
+      if (slider.scrollLeft >= maxScrollLeft - 8) {
+        slider.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+
+      slider.scrollBy({ left: slider.clientWidth * 0.8, behavior: "smooth" });
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [isSliderPaused]);
 
   const handleAddToCart = (product: typeof products[0], e: React.MouseEvent) => {
     e.preventDefault();
@@ -215,7 +236,14 @@ export default function Home() {
           </div>
 
           {/* Horizontal Scroll */}
-          <div ref={sliderRef} className="scroll-container gap-4 pb-2">
+          <div
+            ref={sliderRef}
+            className="scroll-container gap-4 pb-2"
+            onMouseEnter={() => setIsSliderPaused(true)}
+            onMouseLeave={() => setIsSliderPaused(false)}
+            onTouchStart={() => setIsSliderPaused(true)}
+            onTouchEnd={() => window.setTimeout(() => setIsSliderPaused(false), 2500)}
+          >
             {products.map((product) => (
               <div key={product.id} className="scroll-item w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.75rem)] lg:w-[calc(25%-0.75rem)]">
                 <Link href={`/products/${product.id}`}>
