@@ -43,6 +43,17 @@ export function isCheckoutFeeExemptProduct(item: { id: string; baseProductId?: s
   );
 }
 
+function isTestProduct(item: { id: string; baseProductId?: string; name?: string }) {
+  const productId = item.baseProductId ?? item.id;
+  return productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("測試用") === true;
+}
+
+function calcBraceletQuantityForFreeShipping(items: CheckoutFeeItem[]) {
+  return items
+    .filter((item) => !isTestProduct(item) && item.name?.includes("手鍊") === true)
+    .reduce((sum, item) => sum + item.quantity, 0);
+}
+
 export function calcCheckoutFees(params: {
   items: CheckoutFeeItem[];
   checkoutRegion: CheckoutRegion;
@@ -55,9 +66,12 @@ export function calcCheckoutFees(params: {
     .filter((item) => !isCheckoutFeeExemptProduct(item))
     .reduce((sum, item) => sum + item.price * item.quantity, 0);
   const appliesFees = chargeableSubtotal > 0;
+  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcBraceletQuantityForFreeShipping(params.items) >= 2;
 
   const shippingFee = !appliesFees
     ? 0
+    : domesticFreeShipping
+      ? 0
     : params.checkoutRegion === "overseas"
       ? params.overseasCountry
         ? OVERSEAS_SHIPPING_FEES[params.overseasCountry]
@@ -75,5 +89,6 @@ export function calcCheckoutFees(params: {
     paymentFee,
     total,
     appliesFees,
+    domesticFreeShipping,
   };
 }
