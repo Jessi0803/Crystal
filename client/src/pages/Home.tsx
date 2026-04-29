@@ -120,8 +120,7 @@ export default function Home() {
           <img
             src={HERO_SPLIT_IMG}
             alt="日日好日能量水晶"
-            className="w-full h-full object-contain"
-            style={{ maxHeight: "480px" }}
+            className="w-full h-full object-cover object-center"
           />
         </div>
 
