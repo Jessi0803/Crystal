@@ -116,12 +116,12 @@ export default function Home() {
       {/* ─── HERO SPLIT ─── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 min-h-[75vh]">
         {/* Left: Image */}
-        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] min-h-[42vw] lg:min-h-[75vh]">
+        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] min-h-[42vw] lg:min-h-[75vh] flex items-center justify-center p-10 lg:p-16">
           <img
             src={HERO_SPLIT_IMG}
             alt="日日好日能量水晶"
-            className="w-full h-full object-cover object-center"
-            style={{ minHeight: "320px" }}
+            className="w-full h-full object-contain"
+            style={{ maxHeight: "480px" }}
           />
         </div>
 
