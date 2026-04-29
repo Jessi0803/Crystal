@@ -206,7 +206,7 @@ export default function Navbar() {
     <>
       {/* ── Main Header ── */}
       <header
-        className={`sticky top-0 z-50 bg-[oklch(0.985_0_0)] transition-shadow duration-300 ${
+        className={`sticky top-0 z-50 bg-white transition-shadow duration-300 ${
           scrolled ? "shadow-[0_1px_0_0_oklch(0.9_0_0)]" : "border-b border-[oklch(0.93_0_0)]"
         }`}
       >
@@ -390,7 +390,7 @@ export default function Navbar() {
       </header>
 
       {/* ── 跑馬燈公告 ── */}
-      <div className="bg-white border-b border-[oklch(0.95_0_0)] py-2 overflow-hidden">
+      <div className="bg-[oklch(0.985_0_0)] border-b border-[oklch(0.95_0_0)] py-2 overflow-hidden">
         <div className="marquee-track">
           {Array(8).fill(null).map((_, i) => (
             <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
