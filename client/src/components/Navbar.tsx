@@ -218,7 +218,7 @@ export default function Navbar() {
                 <BrandTextMark />
               </Link>
 
-              {/* Left nav: 每月限量、商品分類、購物說明、聯絡我們 */}
+              {/* Left nav: 每月限量、商品分類、購物說明 */}
               <nav className="hidden lg:flex items-center gap-6">
                 <Link href="/products?category=monthly">
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
@@ -235,11 +235,6 @@ export default function Navbar() {
                 <Link href="/about">
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
                     品牌故事
-                  </span>
-                </Link>
-                <Link href="/contact">
-                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
-                    聯絡我們
                   </span>
                 </Link>
               </nav>
@@ -385,13 +380,6 @@ export default function Navbar() {
               <Link href="/about">
                 <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   品牌故事
-                </span>
-              </Link>
-
-              {/* 聯絡我們 */}
-              <Link href="/contact">
-                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
-                  聯絡我們
                 </span>
               </Link>
 

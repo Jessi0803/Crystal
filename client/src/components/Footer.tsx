@@ -21,26 +21,33 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Social Icons */}
-          <div className="flex items-center gap-3">
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
-              aria-label="Instagram"
-            >
-              <Instagram className="w-3.5 h-3.5 text-white/70" />
-            </a>
-            <a
-              href="https://line.me"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
-              aria-label="LINE"
-            >
-              <MessageCircle className="w-3.5 h-3.5 text-white/70" />
-            </a>
+          {/* Right: links + social */}
+          <div className="flex flex-col items-start sm:items-end gap-5">
+            <Link href="/contact">
+              <span className="text-xs font-body tracking-[0.12em] text-white/70 hover:text-white transition-colors cursor-pointer">
+                聯絡我們
+              </span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
+                aria-label="Instagram"
+              >
+                <Instagram className="w-3.5 h-3.5 text-white/70" />
+              </a>
+              <a
+                href="https://line.me"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
+                aria-label="LINE"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-white/70" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
