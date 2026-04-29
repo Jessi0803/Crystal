@@ -45,7 +45,7 @@ function ShoppingGuideDropdown() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1 text-[0.7rem] tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
+        className={`h-4 inline-flex items-center gap-1 text-[0.7rem] leading-none tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
           open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
         }`}
       >
@@ -94,7 +94,7 @@ function CategoryDropdown() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1 text-[0.7rem] tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
+        className={`h-4 inline-flex items-center gap-1 text-[0.7rem] leading-none tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
           open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
         }`}
       >
