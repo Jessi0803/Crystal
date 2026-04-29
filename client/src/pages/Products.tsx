@@ -9,7 +9,6 @@ import { toast } from "sonner";
 
 const categories = [
   { id: "all", label: "全部商品" },
-  { id: "effect", label: "功效系列" },
   { id: "love", label: "愛情桃花" },
   { id: "wealth", label: "財運事業" },
   { id: "protect", label: "能量防護" },
@@ -46,9 +45,7 @@ export default function Products() {
 
   const filtered = products
     .filter((p) =>
-      activeCategory === "all" ||
-      p.category === activeCategory ||
-      (activeCategory === "effect" && ["love", "wealth", "protect", "healing", "necklace", "pendant", "energy-perfume", "other"].includes(p.category))
+      activeCategory === "all" || p.category === activeCategory
     )
     .sort((a, b) => {
       if (sortBy === "price-asc") return a.price - b.price;
