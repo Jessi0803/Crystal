@@ -110,7 +110,7 @@ export const products: Product[] = [
     categoryLabel: "客製化",
     price: 1000,
     priceRange: "NT$1,700 ~ NT$2,300",
-    image: "/images/custom-numerology2.jpg",
+    image: "/images/custom-numerology3.jpg",
     tags: ["生命靈數"],
     description: "生命靈數 × 水晶手鍊客製化服務訂金。",
     story: "",
