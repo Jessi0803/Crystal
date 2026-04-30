@@ -2,7 +2,7 @@
 // Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingBag, Heart, User, Menu, X, ChevronDown } from "lucide-react";
+import { ShoppingBag, Heart, User, Menu, X, ChevronDown } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -244,13 +244,7 @@ export default function Navbar() {
             <div className="flex items-center gap-5">
               {/* Icons */}
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => toast.info("搜尋功能即將上線")}
-                  className="p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
-                  aria-label="搜尋"
-                >
-                  <Search className="w-4 h-4" strokeWidth={1.5} />
-                </button>
+
                 <button
                   onClick={() => toast.info("收藏功能即將上線")}
                   className="p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors hidden sm:block"
