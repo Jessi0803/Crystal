@@ -138,9 +138,6 @@ export default function CartDrawer() {
                 NT$ {totalPrice.toLocaleString()}
               </p>
             </div>
-            <p className="text-[0.6rem] font-body text-[oklch(0.65_0_0)] mb-5">
-              滿 NT$1,500 享免運費 · 運費 NT$80
-            </p>
             <Link href="/checkout">
               <button
                 onClick={() => setIsOpen(false)}
