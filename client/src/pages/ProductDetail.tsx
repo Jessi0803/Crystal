@@ -407,7 +407,6 @@ export default function ProductDetail() {
               {product.category === "custom" && activeTab === "pricing" && (
                 <ul className="space-y-2">
                   {[
-                    `手鍊費用：${{ "custom-deposit-product": "1,500", "tarot-crystal-deposit-product": "2,399", "chakra-crystal-deposit-product": "2,000", "numerology-crystal-deposit-product": "2,000" }[product.id] ?? "1,500"}$ ± 300$`,
                     "若選擇龍蝦扣或磁扣：額外 +200$",
                   ].map((line) => (
                     <li key={line} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
