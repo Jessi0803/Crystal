@@ -46,6 +46,9 @@ const TOPIC_CONTENT: Record<string, { desc?: string; items: string[] }> = {
   "守護神":    { desc: "你的守護神是誰？它想提醒你甚麼…讓能量帶領你與守護神進行連結，帶你認識自己的守護神。", items: ["我的守護星", "我的守護神", "守護神的過去與故事", "守護神與你之間的連結", "守護神想提醒你的事", "要如何與守護神有更深刻的感應"] },
 };
 
+const BASE_TOTAL = 2399;
+const BASE_DEPOSIT = 1399;
+
 // 各主題相對於基本方案的價格調整（訂金同步調整）
 const TOPIC_PRICE_ADJUST: Record<string, number> = {
   "前世今生1": 260,
@@ -719,6 +722,36 @@ export default function CustomFormB() {
                 );
               })}
             </div>
+
+            {/* 動態價格顯示 */}
+            {tarot.group !== "single_q" && (
+              <div className="mt-4 px-4 py-3 rounded-sm border border-[oklch(0.88_0_0)] bg-white flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] tracking-wide mb-0.5">
+                    {tarot.topic ? `目前選擇：${tarot.topic}` : "一般方案"}
+                  </p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      NT$ {(BASE_TOTAL + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
+                    </span>
+                    {(() => {
+                      const adj = tarot.topic ? (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0) : 0;
+                      return adj !== 0 ? (
+                        <span className={`text-xs font-body ${adj > 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                          {adj > 0 ? `+${adj}` : `${adj}`}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-0.5">下單訂金</p>
+                  <p className="text-base font-medium text-[oklch(0.35_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    NT$ {(BASE_DEPOSIT + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* 主題說明文字預覽 */}
             {tarot.topic && TOPIC_CONTENT[tarot.topic] && (
