@@ -122,7 +122,7 @@ export default function ProductDetail() {
             <img
               src={product.image}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover${product.id === "d002-honey-realm" ? " scale-[0.85] origin-center" : ""}`}
             />
           </div>
 
