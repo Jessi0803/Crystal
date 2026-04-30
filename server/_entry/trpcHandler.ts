@@ -7,8 +7,10 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../appRouter";
 import { createContext } from "../_core/context";
 import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
+import { registerLineWebhookRoutes } from "../lineWebhookRoutes";
 
 const app = express();
+registerLineWebhookRoutes(app);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

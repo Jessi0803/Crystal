@@ -45,6 +45,11 @@ import {
   verifyPayPalOrderBelongsToMerchant,
   capturePayPalOrder,
 } from "../_core/paypal";
+import {
+  notifyLineOrderPlaced,
+  notifyLineOrderShipped,
+  notifyLineSafely,
+} from "../lineMessage";
 import { isOverseasShipCountryCode, OVERSEAS_SHIP_COUNTRY_LABELS } from "@shared/overseasShipping";
 import {
   formatOverseasShippingAddress,
@@ -273,7 +278,7 @@ export const orderRouter = router({
         }
       }
 
-      await createOrder(
+      const createdOrderId = await createOrder(
         orderRow,
         orderItems.map((item) => ({
           orderId: 0,
@@ -286,6 +291,7 @@ export const orderRouter = router({
           isPreorder: item.isPreorder ?? false,
         }))
       );
+      await notifyLineSafely("order_placed", () => notifyLineOrderPlaced(createdOrderId));
 
       if (paymentMethod === "paypal") {
         const returnUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
@@ -459,9 +465,12 @@ export const orderRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
-      const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
+      const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
       await dbUpdateOrderStatus(order.merchantTradeNo, input.status);
+      if (input.status === "shipped") {
+        await notifyLineSafely("order_shipped_manual", () => notifyLineOrderShipped(order.id));
+      }
       return { success: true };
     }),
 
@@ -584,6 +593,7 @@ export const orderRouter = router({
 
           // 更新訂單狀態為已出貨
           await dbUpdateOrderStatus(order.merchantTradeNo, "shipped");
+          await notifyLineSafely("order_shipped_logistics", () => notifyLineOrderShipped(input.orderId));
 
           return {
             success: true,

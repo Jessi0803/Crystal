@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/api/oauth/line/start", "destination": "/api/trpc/line-oauth-start" },
     { "source": "/api/oauth/line/callback", "destination": "/api/trpc/line-oauth-callback" },
+    { "source": "/api/line/webhook", "destination": "/api/trpc/line-webhook" },
     { "source": "/api/oauth-line-start", "destination": "/api/trpc/line-oauth-start" },
     { "source": "/api/oauth-line-callback", "destination": "/api/trpc/line-oauth-callback" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
