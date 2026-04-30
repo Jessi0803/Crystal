@@ -9,6 +9,7 @@ export interface Product {
   categoryLabel: string;
   price: number;
   originalPrice?: number;
+  priceRange?: string;
   image: string;
   tags: string[];
   description: string;
@@ -31,6 +32,7 @@ export const products: Product[] = [
     category: "custom",
     categoryLabel: "客製化",
     price: 500,
+    priceRange: "NT$1,200 ~ 1,800",
     image: "/images/custom.png",
     tags: ["客製化", "訂金"],
     description: "純客製水晶手鍊服務訂金。",

@@ -153,7 +153,20 @@ export default function ProductDetail() {
             </p>
 
             {/* Price */}
-            <div className="flex items-baseline gap-3 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
+            <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
+              {product.priceRange ? (
+                <>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                      {product.priceRange}
+                    </span>
+                  </div>
+                  <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+                    下單先支付訂金 NT$ {currentPrice.toLocaleString()}，尾款由老闆確認後另行通知
+                  </p>
+                </>
+              ) : (
+              <div className="flex items-baseline gap-3">
               <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                 NT$ {currentPrice.toLocaleString()}
               </span>
@@ -171,6 +184,8 @@ export default function ProductDetail() {
                 <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
                   省 NT$ {(product.originalPrice - product.price).toLocaleString()}
                 </span>
+              )}
+            </div>
               )}
             </div>
 
