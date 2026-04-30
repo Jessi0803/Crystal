@@ -683,12 +683,25 @@ export default function CustomFormB() {
         {/* ── Phase: 塔羅主題選擇 ── */}
         {phase === "tarot-topic" && (
           <div className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8 mb-6">
-            <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-2" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+            <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
               想占卜哪個主題？
             </h2>
-            <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
-              選擇後我們會請您填入對應的資料，如需搭配多個題組，完成後可再次填寫（搭配手鍊的題組享 9 折優惠）
-            </p>
+            {/* 動態總價顯示 */}
+            {tarot.group !== "single_q" && (
+              <div className="mb-5 flex items-baseline gap-2">
+                <span className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  NT$ {(BASE_TOTAL + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
+                </span>
+                {(() => {
+                  const adj = tarot.topic ? (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0) : 0;
+                  return adj !== 0 ? (
+                    <span className={`text-sm font-body ${adj > 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                      {adj > 0 ? `+${adj}元` : `${adj}元`}
+                    </span>
+                  ) : null;
+                })()}
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {tarotTopics.map((t) => {
                 const adj = TOPIC_PRICE_ADJUST[t.label] ?? 0;
@@ -723,35 +736,6 @@ export default function CustomFormB() {
               })}
             </div>
 
-            {/* 動態價格顯示 */}
-            {tarot.group !== "single_q" && (
-              <div className="mt-4 px-4 py-3 rounded-sm border border-[oklch(0.88_0_0)] bg-white flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] tracking-wide mb-0.5">
-                    {tarot.topic ? `目前選擇：${tarot.topic}` : "一般方案"}
-                  </p>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                      NT$ {(BASE_TOTAL + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
-                    </span>
-                    {(() => {
-                      const adj = tarot.topic ? (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0) : 0;
-                      return adj !== 0 ? (
-                        <span className={`text-xs font-body ${adj > 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                          {adj > 0 ? `+${adj}` : `${adj}`}
-                        </span>
-                      ) : null;
-                    })()}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-0.5">下單訂金</p>
-                  <p className="text-base font-medium text-[oklch(0.35_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                    NT$ {(BASE_DEPOSIT + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* 主題說明文字預覽 */}
             {tarot.topic && TOPIC_CONTENT[tarot.topic] && (
