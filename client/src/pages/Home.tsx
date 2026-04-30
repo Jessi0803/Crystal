@@ -265,7 +265,11 @@ export default function Home() {
                         ))}
                       </div>
                       <p className="product-card-name">{product.name}</p>
-                      <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                      {product.priceRange ? (
+                        <p className="product-card-price">{product.priceRange}</p>
+                      ) : (
+                        <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                      )}
                     </div>
                   </div>
                 </Link>
