@@ -10,6 +10,7 @@ export interface Product {
   price: number;
   originalPrice?: number;
   priceRange?: string;
+  depositRange?: string;
   image: string;
   tags: string[];
   description: string;
@@ -57,6 +58,8 @@ export const products: Product[] = [
     category: "custom",
     categoryLabel: "客製化",
     price: 1399,
+    priceRange: "NT$2,220 ~ NT$2,929",
+    depositRange: "NT$1,220 ~ NT$1,929",
     image: "/images/custom-tarot.png",
     tags: ["客製化", "訂金", "塔羅"],
     description: "塔羅 × 水晶手鍊客製化服務訂金。",

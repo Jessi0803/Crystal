@@ -160,7 +160,9 @@ export default function Products() {
                       {product.priceRange ? (
                         <>
                           <p className="product-card-price">{product.priceRange}</p>
-                          <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)]">訂金 NT$ {product.price.toLocaleString()}</p>
+                          <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)]">
+                            {product.depositRange ? "訂金依主題調整" : `訂金 NT$ ${product.price.toLocaleString()}`}
+                          </p>
                         </>
                       ) : (
                         <div className="flex items-center gap-2">
