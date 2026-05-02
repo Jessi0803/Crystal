@@ -337,6 +337,7 @@ ${inputs}
           goodsAmount: order.totalAmount,
           senderName: process.env.OWNER_NAME || "椛Crystal",
           senderPhone: "0900000000",
+          senderZipCode: process.env.SENDER_ZIPCODE || "110",
           senderAddress: "台北市信義區",
           receiverName: order.buyerName,
           receiverPhone: order.buyerPhone,

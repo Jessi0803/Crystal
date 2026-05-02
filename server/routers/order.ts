@@ -554,6 +554,7 @@ export const orderRouter = router({
             goodsAmount: order.totalAmount,
             senderName: process.env.SENDER_NAME || "陳柔薫",
             senderPhone: process.env.SENDER_PHONE || "0916915813",
+            senderZipCode: process.env.SENDER_ZIPCODE || "330",
             senderAddress: process.env.SENDER_ADDRESS || "桃園市龜山區南上路290巷25號",
             receiverName: normalizedReceiverName,
             receiverPhone: order.buyerPhone,
