@@ -7,12 +7,9 @@
 import crypto from "crypto";
 import { ENV } from "./_core/env";
 
-// 物流憑證（從 ENV 讀取，確保正式環境正確注入）
-// 沙盒 fallback 僅供本地開發測試用
-const isProduction = ENV.isProduction;
 // 判斷是否使用沙盒：只有在明確設定 ECPAY_LOGISTICS_SANDBOX=true 時才用沙盒
 // 預設使用正式環境（因為憑證是正式帳號）
-const useLogisticsSandbox = process.env.ECPAY_LOGISTICS_SANDBOX === "true";
+export const useLogisticsSandbox = process.env.ECPAY_LOGISTICS_SANDBOX === "true";
 
 export const ECPAY_LOGISTICS_CONFIG = {
   MerchantID: ENV.ecpayLogisticsMerchantId || "2000132",
@@ -87,6 +84,27 @@ export function verifyLogisticsCheckMacValue(params: Record<string, string>): bo
 function formatECPayDate(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function parseLogisticsResponse(text: string): { rtnCode: string; result: Record<string, string> } {
+  const result: Record<string, string> = {};
+  const [firstPart = "", ...restParts] = text.split("|");
+  let rtnCode = "";
+
+  if (firstPart && !firstPart.includes("=")) {
+    rtnCode = firstPart.trim();
+  } else if (firstPart) {
+    restParts.unshift(firstPart);
+  }
+
+  const rest = restParts.join("|");
+  const pairs = rest.includes("&") ? rest.split("&") : restParts;
+  for (const pair of pairs) {
+    const [k, ...v] = pair.split("=");
+    if (k) result[k.trim()] = v.join("=").trim();
+  }
+
+  return { rtnCode: rtnCode || result["RtnCode"] || "", result };
 }
 
 /**
@@ -166,28 +184,7 @@ export async function createCVSLogisticsOrder(opts: {
   const text = await response.text();
   console.log("[ECPay Logistics] Create CVS response:", text);
 
-  // 解析回傳（格式：RtnCode|key=value|key=value|...）
-  // 第一個元素是 RtnCode（純數字，沒有 key=value 格式）
-  const result: Record<string, string> = {};
-  const parts = text.split("|");
-  // 第一個 part 可能是純 RtnCode 數字，也可能是 key=value
-  const firstPart = parts[0]?.trim();
-  let rtnCode: string;
-  if (firstPart && !firstPart.includes("=")) {
-    // 純數字 RtnCode
-    rtnCode = firstPart;
-    parts.slice(1).forEach((pair) => {
-      const [k, ...v] = pair.split("=");
-      if (k) result[k.trim()] = v.join("=").trim();
-    });
-  } else {
-    // 全部都是 key=value 格式
-    parts.forEach((pair) => {
-      const [k, ...v] = pair.split("=");
-      if (k) result[k.trim()] = v.join("=").trim();
-    });
-    rtnCode = result["RtnCode"] ?? "";
-  }
+  const { rtnCode, result } = parseLogisticsResponse(text);
   const success = rtnCode === "1" || result["RtnCode"] === "300" || rtnCode === "300";
 
   return {
@@ -242,25 +239,9 @@ export async function createHomeLogisticsOrder(opts: {
     ServerReplyURL: opts.serverReplyURL,
   };
 
-  // Debug: 印出傳送前的參數
-  console.log("[ECPay Logistics] MerchantID:", ECPAY_LOGISTICS_CONFIG.MerchantID);
-  console.log("[ECPay Logistics] HashKey:", ECPAY_LOGISTICS_CONFIG.HashKey);
-  console.log("[ECPay Logistics] HashIV:", ECPAY_LOGISTICS_CONFIG.HashIV);
-  console.log("[ECPay Logistics] CreateURL:", ECPAY_LOGISTICS_CONFIG.CreateURL);
-  console.log("[ECPay Logistics] Params before CheckMacValue:", JSON.stringify(params, null, 2));
-
-  // 計算 CheckMacValue 前先印出排序後的字串
-  const sortedKeys = Object.keys(params).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  const rawStr = `HashKey=${ECPAY_LOGISTICS_CONFIG.HashKey}&` +
-    sortedKeys.map((k) => `${k}=${params[k]}`).join("&") +
-    `&HashIV=${ECPAY_LOGISTICS_CONFIG.HashIV}`;
-  console.log("[ECPay Logistics] Raw string for CheckMacValue:", rawStr);
-
   params.CheckMacValue = generateLogisticsCheckMacValue(params);
-  console.log("[ECPay Logistics] CheckMacValue:", params.CheckMacValue);
 
   const formBody = new URLSearchParams(params).toString();
-  console.log("[ECPay Logistics] FormBody:", formBody);
   const response = await fetch(ECPAY_LOGISTICS_CONFIG.CreateURL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -270,13 +251,7 @@ export async function createHomeLogisticsOrder(opts: {
   const text = await response.text();
   console.log("[ECPay Logistics] Create HOME response:", text);
 
-  const result: Record<string, string> = {};
-  text.split("|").forEach((pair) => {
-    const [k, ...v] = pair.split("=");
-    if (k) result[k.trim()] = v.join("=").trim();
-  });
-
-  const rtnCode = result["RtnCode"] ?? "";
+  const { rtnCode, result } = parseLogisticsResponse(text);
   const success = rtnCode === "1";
 
   return {

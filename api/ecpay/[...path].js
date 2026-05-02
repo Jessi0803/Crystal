@@ -62,7 +62,6 @@ function verifyCheckMacValue(params) {
 
 // server/ecpayLogistics.ts
 import crypto2 from "crypto";
-var isProduction2 = ENV.isProduction;
 var useLogisticsSandbox = process.env.ECPAY_LOGISTICS_SANDBOX === "true";
 var ECPAY_LOGISTICS_CONFIG = {
   MerchantID: ENV.ecpayLogisticsMerchantId || "2000132",
@@ -94,6 +93,23 @@ function verifyLogisticsCheckMacValue(params) {
 function formatECPayDate(date) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+function parseLogisticsResponse(text2) {
+  const result = {};
+  const [firstPart = "", ...restParts] = text2.split("|");
+  let rtnCode = "";
+  if (firstPart && !firstPart.includes("=")) {
+    rtnCode = firstPart.trim();
+  } else if (firstPart) {
+    restParts.unshift(firstPart);
+  }
+  const rest = restParts.join("|");
+  const pairs = rest.includes("&") ? rest.split("&") : restParts;
+  for (const pair of pairs) {
+    const [k, ...v] = pair.split("=");
+    if (k) result[k.trim()] = v.join("=").trim();
+  }
+  return { rtnCode: rtnCode || result["RtnCode"] || "", result };
 }
 function buildCVSMapParams(opts) {
   const params = {
@@ -137,23 +153,7 @@ async function createCVSLogisticsOrder(opts) {
   });
   const text2 = await response.text();
   console.log("[ECPay Logistics] Create CVS response:", text2);
-  const result = {};
-  const parts = text2.split("|");
-  const firstPart = parts[0]?.trim();
-  let rtnCode;
-  if (firstPart && !firstPart.includes("=")) {
-    rtnCode = firstPart;
-    parts.slice(1).forEach((pair) => {
-      const [k, ...v] = pair.split("=");
-      if (k) result[k.trim()] = v.join("=").trim();
-    });
-  } else {
-    parts.forEach((pair) => {
-      const [k, ...v] = pair.split("=");
-      if (k) result[k.trim()] = v.join("=").trim();
-    });
-    rtnCode = result["RtnCode"] ?? "";
-  }
+  const { rtnCode, result } = parseLogisticsResponse(text2);
   const success = rtnCode === "1" || result["RtnCode"] === "300" || rtnCode === "300";
   return {
     success,
@@ -188,18 +188,8 @@ async function createHomeLogisticsOrder(opts) {
     ScheduledDeliveryTime: "1",
     ServerReplyURL: opts.serverReplyURL
   };
-  console.log("[ECPay Logistics] MerchantID:", ECPAY_LOGISTICS_CONFIG.MerchantID);
-  console.log("[ECPay Logistics] HashKey:", ECPAY_LOGISTICS_CONFIG.HashKey);
-  console.log("[ECPay Logistics] HashIV:", ECPAY_LOGISTICS_CONFIG.HashIV);
-  console.log("[ECPay Logistics] CreateURL:", ECPAY_LOGISTICS_CONFIG.CreateURL);
-  console.log("[ECPay Logistics] Params before CheckMacValue:", JSON.stringify(params, null, 2));
-  const sortedKeys = Object.keys(params).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  const rawStr = `HashKey=${ECPAY_LOGISTICS_CONFIG.HashKey}&` + sortedKeys.map((k) => `${k}=${params[k]}`).join("&") + `&HashIV=${ECPAY_LOGISTICS_CONFIG.HashIV}`;
-  console.log("[ECPay Logistics] Raw string for CheckMacValue:", rawStr);
   params.CheckMacValue = generateLogisticsCheckMacValue(params);
-  console.log("[ECPay Logistics] CheckMacValue:", params.CheckMacValue);
   const formBody = new URLSearchParams(params).toString();
-  console.log("[ECPay Logistics] FormBody:", formBody);
   const response = await fetch(ECPAY_LOGISTICS_CONFIG.CreateURL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -207,12 +197,7 @@ async function createHomeLogisticsOrder(opts) {
   });
   const text2 = await response.text();
   console.log("[ECPay Logistics] Create HOME response:", text2);
-  const result = {};
-  text2.split("|").forEach((pair) => {
-    const [k, ...v] = pair.split("=");
-    if (k) result[k.trim()] = v.join("=").trim();
-  });
-  const rtnCode = result["RtnCode"] ?? "";
+  const { rtnCode, result } = parseLogisticsResponse(text2);
   const success = rtnCode === "1";
   return {
     success,
@@ -364,6 +349,8 @@ var orders = mysqlTable("orders", {
   receiverZipCode: varchar("receiverZipCode", { length: 10 }),
   // 銀行轉帳末五碼（客人填入）
   transferLastFive: varchar("transferLastFive", { length: 5 }),
+  // 顧客諮詢備註（客製化報名表單填寫內容）
+  customerNote: text("customerNote"),
   // 老闆備註
   adminNote: text("adminNote"),
   // 綠界回傳的完整通知資料（JSON）
@@ -535,8 +522,33 @@ async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, noti
   return balance;
 }
 
+// server/inventoryDb.ts
+import { eq as eq3, lt, and as and3, sql as sql3 } from "drizzle-orm";
+async function releaseSessionLocks(sessionToken) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(inventoryLocks).where(eq3(inventoryLocks.sessionToken, sessionToken));
+}
+async function deductInventoryAfterPayment(merchantTradeNo) {
+  const db = await getDb();
+  if (!db) return;
+  const [order] = await db.select({ id: orders.id }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!order) return;
+  const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
+  for (const item of items) {
+    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    await db.update(productInventory).set({ stock: sql3`GREATEST(0, ${productInventory.stock} - ${item.quantity})` }).where(
+      and3(
+        eq3(productInventory.productId, item.productId),
+        sql3`${productInventory.stock} != -1`
+      )
+    );
+  }
+  await releaseSessionLocks(merchantTradeNo);
+}
+
 // server/ecpayRoutes.ts
-import { eq as eq3 } from "drizzle-orm";
+import { eq as eq4 } from "drizzle-orm";
 function registerECPayRoutes(app2) {
   app2.post("/api/ecpay/notify", async (req, res) => {
     try {
@@ -555,6 +567,9 @@ function registerECPayRoutes(app2) {
       const order = await getOrderByMerchantTradeNo(merchantTradeNo);
       if (order) {
         await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        if (status === "paid") {
+          await deductInventoryAfterPayment(merchantTradeNo);
+        }
         console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
         res.send("1|OK");
         return;
@@ -726,10 +741,10 @@ ${inputs}
       if (newStatus === "arrived" || newStatus === "picked_up") {
         const db = await getDb();
         if (db) {
-          const [logistics] = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq3(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1);
+          const [logistics] = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq4(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1);
           if (logistics) {
             const orderStatus = newStatus === "arrived" ? "arrived" : "completed";
-            await db.update(orders).set({ orderStatus }).where(eq3(orders.id, logistics.orderId));
+            await db.update(orders).set({ orderStatus }).where(eq4(orders.id, logistics.orderId));
           }
         }
       }
@@ -748,12 +763,12 @@ ${inputs}
         res.status(500).json({ error: "DB unavailable" });
         return;
       }
-      const [order] = await db.select().from(orders).where(eq3(orders.id, orderId)).limit(1);
+      const [order] = await db.select().from(orders).where(eq4(orders.id, orderId)).limit(1);
       if (!order) {
         res.status(404).json({ error: "Order not found" });
         return;
       }
-      const [logistics] = await db.select().from(logisticsOrders).where(eq3(logisticsOrders.orderId, orderId)).limit(1);
+      const [logistics] = await db.select().from(logisticsOrders).where(eq4(logisticsOrders.orderId, orderId)).limit(1);
       if (!logistics) {
         res.status(404).json({ error: "Logistics order not found" });
         return;
@@ -799,8 +814,8 @@ ${inputs}
           bookingNote: result.bookingNote,
           logisticsStatus: "in_transit",
           ecpayLogisticsData: result.raw
-        }).where(eq3(logisticsOrders.orderId, orderId));
-        await db.update(orders).set({ orderStatus: "shipped" }).where(eq3(orders.id, orderId));
+        }).where(eq4(logisticsOrders.orderId, orderId));
+        await db.update(orders).set({ orderStatus: "shipped" }).where(eq4(orders.id, orderId));
       }
       res.json(result);
     } catch (err) {

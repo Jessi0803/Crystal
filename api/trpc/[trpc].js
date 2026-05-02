@@ -456,7 +456,8 @@ var systemRouter = router({
     ecpayLogisticsMerchantId: process.env.ECPAY_LOGISTICS_MERCHANT_ID || "(empty)",
     hasEcpayLogisticsHashKey: !!process.env.ECPAY_LOGISTICS_HASH_KEY,
     ecpayLogisticsHashKeyPrefix: process.env.ECPAY_LOGISTICS_HASH_KEY ? process.env.ECPAY_LOGISTICS_HASH_KEY.substring(0, 6) + "..." : "(empty)",
-    hasEcpayLogisticsHashIV: !!process.env.ECPAY_LOGISTICS_HASH_IV
+    hasEcpayLogisticsHashIV: !!process.env.ECPAY_LOGISTICS_HASH_IV,
+    ecpayLogisticsSandbox: process.env.ECPAY_LOGISTICS_SANDBOX === "true"
   })),
   notifyOwner: adminProcedure.input(
     z.object({
@@ -1174,7 +1175,6 @@ async function getProductAvailability(productId) {
 
 // server/ecpayLogistics.ts
 import crypto2 from "crypto";
-var isProduction2 = ENV.isProduction;
 var useLogisticsSandbox = process.env.ECPAY_LOGISTICS_SANDBOX === "true";
 var ECPAY_LOGISTICS_CONFIG = {
   MerchantID: ENV.ecpayLogisticsMerchantId || "2000132",
@@ -1200,6 +1200,23 @@ function generateLogisticsCheckMacValue(params, hashKey = ECPAY_LOGISTICS_CONFIG
 function formatECPayDate2(date) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+function parseLogisticsResponse(text2) {
+  const result = {};
+  const [firstPart = "", ...restParts] = text2.split("|");
+  let rtnCode = "";
+  if (firstPart && !firstPart.includes("=")) {
+    rtnCode = firstPart.trim();
+  } else if (firstPart) {
+    restParts.unshift(firstPart);
+  }
+  const rest = restParts.join("|");
+  const pairs = rest.includes("&") ? rest.split("&") : restParts;
+  for (const pair of pairs) {
+    const [k, ...v] = pair.split("=");
+    if (k) result[k.trim()] = v.join("=").trim();
+  }
+  return { rtnCode: rtnCode || result["RtnCode"] || "", result };
 }
 async function createCVSLogisticsOrder(opts) {
   const params = {
@@ -1230,23 +1247,7 @@ async function createCVSLogisticsOrder(opts) {
   });
   const text2 = await response.text();
   console.log("[ECPay Logistics] Create CVS response:", text2);
-  const result = {};
-  const parts = text2.split("|");
-  const firstPart = parts[0]?.trim();
-  let rtnCode;
-  if (firstPart && !firstPart.includes("=")) {
-    rtnCode = firstPart;
-    parts.slice(1).forEach((pair) => {
-      const [k, ...v] = pair.split("=");
-      if (k) result[k.trim()] = v.join("=").trim();
-    });
-  } else {
-    parts.forEach((pair) => {
-      const [k, ...v] = pair.split("=");
-      if (k) result[k.trim()] = v.join("=").trim();
-    });
-    rtnCode = result["RtnCode"] ?? "";
-  }
+  const { rtnCode, result } = parseLogisticsResponse(text2);
   const success = rtnCode === "1" || result["RtnCode"] === "300" || rtnCode === "300";
   return {
     success,
@@ -1281,18 +1282,8 @@ async function createHomeLogisticsOrder(opts) {
     ScheduledDeliveryTime: "1",
     ServerReplyURL: opts.serverReplyURL
   };
-  console.log("[ECPay Logistics] MerchantID:", ECPAY_LOGISTICS_CONFIG.MerchantID);
-  console.log("[ECPay Logistics] HashKey:", ECPAY_LOGISTICS_CONFIG.HashKey);
-  console.log("[ECPay Logistics] HashIV:", ECPAY_LOGISTICS_CONFIG.HashIV);
-  console.log("[ECPay Logistics] CreateURL:", ECPAY_LOGISTICS_CONFIG.CreateURL);
-  console.log("[ECPay Logistics] Params before CheckMacValue:", JSON.stringify(params, null, 2));
-  const sortedKeys = Object.keys(params).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  const rawStr = `HashKey=${ECPAY_LOGISTICS_CONFIG.HashKey}&` + sortedKeys.map((k) => `${k}=${params[k]}`).join("&") + `&HashIV=${ECPAY_LOGISTICS_CONFIG.HashIV}`;
-  console.log("[ECPay Logistics] Raw string for CheckMacValue:", rawStr);
   params.CheckMacValue = generateLogisticsCheckMacValue(params);
-  console.log("[ECPay Logistics] CheckMacValue:", params.CheckMacValue);
   const formBody = new URLSearchParams(params).toString();
-  console.log("[ECPay Logistics] FormBody:", formBody);
   const response = await fetch(ECPAY_LOGISTICS_CONFIG.CreateURL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1300,12 +1291,7 @@ async function createHomeLogisticsOrder(opts) {
   });
   const text2 = await response.text();
   console.log("[ECPay Logistics] Create HOME response:", text2);
-  const result = {};
-  text2.split("|").forEach((pair) => {
-    const [k, ...v] = pair.split("=");
-    if (k) result[k.trim()] = v.join("=").trim();
-  });
-  const rtnCode = result["RtnCode"] ?? "";
+  const { rtnCode, result } = parseLogisticsResponse(text2);
   const success = rtnCode === "1";
   return {
     success,
@@ -2232,6 +2218,7 @@ var orderRouter = router({
         await notifyLineSafely("order_shipped_logistics", () => notifyLineOrderShipped(input.orderId));
         return {
           success: true,
+          sandbox: useLogisticsSandbox,
           logisticsId: logisticsMerchantTradeNo,
           allPayLogisticsId: ecpayResult.allPayLogisticsId,
           cvsPaymentNo: ecpayResult.cvsPaymentNo || null
@@ -138177,7 +138164,7 @@ var products = [
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 500,
     priceRange: "NT$1,200 ~ 1,800",
-    image: "/images/custom.png",
+    image: "/images/custom3.jpg",
     tags: [],
     description: "\u7D14\u5BA2\u88FD\u6C34\u6676\u624B\u934A\u670D\u52D9\u8A02\u91D1\u3002",
     story: "",
@@ -138228,7 +138215,7 @@ var products = [
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1e3,
     priceRange: "NT$1,700 ~ NT$2,300",
-    image: "/images/custom-chakra.png",
+    image: "/images/custom-chakra2.jpg",
     tags: ["\u8108\u8F2A"],
     description: "\u8108\u8F2A\u6AA2\u6E2C \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
     story: "",
@@ -138253,7 +138240,7 @@ var products = [
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1e3,
     priceRange: "NT$1,700 ~ NT$2,300",
-    image: "/images/custom-numerology.png",
+    image: "/images/custom-numerology3.jpg",
     tags: ["\u751F\u547D\u9748\u6578"],
     description: "\u751F\u547D\u9748\u6578 \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
     story: "",

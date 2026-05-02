@@ -30,6 +30,7 @@ export const systemRouter = router({
     hasEcpayLogisticsHashKey: !!process.env.ECPAY_LOGISTICS_HASH_KEY,
     ecpayLogisticsHashKeyPrefix: process.env.ECPAY_LOGISTICS_HASH_KEY ? process.env.ECPAY_LOGISTICS_HASH_KEY.substring(0, 6) + "..." : "(empty)",
     hasEcpayLogisticsHashIV: !!process.env.ECPAY_LOGISTICS_HASH_IV,
+    ecpayLogisticsSandbox: process.env.ECPAY_LOGISTICS_SANDBOX === "true",
   })),
 
   notifyOwner: adminProcedure

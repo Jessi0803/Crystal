@@ -35,6 +35,7 @@ import {
   buildPrintTradeDocURL,
   createCVSLogisticsOrder,
   createHomeLogisticsOrder,
+  useLogisticsSandbox,
 } from "../ecpayLogistics";
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
@@ -597,6 +598,7 @@ export const orderRouter = router({
 
           return {
             success: true,
+            sandbox: useLogisticsSandbox,
             logisticsId: logisticsMerchantTradeNo,
             allPayLogisticsId: ecpayResult.allPayLogisticsId,
             cvsPaymentNo: (ecpayResult as any).cvsPaymentNo || null,

@@ -108,6 +108,7 @@ function OrderRowCard({
   confirmTransfer,
   createLogistics,
   updateOrderStatus,
+  isLogisticsSandbox,
 }: {
   order: OrderSummary;
   isExpanded: boolean;
@@ -117,6 +118,7 @@ function OrderRowCard({
   confirmTransfer: ReturnType<typeof trpc.order.confirmTransfer.useMutation>;
   createLogistics: ReturnType<typeof trpc.order.createLogistics.useMutation>;
   updateOrderStatus: ReturnType<typeof trpc.order.updateOrderStatus.useMutation>;
+  isLogisticsSandbox: boolean;
 }) {
   const utils = trpc.useUtils();
   const { data: detail, isLoading: detailLoading } = trpc.order.getOrderDetail.useQuery(
@@ -279,7 +281,7 @@ function OrderRowCard({
                     className="flex items-center gap-1.5 px-4 py-2 bg-[oklch(0.1_0_0)] text-white text-xs font-body hover:bg-[oklch(0.2_0_0)] transition-colors disabled:opacity-60"
                   >
                     <Truck className="w-3.5 h-3.5" />
-                    {createLogistics.isPending ? "建立中..." : "建立物流訂單"}
+                    {createLogistics.isPending ? "建立中..." : isLogisticsSandbox ? "建立沙盒物流訂單" : "建立正式物流訂單"}
                   </button>
                 )}
 
@@ -426,6 +428,10 @@ export default function AdminOrders() {
       enabled: user?.role === "admin",
       staleTime: 60_000,
     });
+  const { data: envCheck } = trpc.system.envCheck.useQuery(undefined, {
+    enabled: user?.role === "admin",
+    staleTime: 60_000,
+  });
 
   const { data: orders, isLoading, error: ordersError, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
     { status: statusFilter, limit: pageSize, offset: (page - 1) * pageSize },
@@ -458,7 +464,8 @@ export default function AdminOrders() {
 
   const createLogistics = trpc.order.createLogistics.useMutation({
     onSuccess: (data) => {
-      toast.success(`物流訂單建立成功！${data.logisticsId ? `物流編號：${data.logisticsId}` : ""}`);
+      const mode = data.sandbox ? "沙盒物流" : "正式物流";
+      toast.success(`${mode}訂單建立成功！${data.logisticsId ? `物流編號：${data.logisticsId}` : ""}`);
       refetchListAndStats();
     },
     onError: (err) => toast.error(`建立物流失敗：${err.message}`),
@@ -651,6 +658,7 @@ export default function AdminOrders() {
                   confirmTransfer={confirmTransfer}
                   createLogistics={createLogistics}
                   updateOrderStatus={updateOrderStatus}
+                  isLogisticsSandbox={Boolean(envCheck?.ecpayLogisticsSandbox)}
                 />
               );
             })}
