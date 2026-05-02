@@ -568,6 +568,7 @@ export const orderRouter = router({
             goodsAmount: order.totalAmount,
             senderName: process.env.SENDER_NAME || "陳柔薫",
             senderPhone: process.env.SENDER_PHONE || "0916915813",
+            senderZipCode: process.env.SENDER_ZIPCODE || "330",
             receiverName: normalizedReceiverName,
             receiverPhone: order.buyerPhone,
             receiverStoreID: order.cvsStoreId || "",

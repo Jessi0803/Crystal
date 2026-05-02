@@ -142,6 +142,7 @@ export async function createCVSLogisticsOrder(opts: {
   goodsAmount: number;
   senderName: string;
   senderPhone: string;
+  senderZipCode?: string;
   receiverName: string;
   receiverPhone: string;
   receiverStoreID: string;
@@ -160,6 +161,7 @@ export async function createCVSLogisticsOrder(opts: {
     GoodsName: opts.goodsName,
     SenderName: opts.senderName,
     SenderCellPhone: opts.senderPhone,
+    SenderZipCode: opts.senderZipCode ?? process.env.SENDER_ZIPCODE ?? "330",
     ReceiverName: opts.receiverName,
     ReceiverCellPhone: opts.receiverPhone,
     ReceiverStoreID: opts.receiverStoreID,
