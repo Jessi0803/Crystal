@@ -70,6 +70,7 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "deposit_paid", label: "已付訂金" },
   { key: "paid", label: "已付款" },
   { key: "processing", label: "備貨中" },
+  { key: "shipped", label: "已出貨" },
   { key: "cancelled", label: "已取消" },
 ];
 
@@ -334,6 +335,7 @@ function OrderRowCard({
                   >
                     <option value="">更新狀態...</option>
                     <option value="processing">備貨中</option>
+                    <option value="shipped">已出貨</option>
                     <option value="cancelled">取消訂單</option>
                   </select>
                 )}
