@@ -461,7 +461,7 @@ export const orderRouter = router({
   updateOrderStatus: adminProcedure
     .input(z.object({
       orderId: z.number(),
-      status: z.enum(["pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "completed", "cancelled"]),
+      status: z.enum(["pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled"]),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -656,7 +656,7 @@ export const orderRouter = router({
   listOrders: adminProcedure
     .input(
       z.object({
-        status: z.enum(["all", "pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "completed", "cancelled", "transfer_pending"]).optional().default("all"),
+        status: z.enum(["all", "pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled", "transfer_pending"]).optional().default("all"),
         limit: z.number().min(1).max(500).optional().default(100),
         offset: z.number().min(0).optional().default(0),
       })

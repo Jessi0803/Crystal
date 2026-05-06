@@ -16,6 +16,8 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   processing: "備貨中",
   shipped: "🚚 已出貨",
   arrived: "📦 已到店",
+  picked_up: "✅ 已取貨",
+  not_picked: "未取貨",
   completed: "✅ 已完成",
   cancelled: "已取消",
 };

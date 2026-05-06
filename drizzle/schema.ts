@@ -100,7 +100,9 @@ export const orders = mysqlTable("orders", {
     "processing",       // 處理中（備貨）
     "shipped",          // 已出貨
     "arrived",          // 已到店/已送達
-    "completed",        // 已完成（已領取）
+    "picked_up",        // 已取貨
+    "not_picked",       // 未取貨/退件
+    "completed",        // 已完成
     "cancelled",        // 已取消
   ]).default("pending_payment").notNull(),
   // 是否為預購訂單

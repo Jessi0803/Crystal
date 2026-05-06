@@ -10,6 +10,8 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   processing: "備貨中",
   shipped: "已出貨",
   arrived: "已到店 / 已送達",
+  picked_up: "已取貨",
+  not_picked: "未取貨",
   completed: "已完成",
   cancelled: "已取消",
 };
@@ -37,6 +39,8 @@ function StatusBadge({ status }: { status: string }) {
     processing: "bg-purple-50 text-purple-700 border-purple-200",
     shipped: "bg-indigo-50 text-indigo-700 border-indigo-200",
     arrived: "bg-teal-50 text-teal-700 border-teal-200",
+    picked_up: "bg-green-50 text-green-700 border-green-200",
+    not_picked: "bg-orange-50 text-orange-700 border-orange-200",
     completed: "bg-green-50 text-green-700 border-green-200",
     cancelled: "bg-gray-50 text-gray-500 border-gray-200",
   };

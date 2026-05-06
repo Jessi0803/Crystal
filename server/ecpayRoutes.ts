@@ -274,8 +274,8 @@ ${inputs}
 
       await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus);
 
-      // 如果已到店，同步更新訂單狀態
-      if (newStatus === "arrived" || newStatus === "picked_up") {
+      // 如果物流狀態已到店、已取貨或退件，同步更新訂單狀態
+      if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
         const db = await getDb();
         if (db) {
           const [logistics] = await db
@@ -285,7 +285,12 @@ ${inputs}
             .limit(1);
 
           if (logistics) {
-            const orderStatus = newStatus === "arrived" ? "arrived" : "completed";
+            const orderStatus =
+              newStatus === "arrived"
+                ? "arrived"
+                : newStatus === "picked_up"
+                  ? "picked_up"
+                  : "not_picked";
             await db
               .update(orders)
               .set({ orderStatus })

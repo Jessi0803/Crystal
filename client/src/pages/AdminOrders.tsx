@@ -46,6 +46,8 @@ type StatusFilter =
   | "processing"
   | "shipped"
   | "arrived"
+  | "picked_up"
+  | "not_picked"
   | "completed"
   | "cancelled";
 
@@ -57,6 +59,8 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string; do
   processing: { label: "備貨中", className: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-400" },
   shipped: { label: "已出貨", className: "bg-indigo-50 text-indigo-700 border-indigo-200", dot: "bg-indigo-400" },
   arrived: { label: "已到店", className: "bg-teal-50 text-teal-700 border-teal-200", dot: "bg-teal-400" },
+  picked_up: { label: "已取貨", className: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+  not_picked: { label: "未取貨", className: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-400" },
   completed: { label: "已完成", className: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
   cancelled: { label: "已取消", className: "bg-gray-50 text-gray-600 border-gray-200", dot: "bg-gray-400" },
 };
@@ -71,6 +75,9 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "paid", label: "已付款" },
   { key: "processing", label: "備貨中" },
   { key: "shipped", label: "已出貨" },
+  { key: "arrived", label: "已到店" },
+  { key: "picked_up", label: "已取貨" },
+  { key: "not_picked", label: "未取貨" },
   { key: "cancelled", label: "已取消" },
 ];
 
@@ -336,6 +343,9 @@ function OrderRowCard({
                     <option value="">更新狀態...</option>
                     <option value="processing">備貨中</option>
                     <option value="shipped">已出貨</option>
+                    <option value="arrived">已到店</option>
+                    <option value="picked_up">已取貨</option>
+                    <option value="not_picked">未取貨</option>
                     <option value="cancelled">取消訂單</option>
                   </select>
                 )}

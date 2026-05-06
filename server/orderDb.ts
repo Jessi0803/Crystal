@@ -259,6 +259,8 @@ export async function updateOrderStatus(
     | "processing"
     | "shipped"
     | "arrived"
+    | "picked_up"
+    | "not_picked"
     | "completed"
     | "cancelled"
 ) {
@@ -446,9 +448,9 @@ export async function getOrderStats() {
       toShip: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing') THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       paid: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'paid' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       shipped: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'shipped' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
-      completed: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'completed' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
-      totalRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed') THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
-      monthRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
+      completed: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('picked_up', 'completed') THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+      totalRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
+      monthRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
     })
     .from(orders);
 
@@ -491,7 +493,7 @@ export async function getMonthlyRevenue(months = 6) {
       );
 
     const paidOrders = monthOrders.filter((o) =>
-      ["paid", "processing", "shipped", "arrived", "completed"].includes(o.orderStatus)
+      ["paid", "processing", "shipped", "arrived", "picked_up", "completed"].includes(o.orderStatus)
     );
 
     result.push({
@@ -513,7 +515,7 @@ export async function getTopProducts(limit = 10) {
     .select({ id: orders.id })
     .from(orders)
     .where(
-      sql`${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'completed')`
+      sql`${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed')`
     );
 
   if (paidOrders.length === 0) return [];
