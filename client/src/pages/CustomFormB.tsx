@@ -520,7 +520,7 @@ export default function CustomFormB() {
     {
       title: "完成！付完訂金後記得加入 LINE",
       subtitle: "",
-      required: false,
+      required: true,
       field: (
         <div className="space-y-6">
           <div className="p-5 rounded-sm" style={{ backgroundColor: "oklch(0.97 0.03 145)", border: "1px solid oklch(0.85 0.06 145)" }}>
@@ -540,14 +540,15 @@ export default function CustomFormB() {
           </div>
           <div>
             <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
-              Instagram 帳號（選填）
+              Instagram 帳號
             </label>
             <input type="text" value={bracelet.igHandle}
               onChange={(e) => setBracelet({ ...bracelet, igHandle: e.target.value })}
               placeholder="例如：@your_ig_handle"
+              required
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]" />
             <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
-              若有提供 IG 帳號，老闆也可透過 IG 私訊聯絡您
+              請填寫 IG 帳號，老闆也可透過 IG 私訊聯絡您
             </p>
           </div>
         </div>
@@ -593,6 +594,7 @@ export default function CustomFormB() {
     if (braceletStep === 2 && !bracelet.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
     if (braceletStep === 3 && !bracelet.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
     if (braceletStep === 4 && (!bracelet.silverTube || !bracelet.beadFrame)) { toast.error("請選擇銀管和珠框的偏好"); return false; }
+    if (braceletStep === braceletSteps.length - 1 && !bracelet.igHandle.trim()) { toast.error("請填寫 Instagram 帳號"); return false; }
     return true;
   }
 
