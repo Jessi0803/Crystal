@@ -98,7 +98,7 @@ export default function Home() {
       }
 
       slider.scrollBy({ left: slider.clientWidth * 0.8, behavior: "smooth" });
-    }, 3000);
+    }, 1800);
 
     return () => window.clearInterval(timer);
   }, [isSliderPaused]);
