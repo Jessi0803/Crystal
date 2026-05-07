@@ -21,7 +21,7 @@ const categories = [
 ];
 
 const sortOptions = [
-  { id: "sales", label: "銷售量排序" },
+  { id: "sales", label: "銷售量" },
   { id: "price-asc", label: "價格低到高" },
   { id: "price-desc", label: "價格高到低" },
   { id: "newest", label: "最新商品" },
