@@ -174,6 +174,53 @@ const knowledgeChunks = [
     id: "faq-tarot-topics",
     embedText: "塔羅可以問什麼 塔羅主題 占卜 感情 財運 職涯 療癒 前世今生 守護神 流年",
   },
+  {
+    id: "rec-confidence",
+    embedText: "提升自信 自信心 魅力 吸引力 氣場 行動力 增強自信 建立自信 想變自信 自我提升",
+  },
+  {
+    id: "rec-wealth",
+    embedText: "招財 財運 財富 錢財 事業 工作 升遷 行動力 提升財運 招財手鍊 賺錢",
+  },
+  {
+    id: "rec-love",
+    embedText: "愛情 桃花 人緣 感情 戀愛 交友 吸引異性 提升桃花 正緣 好人緣 脫單",
+  },
+  {
+    id: "rec-healing",
+    embedText: "療癒 壓力 焦慮 情緒 安撫 紓壓 放鬆 不安 釋放壓力 情緒穩定 心情不好 負面情緒",
+  },
+  {
+    id: "rec-protection",
+    embedText: "防護 負能量 保護 氣場 淨化 穩定 防小人 避邪 保護能量 驅邪",
+  },
+  {
+    id: "rec-crystal-rose-quartz",
+    embedText:
+      "粉晶 粉水晶 玫瑰石英 薔薇石英 rose quartz 想要粉晶 粉晶手鍊 粉晶推薦 有粉晶的手鍊嗎 粉晶款式 招桃花粉晶 人緣粉晶 愛情粉晶 推薦手鍊",
+  },
+  {
+    id: "rec-crystal-strawberry",
+    embedText: "草莓晶 草莓水晶 想要草莓晶 草莓晶手鍊 草莓晶推薦 有草莓晶的手鍊嗎 桃花草莓晶",
+  },
+  {
+    id: "rec-crystal-moonstone",
+    embedText:
+      "月光石 月光石手鍊 藍月光 白月光 灰月光 月亮石 moonstone 想要月光石 有月光石的手鍊嗎 月光石推薦",
+  },
+  {
+    id: "rec-crystal-citrine-rutilated",
+    embedText: "黃水晶 銅髮晶 髮晶 招財水晶 財運水晶 想要黃水晶 黃水晶手鍊 銅髮晶手鍊 有黃水晶的手鍊嗎",
+  },
+  {
+    id: "rec-crystal-obsidian",
+    embedText: "黑曜石 黑曜石手鍊 想要黑曜石 黑曜石推薦 有黑曜石的手鍊嗎 避邪黑曜石",
+  },
+  {
+    id: "rec-crystal-white-phantom-tourmaline",
+    embedText:
+      "白幽靈 白幽靈手鍊 紅兔毛 白兔毛 兔毛水晶 粉碧璽 想要白幽靈 有白幽靈的手鍊嗎 粉碧璽手鍊",
+  },
 ];
 
 async function embed(text) {

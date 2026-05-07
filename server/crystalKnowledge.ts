@@ -383,6 +383,69 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     category: "商品推薦",
     relatedProductIds: ["d001-moon-secret", "d002-honey-realm"],
   },
+  {
+    id: "rec-crystal-rose-quartz",
+    question: "想要粉晶／粉水晶手鍊，有推薦的款式嗎？",
+    answer:
+      "推薦「月映淨心手鍊」（以粉晶搭配白月光、藍月光與白水晶為主軸，溫柔招桃花與好人緣、安撫情緒，NT$1,500），以及「蜜光之境手鍊」（複方設計中含粉晶，同時兼顧財運、人緣與穩定氣場，NT$1,580）。若想指定粉晶比例或配色，也可考慮客製化手鍊。",
+    embedText:
+      "粉晶 粉水晶 玫瑰石英 薔薇石英 rose quartz 想要粉晶 粉晶手鍊 粉晶推薦 有粉晶的手鍊嗎 粉晶款式 招桃花粉晶 人緣粉晶 愛情粉晶 推薦手鍊",
+    keywords: ["粉晶", "粉水晶", "玫瑰石英", "薔薇石英", "rose quartz"],
+    category: "商品推薦",
+    relatedProductIds: ["d005-moon-clear-heart", "d002-honey-realm"],
+  },
+  {
+    id: "rec-crystal-strawberry",
+    question: "想要草莓晶手鍊，有推薦嗎？",
+    answer:
+      "推薦「蜜光之境手鍊」（配方含草莓晶，搭配黃水晶、銅髮晶等，有助招財聚能、好人緣與行動力，NT$1,580）。若希望草莓晶為主體或與其他晶石搭配，歡迎參考客製化方案。",
+    embedText: "草莓晶 草莓水晶 想要草莓晶 草莓晶手鍊 草莓晶推薦 有草莓晶的手鍊嗎 桃花草莓晶",
+    keywords: ["草莓晶", "草莓水晶"],
+    category: "商品推薦",
+    relatedProductIds: ["d002-honey-realm"],
+  },
+  {
+    id: "rec-crystal-moonstone",
+    question: "想要月光石／藍月光手鍊，有推薦嗎？",
+    answer:
+      "推薦「月下密語手鍊」（藍月光、灰月光等，淨化與平衡情緒，NT$1,480起）、「晨光輕語手鍊」（藍月光、白月光等，愛情與人緣平衡，NT$1,800）、「月映淨心手鍊」（粉晶配白月光、藍月光，柔和療癒，NT$1,500）。吊飾「維納斯 Venus」亦含藍月光元素（NT$950）。",
+    embedText:
+      "月光石 月光石手鍊 藍月光 白月光 灰月光 月亮石 moonstone 想要月光石 有月光石的手鍊嗎 月光石推薦",
+    keywords: ["月光石", "藍月光", "白月光", "灰月光", "月亮石", "moonstone"],
+    category: "商品推薦",
+    relatedProductIds: ["d001-moon-secret", "d004-morning-whisper", "d005-moon-clear-heart", "d003-venus"],
+  },
+  {
+    id: "rec-crystal-citrine-rutilated",
+    question: "想要黃水晶、銅髮晶或招財系晶石手鍊，有推薦嗎？",
+    answer:
+      "推薦「蜜光之境手鍊」（含銅髮晶、黃水晶、太陽石等，招財與行動力取向，NT$1,580）。若要以特定晶石為主或加強事業財運，也可透過客製化討論。",
+    embedText: "黃水晶 銅髮晶 髮晶 招財水晶 財運水晶 想要黃水晶 黃水晶手鍊 銅髮晶手鍊 有黃水晶的手鍊嗎",
+    keywords: ["黃水晶", "銅髮晶", "髮晶"],
+    category: "商品推薦",
+    relatedProductIds: ["d002-honey-realm"],
+  },
+  {
+    id: "rec-crystal-obsidian",
+    question: "想要黑曜石手鍊，有推薦嗎？",
+    answer:
+      "現貨設計中「蜜光之境手鍊」配方含黑曜石，可輔助穩定氣場與防護感（NT$1,580）。若希望以黑曜石為主軸，建議使用客製化服務與老闆討論比例與款式。",
+    embedText: "黑曜石 黑曜石手鍊 想要黑曜石 黑曜石推薦 有黑曜石的手鍊嗎 避邪黑曜石",
+    keywords: ["黑曜石"],
+    category: "商品推薦",
+    relatedProductIds: ["d002-honey-realm"],
+  },
+  {
+    id: "rec-crystal-white-phantom-tourmaline",
+    question: "想要白幽靈、兔毛或粉碧璽手鍊，有推薦嗎？",
+    answer:
+      "推薦「晨光輕語手鍊」（白幽靈、紅兔毛、白兔毛、粉碧璽與月光石等，愛情與人緣、情緒平衡，NT$1,800），以及「月下密語手鍊」（白幽靈、藍月光等，淨化與釋放壓力，NT$1,480起）。",
+    embedText:
+      "白幽靈 白幽靈手鍊 紅兔毛 白兔毛 兔毛水晶 粉碧璽 想要白幽靈 有白幽靈的手鍊嗎 粉碧璽手鍊",
+    keywords: ["白幽靈", "紅兔毛", "白兔毛", "兔毛", "粉碧璽"],
+    category: "商品推薦",
+    relatedProductIds: ["d004-morning-whisper", "d001-moon-secret"],
+  },
 ];
 
 // ─── Embedding 向量搜尋 ──────────────────────────────────────────────────────
@@ -404,17 +467,20 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-function keywordSearch(query: string, topK: number): KnowledgeChunk[] {
+function keywordHitCount(query: string, chunk: KnowledgeChunk): number {
   const q = query.toLowerCase();
-  const scored = knowledgeChunks.map((c) => ({
-    chunk: c,
-    hits: c.keywords.filter((k) => q.includes(k.toLowerCase()) || k.toLowerCase().includes(q)).length,
-  }));
-  return scored
-    .filter((s) => s.hits > 0)
-    .sort((a, b) => b.hits - a.hits)
-    .slice(0, topK)
-    .map((s) => s.chunk);
+  return chunk.keywords.filter(
+    (k) => q.includes(k.toLowerCase()) || k.toLowerCase().includes(q)
+  ).length;
+}
+
+/** 關鍵字命中的加權分數，讓「商品推薦」在顧客直接打出水晶名時能進入排序並觸發商品卡 */
+function keywordBoostScore(chunk: KnowledgeChunk, hits: number): number {
+  if (hits <= 0) return 0;
+  if (chunk.category === "商品推薦") {
+    return Math.min(0.78, 0.73 + 0.02 * Math.min(hits - 1, 3));
+  }
+  return Math.min(0.58, 0.48 + 0.04 * Math.min(hits, 3));
 }
 
 export type ScoredChunk = KnowledgeChunk & { score: number };
@@ -426,28 +492,19 @@ export async function searchKnowledge(
   threshold = 0.45
 ): Promise<ScoredChunk[]> {
   const embeddings = loadEmbeddings();
+  const vectorById = new Map(embeddings.map((e) => [e.id, e.vector]));
 
-  const vectorResults: ScoredChunk[] = [];
-  if (embeddings.length > 0) {
-    const scored = embeddings.map(({ id, vector }) => ({
-      id,
-      score: cosineSimilarity(queryVector, vector),
-    }));
-    const top = scored
-      .filter((s) => s.score >= threshold)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
-    for (const { id, score } of top) {
-      const chunk = knowledgeChunks.find((c) => c.id === id);
-      if (chunk) vectorResults.push({ ...chunk, score });
-    }
-  }
+  const merged: ScoredChunk[] = knowledgeChunks.map((chunk) => {
+    const vector = vectorById.get(chunk.id);
+    const vecScore = vector ? cosineSimilarity(queryVector, vector) : 0;
+    const hits = keywordHitCount(query, chunk);
+    const kwScore = keywordBoostScore(chunk, hits);
+    const score = Math.max(vecScore, kwScore);
+    return { ...chunk, score };
+  });
 
-  // keyword 永遠跑，補上向量搜尋沒找到的結果（score = 0）
-  const seen = new Set(vectorResults.map((c) => c.id));
-  const kwResults = keywordSearch(query, topK)
-    .filter((c) => !seen.has(c.id))
-    .map((c) => ({ ...c, score: 0 }));
-
-  return [...vectorResults, ...kwResults].slice(0, topK);
+  return merged
+    .filter((c) => c.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
 }
