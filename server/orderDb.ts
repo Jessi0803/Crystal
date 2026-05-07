@@ -53,6 +53,33 @@ export type AdminOrdersPage = {
   pageSize: number;
 };
 
+const balancePaymentLegacySelect = {
+  id: orderBalancePayments.id,
+  orderId: orderBalancePayments.orderId,
+  merchantTradeNo: orderBalancePayments.merchantTradeNo,
+  amount: orderBalancePayments.amount,
+  paymentMethod: orderBalancePayments.paymentMethod,
+  paymentStatus: orderBalancePayments.paymentStatus,
+  transferLastFive: orderBalancePayments.transferLastFive,
+  tradeNo: orderBalancePayments.tradeNo,
+  ecpayNotifyData: orderBalancePayments.ecpayNotifyData,
+  paidAt: orderBalancePayments.paidAt,
+  createdAt: orderBalancePayments.createdAt,
+  updatedAt: orderBalancePayments.updatedAt,
+};
+
+type BalancePaymentLegacyRow = Omit<BalancePaymentRow, "shippingFee" | "paymentFee" | "totalAmount">;
+
+function hydrateBalancePayment(row: BalancePaymentLegacyRow | undefined): BalancePaymentRow | null {
+  if (!row) return null;
+  return {
+    ...row,
+    shippingFee: 0,
+    paymentFee: 0,
+    totalAmount: row.amount,
+  };
+}
+
 /** 批次載入商品明細與物流，避免 N+1 查詢（管理後台 list、會員訂單） */
 async function attachItemsAndLogisticsForOrders(
   db: DbInstance,
@@ -147,12 +174,12 @@ export async function getOrderWithItems(merchantTradeNo: string) {
     .limit(1);
 
   const [balancePayment] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.orderId, order.id))
     .limit(1);
 
-  return { ...order, items, logistics: logistics ?? null, balancePayment: balancePayment ?? null };
+  return { ...order, items, logistics: logistics ?? null, balancePayment: hydrateBalancePayment(balancePayment) };
 }
 
 /** PayPal Capture 成功後標記已付款 */
@@ -420,14 +447,14 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
   const [items, logistics, balancePayment] = await Promise.all([
     db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
     db.select().from(logisticsOrders).where(eq(logisticsOrders.orderId, order.id)).limit(1),
-    db.select().from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
+    db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
   ]);
 
   return {
     ...order,
     items,
     logistics: logistics[0] ?? null,
-    balancePayment: balancePayment[0] ?? null,
+    balancePayment: hydrateBalancePayment(balancePayment[0]),
   };
 }
 
@@ -601,7 +628,7 @@ export async function createOrReplaceBalancePayment(opts: {
   if (!order) throw new Error("Order not found");
 
   const [existing] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.orderId, opts.orderId))
     .limit(1);
@@ -611,7 +638,7 @@ export async function createOrReplaceBalancePayment(opts: {
   }
 
   const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
-  const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
+  const previousBalanceTotal = existing?.amount ?? 0;
   const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
 
   await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq(orders.id, opts.orderId));
@@ -633,11 +660,11 @@ export async function createOrReplaceBalancePayment(opts: {
       .where(eq(orderBalancePayments.id, existing.id));
 
     const [updated] = await db
-      .select()
+      .select(balancePaymentLegacySelect)
       .from(orderBalancePayments)
       .where(eq(orderBalancePayments.id, existing.id))
       .limit(1);
-    return updated!;
+    return hydrateBalancePayment(updated)!;
   }
 
   const insertData: InsertOrderBalancePayment = {
@@ -653,11 +680,11 @@ export async function createOrReplaceBalancePayment(opts: {
   await db.insert(orderBalancePayments).values(insertData);
 
   const [created] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.merchantTradeNo, nextMerchantTradeNo))
     .limit(1);
-  return created!;
+  return hydrateBalancePayment(created)!;
 }
 
 export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string) {
@@ -665,11 +692,11 @@ export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string
   if (!db) throw new Error("Database not available");
 
   const [row] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
     .limit(1);
-  return row ?? null;
+  return hydrateBalancePayment(row);
 }
 
 export async function getBalancePaymentDetail(merchantTradeNo: string) {
@@ -677,11 +704,12 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
   if (!db) throw new Error("Database not available");
 
   const [row] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
     .limit(1);
-  if (!row) return null;
+  const balancePayment = hydrateBalancePayment(row);
+  if (!balancePayment) return null;
 
   const [order] = await db
     .select()
@@ -690,7 +718,7 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     .limit(1);
   if (!order) return null;
 
-  return { ...row, order };
+  return { ...balancePayment, order };
 }
 
 export async function updateBalancePaymentStatus(
@@ -703,7 +731,7 @@ export async function updateBalancePaymentStatus(
   if (!db) throw new Error("Database not available");
 
   const [balance] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
     .limit(1);
@@ -723,7 +751,7 @@ export async function updateBalancePaymentStatus(
     await db.update(orders).set({ orderStatus: "paid" }).where(eq(orders.id, balance.orderId));
   }
 
-  return balance;
+  return hydrateBalancePayment(balance);
 }
 
 export async function updateBalancePaymentTransferCode(
@@ -757,7 +785,7 @@ export async function confirmBalanceTransfer(merchantTradeNo: string) {
   if (!db) throw new Error("Database not available");
 
   const [balance] = await db
-    .select()
+    .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
     .limit(1);
