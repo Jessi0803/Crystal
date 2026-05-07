@@ -729,7 +729,9 @@ export default function CustomFormB() {
                 <h2 className="text-lg font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
                   {index + 3}. {item.title}
                 </h2>
-                {!item.required && <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">選填</span>}
+                {!item.required && item.title !== "完成！付完訂金後記得加入 LINE" && (
+                  <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">選填</span>
+                )}
               </div>
               {item.subtitle && (
                 <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">{item.subtitle}</p>
