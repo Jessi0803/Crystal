@@ -95,7 +95,7 @@ export default function OrderResult() {
       return {
         icon: <Banknote className="w-12 h-12 text-blue-400" />,
         title: "等待轉帳確認",
-        desc: "請完成匯款，並在下方填入匯款末五碼，老闆確認後將為您處理出貨。",
+        desc: "請完成匯款，並在下方填入匯款末五碼，設計師確認後將為您處理出貨。",
         color: "text-blue-600",
         bg: "bg-blue-50",
       };
