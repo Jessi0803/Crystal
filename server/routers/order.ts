@@ -57,6 +57,7 @@ import {
   validateOverseasAddress,
 } from "@shared/overseasAddress";
 import { calcCheckoutFees } from "@shared/checkoutFees";
+import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 
 function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: string }) {
   const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
@@ -78,6 +79,10 @@ const CartItemSchema = z.object({
   image: z.string().optional(),
   isPreorder: z.boolean().optional(),
 });
+
+function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
+  return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
+}
 
 export const orderRouter = router({
   /**
@@ -112,6 +117,15 @@ export const orderRouter = router({
           customerNote: z.string().max(2000).optional(),
         })
         .superRefine((data, ctx) => {
+          const isCustomDepositCheckout = data.items
+            .filter((item) => {
+              const productId = item.baseProductId ?? item.id;
+              return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
+            })
+            .every(isCustomCheckoutItem);
+
+          if (isCustomDepositCheckout) return;
+
           if (data.checkoutRegion === "domestic") {
             const phone = data.buyerPhone.replace(/\s/g, "");
             if (!/^09\d{8}$/.test(phone)) {
@@ -699,11 +713,59 @@ export const orderRouter = router({
 
   getBalancePaymentCheckout: publicProcedure
     .input(
-      z.object({
-        merchantTradeNo: z.string().min(1),
-        paymentMethod: z.enum(["credit", "atm"]),
-        origin: z.string().url(),
-      })
+      z
+        .object({
+          merchantTradeNo: z.string().min(1),
+          paymentMethod: z.enum(["credit", "atm"]),
+          checkoutRegion: z.enum(["domestic", "overseas"]),
+          shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
+          cvsStoreId: z.string().optional(),
+          cvsStoreName: z.string().optional(),
+          cvsType: z.string().optional(),
+          shippingAddress: z.string().optional(),
+          receiverZipCode: z.string().optional(),
+          intlCountry: z.string().optional(),
+          intlAddrLine1: z.string().optional(),
+          intlAddrLine2: z.string().optional(),
+          intlCity: z.string().optional(),
+          intlState: z.string().optional(),
+          intlPostalCode: z.string().optional(),
+          origin: z.string().url(),
+        })
+        .superRefine((data, ctx) => {
+          if (data.checkoutRegion === "domestic") {
+            if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
+              if (!data.cvsStoreId?.trim()) {
+                ctx.addIssue({ code: "custom", message: "請選擇超商門市", path: ["cvsStoreId"] });
+              }
+            }
+            if (data.shippingMethod === "home") {
+              if (!data.shippingAddress?.trim()) {
+                ctx.addIssue({ code: "custom", message: "請填寫收件地址", path: ["shippingAddress"] });
+              }
+              const zip = data.receiverZipCode?.trim() ?? "";
+              if (!/^\d{3,6}$/.test(zip)) {
+                ctx.addIssue({ code: "custom", message: "請填寫郵遞區號", path: ["receiverZipCode"] });
+              }
+            }
+          } else {
+            const payload = {
+              intlCountry: data.intlCountry ?? "",
+              intlAddrLine1: data.intlAddrLine1 ?? "",
+              intlAddrLine2: data.intlAddrLine2 ?? "",
+              intlCity: data.intlCity ?? "",
+              intlState: data.intlState ?? "",
+              intlPostalCode: data.intlPostalCode ?? "",
+            };
+            for (const it of validateOverseasAddress(payload)) {
+              ctx.addIssue({
+                code: "custom",
+                message: it.message,
+                path: [it.path as string],
+              });
+            }
+          }
+        })
     )
     .mutation(async ({ input }) => {
       const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
@@ -717,13 +779,78 @@ export const orderRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
+      const isOverseas = input.checkoutRegion === "overseas";
+      const shippingMethod = isOverseas ? ("home" as const) : input.shippingMethod;
+      let shippingAddress = input.shippingAddress;
+      let receiverZipCode = input.receiverZipCode;
+      let cvsStoreId = input.cvsStoreId;
+      let cvsStoreName = input.cvsStoreName;
+      let cvsType = input.cvsType;
+      let overseasCountry: OverseasShipCountryCode | null = null;
+
+      if (isOverseas) {
+        cvsStoreId = undefined;
+        cvsStoreName = undefined;
+        cvsType = undefined;
+        const countryCode = input.intlCountry!.trim();
+        if (!isOverseasShipCountryCode(countryCode)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "不支援的海外配送地區" });
+        }
+        overseasCountry = countryCode;
+        const formatted = formatOverseasShippingAddress({
+          countryCode,
+          line1: input.intlAddrLine1!.trim(),
+          line2: input.intlAddrLine2 ?? "",
+          city: input.intlCity!.trim(),
+          state: input.intlState ?? "",
+          postal: input.intlPostalCode ?? "",
+        });
+        shippingAddress = formatted.shippingAddress;
+        receiverZipCode = formatted.receiverZipCode;
+      }
+
+      const feeSummary = calcCheckoutFees({
+        items: [{
+          id: "custom-balance-payment",
+          name: "客製化商品尾款",
+          price: balancePayment.amount,
+          quantity: 1,
+        }],
+        checkoutRegion: input.checkoutRegion,
+        shippingMethod,
+        paymentMethod: input.paymentMethod,
+        overseasCountry,
+      });
+      const totalAmount = feeSummary.total;
+
       await db.update(orderBalancePayments)
-        .set({ paymentMethod: input.paymentMethod })
+        .set({
+          paymentMethod: input.paymentMethod,
+          shippingFee: feeSummary.shippingFee,
+          paymentFee: feeSummary.paymentFee,
+          totalAmount,
+        })
         .where(eq(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
+
+      await db.update(orders)
+        .set({
+          deliveryRegion: isOverseas ? "overseas" : "domestic",
+          shippingMethod,
+          cvsStoreId: cvsStoreId ?? null,
+          cvsStoreName: cvsStoreName ?? null,
+          cvsType: cvsType ?? null,
+          shippingAddress: shippingAddress ?? null,
+          receiverZipCode: receiverZipCode ?? null,
+          totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount,
+        })
+        .where(eq(orders.id, balancePayment.orderId));
 
       if (input.paymentMethod === "atm") {
         return {
           kind: "atm" as const,
+          amount: totalAmount,
+          shippingFee: feeSummary.shippingFee,
+          paymentFee: feeSummary.paymentFee,
           bankInfo: {
             bankName: process.env.BANK_NAME ?? "",
             accountName: process.env.BANK_ACCOUNT_NAME ?? "",
@@ -736,7 +863,7 @@ export const orderRouter = router({
         merchantTradeNo: balancePayment.merchantTradeNo,
         tradeDesc: "椛Crystal客製化尾款",
         itemName: `客製化商品尾款#${balancePayment.order.merchantTradeNo}`,
-        totalAmount: balancePayment.amount,
+        totalAmount,
         returnURL: `${input.origin}/api/ecpay/notify`,
         orderResultURL: `${input.origin}/api/ecpay/balance-result`,
         clientBackURL: `${input.origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
@@ -746,6 +873,9 @@ export const orderRouter = router({
         kind: "credit" as const,
         paymentURL: ECPAY_CONFIG.PaymentURL,
         paymentParams,
+        amount: totalAmount,
+        shippingFee: feeSummary.shippingFee,
+        paymentFee: feeSummary.paymentFee,
       };
     }),
 

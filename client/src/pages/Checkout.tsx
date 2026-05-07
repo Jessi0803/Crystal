@@ -22,6 +22,7 @@ import {
   isOverseasShipCountryCode,
 } from "@shared/overseasShipping";
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
+import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -31,6 +32,8 @@ export default function Checkout() {
   const [, setLocation] = useLocation();
   const { items, totalPrice, clearCart } = useCart();
   const customConsultationNote = sessionStorage.getItem("customConsultationNote") ?? undefined;
+  const isCustomDepositCheckout =
+    items.length > 0 && items.every((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
 
   const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
@@ -124,7 +127,10 @@ export default function Checkout() {
     if (!form.buyerEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.buyerEmail))
       errs.buyerEmail = "請輸入有效的 Email";
 
-    if (checkoutRegion === "domestic") {
+    if (isCustomDepositCheckout) {
+      if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
+        errs.buyerPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
+    } else if (checkoutRegion === "domestic") {
       if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
         errs.buyerPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
       if (shippingMethod === "cvs_711" && !cvsStore) errs.cvsStore = "請選擇超商門市";
@@ -158,27 +164,27 @@ export default function Checkout() {
 
     try {
       const result = await createAndPay.mutateAsync({
-        checkoutRegion,
+        checkoutRegion: isCustomDepositCheckout ? "domestic" : checkoutRegion,
         buyerName: form.buyerName,
         buyerEmail: form.buyerEmail,
         buyerPhone: form.buyerPhone,
         paymentMethod,
-        shippingMethod: checkoutRegion === "overseas" ? "home" : shippingMethod,
-        cvsStoreId: checkoutRegion === "domestic" ? cvsStore?.storeId : undefined,
-        cvsStoreName: checkoutRegion === "domestic" ? cvsStore?.storeName : undefined,
-        cvsType: checkoutRegion === "domestic" ? cvsStore?.cvsType : undefined,
+        shippingMethod: isCustomDepositCheckout ? "home" : checkoutRegion === "overseas" ? "home" : shippingMethod,
+        cvsStoreId: !isCustomDepositCheckout && checkoutRegion === "domestic" ? cvsStore?.storeId : undefined,
+        cvsStoreName: !isCustomDepositCheckout && checkoutRegion === "domestic" ? cvsStore?.storeName : undefined,
+        cvsType: !isCustomDepositCheckout && checkoutRegion === "domestic" ? cvsStore?.cvsType : undefined,
         shippingAddress:
-          checkoutRegion === "domestic" && shippingMethod === "home"
+          !isCustomDepositCheckout && checkoutRegion === "domestic" && shippingMethod === "home"
             ? `${form.shippingCity}${form.shippingDistrict}${form.shippingDetail}`
             : undefined,
         receiverZipCode:
-          checkoutRegion === "domestic" && shippingMethod === "home" ? form.shippingZip : undefined,
-        intlCountry: checkoutRegion === "overseas" ? form.intlCountry : undefined,
-        intlAddrLine1: checkoutRegion === "overseas" ? form.intlAddrLine1 : undefined,
-        intlAddrLine2: checkoutRegion === "overseas" ? form.intlAddrLine2 : undefined,
-        intlCity: checkoutRegion === "overseas" ? form.intlCity : undefined,
-        intlState: checkoutRegion === "overseas" ? form.intlState : undefined,
-        intlPostalCode: checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
+          !isCustomDepositCheckout && checkoutRegion === "domestic" && shippingMethod === "home" ? form.shippingZip : undefined,
+        intlCountry: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlCountry : undefined,
+        intlAddrLine1: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlAddrLine1 : undefined,
+        intlAddrLine2: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlAddrLine2 : undefined,
+        intlCity: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlCity : undefined,
+        intlState: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlState : undefined,
+        intlPostalCode: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
         items: items.map((i) => ({
           id: i.id,
           baseProductId: i.product.id,
@@ -282,6 +288,7 @@ export default function Checkout() {
           <form onSubmit={handleSubmit} className="space-y-8">
 
             {/* 配送地區 */}
+            {!isCustomDepositCheckout && (
             <section>
               <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
                 配送地區
@@ -338,6 +345,7 @@ export default function Checkout() {
                 </p>
               )}
             </section>
+            )}
 
             {/* 購買人資訊 */}
             <section>
@@ -388,6 +396,7 @@ export default function Checkout() {
             </section>
 
             {/* 配送方式 */}
+            {!isCustomDepositCheckout && (
             <section>
               <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
                 {checkoutRegion === "overseas" ? "收件地址（國際宅配）" : "配送方式"}
@@ -694,6 +703,7 @@ export default function Checkout() {
                 </div>
               )}
             </section>
+            )}
 
             {/* 付款方式 */}
             {checkoutRegion === "domestic" && (

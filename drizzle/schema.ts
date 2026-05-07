@@ -170,6 +170,9 @@ export const orderBalancePayments = mysqlTable("orderBalancePayments", {
   orderId: int("orderId").notNull().unique(),
   merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
   amount: int("amount").notNull(),
+  shippingFee: int("shippingFee").default(0).notNull(),
+  paymentFee: int("paymentFee").default(0).notNull(),
+  totalAmount: int("totalAmount").notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["credit", "atm"]).default("credit").notNull(),
   paymentStatus: mysqlEnum("paymentStatus", [
     "pending",

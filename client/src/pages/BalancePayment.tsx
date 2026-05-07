@@ -1,15 +1,49 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { CheckCircle, CreditCard, Banknote, XCircle } from "lucide-react";
+import { CheckCircle, CreditCard, Banknote, XCircle, Home, Store, MapPin, Globe } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import {
+  AU_STATE_OPTIONS,
+  OVERSEAS_COUNTRY_EN,
+  overseasPostalRequired,
+  US_STATE_OPTIONS,
+  validateOverseasAddress,
+} from "@shared/overseasAddress";
+import {
+  OVERSEAS_SHIP_COUNTRY_LABELS,
+  OVERSEAS_SHIP_COUNTRY_OPTIONS,
+  isOverseasShipCountryCode,
+} from "@shared/overseasShipping";
+import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
+
+type PaymentMethod = "credit" | "atm";
+type ShippingMethod = "cvs_711" | "home";
+type CheckoutRegion = "domestic" | "overseas";
 
 export default function BalancePayment() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
-  const [paymentMethod, setPaymentMethod] = useState<"credit" | "atm">("credit");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
+  const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("home");
+  const [form, setForm] = useState({
+    shippingZip: "",
+    shippingCity: "",
+    shippingDistrict: "",
+    shippingDetail: "",
+    intlCountry: "",
+    intlAddrLine1: "",
+    intlAddrLine2: "",
+    intlCity: "",
+    intlState: "",
+    intlPostalCode: "",
+  });
+  const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [transferCode, setTransferCode] = useState("");
   const [codeSubmitted, setCodeSubmitted] = useState(false);
+  const cvsWindowRef = useRef<Window | null>(null);
 
   const { data, isLoading, refetch } = trpc.order.getBalancePayment.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
@@ -48,6 +82,21 @@ export default function BalancePayment() {
     onError: () => toast.error("送出失敗，請重試"),
   });
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "CVS_STORE_SELECTED") {
+        const { storeId, storeName, cvsType } = event.data;
+        setCvsStore({ storeId, storeName, cvsType });
+        toast.success(`已選擇門市：${storeName}`);
+        if (cvsWindowRef.current && !cvsWindowRef.current.closed) {
+          cvsWindowRef.current.close();
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   const handleSubmitCode = () => {
     if (transferCode.length !== 5 || !/^\d+$/.test(transferCode)) {
       toast.error("請輸入正確的 5 位數字");
@@ -85,6 +134,94 @@ export default function BalancePayment() {
   const isPaid = data.paymentStatus === "paid";
   const isTransferPending = data.paymentStatus === "transfer_pending";
   const showPaymentChoice = !isPaid && !isTransferPending && !startCheckout.isSuccess;
+  const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
+  const feeSummary = calcCheckoutFees({
+    items: [{ id: "custom-balance-payment", name: "客製化商品尾款", price: data.amount, quantity: 1 }],
+    checkoutRegion,
+    shippingMethod,
+    paymentMethod,
+    overseasCountry: overseasCode,
+  });
+  const payableAmount = feeSummary.total;
+
+  const inputClass = (field: string) =>
+    `w-full border px-4 py-3 text-sm font-body focus:outline-none transition-colors ${
+      errors[field]
+        ? "border-red-400 focus:border-red-500"
+        : "border-[oklch(0.88_0_0)] focus:border-[oklch(0.1_0_0)]"
+    }`;
+
+  const setRegion = (region: CheckoutRegion) => {
+    setCheckoutRegion(region);
+    setErrors({});
+    if (region === "overseas") {
+      setShippingMethod("home");
+      setCvsStore(null);
+    }
+  };
+
+  const validateShipping = () => {
+    const nextErrors: Record<string, string> = {};
+    if (checkoutRegion === "domestic") {
+      if (shippingMethod === "cvs_711" && !cvsStore) nextErrors.cvsStore = "請選擇超商門市";
+      if (shippingMethod === "home") {
+        if (!form.shippingZip.trim() || !/^\d{3,6}$/.test(form.shippingZip)) nextErrors.shippingZip = "請輸入有效郵遞區號";
+        if (!form.shippingCity.trim()) nextErrors.shippingCity = "請輸入縣市";
+        if (!form.shippingDistrict.trim()) nextErrors.shippingDistrict = "請輸入鄉鎮市區";
+        if (!form.shippingDetail.trim()) nextErrors.shippingDetail = "請輸入詳細地址（路名門牌）";
+      }
+    } else {
+      for (const it of validateOverseasAddress({
+        intlCountry: form.intlCountry,
+        intlAddrLine1: form.intlAddrLine1,
+        intlAddrLine2: form.intlAddrLine2,
+        intlCity: form.intlCity,
+        intlState: form.intlState,
+        intlPostalCode: form.intlPostalCode,
+      })) {
+        nextErrors[it.path as string] = it.message;
+      }
+    }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSelectCvsStore = () => {
+    const tradeNo = `MAP${Date.now()}`;
+    const mapURL = `/api/ecpay/cvs-map?tradeNo=${encodeURIComponent(tradeNo)}&subType=UNIMARTC2C`;
+    const popup = window.open(mapURL, "ecpay_cvs_map", "width=1024,height=768,scrollbars=yes");
+    if (!popup) {
+      toast.error("無法開啟選店視窗，請允許彈出視窗後再試");
+      return;
+    }
+    cvsWindowRef.current = popup;
+  };
+
+  const startBalanceCheckout = () => {
+    if (!validateShipping()) return;
+
+    startCheckout.mutate({
+      merchantTradeNo: data.merchantTradeNo,
+      paymentMethod,
+      checkoutRegion,
+      shippingMethod: checkoutRegion === "overseas" ? "home" : shippingMethod,
+      cvsStoreId: checkoutRegion === "domestic" ? cvsStore?.storeId : undefined,
+      cvsStoreName: checkoutRegion === "domestic" ? cvsStore?.storeName : undefined,
+      cvsType: checkoutRegion === "domestic" ? cvsStore?.cvsType : undefined,
+      shippingAddress:
+        checkoutRegion === "domestic" && shippingMethod === "home"
+          ? `${form.shippingCity}${form.shippingDistrict}${form.shippingDetail}`
+          : undefined,
+      receiverZipCode: checkoutRegion === "domestic" && shippingMethod === "home" ? form.shippingZip : undefined,
+      intlCountry: checkoutRegion === "overseas" ? form.intlCountry : undefined,
+      intlAddrLine1: checkoutRegion === "overseas" ? form.intlAddrLine1 : undefined,
+      intlAddrLine2: checkoutRegion === "overseas" ? form.intlAddrLine2 : undefined,
+      intlCity: checkoutRegion === "overseas" ? form.intlCity : undefined,
+      intlState: checkoutRegion === "overseas" ? form.intlState : undefined,
+      intlPostalCode: checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
+      origin: window.location.origin,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[oklch(0.98_0.005_60)]">
@@ -123,9 +260,25 @@ export default function BalancePayment() {
               <span className="text-[oklch(0.12_0_0)]">{data.order.buyerName}</span>
             </div>
             <div className="flex justify-between gap-4 text-sm font-body">
-              <span className="text-[oklch(0.5_0_0)]">尾款金額</span>
+              <span className="text-[oklch(0.5_0_0)]">尾款小計</span>
               <span className="text-[oklch(0.12_0_0)] font-medium">NT$ {data.amount.toLocaleString()}</span>
             </div>
+            {!isPaid && !isTransferPending && (
+              <>
+                <div className="flex justify-between gap-4 text-sm font-body">
+                  <span className="text-[oklch(0.5_0_0)]">運費</span>
+                  <span className="text-[oklch(0.12_0_0)]">NT$ {feeSummary.shippingFee.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between gap-4 text-sm font-body">
+                  <span className="text-[oklch(0.5_0_0)]">手續費{paymentMethod === "credit" ? "（2%）" : ""}</span>
+                  <span className="text-[oklch(0.12_0_0)]">NT$ {feeSummary.paymentFee.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
+                  <span className="text-[oklch(0.12_0_0)] font-medium">應付總額</span>
+                  <span className="text-[oklch(0.12_0_0)] font-semibold">NT$ {payableAmount.toLocaleString()}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between gap-4 text-sm font-body">
               <span className="text-[oklch(0.5_0_0)]">目前狀態</span>
               <span className={
@@ -145,6 +298,217 @@ export default function BalancePayment() {
           {/* 選擇付款方式 */}
           {showPaymentChoice && (
             <>
+              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送地區</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setRegion("domestic")}
+                  className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                    checkoutRegion === "domestic"
+                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
+                      : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                  }`}
+                >
+                  <Home className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                  <div>
+                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">台灣（國內）</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">宅配或 7-11 取貨</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegion("overseas")}
+                  className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                    checkoutRegion === "overseas"
+                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
+                      : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                  }`}
+                >
+                  <Globe className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                  <div>
+                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">海外</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">國際宅配</p>
+                  </div>
+                </button>
+              </div>
+
+              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送方式</p>
+              {checkoutRegion === "domestic" ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    {[
+                      { key: "home" as ShippingMethod, icon: <Home className="w-5 h-5" />, title: "宅配到府", desc: "黑貓宅急便（NT$ 100）" },
+                      { key: "cvs_711" as ShippingMethod, icon: <Store className="w-5 h-5" />, title: "7-11 取貨", desc: "超商取貨（NT$ 60）" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => { setShippingMethod(opt.key); setCvsStore(null); setErrors({}); }}
+                        className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                          shippingMethod === opt.key
+                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
+                            : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                        }`}
+                      >
+                        <span className="text-[oklch(0.3_0_0)] mt-0.5 shrink-0">{opt.icon}</span>
+                        <div>
+                          <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">{opt.title}</p>
+                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">{opt.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {shippingMethod === "cvs_711" ? (
+                    <div className="mb-5">
+                      {cvsStore ? (
+                        <div className="flex items-center justify-between p-3 border border-green-200 bg-green-50">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-body text-green-800">
+                              已選擇：{cvsStore.storeName}（門市代號：{cvsStore.storeId}）
+                            </span>
+                          </div>
+                          <button type="button" onClick={() => setCvsStore(null)} className="text-xs font-body text-green-600 underline">
+                            重新選擇
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSelectCvsStore}
+                          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[oklch(0.7_0_0)] text-sm font-body text-[oklch(0.4_0_0)] hover:border-[oklch(0.3_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          點此選擇 7-11 門市
+                        </button>
+                      )}
+                      {errors.cvsStore && <p className="text-xs text-red-400 mt-1">{errors.cvsStore}</p>}
+                    </div>
+                  ) : (
+                    <div className="mb-5 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="郵遞區號"
+                            value={form.shippingZip}
+                            onChange={(e) => setForm((f) => ({ ...f, shippingZip: e.target.value }))}
+                            className={inputClass("shippingZip")}
+                            maxLength={6}
+                          />
+                          {errors.shippingZip && <p className="text-xs text-red-400 mt-1">{errors.shippingZip}</p>}
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="縣市"
+                            value={form.shippingCity}
+                            onChange={(e) => setForm((f) => ({ ...f, shippingCity: e.target.value }))}
+                            className={inputClass("shippingCity")}
+                          />
+                          {errors.shippingCity && <p className="text-xs text-red-400 mt-1">{errors.shippingCity}</p>}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="鄉鎮市區"
+                        value={form.shippingDistrict}
+                        onChange={(e) => setForm((f) => ({ ...f, shippingDistrict: e.target.value }))}
+                        className={inputClass("shippingDistrict")}
+                      />
+                      {errors.shippingDistrict && <p className="text-xs text-red-400 mt-1">{errors.shippingDistrict}</p>}
+                      <input
+                        type="text"
+                        placeholder="路名、門牌、樓層"
+                        value={form.shippingDetail}
+                        onChange={(e) => setForm((f) => ({ ...f, shippingDetail: e.target.value }))}
+                        className={inputClass("shippingDetail")}
+                      />
+                      {errors.shippingDetail && <p className="text-xs text-red-400 mt-1">{errors.shippingDetail}</p>}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mb-5 space-y-3">
+                  <select
+                    value={form.intlCountry}
+                    onChange={(e) => setForm((f) => ({ ...f, intlCountry: e.target.value, intlState: "", intlPostalCode: "" }))}
+                    className={inputClass("intlCountry")}
+                  >
+                    <option value="">Select country</option>
+                    {OVERSEAS_SHIP_COUNTRY_OPTIONS.map(({ code }) => (
+                      <option key={code} value={code}>
+                        {OVERSEAS_COUNTRY_EN[code]} ({OVERSEAS_SHIP_COUNTRY_LABELS[code]}) NT$ {OVERSEAS_SHIPPING_FEES[code]}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.intlCountry && <p className="text-xs text-red-400 mt-1">{errors.intlCountry}</p>}
+                  <input
+                    type="text"
+                    placeholder="Address Line 1"
+                    value={form.intlAddrLine1}
+                    onChange={(e) => setForm((f) => ({ ...f, intlAddrLine1: e.target.value }))}
+                    className={inputClass("intlAddrLine1")}
+                  />
+                  {errors.intlAddrLine1 && <p className="text-xs text-red-400 mt-1">{errors.intlAddrLine1}</p>}
+                  <input
+                    type="text"
+                    placeholder="Address Line 2 (optional)"
+                    value={form.intlAddrLine2}
+                    onChange={(e) => setForm((f) => ({ ...f, intlAddrLine2: e.target.value }))}
+                    className={inputClass("intlAddrLine2")}
+                  />
+                  {errors.intlAddrLine2 && <p className="text-xs text-red-400 mt-1">{errors.intlAddrLine2}</p>}
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={form.intlCity}
+                    onChange={(e) => setForm((f) => ({ ...f, intlCity: e.target.value }))}
+                    className={inputClass("intlCity")}
+                  />
+                  {errors.intlCity && <p className="text-xs text-red-400 mt-1">{errors.intlCity}</p>}
+                  {overseasCode === "US" ? (
+                    <select
+                      value={form.intlState}
+                      onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                      className={inputClass("intlState")}
+                    >
+                      <option value="">Select state</option>
+                      {US_STATE_OPTIONS.map((s) => (
+                        <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+                      ))}
+                    </select>
+                  ) : overseasCode === "AU" ? (
+                    <select
+                      value={form.intlState}
+                      onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                      className={inputClass("intlState")}
+                    >
+                      <option value="">Select state / territory</option>
+                      {AU_STATE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="State / province (if applicable)"
+                      value={form.intlState}
+                      onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                      className={inputClass("intlState")}
+                    />
+                  )}
+                  {errors.intlState && <p className="text-xs text-red-400 mt-1">{errors.intlState}</p>}
+                  <input
+                    type="text"
+                    placeholder={!overseasCode || overseasPostalRequired(overseasCode) ? "Postal code" : "Postal code (optional)"}
+                    value={form.intlPostalCode}
+                    onChange={(e) => setForm((f) => ({ ...f, intlPostalCode: e.target.value }))}
+                    className={inputClass("intlPostalCode")}
+                  />
+                  {errors.intlPostalCode && <p className="text-xs text-red-400 mt-1">{errors.intlPostalCode}</p>}
+                </div>
+              )}
+
               <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇付款方式</p>
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <button
@@ -190,11 +554,7 @@ export default function BalancePayment() {
               </div>
 
               <button
-                onClick={() => startCheckout.mutate({
-                  merchantTradeNo: data.merchantTradeNo,
-                  paymentMethod,
-                  origin: window.location.origin,
-                })}
+                onClick={startBalanceCheckout}
                 disabled={startCheckout.isPending}
                 className="w-full bg-[oklch(0.12_0_0)] text-white py-3.5 text-sm font-body hover:bg-[oklch(0.22_0_0)] transition-colors disabled:opacity-60"
               >
@@ -230,7 +590,9 @@ export default function BalancePayment() {
                         </div>
                         <div className="flex justify-between text-sm font-body border-t border-blue-200 pt-2">
                           <span className="text-blue-700">轉帳金額</span>
-                          <span className="font-bold text-blue-900">NT$ {data.amount.toLocaleString()}</span>
+                          <span className="font-bold text-blue-900">
+                            NT$ {(startCheckout.data?.kind === "atm" ? startCheckout.data.amount : payableAmount).toLocaleString()}
+                          </span>
                         </div>
                       </div>
                     ) : null;

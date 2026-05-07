@@ -611,7 +611,8 @@ export async function createOrReplaceBalancePayment(opts: {
   }
 
   const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
-  const nextTotalAmount = Math.max(1, order.totalAmount - (existing?.amount ?? 0) + opts.amount);
+  const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
+  const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
 
   await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq(orders.id, opts.orderId));
 
@@ -621,6 +622,9 @@ export async function createOrReplaceBalancePayment(opts: {
       .set({
         merchantTradeNo: nextMerchantTradeNo,
         amount: opts.amount,
+        shippingFee: 0,
+        paymentFee: 0,
+        totalAmount: opts.amount,
         paymentStatus: "pending",
         tradeNo: null,
         ecpayNotifyData: null,
@@ -640,6 +644,9 @@ export async function createOrReplaceBalancePayment(opts: {
     orderId: opts.orderId,
     merchantTradeNo: nextMerchantTradeNo,
     amount: opts.amount,
+    shippingFee: 0,
+    paymentFee: 0,
+    totalAmount: opts.amount,
     paymentStatus: "pending",
   };
 
