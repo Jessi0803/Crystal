@@ -76,10 +76,11 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1545);
   });
 
-  it("does not add shipping or handling fees for test products", () => {
+  it("does not add shipping or handling fees for test and custom products", () => {
     const fees = calcCheckoutFees({
       items: [
         { id: "test-credit-5", name: "[測試用] 信用卡測試商品 5元", price: 5, quantity: 1 },
+        { id: CUSTOM_PRODUCT_ID, price: 1, quantity: 1 },
       ],
       checkoutRegion: "overseas",
       shippingMethod: "home",
@@ -89,19 +90,6 @@ describe("checkout fee calculation", () => {
 
     expect(fees.shippingFee).toBe(0);
     expect(fees.paymentFee).toBe(0);
-    expect(fees.total).toBe(5);
-  });
-
-  it("adds shipping and handling fees for custom deposit products", () => {
-    const fees = calcCheckoutFees({
-      items: [{ id: CUSTOM_PRODUCT_ID, price: 500, quantity: 1 }],
-      checkoutRegion: "domestic",
-      shippingMethod: "home",
-      paymentMethod: "credit",
-    });
-
-    expect(fees.shippingFee).toBe(100);
-    expect(fees.paymentFee).toBe(12);
-    expect(fees.total).toBe(612);
+    expect(fees.total).toBe(6);
   });
 });
