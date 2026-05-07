@@ -474,7 +474,7 @@ export default function CustomFormB() {
     {
       title: "要換龍蝦扣或磁扣嗎？",
       subtitle: "預設為彈力繩；若更換扣具需額外加收 200 元",
-      required: false,
+      required: true,
       field: (
         <div className="grid grid-cols-3 gap-3">
           {[
@@ -583,6 +583,7 @@ export default function CustomFormB() {
     if (!bracelet.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
     if (!bracelet.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
     if (!bracelet.silverTube || !bracelet.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
+    if (!bracelet.claspType) { toast.error("請選擇扣具"); return false; }
     return true;
   }
 
