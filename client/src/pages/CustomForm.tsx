@@ -293,7 +293,7 @@ export default function CustomForm() {
           </div>
           <div>
             <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
-              Instagram 帳號（選填）
+              Instagram 帳號
             </label>
             <input
               type="text"
