@@ -534,6 +534,12 @@ export async function getMonthlyRevenue(months = 6) {
 }
 
 export async function getTopProducts(limit = 10) {
+  const salesTotals = await getProductSalesTotals();
+
+  return salesTotals.slice(0, limit);
+}
+
+export async function getProductSalesTotals() {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -573,8 +579,7 @@ export async function getTopProducts(limit = 10) {
   }
 
   return Array.from(productMap.values())
-    .sort((a, b) => b.totalQty - a.totalQty)
-    .slice(0, limit);
+    .sort((a, b) => b.totalQty - a.totalQty);
 }
 
 // ─── 物流訂單 ─────────────────────────────────────────────────────────────────

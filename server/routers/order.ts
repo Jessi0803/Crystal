@@ -21,6 +21,7 @@ import {
   getOrderStats,
   getMonthlyRevenue,
   getTopProducts,
+  getProductSalesTotals,
   updateOrderStatus as dbUpdateOrderStatus,
   createLogisticsOrder,
   markOrderPaidPayPal,
@@ -920,4 +921,16 @@ export const orderRouter = router({
     .query(async ({ input }) => {
       return getTopProducts(input.limit);
     }),
+
+  /**
+   * 商品銷售量排序資料（前台商品列表使用）
+   */
+  getProductSalesTotals: publicProcedure.query(async () => {
+    try {
+      return await getProductSalesTotals();
+    } catch (error) {
+      console.error("[order.getProductSalesTotals] failed", error);
+      return [];
+    }
+  }),
 });

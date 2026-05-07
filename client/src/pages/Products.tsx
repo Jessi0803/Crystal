@@ -5,6 +5,7 @@ import { Link, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 const categories = [
@@ -20,7 +21,7 @@ const categories = [
 ];
 
 const sortOptions = [
-  { id: "default", label: "推薦排序" },
+  { id: "sales", label: "銷售量排序" },
   { id: "price-asc", label: "價格低到高" },
   { id: "price-desc", label: "價格高到低" },
   { id: "newest", label: "最新商品" },
@@ -30,17 +31,21 @@ export default function Products() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const initialCategory = params.get("category") || "all";
-  const initialSort = params.get("sort") || "default";
+  const initialSort = params.get("sort") || "sales";
 
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState(initialSort);
   const [showFilter, setShowFilter] = useState(false);
   const { addToCart } = useCart();
+  const { data: productSalesTotals = [] } = trpc.order.getProductSalesTotals.useQuery();
+  const salesQtyByProductId = new Map(
+    productSalesTotals.map((item) => [item.productId, item.totalQty])
+  );
 
   useEffect(() => {
     const p = new URLSearchParams(search);
     setActiveCategory(p.get("category") || "all");
-    setSortBy(p.get("sort") || "default");
+    setSortBy(p.get("sort") || "sales");
   }, [search]);
 
   const filtered = products
@@ -48,6 +53,9 @@ export default function Products() {
       activeCategory === "all" || p.category === activeCategory
     )
     .sort((a, b) => {
+      if (sortBy === "sales" || sortBy === "default") {
+        return (salesQtyByProductId.get(b.id) ?? 0) - (salesQtyByProductId.get(a.id) ?? 0);
+      }
       if (sortBy === "price-asc") return a.price - b.price;
       if (sortBy === "price-desc") return b.price - a.price;
       return 0;
