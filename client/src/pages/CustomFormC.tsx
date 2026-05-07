@@ -304,7 +304,7 @@ export default function CustomFormC() {
     {
       title: "完成！付完訂金後記得加入 LINE",
       subtitle: "",
-      required: true,
+      required: false,
       field: (
         <div className="space-y-6">
           <div className="p-5 rounded-sm" style={{ backgroundColor: "oklch(0.97 0.03 145)", border: "1px solid oklch(0.85 0.06 145)" }}>
@@ -328,18 +328,17 @@ export default function CustomFormC() {
           </div>
           <div>
             <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
-              Instagram 帳號
+              Instagram 帳號（選填）
             </label>
             <input
               type="text"
               value={form.igHandle}
               onChange={(e) => setForm({ ...form, igHandle: e.target.value })}
               placeholder="例如：@your_ig_handle"
-              required
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
             />
             <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
-              請填寫 IG 帳號，老闆也可透過 IG 私訊聯絡您
+              請填寫 IG 帳號，設計師也可透過 IG 私訊聯絡您
             </p>
           </div>
         </div>
@@ -361,7 +360,6 @@ export default function CustomFormC() {
 
   const handleSubmit = () => {
     if (!depositProduct) { toast.error("找不到訂金商品，請聯繫客服"); return; }
-    if (!form.igHandle.trim()) { toast.error("請填寫 Instagram 帳號"); return; }
     sessionStorage.setItem("customConsultationNote", buildNote(form));
     addToCart(depositProduct);
     setIsOpen(false);
