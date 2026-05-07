@@ -1,6 +1,6 @@
 // 椛˙Crystal — 塔羅 × 水晶手鍊報名表單
 import { useState } from "react";
-import { ChevronRight, ChevronLeft, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
@@ -202,8 +202,6 @@ function buildNote(tarot: TarotData, bracelet: BraceletData): string {
 export default function CustomFormB() {
   const [tarot, setTarot] = useState<TarotData>(EMPTY_TAROT);
   const [bracelet, setBracelet] = useState<BraceletData>(EMPTY_BRACELET);
-  const [phase, setPhase] = useState<"tarot-topic" | "tarot-data" | "bracelet">("tarot-topic");
-  const [braceletStep, setBraceletStep] = useState(0);
   const [, navigate] = useLocation();
   const { addToCart, setIsOpen } = useCart();
 
@@ -555,14 +553,6 @@ export default function CustomFormB() {
     },
   ];
 
-  // ── 進度顯示 ──────────────────────────────────────────────────────────────
-
-  const totalSteps = 2 + braceletSteps.length; // 選主題 + 塔羅資料 + 8 手鍊步驟
-  const currentStepNum =
-    phase === "tarot-topic" ? 1
-    : phase === "tarot-data" ? 2
-    : 2 + braceletStep + 1;
-
   // ── 驗證 ──────────────────────────────────────────────────────────────────
 
   function validateTarotData(): boolean {
@@ -588,11 +578,11 @@ export default function CustomFormB() {
     return true;
   }
 
-  function validateBraceletStep(): boolean {
-    if (braceletStep === 1 && !bracelet.wristSize) { toast.error("請填寫手圍尺寸"); return false; }
-    if (braceletStep === 2 && !bracelet.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
-    if (braceletStep === 3 && !bracelet.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
-    if (braceletStep === 4 && (!bracelet.silverTube || !bracelet.beadFrame)) { toast.error("請選擇銀管和珠框的偏好"); return false; }
+  function validateBraceletData(): boolean {
+    if (!bracelet.wristSize) { toast.error("請填寫手圍尺寸"); return false; }
+    if (!bracelet.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
+    if (!bracelet.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
+    if (!bracelet.silverTube || !bracelet.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
     return true;
   }
 
@@ -600,6 +590,10 @@ export default function CustomFormB() {
 
   function handleSubmit() {
     if (!depositProduct) { toast.error("找不到訂金商品，請聯繫客服"); return; }
+    if (!tarot.topic) { toast.error("請選擇占卜主題"); return; }
+    if (tarot.group === "single_q") return;
+    if (!validateTarotData()) return;
+    if (!validateBraceletData()) return;
     sessionStorage.setItem("customConsultationNote", buildNote(tarot, bracelet));
     const priceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
     const unitPrice = depositProduct.price + priceAdjust;
@@ -609,42 +603,7 @@ export default function CustomFormB() {
     toast.success("諮詢內容已儲存，請完成結帳以預約訂金");
   }
 
-  // ── 上一步 ────────────────────────────────────────────────────────────────
-
-  function handleBack() {
-    if (phase === "tarot-topic") { navigate("/custom"); return; }
-    if (phase === "tarot-data") { setPhase("tarot-topic"); return; }
-    if (phase === "bracelet" && braceletStep === 0) { setPhase("tarot-data"); return; }
-    setBraceletStep((s) => s - 1);
-  }
-
-  // ── 下一步 ────────────────────────────────────────────────────────────────
-
-  function handleNext() {
-    if (phase === "tarot-topic") {
-      if (!tarot.topic) { toast.error("請選擇占卜主題"); return; }
-      if (tarot.group === "single_q") return; // 單題制不繼續
-      setPhase("tarot-data");
-      return;
-    }
-    if (phase === "tarot-data") {
-      if (!validateTarotData()) return;
-      setPhase("bracelet");
-      setBraceletStep(0);
-      return;
-    }
-    if (phase === "bracelet") {
-      if (!validateBraceletStep()) return;
-      if (braceletStep === braceletSteps.length - 1) {
-        handleSubmit();
-      } else {
-        setBraceletStep((s) => s + 1);
-      }
-    }
-  }
-
-  const isLastStep = phase === "bracelet" && braceletStep === braceletSteps.length - 1;
-  const currentStep = phase === "bracelet" ? braceletSteps[braceletStep] : null;
+  const canShowDetails = Boolean(tarot.topic) && tarot.group !== "single_q";
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -655,7 +614,7 @@ export default function CustomFormB() {
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/custom">
             <button className="flex items-center gap-1.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors">
-              <ChevronLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" />
               返回
             </button>
           </Link>
@@ -667,24 +626,10 @@ export default function CustomFormB() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Progress */}
-        <div className="mb-8">
-          <div className="flex items-center gap-1 mb-2">
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i < currentStepNum ? "bg-[oklch(0.65_0.12_290)]" : "bg-[oklch(0.88_0_0)]"}`} />
-            ))}
-          </div>
-          <p className="text-xs font-body text-[oklch(0.55_0_0)]">
-            步驟 {currentStepNum} / {totalSteps}
-            {currentStep && !currentStep.required && <span className="ml-2 text-[oklch(0.65_0_0)]">（選填）</span>}
-          </p>
-        </div>
-
-        {/* ── Phase: 塔羅主題選擇 ── */}
-        {phase === "tarot-topic" && (
-          <div className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8 mb-6">
+        <div className="space-y-5 mb-8">
+          <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
             <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              想占卜哪個主題？
+              1. 想占卜哪個主題？
             </h2>
             {/* 動態總價顯示 */}
             {tarot.group !== "single_q" && (
@@ -764,56 +709,49 @@ export default function CustomFormB() {
                 </a>
               </div>
             )}
-          </div>
-        )}
+          </section>
 
-        {/* ── Phase: 塔羅資料填寫 ── */}
-        {phase === "tarot-data" && (
-          <div className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8 mb-6">
+          {canShowDetails && (
+            <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
             <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-1" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {tarot.topic} — 占卜所需資料
+              2. {tarot.topic} — 占卜所需資料
             </h2>
             <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">請填寫以下資料，讓老闆為您進行解析</p>
             {tarotDataFields()}
-          </div>
-        )}
+            </section>
+          )}
 
-        {/* ── Phase: 手鍊偏好 ── */}
-        {phase === "bracelet" && currentStep && (
-          <div className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8 mb-6">
-            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase mb-2">水晶手鍊偏好</p>
-            <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-2" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {currentStep.title}
-            </h2>
-            <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">{currentStep.subtitle}</p>
-            {currentStep.field}
-          </div>
-        )}
+          {canShowDetails && braceletSteps.map((item, index) => (
+            <section key={item.title} className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
+              <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase mb-2">水晶手鍊偏好</p>
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <h2 className="text-lg font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  {index + 3}. {item.title}
+                </h2>
+                {!item.required && <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">選填</span>}
+              </div>
+              {item.subtitle && (
+                <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">{item.subtitle}</p>
+              )}
+              {item.field}
+            </section>
+          ))}
+        </div>
 
-        {/* Navigation */}
         <div className="flex items-center justify-between">
-          <button type="button" onClick={handleBack}
+          <button type="button" onClick={() => navigate("/custom")}
             className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm">
-            <ChevronLeft className="w-4 h-4" />
-            {phase === "tarot-topic" ? "返回方案頁" : "上一步"}
+            <ArrowLeft className="w-4 h-4" />
+            返回方案頁
           </button>
 
           {tarot.group !== "single_q" && (
-            isLastStep ? (
-              <button type="button" onClick={handleNext}
-                className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-                style={{ backgroundColor: "oklch(0.65 0.12 290)" }}>
-                <Check className="w-4 h-4" />
-                確認，前往下訂金
-              </button>
-            ) : (
-              <button type="button" onClick={handleNext}
-                className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-                style={{ backgroundColor: "oklch(0.65 0.12 290)" }}>
-                下一步
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            )
+            <button type="button" onClick={handleSubmit}
+              className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
+              style={{ backgroundColor: "oklch(0.65 0.12 290)" }}>
+              <Check className="w-4 h-4" />
+              確認，前往下訂金
+            </button>
           )}
         </div>
       </div>

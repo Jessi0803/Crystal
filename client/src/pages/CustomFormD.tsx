@@ -1,6 +1,6 @@
 // 椛˙Crystal — 生命靈數 × 水晶手鍊報名表單
 import { useState } from "react";
-import { ChevronRight, ChevronLeft, Check } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
@@ -59,7 +59,6 @@ const ACCENT = "oklch(0.68 0.11 30)";
 
 export default function CustomFormD() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const [step, setStep] = useState(0);
   const [, navigate] = useLocation();
   const { addToCart, setIsOpen } = useCart();
 
@@ -346,20 +345,19 @@ export default function CustomFormD() {
     },
   ];
 
-  const isLast = step === steps.length - 1;
-
-  const handleNext = () => {
-    if (step === 0 && !form.name.trim()) { toast.error("請填寫姓名"); return; }
-    if (step === 1 && !form.birthday.trim()) { toast.error("請填寫西元生日"); return; }
-    if (step === 3 && !form.wristSize) { toast.error("請填寫手圍尺寸"); return; }
-    if (step === 4 && !form.fitPreference) { toast.error("請選擇鬆緊偏好"); return; }
-    if (step === 5 && !form.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return; }
-    if (step === 6 && (!form.silverTube || !form.beadFrame)) { toast.error("請選擇銀管和珠框的偏好"); return; }
-    setStep((s) => s + 1);
+  const validateForm = () => {
+    if (!form.name.trim()) { toast.error("請填寫姓名"); return false; }
+    if (!form.birthday.trim()) { toast.error("請填寫西元生日"); return false; }
+    if (!form.wristSize) { toast.error("請填寫手圍尺寸"); return false; }
+    if (!form.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
+    if (!form.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
+    if (!form.silverTube || !form.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
+    return true;
   };
 
   const handleSubmit = () => {
     if (!depositProduct) { toast.error("找不到訂金商品，請聯繫客服"); return; }
+    if (!validateForm()) return;
     sessionStorage.setItem("customConsultationNote", buildNote(form));
     addToCart(depositProduct);
     setIsOpen(false);
@@ -374,7 +372,7 @@ export default function CustomFormD() {
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/custom">
             <button className="flex items-center gap-1.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors">
-              <ChevronLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" />
               返回
             </button>
           </Link>
@@ -386,70 +384,47 @@ export default function CustomFormD() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Progress */}
-        <div className="mb-8">
-          <div className="flex items-center gap-1.5 mb-2">
-            {steps.map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 flex-1 rounded-full transition-colors ${
-                  i <= step ? "bg-[oklch(0.68_0.11_30)]" : "bg-[oklch(0.88_0_0)]"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="text-xs font-body text-[oklch(0.55_0_0)]">
-            步驟 {step + 1} / {steps.length}
-            {!steps[step].required && <span className="ml-2 text-[oklch(0.65_0_0)]">（選填）</span>}
-          </p>
+        <div className="space-y-5 mb-8">
+          {steps.map((item, index) => (
+            <section key={item.title} className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <h2
+                  className="text-lg font-medium text-[oklch(0.1_0_0)]"
+                  style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
+                >
+                  {index + 1}. {item.title}
+                </h2>
+                {!item.required && <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">選填</span>}
+              </div>
+              {item.subtitle && (
+                <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
+                  {item.subtitle}
+                </p>
+              )}
+              {item.field}
+            </section>
+          ))}
         </div>
 
-        {/* Step Content */}
-        <div className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8 mb-6">
-          <h2
-            className="text-xl font-medium text-[oklch(0.1_0_0)] mb-2"
-            style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-          >
-            {steps[step].title}
-          </h2>
-          <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
-            {steps[step].subtitle}
-          </p>
-          {steps[step].field}
-        </div>
-
-        {/* Navigation */}
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={step === 0 ? () => navigate("/custom") : () => setStep((s) => s - 1)}
+            onClick={() => navigate("/custom")}
             className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
           >
-            <ChevronLeft className="w-4 h-4" />
-            {step === 0 ? "返回方案頁" : "上一步"}
+            <ArrowLeft className="w-4 h-4" />
+            返回方案頁
           </button>
 
-          {isLast ? (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-              style={{ backgroundColor: ACCENT }}
-            >
-              <Check className="w-4 h-4" />
-              確認，前往下訂金
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleNext}
-              className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-              style={{ backgroundColor: ACCENT }}
-            >
-              下一步
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
+            style={{ backgroundColor: ACCENT }}
+          >
+            <Check className="w-4 h-4" />
+            確認，前往下訂金
+          </button>
         </div>
       </div>
     </div>
