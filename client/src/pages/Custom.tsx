@@ -175,7 +175,7 @@ export default function Custom() {
                   <h3 className="text-xl md:text-2xl font-serif-zh text-[#2f2f2f] mb-3 tracking-[0.12em] font-medium leading-snug">
                     {plan.title}
                   </h3>
-                  <div className="inline-flex max-w-full flex-col gap-1 rounded-2xl bg-white/55 px-3.5 py-2.5 ring-1 ring-[#8E735B]/10">
+                  <div className="inline-flex max-w-full flex-col gap-1">
                     <p className="text-[9px] text-[#8E735B]/65 tracking-[0.24em] uppercase font-medium">
                       費用
                     </p>
