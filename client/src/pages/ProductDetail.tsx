@@ -69,6 +69,7 @@ export default function ProductDetail() {
     : product.price;
   const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
+  const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
 
   const handleAddToCart = () => {
     for (let i = 0; i < qty; i++) {
@@ -163,16 +164,39 @@ export default function ProductDetail() {
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
               {product.priceRange ? (
                 <>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                      {product.priceRange}
-                    </span>
-                  </div>
-                  <p className="text-sm font-body text-[oklch(0.5_0_0)]">
-                    {product.depositRange
-                      ? `下單先支付訂金 ${product.depositRange}（依占卜主題調整），尾款由老闆確認後另行通知`
-                      : `下單先支付訂金 NT$ ${currentPrice.toLocaleString()}，尾款由老闆確認後另行通知`}
-                  </p>
+                  {isChakraDepositProduct ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
+                        <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                          手鍊價格
+                        </p>
+                        <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                          NT$1,200 ~ 1,800
+                        </p>
+                      </div>
+                      <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
+                        <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                          脈輪檢測價格
+                        </p>
+                        <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                          NT$500
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                          {product.priceRange}
+                        </span>
+                      </div>
+                      <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+                        {product.depositRange
+                          ? `下單先支付訂金 ${product.depositRange}（依占卜主題調整），尾款由老闆確認後另行通知`
+                          : `下單先支付訂金 NT$ ${currentPrice.toLocaleString()}，尾款由老闆確認後另行通知`}
+                      </p>
+                    </>
+                  )}
                 </>
               ) : (
               <div className="flex items-baseline gap-3">

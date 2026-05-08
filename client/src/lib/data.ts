@@ -84,7 +84,7 @@ export const products: Product[] = [
     category: "custom",
     categoryLabel: "客製化",
     price: 1000,
-    priceRange: "NT$1,700 ~ NT$2,300",
+    priceRange: "手鍊 NT$1,200 ~ 1,800｜脈輪檢測 NT$500",
     image: "/images/custom-chakra2.jpg",
     tags: ["脈輪"],
     description: "脈輪檢測 × 水晶手鍊客製化服務訂金。",
