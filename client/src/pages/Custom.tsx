@@ -153,24 +153,27 @@ export default function Custom() {
 
       {/* 四大方案 */}
       <section className="max-w-7xl mx-auto px-6 py-32 relative">
-        <div className="text-center mb-24 reveal opacity-0 translate-y-10 transition-all duration-1000">
+        <div className="text-center mb-16 md:mb-20 reveal opacity-0 translate-y-10 transition-all duration-1000 max-w-lg mx-auto">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Star size={14} className="text-[#D8C3BD] fill-[#D8C3BD]" />
-            <h2 className="text-2xl font-serif-zh text-[#333] tracking-[0.4em] font-light italic">
+            <h2 className="text-2xl md:text-[1.65rem] font-serif-zh text-[#333] tracking-[0.25em] font-light italic">
               四大客製方案
             </h2>
             <Star size={14} className="text-[#D8C3BD] fill-[#D8C3BD]" />
           </div>
-          <p className="text-[10px] text-[#8E735B] tracking-[0.3em] uppercase opacity-60">
+          <p className="text-[10px] text-[#8E735B] tracking-[0.28em] uppercase opacity-60 mb-3">
             Professional Consultation
+          </p>
+          <p className="text-[13px] text-[#666] font-serif-zh font-light leading-relaxed tracking-wide">
+            先看重點與費用；訂購步驟與注意事項可於卡片內展開閱讀。
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 max-w-5xl mx-auto">
           {plans.map((plan, i) => (
             <div
               key={i}
-              className={`reveal opacity-0 translate-y-10 transition-all duration-1000 rounded-[3rem] border border-white shadow-[0_15px_45px_rgba(216,195,189,0.06)] hover:shadow-[0_30px_80px_rgba(216,195,189,0.15)] duration-700 group relative overflow-hidden ${plan.bgColor} backdrop-blur-xl flex flex-col`}
+              className={`reveal opacity-0 translate-y-10 transition-all duration-1000 rounded-[1.75rem] border border-white/90 shadow-[0_8px_32px_rgba(90,78,70,0.06),0_1px_0_rgba(255,255,255,0.9)_inset] hover:shadow-[0_20px_48px_rgba(142,115,91,0.12)] duration-700 group relative overflow-hidden ${plan.bgColor} flex flex-col ring-1 ring-black/[0.03]`}
               style={{ transitionDelay: `${i * 150}ms` }}
             >
               {/* 背景編號 */}
@@ -178,58 +181,64 @@ export default function Custom() {
                 {plan.id}
               </div>
 
-              <div className="p-10 md:p-14 flex flex-col h-full relative z-10">
+              <div className="p-8 md:p-11 flex flex-col h-full relative z-10">
                 {/* Header */}
-                <div className="mb-8 text-center">
-                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#8E735B] shadow-sm mx-auto mb-6 group-hover:scale-110 transition-transform duration-700">
+                <div className="mb-7 text-center">
+                  <div className="w-11 h-11 rounded-2xl bg-white/90 flex items-center justify-center text-[#8E735B] shadow-sm mx-auto mb-5 group-hover:scale-[1.03] transition-transform duration-500 ring-1 ring-[#8E735B]/10">
                     {plan.icon}
                   </div>
-                  <h3 className="text-2xl font-serif-zh text-[#333] mb-4 tracking-[0.15em] font-medium">
+                  <h3 className="text-xl md:text-2xl font-serif-zh text-[#2f2f2f] mb-3 tracking-[0.12em] font-medium leading-snug">
                     {plan.title}
                   </h3>
-                  <p className="text-lg font-serif-en text-[#8E735B] tracking-[0.1em] font-light italic">
+                  <p className="inline-block text-sm md:text-base font-serif-en text-[#8E735B] tracking-[0.06em] font-light italic px-3 py-1 rounded-full bg-white/55 ring-1 ring-[#8E735B]/10">
                     費用：{plan.price}
                   </p>
                 </div>
 
-                <div className="w-10 h-px bg-[#8E735B]/10 mx-auto mb-10" />
+                <div className="w-12 max-w-full h-px bg-gradient-to-r from-transparent via-[#8E735B]/15 to-transparent mx-auto mb-8" />
 
                 {/* 服務內容 */}
-                <div className="flex-grow">
-                  <span className="text-xs text-[#8E735B]/60 tracking-[0.5em] uppercase block mb-8 text-center font-medium">
+                <div className="flex-grow rounded-2xl bg-white/35 ring-1 ring-white/60 px-5 py-6 md:px-6 md:py-7">
+                  <span className="text-[11px] text-[#8E735B]/75 tracking-[0.35em] uppercase block mb-5 text-center font-medium">
                     服務內容
                   </span>
-                  <ul className="space-y-6">
+                  <ul className="space-y-5">
                     {plan.features.map((feature, idx) => (
                       <li
                         key={idx}
-                        className="flex items-start gap-4 text-base text-[#555] leading-relaxed font-light tracking-wide text-left"
+                        className="text-[15px] md:text-base text-[#4a4a4a] leading-[1.75] font-light tracking-wide text-left border-l-[3px] border-[#D8C3BD]/45 pl-4"
                       >
-                        <div className="mt-2.5 w-1 h-1 rounded-full bg-[#D8C3BD]/60 shrink-0" />
-                        <span>{feature}</span>
+                        {feature}
                       </li>
                     ))}
                   </ul>
                 </div>
 
                 {/* 訂購流程 + 手鍊注意事項：收合顯示，內文完整保留 */}
-                <details className="custom-plan-fold mt-10 pt-10 border-t border-[#8E735B]/10">
-                  <summary className="cursor-pointer list-none text-center [&::-webkit-details-marker]:hidden">
-                    <span className="inline-flex items-center justify-center gap-2 rounded-full border border-[#8E735B]/20 bg-white/40 px-4 py-2.5 text-xs text-[#8E735B]/90 tracking-[0.2em] font-medium hover:bg-white/70 transition-colors">
+                <details className="custom-plan-fold mt-8 pt-8 border-t border-[#8E735B]/10">
+                  <summary className="cursor-pointer list-none w-full rounded-xl border border-[#8E735B]/12 bg-white/45 px-4 py-3.5 hover:bg-white/70 hover:border-[#8E735B]/18 transition-all duration-300 shadow-sm [&::-webkit-details-marker]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E735B]/40">
+                    <span className="flex w-full items-center justify-between gap-3 text-left">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-serif-zh text-[#4a3f36] tracking-wide font-medium leading-snug">
+                          訂購流程與手鍊注意事項
+                        </span>
+                        <span className="mt-1 block text-[11px] text-[#8E735B]/75 font-light tracking-wide">
+                          點開看全文
+                        </span>
+                      </span>
                       <ChevronDown
-                        size={16}
+                        size={18}
                         strokeWidth={1.5}
-                        className="fold-chevron shrink-0 opacity-70 transition-transform duration-300"
+                        className="fold-chevron shrink-0 text-[#8E735B]/55"
                       />
-                      訂購流程與手鍊注意事項（點開看全文）
                     </span>
                   </summary>
-                  <div className="mt-8 space-y-8 border-t border-transparent pt-2">
+                  <div className="mt-4 space-y-6 rounded-xl border border-[#E8E2DE]/50 bg-white/40 p-5 md:p-6">
                     <div>
-                      <span className="text-xs text-[#8E735B]/70 tracking-[0.35em] uppercase block mb-4 text-center font-medium">
+                      <span className="text-[11px] text-[#8E735B]/80 tracking-[0.28em] uppercase block mb-3 font-medium">
                         訂購流程
                       </span>
-                      <ol className="space-y-3 text-sm text-[#555] leading-relaxed font-light tracking-wide list-decimal list-inside marker:text-[#8E735B]/80">
+                      <ol className="ml-1 list-outside list-decimal space-y-3 pl-5 text-sm text-[#444] leading-[1.75] font-light tracking-wide marker:font-medium marker:text-[#8E735B]">
                         <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
                         <li>支付訂金。</li>
                         <li>
@@ -238,7 +247,7 @@ export default function Custom() {
                             href={LINE_URL}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[#8E735B] underline underline-offset-2 mx-0.5"
+                            className="font-medium text-[#8E735B] underline decoration-[#8E735B]/35 underline-offset-[3px] hover:decoration-[#8E735B]"
                           >
                             官方 LINE
                           </a>
@@ -249,16 +258,18 @@ export default function Custom() {
                       </ol>
                     </div>
 
-                    <div className="rounded-2xl bg-white/60 border border-amber-200/50 px-5 py-5 shadow-sm">
-                      <p className="text-sm font-serif-zh text-[#6b5344] tracking-wide mb-3 flex items-center gap-2">
-                        <span className="text-amber-600">⚠️</span>
+                    <div className="rounded-xl bg-[#faf8f5] ring-1 ring-stone-200/80 px-5 py-4 md:px-6 md:py-5">
+                      <p className="text-sm font-serif-zh text-[#5c4d42] tracking-wide mb-3 flex items-center gap-2">
+                        <span className="text-amber-600/90" aria-hidden>
+                          ⚠️
+                        </span>
                         手鍊注意事項
                       </p>
-                      <div className="space-y-3 text-xs text-[#666] leading-relaxed font-light tracking-wide">
+                      <div className="space-y-3.5 text-[13px] text-[#5a5a5a] leading-[1.8] font-light tracking-wide">
                         {BRACELET_NOTICES.map((n, idx) => (
                           <div key={idx}>
                             {n.title ? (
-                              <p className="font-medium text-[#555] mb-1">{n.title}</p>
+                              <p className="font-medium text-[#4a4a4a] mb-1">{n.title}</p>
                             ) : null}
                             <p>{n.body}</p>
                           </div>
@@ -269,13 +280,16 @@ export default function Custom() {
                 </details>
 
                 {/* 按鈕 */}
-                <div className="mt-12 pt-8 border-t border-[#8E735B]/5">
+                <div className="mt-9 pt-7 border-t border-[#8E735B]/8">
                   <Link href={plan.formPath}>
-                    <button className="w-full py-5 rounded-2xl bg-white/50 border border-[#D8C3BD]/20 text-[#8E735B] text-xs tracking-[0.5em] uppercase hover:bg-[#8E735B] hover:text-white hover:border-[#8E735B] transition-all duration-500 shadow-sm flex items-center justify-center gap-3 group/btn">
-                      填寫報名表單{" "}
+                    <button
+                      type="button"
+                      className="w-full py-4 rounded-xl bg-[#8E735B] text-white text-sm tracking-[0.35em] border border-[#7a634e] shadow-md shadow-[#8E735B]/15 hover:bg-[#7a634e] hover:shadow-lg hover:shadow-[#8E735B]/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
+                    >
+                      填寫報名表單
                       <ArrowRight
-                        size={14}
-                        className="group-hover/btn:translate-x-2 transition-transform"
+                        size={16}
+                        className="opacity-90 group-hover/btn:translate-x-1 transition-transform"
                       />
                     </button>
                   </Link>
