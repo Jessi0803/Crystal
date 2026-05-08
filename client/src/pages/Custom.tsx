@@ -16,26 +16,12 @@ import {
   Zap,
 } from "lucide-react";
 import { Link } from "wouter";
+import {
+  CUSTOM_BRACELET_NOTICES,
+  CUSTOM_LINE_URL,
+} from "@/lib/customOrderingContent";
 
-const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
-
-/** 四方案卡片內共用：手鍊初版／維修與修改規範 */
-const BRACELET_NOTICES = [
-  {
-    title: "《初版、維修》",
-    body:
-      "我們提供免費一次改初版和維修，但是不接受改手圍、新增條件（要銀管、要珠框、不要紫色、要磁扣等等）～因為這樣屬重新打掉設計，需加收費用 200 元，請在預約時直接跟我說🤍",
-  },
-  {
-    title: null,
-    body:
-      "初版、維修可調整的部分為有不喜歡的配飾可以更改、水晶／配飾擺放順序，有不清楚的也可以詢問我～🤍",
-  },
-  {
-    title: null,
-    body: "另外，如想要再改第二次，需加收 200 元的費用～",
-  },
-];
+const LINE_URL = CUSTOM_LINE_URL;
 
 const plans = [
   {
@@ -266,7 +252,7 @@ export default function Custom() {
                         手鍊注意事項
                       </p>
                       <div className="space-y-3.5 text-[13px] text-[#5a5a5a] leading-[1.8] font-light tracking-wide">
-                        {BRACELET_NOTICES.map((n, idx) => (
+                        {CUSTOM_BRACELET_NOTICES.map((n, idx) => (
                           <div key={idx}>
                             {n.title ? (
                               <p className="font-medium text-[#4a4a4a] mb-1">{n.title}</p>
