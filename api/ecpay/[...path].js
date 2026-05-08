@@ -326,8 +326,12 @@ var orders = mysqlTable("orders", {
     // 已出貨
     "arrived",
     // 已到店/已送達
+    "picked_up",
+    // 已取貨
+    "not_picked",
+    // 未取貨/退件
     "completed",
-    // 已完成（已領取）
+    // 已完成
     "cancelled"
     // 已取消
   ]).default("pending_payment").notNull(),
@@ -387,6 +391,9 @@ var orderBalancePayments = mysqlTable("orderBalancePayments", {
   orderId: int("orderId").notNull().unique(),
   merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
   amount: int("amount").notNull(),
+  shippingFee: int("shippingFee").default(0).notNull(),
+  paymentFee: int("paymentFee").default(0).notNull(),
+  totalAmount: int("totalAmount").notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["credit", "atm"]).default("credit").notNull(),
   paymentStatus: mysqlEnum("paymentStatus", [
     "pending",
@@ -449,6 +456,23 @@ var logisticsOrders = mysqlTable("logisticsOrders", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
+var chatbotLogs = mysqlTable("chatbotLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  userId: int("userId"),
+  customerName: varchar("customerName", { length: 100 }),
+  customerEmail: varchar("customerEmail", { length: 320 }),
+  customerQuestion: text("customerQuestion").notNull(),
+  botReply: text("botReply").notNull(),
+  relatedProducts: json("relatedProducts"),
+  retrievedQuestions: json("retrievedQuestions"),
+  pagePath: varchar("pagePath", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+}, (table) => [
+  index("chatbot_logs_created_at_idx").on(table.createdAt),
+  index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
+  index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt)
+]);
 
 // server/db.ts
 var ADMIN_EMAIL_ALLOWLIST = new Set(
@@ -474,6 +498,29 @@ async function getDb() {
 var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
 
 // server/orderDb.ts
+var balancePaymentLegacySelect = {
+  id: orderBalancePayments.id,
+  orderId: orderBalancePayments.orderId,
+  merchantTradeNo: orderBalancePayments.merchantTradeNo,
+  amount: orderBalancePayments.amount,
+  paymentMethod: orderBalancePayments.paymentMethod,
+  paymentStatus: orderBalancePayments.paymentStatus,
+  transferLastFive: orderBalancePayments.transferLastFive,
+  tradeNo: orderBalancePayments.tradeNo,
+  ecpayNotifyData: orderBalancePayments.ecpayNotifyData,
+  paidAt: orderBalancePayments.paidAt,
+  createdAt: orderBalancePayments.createdAt,
+  updatedAt: orderBalancePayments.updatedAt
+};
+function hydrateBalancePayment(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    shippingFee: 0,
+    paymentFee: 0,
+    totalAmount: row.amount
+  };
+}
 async function getOrderByMerchantTradeNo(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -503,13 +550,13 @@ async function updateLogisticsStatus(logisticsMerchantTradeNo, status, extra) {
 async function getBalancePaymentByMerchantTradeNo(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const [row] = await db.select().from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
-  return row ?? null;
+  const [row] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
+  return hydrateBalancePayment(row);
 }
 async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const [balance] = await db.select().from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
+  const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!balance) return null;
   await db.update(orderBalancePayments).set({
     paymentStatus: status,
@@ -520,7 +567,7 @@ async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, noti
   if (status === "paid") {
     await db.update(orders).set({ orderStatus: "paid" }).where(eq2(orders.id, balance.orderId));
   }
-  return balance;
+  return hydrateBalancePayment(balance);
 }
 
 // server/inventoryDb.ts
@@ -739,12 +786,12 @@ ${inputs}
       else if (rtnCode === "3022" || rtnCode === "3028") newStatus = "returned";
       else if (["3002", "3003", "3004"].includes(rtnCode)) newStatus = "failed";
       await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus);
-      if (newStatus === "arrived" || newStatus === "picked_up") {
+      if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
         const db = await getDb();
         if (db) {
           const [logistics] = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq4(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1);
           if (logistics) {
-            const orderStatus = newStatus === "arrived" ? "arrived" : "completed";
+            const orderStatus = newStatus === "arrived" ? "arrived" : newStatus === "picked_up" ? "picked_up" : "not_picked";
             await db.update(orders).set({ orderStatus }).where(eq4(orders.id, logistics.orderId));
           }
         }

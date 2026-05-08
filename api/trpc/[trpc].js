@@ -11,6 +11,7 @@ var __export = (target, all) => {
 // drizzle/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
+  chatbotLogs: () => chatbotLogs,
   inventoryLocks: () => inventoryLocks,
   logisticsOrders: () => logisticsOrders,
   orderBalancePayments: () => orderBalancePayments,
@@ -20,7 +21,7 @@ __export(schema_exports, {
   users: () => users
 });
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
-var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders;
+var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -257,6 +258,23 @@ var init_schema = __esm({
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
     });
+    chatbotLogs = mysqlTable("chatbotLogs", {
+      id: int("id").autoincrement().primaryKey(),
+      sessionId: varchar("sessionId", { length: 64 }).notNull(),
+      userId: int("userId"),
+      customerName: varchar("customerName", { length: 100 }),
+      customerEmail: varchar("customerEmail", { length: 320 }),
+      customerQuestion: text("customerQuestion").notNull(),
+      botReply: text("botReply").notNull(),
+      relatedProducts: json("relatedProducts"),
+      retrievedQuestions: json("retrievedQuestions"),
+      pagePath: varchar("pagePath", { length: 255 }),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    }, (table) => [
+      index("chatbot_logs_created_at_idx").on(table.createdAt),
+      index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
+      index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt)
+    ]);
   }
 });
 
@@ -1770,10 +1788,6 @@ var OVERSEAS_SHIPPING_FEES = {
   GB: 644,
   AU: 552
 };
-var PAYMENT_FEE_RATES = {
-  credit: 0.02,
-  paypal: 0.06
-};
 function isCheckoutFeeExemptProduct(item) {
   const productId = item.baseProductId ?? item.id;
   return CUSTOM_PRODUCT_IDS.includes(productId) || productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
@@ -1791,8 +1805,7 @@ function calcCheckoutFees(params) {
   const appliesFees = chargeableSubtotal > 0;
   const domesticFreeShipping = params.checkoutRegion === "domestic" && calcBraceletQuantityForFreeShipping(params.items) >= 2;
   const shippingFee = !appliesFees ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
-  const paymentFeeRate = appliesFees ? PAYMENT_FEE_RATES[params.paymentMethod] ?? 0 : 0;
-  const paymentFee = Math.ceil((chargeableSubtotal + shippingFee) * paymentFeeRate);
+  const paymentFee = 0;
   const total = subtotal + shippingFee + paymentFee;
   return {
     subtotal,
@@ -1960,16 +1973,6 @@ var orderRouter = router({
         baseProductId: "shipping-fee",
         name: isOverseas ? `\u6D77\u5916\u904B\u8CBB - ${OVERSEAS_SHIP_COUNTRY_LABELS[overseasCountry]}` : shippingMethod === "home" ? "\u904B\u8CBB - \u9ED1\u8C93\u5B85\u6025\u4FBF" : shippingMethod === "cvs_711" ? "\u904B\u8CBB - 7-11\u5E97\u5230\u5E97" : "\u904B\u8CBB - \u5168\u5BB6\u5E97\u5230\u5E97",
         price: feeSummary.shippingFee,
-        quantity: 1,
-        image: ""
-      });
-    }
-    if (feeSummary.paymentFee > 0) {
-      feeItems.push({
-        id: "payment-fee",
-        baseProductId: "payment-fee",
-        name: paymentMethod === "paypal" ? "\u6D77\u5916\u4ED8\u6B3E\u624B\u7E8C\u8CBB\uFF086%\uFF09" : "\u5237\u5361\u624B\u7E8C\u8CBB\uFF082%\uFF09",
-        price: feeSummary.paymentFee,
         quantity: 1,
         image: ""
       });
@@ -2531,6 +2534,7 @@ var orderRouter = router({
 // server/routers/chatbot.ts
 import { z as z3 } from "zod";
 import { TRPCError as TRPCError4 } from "@trpc/server";
+import { and as and4, desc as desc2, or as or2, sql as sql4 } from "drizzle-orm";
 
 // server/faqEmbeddings.json
 var faqEmbeddings_default = [
@@ -156577,7 +156581,7 @@ var knowledgeChunks = [
   {
     id: "faq-payment-methods",
     question: "\u652F\u63F4\u54EA\u4E9B\u4ED8\u6B3E\u65B9\u5F0F\uFF1F",
-    answer: "\u53F0\u7063\u5730\u5340\uFF08\u542B\u96E2\u5CF6\uFF09\uFF1A\u8F49\u5E33\u3001\u4FE1\u7528\u5361\u3001Apple Pay\uFF08\u4FE1\u7528\u5361\u53CA Apple Pay \u9700\u984D\u5916\u652F\u4ED8 2% \u624B\u7E8C\u8CBB\uFF09\u3002\u53F0\u7063\u4EE5\u5916\u5730\u5340\uFF1A\u50C5\u652F\u63F4 PayPal\uFF08\u9700\u984D\u5916\u652F\u4ED8 6% \u624B\u7E8C\u8CBB\uFF09\u3002",
+    answer: "\u53F0\u7063\u5730\u5340\uFF08\u542B\u96E2\u5CF6\uFF09\uFF1A\u8F49\u5E33\u3001\u4FE1\u7528\u5361\u3001Apple Pay\u3002\u53F0\u7063\u4EE5\u5916\u5730\u5340\uFF1A\u50C5\u652F\u63F4 PayPal\u3002",
     embedText: "\u4ED8\u6B3E\u65B9\u5F0F \u652F\u4ED8 \u4FE1\u7528\u5361 \u8F49\u5E33 ATM Apple Pay Paypal \u6D77\u5916\u4ED8\u6B3E",
     keywords: ["\u4ED8\u6B3E\u65B9\u5F0F", "\u4FE1\u7528\u5361", "\u8F49\u5E33", "ATM", "Apple Pay", "Paypal", "\u6D77\u5916"],
     category: "\u5E38\u898B\u554F\u984C"
@@ -156681,7 +156685,7 @@ var knowledgeChunks = [
   {
     id: "faq-overseas-shipping",
     question: "\u53EF\u4EE5\u5BC4\u9001\u5230\u6D77\u5916\u55CE\uFF1F",
-    answer: "\u53EF\u4EE5\uFF0C\u652F\u63F4\u5BC4\u9001\u81F3\u99AC\u4F86\u897F\u4E9E\u3001\u9999\u6E2F\u3001\u65B0\u52A0\u5761\u3001\u7F8E\u570B\u3001\u82F1\u570B\u3001\u6FB3\u6D32\uFF0C\u4ED8\u6B3E\u65B9\u5F0F\u70BA PayPal\uFF08\u9700\u984D\u5916\u652F\u4ED8 6% \u624B\u7E8C\u8CBB\uFF09\u3002",
+    answer: "\u53EF\u4EE5\uFF0C\u652F\u63F4\u5BC4\u9001\u81F3\u99AC\u4F86\u897F\u4E9E\u3001\u9999\u6E2F\u3001\u65B0\u52A0\u5761\u3001\u7F8E\u570B\u3001\u82F1\u570B\u3001\u6FB3\u6D32\uFF0C\u4ED8\u6B3E\u65B9\u5F0F\u70BA PayPal\u3002",
     embedText: "\u6D77\u5916\u5BC4\u9001 \u5BC4\u5230\u570B\u5916 \u6D77\u5916\u914D\u9001 \u99AC\u4F86\u897F\u4E9E \u9999\u6E2F \u65B0\u52A0\u5761 \u7F8E\u570B \u82F1\u570B \u6FB3\u6D32 \u570B\u969B",
     keywords: ["\u6D77\u5916", "\u570B\u5916", "\u99AC\u4F86\u897F\u4E9E", "\u9999\u6E2F", "\u65B0\u52A0\u5761", "\u7F8E\u570B", "\u82F1\u570B", "\u6FB3\u6D32", "\u570B\u969B"],
     category: "\u5E38\u898B\u554F\u984C"
@@ -157157,6 +157161,7 @@ var products = [
 ];
 
 // server/routers/chatbot.ts
+init_schema();
 var SYSTEM_PROMPT = `\u4F60\u662F\u300C\u691B\u02D9Crystal\u300D\u6C34\u6676\u5E97\u7684 AI \u9867\u554F\u52A9\u7406\uFF0C\u540D\u53EB\u300C\u691B\u5C0F\u52A9\u300D\u3002
 
 \u4F60\u7684\u89D2\u8272\uFF1A
@@ -157217,10 +157222,31 @@ async function embedQuery(text2) {
   const data = await res.json();
   return data.embedding.values;
 }
+async function saveChatbotLog(params) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(chatbotLogs).values({
+      sessionId: params.sessionId.slice(0, 64),
+      userId: params.userId ?? null,
+      customerName: params.customerName?.slice(0, 100) ?? null,
+      customerEmail: params.customerEmail?.slice(0, 320) ?? null,
+      customerQuestion: params.customerQuestion,
+      botReply: params.botReply,
+      relatedProducts: params.relatedProducts,
+      retrievedQuestions: params.retrievedQuestions,
+      pagePath: params.pagePath?.slice(0, 255) ?? null
+    });
+  } catch (error) {
+    console.warn("[chatbot] failed to save log:", error);
+  }
+}
 var chatbotRouter = router({
   chat: publicProcedure.input(
     z3.object({
       message: z3.string().min(1).max(500),
+      sessionId: z3.string().min(1).max(64).optional(),
+      pagePath: z3.string().max(255).optional(),
       history: z3.array(
         z3.object({
           role: z3.enum(["user", "assistant"]),
@@ -157228,7 +157254,16 @@ var chatbotRouter = router({
         })
       ).max(10).default([])
     })
-  ).mutation(async ({ input }) => {
+  ).mutation(async ({ input, ctx }) => {
+    const sessionId = input.sessionId || `server-${Date.now()}`;
+    const baseLog = {
+      sessionId,
+      userId: ctx.user?.id ?? null,
+      customerName: ctx.user?.name ?? null,
+      customerEmail: ctx.user?.email ?? null,
+      customerQuestion: input.message,
+      pagePath: input.pagePath ?? null
+    };
     const lastTurn = input.history.slice(-2).map((h) => h.content).join(" ");
     const queryText = lastTurn ? `${lastTurn} ${input.message}` : input.message;
     let queryVector;
@@ -157260,6 +157295,19 @@ A: ${c.answer}`).join("\n\n");
       input.message,
       1024
     );
+    const responseProducts = relatedProducts.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      href: `/products/${p.id}`
+    }));
+    const retrievedQuestions = relevantChunks.map((c) => c.question);
+    await saveChatbotLog({
+      ...baseLog,
+      botReply: reply,
+      relatedProducts: responseProducts,
+      retrievedQuestions
+    });
     return {
       reply,
       relatedProducts: relatedProducts.map((p) => ({
@@ -157269,7 +157317,43 @@ A: ${c.answer}`).join("\n\n");
         image: p.image,
         href: `/products/${p.id}`
       })),
-      retrievedChunks: relevantChunks.map((c) => c.question)
+      retrievedChunks: retrievedQuestions
+    };
+  }),
+  listLogs: adminProcedure.input(
+    z3.object({
+      limit: z3.number().int().min(1).max(100).default(20),
+      offset: z3.number().int().min(0).default(0),
+      search: z3.string().max(100).optional()
+    })
+  ).query(async ({ input }) => {
+    const db = await getDb();
+    if (!db) {
+      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    }
+    const conditions = [];
+    const search = input.search?.trim();
+    if (search) {
+      const term = `%${search}%`;
+      conditions.push(
+        or2(
+          sql4`${chatbotLogs.customerQuestion} LIKE ${term}`,
+          sql4`${chatbotLogs.botReply} LIKE ${term}`,
+          sql4`${chatbotLogs.customerEmail} LIKE ${term}`,
+          sql4`${chatbotLogs.customerName} LIKE ${term}`
+        )
+      );
+    }
+    const where = conditions.length > 0 ? and4(...conditions) : void 0;
+    const rowsQuery = db.select().from(chatbotLogs).orderBy(desc2(chatbotLogs.createdAt)).limit(input.limit).offset(input.offset);
+    const countQuery = db.select({ count: sql4`CAST(COUNT(*) AS SIGNED)` }).from(chatbotLogs);
+    const [items, countRows] = await Promise.all([
+      where ? rowsQuery.where(where) : rowsQuery,
+      where ? countQuery.where(where) : countQuery
+    ]);
+    return {
+      items,
+      total: Number(countRows[0]?.count ?? 0)
     };
   })
 });
