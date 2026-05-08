@@ -176,7 +176,7 @@ export default function Custom() {
                     {plan.title}
                   </h3>
                   <div className="inline-flex max-w-full flex-col gap-1">
-                    <p className="text-[9px] text-[#8E735B]/65 tracking-[0.24em] uppercase font-medium">
+                    <p className="text-xs md:text-sm font-serif-zh text-[#8E735B]/65 tracking-[0.03em] font-light leading-relaxed">
                       費用
                     </p>
                     {plan.priceLines.map((priceLine) => (
