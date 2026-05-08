@@ -12,6 +12,28 @@ import {
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
 
+const tarotReadingPriceList = [
+  { name: "前世今生 3", originalPrice: 800, discountedPrice: 720 },
+  { name: "戀愛指南", originalPrice: 999, discountedPrice: 899 },
+  { name: "感情復合", originalPrice: 999, discountedPrice: 899 },
+  { name: "緣來暗戀", originalPrice: 999, discountedPrice: 899 },
+  { name: "旺桃花運", originalPrice: 999, discountedPrice: 899 },
+  { name: "財富密碼", originalPrice: 999, discountedPrice: 899 },
+  { name: "創業衝衝", originalPrice: 999, discountedPrice: 899 },
+  { name: "職涯探索", originalPrice: 999, discountedPrice: 899 },
+  { name: "面試勝經", originalPrice: 999, discountedPrice: 899 },
+  { name: "進化人生", originalPrice: 999, discountedPrice: 899 },
+  { name: "雙向之路", originalPrice: 999, discountedPrice: 899 },
+  { name: "友情可貴", originalPrice: 999, discountedPrice: 899 },
+  { name: "心靈療癒", originalPrice: 999, discountedPrice: 899 },
+  { name: "守護神", originalPrice: 1088, discountedPrice: 979 },
+  { name: "流年運勢 3", originalPrice: 1088, discountedPrice: 979 },
+  { name: "前世今生 1", originalPrice: 1288, discountedPrice: 1159 },
+  { name: "流年運勢 1", originalPrice: 1288, discountedPrice: 1159 },
+  { name: "流年運勢 2", originalPrice: 1588, discountedPrice: 1429 },
+  { name: "前世今生 2", originalPrice: 999, discountedPrice: 899 },
+];
+
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
@@ -69,6 +91,7 @@ export default function ProductDetail() {
     : product.price;
   const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
+  const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
   const isNumerologyDepositProduct = product.id === "numerology-crystal-deposit-product";
   const splitCustomFeeLabel = isChakraDepositProduct
@@ -170,7 +193,61 @@ export default function ProductDetail() {
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
               {product.priceRange ? (
                 <>
-                  {splitCustomFeeLabel ? (
+                  {isTarotDepositProduct ? (
+                    <div className="space-y-5">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
+                          <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                            手鍊價格
+                          </p>
+                          <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                            NT$1,200 ~ 1,800
+                          </p>
+                        </div>
+                        <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
+                          <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                            塔羅價格
+                          </p>
+                          <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                            價目表 9 折
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.9_0_0)] px-4 py-4">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-3">
+                          <div>
+                            <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                              塔羅價目表
+                            </p>
+                            <p className="text-sm font-body text-[oklch(0.35_0_0)]">
+                              客製水晶搭配塔羅解析時，以下價格依原價 9 折計算
+                            </p>
+                          </div>
+                          <span className="text-xs font-body text-[oklch(0.48_0.06_35)] bg-white border border-[oklch(0.9_0_0)] px-2.5 py-1">
+                            9 折優惠
+                          </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {tarotReadingPriceList.map((item) => (
+                            <div
+                              key={item.name}
+                              className="flex items-center justify-between gap-3 bg-white border border-[oklch(0.92_0_0)] px-3 py-2.5"
+                            >
+                              <p className="text-sm font-body text-[oklch(0.18_0_0)]">{item.name}</p>
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-medium text-[oklch(0.1_0_0)]">
+                                  NT$ {item.discountedPrice.toLocaleString()}
+                                </p>
+                                <p className="text-[0.65rem] font-body text-[oklch(0.65_0_0)] line-through">
+                                  NT$ {item.originalPrice.toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : splitCustomFeeLabel ? (
                     <div className="grid gap-2 sm:grid-cols-2">
                       <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
                         <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
