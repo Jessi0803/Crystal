@@ -20,7 +20,7 @@ export default function CustomFormPendantCharmField({
           className="w-full max-h-72 object-contain rounded-sm bg-[oklch(0.97_0_0)] border border-[oklch(0.9_0_0)]"
         />
         <p className="mt-3 text-xs font-body text-[oklch(0.5_0_0)] leading-relaxed">
-          此為示意圖，實際有什麼款式由店家搭配。
+          此為示意圖，實際的款式由店家搭配。
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3">
