@@ -30,6 +30,20 @@ const WELCOME_MESSAGE: Message = {
     "你好！我是椛小助 ✨\n\n我是椛˙Crystal 的 AI 水晶顧問，可以幫你解答水晶相關問題、推薦適合你的水晶，或介紹客製化方案。\n\n有什麼想問的嗎？",
 };
 
+const CHATBOT_SESSION_ID_KEY = "crystal-chatbot-session-id";
+
+function getChatbotSessionId() {
+  const existing = localStorage.getItem(CHATBOT_SESSION_ID_KEY);
+  if (existing) return existing;
+
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(CHATBOT_SESSION_ID_KEY, id);
+  return id;
+}
+
 function renderWithLinks(text: string) {
   const urlRegex = /(https?:\/\/[^\s，。、！？「」\]）)]+)/g;
   const parts = text.split(urlRegex);
@@ -152,7 +166,12 @@ export default function ChatBot() {
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    chatMutation.mutate({ message: text, history });
+    chatMutation.mutate({
+      message: text,
+      history,
+      sessionId: getChatbotSessionId(),
+      pagePath: window.location.pathname,
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {

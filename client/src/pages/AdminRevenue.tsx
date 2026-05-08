@@ -76,14 +76,22 @@ export default function AdminRevenue() {
               營收報表
             </h1>
           </div>
-          <button
-            onClick={refetchAll}
-            disabled={isLoading}
-            className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            重新整理
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLocation("/admin/chatbot")}
+              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+            >
+              AI 客服
+            </button>
+            <button
+              onClick={refetchAll}
+              disabled={isLoading}
+              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              重新整理
+            </button>
+          </div>
         </div>
       </div>
 

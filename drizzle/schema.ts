@@ -235,3 +235,25 @@ export const logisticsOrders = mysqlTable("logisticsOrders", {
 
 export type LogisticsOrder = typeof logisticsOrders.$inferSelect;
 export type InsertLogisticsOrder = typeof logisticsOrders.$inferInsert;
+
+// ─── AI 客服問答紀錄表 ────────────────────────────────────────────────────────
+export const chatbotLogs = mysqlTable("chatbotLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  userId: int("userId"),
+  customerName: varchar("customerName", { length: 100 }),
+  customerEmail: varchar("customerEmail", { length: 320 }),
+  customerQuestion: text("customerQuestion").notNull(),
+  botReply: text("botReply").notNull(),
+  relatedProducts: json("relatedProducts"),
+  retrievedQuestions: json("retrievedQuestions"),
+  pagePath: varchar("pagePath", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("chatbot_logs_created_at_idx").on(table.createdAt),
+  index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
+  index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt),
+]);
+
+export type ChatbotLog = typeof chatbotLogs.$inferSelect;
+export type InsertChatbotLog = typeof chatbotLogs.$inferInsert;

@@ -84,11 +84,21 @@ const knowledgeChunks = [
   },
   {
     id: "faq-free-revision",
-    embedText: "可以免費修改嗎 修改 免費修改 改設計 不滿意 修改幾次",
+    embedText:
+      "可以免費修改嗎 免費修改 初版 維修 改幾次 修改幾次 改手圍 手圍 新增條件 銀管 珠框 顏色 紫色 磁扣 龍蝦扣 第二次修改 再改一次 加收 200 重新設計 改設計 不滿意",
   },
   {
     id: "faq-dislike-design",
-    embedText: "不喜歡成品圖 成品圖 不滿意設計 修改 改款 設計不好看",
+    embedText: "不喜歡成品圖 成品圖 不滿意設計 修改 改款 設計不好看 初版 免費修改 配飾 順序",
+  },
+  {
+    id: "faq-revision-extra-conditions",
+    embedText:
+      "改手圍 換手圍 加銀管 加珠框 要銀管 要珠框 不要紫色 換磁扣 改磁扣 龍蝦扣 加價 加錢 200 重新設計 新增條件 客製修改",
+  },
+  {
+    id: "faq-second-revision-fee",
+    embedText: "第二次修改 再改一次 改第二次 修改費用 加收 200 幾次免費",
   },
   {
     id: "faq-refund",

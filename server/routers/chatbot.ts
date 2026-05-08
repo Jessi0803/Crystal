@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { publicProcedure, router } from "../_core/trpc";
+import { and, desc, or, sql } from "drizzle-orm";
+import { adminProcedure, publicProcedure, router } from "../_core/trpc";
+import { getDb } from "../db";
 import { searchKnowledge } from "../crystalKnowledge";
 import { ENV } from "../_core/env";
 import { products } from "../../client/src/lib/data";
+import { chatbotLogs } from "../../drizzle/schema";
 
 const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，名叫「椛小助」。
 
@@ -76,11 +79,51 @@ async function embedQuery(text: string): Promise<number[]> {
   return data.embedding.values;
 }
 
+type ChatbotRelatedProduct = {
+  id: string;
+  name: string;
+  price: number;
+  href: string;
+};
+
+async function saveChatbotLog(params: {
+  sessionId: string;
+  userId?: number | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  customerQuestion: string;
+  botReply: string;
+  relatedProducts: ChatbotRelatedProduct[];
+  retrievedQuestions: string[];
+  pagePath?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    await db.insert(chatbotLogs).values({
+      sessionId: params.sessionId.slice(0, 64),
+      userId: params.userId ?? null,
+      customerName: params.customerName?.slice(0, 100) ?? null,
+      customerEmail: params.customerEmail?.slice(0, 320) ?? null,
+      customerQuestion: params.customerQuestion,
+      botReply: params.botReply,
+      relatedProducts: params.relatedProducts,
+      retrievedQuestions: params.retrievedQuestions,
+      pagePath: params.pagePath?.slice(0, 255) ?? null,
+    });
+  } catch (error) {
+    console.warn("[chatbot] failed to save log:", error);
+  }
+}
+
 export const chatbotRouter = router({
   chat: publicProcedure
     .input(
       z.object({
         message: z.string().min(1).max(500),
+        sessionId: z.string().min(1).max(64).optional(),
+        pagePath: z.string().max(255).optional(),
         history: z
           .array(
             z.object({
@@ -92,7 +135,17 @@ export const chatbotRouter = router({
           .default([]),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const sessionId = input.sessionId || `server-${Date.now()}`;
+      const baseLog = {
+        sessionId,
+        userId: ctx.user?.id ?? null,
+        customerName: ctx.user?.name ?? null,
+        customerEmail: ctx.user?.email ?? null,
+        customerQuestion: input.message,
+        pagePath: input.pagePath ?? null,
+      };
+
       // 1. embed 用戶問題（加入最近一輪對話提升語意準確度）
       const lastTurn = input.history.slice(-2).map((h) => h.content).join(" ");
       const queryText = lastTurn ? `${lastTurn} ${input.message}` : input.message;
@@ -156,6 +209,21 @@ export const chatbotRouter = router({
         1024
       );
 
+      const responseProducts = relatedProducts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        href: `/products/${p.id}`,
+      }));
+      const retrievedQuestions = relevantChunks.map((c) => c.question);
+
+      await saveChatbotLog({
+        ...baseLog,
+        botReply: reply,
+        relatedProducts: responseProducts,
+        retrievedQuestions,
+      });
+
       return {
         reply,
         relatedProducts: relatedProducts.map((p) => ({
@@ -165,7 +233,57 @@ export const chatbotRouter = router({
           image: p.image,
           href: `/products/${p.id}`,
         })),
-        retrievedChunks: relevantChunks.map((c) => c.question),
+        retrievedChunks: retrievedQuestions,
+      };
+    }),
+
+  listLogs: adminProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(100).default(20),
+        offset: z.number().int().min(0).default(0),
+        search: z.string().max(100).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      const conditions = [];
+      const search = input.search?.trim();
+      if (search) {
+        const term = `%${search}%`;
+        conditions.push(
+          or(
+            sql`${chatbotLogs.customerQuestion} LIKE ${term}`,
+            sql`${chatbotLogs.botReply} LIKE ${term}`,
+            sql`${chatbotLogs.customerEmail} LIKE ${term}`,
+            sql`${chatbotLogs.customerName} LIKE ${term}`
+          )
+        );
+      }
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const rowsQuery = db
+        .select()
+        .from(chatbotLogs)
+        .orderBy(desc(chatbotLogs.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+      const countQuery = db
+        .select({ count: sql<number>`CAST(COUNT(*) AS SIGNED)` })
+        .from(chatbotLogs);
+
+      const [items, countRows] = await Promise.all([
+        where ? rowsQuery.where(where) : rowsQuery,
+        where ? countQuery.where(where) : countQuery,
+      ]);
+
+      return {
+        items,
+        total: Number(countRows[0]?.count ?? 0),
       };
     }),
 });

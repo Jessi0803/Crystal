@@ -26,6 +26,7 @@ import OrderResult from "./pages/OrderResult";
 import BalancePayment from "./pages/BalancePayment";
 import AdminOrders from "./pages/AdminOrders";
 import AdminRevenue from "./pages/AdminRevenue";
+import AdminChatbot from "./pages/AdminChatbot";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -122,6 +123,7 @@ function Router() {
       <Route path="/balance/:merchantTradeNo" component={BalancePayment} />
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/revenue" component={AdminRevenue} />
+      <Route path="/admin/chatbot" component={AdminChatbot} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
