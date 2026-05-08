@@ -119,6 +119,7 @@ export default function Custom() {
         .font-serif-zh { font-family: 'Noto Serif TC', serif; }
         .letter-spacing-huge { letter-spacing: 0.5em; }
         .letter-spacing-wide { letter-spacing: 0.2em; }
+        details.custom-plan-fold[open] summary .fold-chevron { transform: rotate(180deg); }
       `}</style>
 
       {/* 背景柔和光暈 */}
@@ -202,7 +203,7 @@ export default function Custom() {
                     {plan.features.map((feature, idx) => (
                       <li
                         key={idx}
-                        className="flex items-start gap-4 text-base text-[#555] leading-relaxed font-light tracking-widest text-justify"
+                        className="flex items-start gap-4 text-base text-[#555] leading-relaxed font-light tracking-wide text-left"
                       >
                         <div className="mt-2.5 w-1 h-1 rounded-full bg-[#D8C3BD]/60 shrink-0" />
                         <span>{feature}</span>
@@ -211,49 +212,61 @@ export default function Custom() {
                   </ul>
                 </div>
 
-                {/* 訂購流程 + 手鍊注意事項（四方案皆顯示） */}
-                <div className="mt-10 pt-10 border-t border-[#8E735B]/10 space-y-8">
-                  <div>
-                    <span className="text-xs text-[#8E735B]/70 tracking-[0.35em] uppercase block mb-4 text-center font-medium">
-                      訂購流程
+                {/* 訂購流程 + 手鍊注意事項：收合顯示，內文完整保留 */}
+                <details className="custom-plan-fold mt-10 pt-10 border-t border-[#8E735B]/10">
+                  <summary className="cursor-pointer list-none text-center [&::-webkit-details-marker]:hidden">
+                    <span className="inline-flex items-center justify-center gap-2 rounded-full border border-[#8E735B]/20 bg-white/40 px-4 py-2.5 text-xs text-[#8E735B]/90 tracking-[0.2em] font-medium hover:bg-white/70 transition-colors">
+                      <ChevronDown
+                        size={16}
+                        strokeWidth={1.5}
+                        className="fold-chevron shrink-0 opacity-70 transition-transform duration-300"
+                      />
+                      訂購流程與手鍊注意事項（點開看全文）
                     </span>
-                    <ol className="space-y-3 text-sm text-[#555] leading-relaxed font-light tracking-wide list-decimal list-inside marker:text-[#8E735B]/80">
-                      <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
-                      <li>支付訂金。</li>
-                      <li>
-                        加入
-                        <a
-                          href={LINE_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#8E735B] underline underline-offset-2 mx-0.5"
-                        >
-                          官方 LINE
-                        </a>
-                        ，等待設計師傳送水晶搭配圖。
-                      </li>
-                      <li>手鍊與設計確認完成後，將提供尾款報價。</li>
-                      <li>尾款支付完畢，準備出貨。</li>
-                    </ol>
-                  </div>
+                  </summary>
+                  <div className="mt-8 space-y-8 border-t border-transparent pt-2">
+                    <div>
+                      <span className="text-xs text-[#8E735B]/70 tracking-[0.35em] uppercase block mb-4 text-center font-medium">
+                        訂購流程
+                      </span>
+                      <ol className="space-y-3 text-sm text-[#555] leading-relaxed font-light tracking-wide list-decimal list-inside marker:text-[#8E735B]/80">
+                        <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
+                        <li>支付訂金。</li>
+                        <li>
+                          加入
+                          <a
+                            href={LINE_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#8E735B] underline underline-offset-2 mx-0.5"
+                          >
+                            官方 LINE
+                          </a>
+                          ，等待設計師傳送水晶搭配圖。
+                        </li>
+                        <li>手鍊與設計確認完成後，將提供尾款報價。</li>
+                        <li>尾款支付完畢，準備出貨。</li>
+                      </ol>
+                    </div>
 
-                  <div className="rounded-2xl bg-white/60 border border-amber-200/50 px-5 py-5 shadow-sm">
-                    <p className="text-sm font-serif-zh text-[#6b5344] tracking-wide mb-3 flex items-center gap-2">
-                      <span className="text-amber-600">⚠️</span>
-                      手鍊注意事項
-                    </p>
-                    <div className="space-y-3 text-xs text-[#666] leading-relaxed font-light tracking-wide">
-                      {BRACELET_NOTICES.map((n, idx) => (
-                        <div key={idx}>
-                          {n.title ? (
-                            <p className="font-medium text-[#555] mb-1">{n.title}</p>
-                          ) : null}
-                          <p>{n.body}</p>
-                        </div>
-                      ))}
+                    <div className="rounded-2xl bg-white/60 border border-amber-200/50 px-5 py-5 shadow-sm">
+                      <p className="text-sm font-serif-zh text-[#6b5344] tracking-wide mb-3 flex items-center gap-2">
+                        <span className="text-amber-600">⚠️</span>
+                        手鍊注意事項
+                      </p>
+                      <div className="space-y-3 text-xs text-[#666] leading-relaxed font-light tracking-wide">
+                        {BRACELET_NOTICES.map((n, idx) => (
+                          <div key={idx}>
+                            {n.title ? (
+                              <p className="font-medium text-[#555] mb-1">{n.title}</p>
+                            ) : null}
+                            <p>{n.body}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </details>
 
                 {/* 按鈕 */}
                 <div className="mt-12 pt-8 border-t border-[#8E735B]/5">
