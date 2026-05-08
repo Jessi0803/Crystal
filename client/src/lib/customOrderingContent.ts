@@ -25,7 +25,7 @@ export const CUSTOM_BRACELET_NOTICES: { title: string | null; body: string }[] =
   {
     title: null,
     body:
-      "初版、維修可調整的部分為有不喜歡的配飾可以更改、水晶／配飾擺放順序，有不清楚的也可以詢問我～🤍",
+      "初版、維修可調整的部分為有不喜歡的配飾可以更改、水晶／配飾擺放順序，有不清楚的也可以詢問店家～🤍",
   },
   {
     title: null,
