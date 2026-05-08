@@ -70,6 +70,12 @@ export default function ProductDetail() {
   const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
+  const isNumerologyDepositProduct = product.id === "numerology-crystal-deposit-product";
+  const splitCustomFeeLabel = isChakraDepositProduct
+    ? "脈輪檢測價格"
+    : isNumerologyDepositProduct
+      ? "生命靈數解析價格"
+      : "";
 
   const handleAddToCart = () => {
     for (let i = 0; i < qty; i++) {
@@ -164,7 +170,7 @@ export default function ProductDetail() {
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
               {product.priceRange ? (
                 <>
-                  {isChakraDepositProduct ? (
+                  {splitCustomFeeLabel ? (
                     <div className="grid gap-2 sm:grid-cols-2">
                       <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
                         <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
@@ -176,7 +182,7 @@ export default function ProductDetail() {
                       </div>
                       <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
                         <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
-                          脈輪檢測價格
+                          {splitCustomFeeLabel}
                         </p>
                         <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                           NT$500
