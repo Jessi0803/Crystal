@@ -42,7 +42,6 @@ const plans = [
     id: "A",
     title: "純客製水晶手鍊",
     price: "1,500$ ± 300$",
-    depositLine: "支付訂金 500 元以完成排單",
     icon: <Gem className="w-5 h-5" />,
     features: [
       "可提供想要的功效、色系、款式",
@@ -57,7 +56,6 @@ const plans = [
     id: "B",
     title: "塔羅 × 水晶手鍊",
     price: "2,399$ ± 300$",
-    depositLine: "支付訂金 1,399 元以完成排單",
     icon: <Sparkles className="w-5 h-5" />,
     features: [
       "選擇想要搭配的塔羅方案，我會提供解析並透過解析去分析出你缺失的能量是什麼並進行水晶搭配！",
@@ -72,7 +70,6 @@ const plans = [
     id: "C",
     title: "脈輪檢測 × 水晶手鍊",
     price: "2,000$ ± 300$",
-    depositLine: "支付訂金 1,000 元以完成排單",
     icon: <Zap className="w-5 h-5" />,
     features: [
       "使用塔羅、靈擺，連結你的能量與高我對談，逐一分析七大脈輪個別能量。我會提供一份文字訊息報告，並透過此檢測分析出缺失的脈輪能量進行水晶搭配。",
@@ -86,7 +83,6 @@ const plans = [
     id: "D",
     title: "生命靈數 × 水晶手鍊",
     price: "2,000$ ± 300$",
-    depositLine: "支付訂金 1,000 元以完成排單",
     icon: <Fingerprint className="w-5 h-5" />,
     features: [
       "透過你的生命數、天賦數、星座數、先天數，去找到你的空缺數，並透過你的生命靈數與空缺數去搭配水晶，增強優勢，改善缺點",
@@ -222,12 +218,20 @@ export default function Custom() {
                       訂購流程
                     </span>
                     <ol className="space-y-3 text-sm text-[#555] leading-relaxed font-light tracking-wide list-decimal list-inside marker:text-[#8E735B]/80">
-                      <li>
-                        確認本方案為「{plan.title}」，點擊下方填寫報名表單。
-                      </li>
                       <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
-                      <li>{plan.depositLine}。</li>
-                      <li>等待水晶搭配圖。</li>
+                      <li>支付訂金。</li>
+                      <li>
+                        加入
+                        <a
+                          href={LINE_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#8E735B] underline underline-offset-2 mx-0.5"
+                        >
+                          官方 LINE
+                        </a>
+                        ，等待設計師傳送水晶搭配圖。
+                      </li>
                       <li>手鍊與設計確認完成後，將提供尾款報價。</li>
                       <li>尾款支付完畢，準備出貨。</li>
                     </ol>
