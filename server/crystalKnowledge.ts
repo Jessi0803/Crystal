@@ -65,24 +65,6 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     category: "常見問題",
   },
   {
-    id: "faq-custom-bcd-wish",
-    question: "預約客製化BCD方案，還可以許願特定功效嗎？",
-    answer:
-      "可以喔！可以跟我許願，這樣就是幫你搭配能量解析缺乏運勢＋你指定的運勢。",
-    embedText: "客製化BCD許願功效 客製化方案 指定功效 運勢 能量解析 塔羅 脈輪 生命靈數",
-    keywords: ["客製化", "BCD", "許願", "功效", "運勢", "塔羅", "脈輪", "生命靈數"],
-    category: "客製化",
-  },
-  {
-    id: "faq-custom-b-multi",
-    question: "預約客製化B方案，可以搭配多個題組嗎？",
-    answer:
-      "可以喔！需要搭配手鍊的題組都有9折優惠，也會用多題組的解析配置手鍊。",
-    embedText: "客製化B方案多題組 塔羅 多個題組 9折 優惠 搭配",
-    keywords: ["客製化", "B方案", "題組", "9折", "優惠", "塔羅"],
-    category: "客製化",
-  },
-  {
     id: "faq-wrist-size",
     question: "手圍怎麼量？",
     answer:
@@ -130,14 +112,6 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     answer: "A 純客製：您提供功效需求，老闆量身設計。B 塔羅方案：透過塔羅牌解析能量缺口再設計。C 脈輪方案：以靈擺測出七脈輪狀態補足能量缺口。D 生命靈數：從出生年月日找出缺數，以水晶精準補足天賦。詳細說明：https://goodaytarot.com/custom",
     embedText: "客製化方案差別 四個方案 純客製 塔羅方案 脈輪方案 生命靈數方案 ABCD 比較",
     keywords: ["方案差別", "純客製", "塔羅方案", "脈輪方案", "生命靈數方案", "ABCD", "選擇方案"],
-    category: "客製化",
-  },
-  {
-    id: "faq-deposit-price",
-    question: "訂金是多少？之後還要付什麼？",
-    answer: "各方案訂金不同：純客製 500 元、塔羅方案 1,399 元、脈輪/生命靈數方案各 1,000 元。老闆設計完成品圖後確認滿意再支付尾款，手鍊總價依方案而定。詳細總價見：https://goodaytarot.com/custom",
-    embedText: "訂金多少 訂金 尾款 費用 付款 多少錢 價格 方案費用",
-    keywords: ["訂金", "尾款", "費用", "多少錢", "價格", "付款金額"],
     category: "客製化",
   },
   {
@@ -207,14 +181,6 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     category: "常見問題",
   },
   {
-    id: "faq-fit-preference",
-    question: "手鍊尺寸可以選鬆緊嗎？",
-    answer: "可以，填寫表單時可選擇「剛好」（有水晶壓痕但不掐肉）或「微鬆」（可輕微滑動）。前往填寫：https://goodaytarot.com/custom",
-    embedText: "手鍊鬆緊 尺寸鬆緊 剛好 微鬆 鬆緊偏好 寬鬆 緊",
-    keywords: ["鬆緊", "剛好", "微鬆", "尺寸偏好", "寬鬆"],
-    category: "常見問題",
-  },
-  {
     id: "faq-default-clasp",
     question: "手鍊預設是什麼扣具？",
     answer: "預設為彈力繩（免費）。若想升級為龍蝦扣或磁扣，需額外加收 200 元。",
@@ -228,14 +194,6 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     answer: "龍蝦扣及磁扣是以沒有彈性的魚線製作，較容易因拉扯或勾到而損壞。想要穿戴方便且耐用的話，可選擇彈力繩款（彈力繩款無需加價）。",
     embedText: "龍蝦扣磁扣差別 龍蝦扣 磁扣 彈力繩 差別 比較 魚線 耐用",
     keywords: ["龍蝦扣", "磁扣", "彈力繩", "差別", "比較", "魚線", "耐用"],
-    category: "常見問題",
-  },
-  {
-    id: "faq-silver-tube-bead",
-    question: "可以加銀管或珠框嗎？",
-    answer: "可以，在表單填寫時可選擇是否加入銀管或珠框，兩者可分開選擇。前往填寫：https://goodaytarot.com/custom",
-    embedText: "銀管 珠框 加銀管 加珠框 配件 裝飾",
-    keywords: ["銀管", "珠框", "配件", "加銀管", "加珠框"],
     category: "常見問題",
   },
   {
@@ -273,7 +231,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-workshop-price",
     question: "水晶創業全能班的費用和課程內容是什麼？",
-    answer: "早鳥優惠價 12,888 元（共 6 小時），兩人同行再減 888 元/人。地點：桃園小檜溪區（預約制）。課程分三段：①理論/創業基礎（2hr）②手作 3 件作品（3hr）③淨化保養與連結（0.5hr）。包含 6 種核心製作技法及龍蝦扣、磁扣、U 型扣等進階技法，IG 分享可獲贈品。報名請私訊 LINE：https://line.me/R/ti/p/@011tymeh",
+    answer: "早鳥優惠價 12,888 元（共 6 小時），兩人同行再減 888 元/人。地點：桃園小檜溪區（預約制）。課程分三段：①理論/創業基礎（2hr）②手作 3 件作品（3hr）③淨化保養與連結（0.5hr）。6 種核心製作技法包含龍蝦扣、磁扣、U 型扣等進階技法，IG 分享可獲贈品。報名請私訊 LINE：https://line.me/R/ti/p/@011tymeh",
     embedText: "水晶創業全能班費用 創業班費用 課程內容 大綱 12888 桃園 報名",
     keywords: ["創業全能班", "費用", "課程內容", "12888", "桃園", "報名"],
     category: "課程",
@@ -284,22 +242,6 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     answer: "水晶具有天然礦石的獨特頻率，許多人在配戴後感受到情緒或能量的轉變。老闆會根據您的需求挑選最適合的水晶，並協助您與手鍊建立連結。",
     embedText: "水晶能量真實嗎 水晶能量 是否有效 有用嗎 頻率 礦石 真的有效",
     keywords: ["水晶能量", "有效", "真實", "頻率", "礦石", "有用嗎"],
-    category: "常見問題",
-  },
-  {
-    id: "faq-wear-always",
-    question: "水晶手鍊可以一直戴著嗎？睡覺也可以戴嗎？",
-    answer: "一般建議白天配戴，睡眠時可取下讓水晶休息並放置淨化。如果非常想要 24 小時配戴，建議選擇金飾款。",
-    embedText: "一直戴著 睡覺戴 24小時 一直戴 睡眠時 配戴時間 可以一直戴嗎",
-    keywords: ["一直戴", "睡覺戴", "24小時", "配戴時間", "睡眠"],
-    category: "常見問題",
-  },
-  {
-    id: "faq-broken-crystal",
-    question: "水晶斷掉或脫落代表什麼？",
-    answer: "水晶斷裂通常代表它已吸收了足夠的負能量或完成使命，不需要擔心。歡迎私訊 LINE 討論後續：https://line.me/R/ti/p/@011tymeh",
-    embedText: "水晶斷掉 水晶斷了 脫落 掉了 斷裂 代表什麼 不好的預兆",
-    keywords: ["水晶斷掉", "斷裂", "脫落", "代表什麼", "斷了"],
     category: "常見問題",
   },
   {
@@ -349,14 +291,6 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     answer: "可以，支援寄送至馬來西亞、香港、新加坡、美國、英國、澳洲，付款方式為 PayPal。",
     embedText: "海外寄送 寄到國外 海外配送 馬來西亞 香港 新加坡 美國 英國 澳洲 國際",
     keywords: ["海外", "國外", "馬來西亞", "香港", "新加坡", "美國", "英國", "澳洲", "國際"],
-    category: "常見問題",
-  },
-  {
-    id: "faq-dispatch-time",
-    question: "下單後多久會出貨？",
-    answer: "現貨商品約 1–3 個工作天出貨；客製化商品需等雙方確認設計稿後安排出貨，實際時間依製作進度而定，請私訊 LINE 確認：https://line.me/R/ti/p/@011tymeh",
-    embedText: "出貨多久 出貨時間 何時出貨 幾天到 幾天出貨 快速出貨",
-    keywords: ["出貨時間", "多久", "幾天", "出貨", "何時出貨"],
     category: "常見問題",
   },
   {

@@ -43,14 +43,6 @@ const knowledgeChunks = [
     embedText: "淨化後重新連結 淨化完 重新許願 連結 紙 願望",
   },
   {
-    id: "faq-custom-bcd-wish",
-    embedText: "客製化BCD許願功效 客製化方案 指定功效 運勢 能量解析 塔羅 脈輪 生命靈數",
-  },
-  {
-    id: "faq-custom-b-multi",
-    embedText: "客製化B方案多題組 塔羅 多個題組 9折 優惠 搭配",
-  },
-  {
     id: "faq-wrist-size",
     embedText: "手圍怎麼量 尺寸 測量 皮尺 淨手圍 鬆緊",
   },
@@ -73,10 +65,6 @@ const knowledgeChunks = [
   {
     id: "faq-custom-plans-diff",
     embedText: "客製化方案差別 四個方案 純客製 塔羅方案 脈輪方案 生命靈數方案 ABCD 比較",
-  },
-  {
-    id: "faq-deposit-price",
-    embedText: "訂金多少 訂金 尾款 費用 付款 多少錢 價格 方案費用",
   },
   {
     id: "faq-production-time",
@@ -105,20 +93,12 @@ const knowledgeChunks = [
     embedText: "可以退款嗎 退款 退貨 換貨 退換貨 不能退 瑕疵 損壞",
   },
   {
-    id: "faq-fit-preference",
-    embedText: "手鍊鬆緊 尺寸鬆緊 剛好 微鬆 鬆緊偏好 寬鬆 緊",
-  },
-  {
     id: "faq-default-clasp",
     embedText: "手鍊預設扣具 彈力繩 龍蝦扣 磁扣 扣具 預設 免費",
   },
   {
     id: "faq-clasp-diff",
     embedText: "龍蝦扣磁扣差別 龍蝦扣 磁扣 彈力繩 差別 比較 魚線 耐用",
-  },
-  {
-    id: "faq-silver-tube-bead",
-    embedText: "銀管 珠框 加銀管 加珠框 配件 裝飾",
   },
   {
     id: "faq-payment-methods",
@@ -145,14 +125,6 @@ const knowledgeChunks = [
     embedText: "水晶能量真實嗎 水晶能量 是否有效 有用嗎 頻率 礦石 真的有效",
   },
   {
-    id: "faq-wear-always",
-    embedText: "一直戴著 睡覺戴 24小時 一直戴 睡眠時 配戴時間 可以一直戴嗎",
-  },
-  {
-    id: "faq-broken-crystal",
-    embedText: "水晶斷掉 水晶斷了 脫落 掉了 斷裂 代表什麼 不好的預兆",
-  },
-  {
     id: "faq-natural-crystal",
     embedText: "天然水晶嗎 是否天然 真的水晶 假的 合成 天然礦石 品質",
   },
@@ -175,10 +147,6 @@ const knowledgeChunks = [
   {
     id: "faq-overseas-shipping",
     embedText: "海外寄送 寄到國外 海外配送 馬來西亞 香港 新加坡 美國 英國 澳洲 國際",
-  },
-  {
-    id: "faq-dispatch-time",
-    embedText: "出貨多久 出貨時間 何時出貨 幾天到 幾天出貨 快速出貨",
   },
   {
     id: "faq-tarot-topics",
