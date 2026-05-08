@@ -22,6 +22,7 @@ import { sdk } from "./_core/sdk";
 import * as db from "./db";
 
 const LINE_STATE_COOKIE = "line_oauth_state";
+const LINE_RETURN_TO_COOKIE = "line_oauth_return_to";
 
 function lineConfig() {
   const channelId = process.env.LINE_CHANNEL_ID?.trim();
@@ -34,6 +35,12 @@ function readCookie(req: Request, name: string): string | undefined {
   if (!raw) return undefined;
   const parsed = parseCookieHeader(raw);
   return typeof parsed[name] === "string" ? parsed[name] : undefined;
+}
+
+function safeReturnTo(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  if (!value.startsWith("/") || value.startsWith("//")) return undefined;
+  return value.slice(0, 255);
 }
 
 function siteBaseUrl(req: Request): string {
@@ -123,8 +130,12 @@ export function lineOAuthStart(req: Request, res: Response): void {
 
   const state = crypto.randomBytes(24).toString("hex");
   const callback = lineCallbackUrl(req);
+  const returnTo = safeReturnTo(req.query.returnTo);
   const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 600_000 };
   res.cookie(LINE_STATE_COOKIE, state, cookieOpts);
+  if (returnTo) {
+    res.cookie(LINE_RETURN_TO_COOKIE, returnTo, cookieOpts);
+  }
 
   const authorize = new URL("https://access.line.me/oauth2/v2.1/authorize");
   authorize.searchParams.set("response_type", "code");
@@ -139,6 +150,7 @@ export function lineOAuthStart(req: Request, res: Response): void {
 export async function lineOAuthCallback(req: Request, res: Response): Promise<void> {
     const clearStateCookie = () => {
       res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
+      res.clearCookie(LINE_RETURN_TO_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
     };
 
     try {
@@ -209,7 +221,8 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
       clearStateCookie();
       const sessionCookieOpts = { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS };
       res.cookie(COOKIE_NAME, sessionToken, sessionCookieOpts);
-      res.redirect(302, "/products");
+      const returnTo = safeReturnTo(readCookie(req, LINE_RETURN_TO_COOKIE));
+      res.redirect(302, returnTo ?? (user.role === "admin" ? "/admin/orders" : "/products"));
     } catch (err) {
       console.error("[LINE OAuth] callback failed", err);
       clearStateCookie();

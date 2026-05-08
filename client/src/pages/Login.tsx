@@ -3,15 +3,24 @@ import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
+function getSafeReturnTo() {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get("returnTo");
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
 export default function Login() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const loginMutation = trpc.member.login.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      await utils.auth.me.invalidate();
       toast.success("登入成功，歡迎回來！");
-      navigate(data.user.role === "admin" ? "/admin/orders" : "/products");
+      navigate(getSafeReturnTo() ?? (data.user.role === "admin" ? "/admin/orders" : "/products"));
     },
     onError: (err) => {
       toast.error(err.message || "登入失敗，請稍後再試");
@@ -126,7 +135,9 @@ export default function Login() {
             <button
               type="button"
               onClick={() => {
-                window.location.href = `${window.location.origin}/api/trpc/line-oauth-start`;
+                const returnTo = getSafeReturnTo();
+                const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
+                window.location.href = `${window.location.origin}/api/trpc/line-oauth-start${query}`;
               }}
               className="w-full flex items-center justify-center gap-2 py-3.5 text-sm font-body border border-[#06C755] text-[#06C755] hover:bg-[#06C755]/10 transition-colors"
             >
