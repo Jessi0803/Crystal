@@ -16,9 +16,9 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
-  const [activeTab, setActiveTab] = useState<"benefits" | "content" | "howto" | "pricing">(
-    (product?.benefits?.length ?? 0) > 0 ? "benefits" : "content"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "benefits" | "content" | "howto" | "notices"
+  >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const wristSizes = ["12", "12.5", "13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
   const claspChoices = [
     { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
@@ -96,7 +96,9 @@ export default function ProductDetail() {
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
     ...(showHowToTab ? [{ id: "howto" as const, label: "下單流程" }] : []),
-    ...(product.category === "custom" ? [{ id: "pricing" as const, label: "價格說明" }] : []),
+    ...(product.category === "custom" && isCustomDepositProduct(product.id)
+      ? [{ id: "notices" as const, label: "注意事項" }]
+      : []),
   ];
   const contentItems = product.crystalType.includes("｜")
     ? product.crystalType.split("｜")
@@ -402,58 +404,27 @@ export default function ProductDetail() {
               {showHowToTab && activeTab === "howto" && (
                 <div className="space-y-8">
                   {isCustomDepositProduct(product.id) ? (
-                    <>
-                      <div>
-                        <p className="eyebrow mb-3">訂購流程</p>
-                        <ol className="ml-1 list-outside list-decimal space-y-2.5 pl-5 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed marker:font-medium marker:text-[oklch(0.55_0.08_70)]">
-                          <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
-                          <li>支付訂金。</li>
-                          <li>
-                            加入
-                            <a
-                              href={CUSTOM_LINE_URL}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-[oklch(0.45_0.12_155)] underline decoration-[oklch(0.45_0.12_155)]/30 underline-offset-[3px] hover:opacity-80 mx-0.5"
-                            >
-                              官方 LINE
-                            </a>
-                            ，等待設計師傳送水晶搭配圖。
-                          </li>
-                          <li>手鍊與設計確認完成後，將提供尾款報價。</li>
-                          <li>尾款支付完畢，準備出貨。</li>
-                        </ol>
-                      </div>
-                      <div className="rounded-sm border border-[oklch(0.9_0.02_85)] bg-[oklch(0.985_0.005_85)] px-4 py-4">
-                        <p className="text-sm font-body text-[oklch(0.35_0_0)] mb-3 flex items-center gap-2 tracking-wide">
-                          <span className="text-amber-600/90" aria-hidden>
-                            ⚠️
-                          </span>
-                          手鍊注意事項
-                        </p>
-                        <div className="space-y-3 text-[0.8125rem] font-body font-light text-[oklch(0.4_0_0)] leading-[1.75] tracking-wide">
-                          {CUSTOM_BRACELET_NOTICES.map((n, idx) => (
-                            <div key={idx}>
-                              {n.title ? (
-                                <p className="font-medium text-[oklch(0.32_0_0)] mb-1">{n.title}</p>
-                              ) : null}
-                              <p>{n.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="pt-4 border-t border-[oklch(0.93_0_0)]">
-                        <p className="eyebrow mb-3">此商品下單後</p>
-                        <ul className="space-y-2">
-                          {product.howToUse.map((h, i) => (
-                            <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                              <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5 font-body">{i + 1}.</span>
-                              {h}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </>
+                    <div>
+                      <p className="eyebrow mb-3">訂購流程</p>
+                      <ol className="ml-1 list-outside list-decimal space-y-2.5 pl-5 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed marker:font-medium marker:text-[oklch(0.55_0.08_70)]">
+                        <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
+                        <li>支付訂金。</li>
+                        <li>
+                          加入
+                          <a
+                            href={CUSTOM_LINE_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-[oklch(0.45_0.12_155)] underline decoration-[oklch(0.45_0.12_155)]/30 underline-offset-[3px] hover:opacity-80 mx-0.5"
+                          >
+                            官方 LINE
+                          </a>
+                          ，等待設計師傳送水晶搭配圖。
+                        </li>
+                        <li>手鍊與設計確認完成後，將提供尾款報價。</li>
+                        <li>尾款支付完畢，準備出貨。</li>
+                      </ol>
+                    </div>
                   ) : (
                     <ul className="space-y-2">
                       {product.howToUse.map((h, i) => (
@@ -466,17 +437,25 @@ export default function ProductDetail() {
                   )}
                 </div>
               )}
-              {product.category === "custom" && activeTab === "pricing" && (
-                <ul className="space-y-2">
-                  {[
-                    "若選擇龍蝦扣或磁扣：額外 +200$",
-                  ].map((line) => (
-                    <li key={line} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
-                      {line}
-                    </li>
-                  ))}
-                </ul>
+              {product.category === "custom" && isCustomDepositProduct(product.id) && activeTab === "notices" && (
+                <div className="rounded-sm border border-[oklch(0.9_0.02_85)] bg-[oklch(0.985_0.005_85)] px-4 py-4">
+                  <p className="text-sm font-body text-[oklch(0.35_0_0)] mb-3 flex items-center gap-2 tracking-wide">
+                    <span className="text-amber-600/90" aria-hidden>
+                      ⚠️
+                    </span>
+                    手鍊注意事項
+                  </p>
+                  <div className="space-y-3 text-[0.8125rem] font-body font-light text-[oklch(0.4_0_0)] leading-[1.75] tracking-wide">
+                    {CUSTOM_BRACELET_NOTICES.map((n, idx) => (
+                      <div key={idx}>
+                        {n.title ? (
+                          <p className="font-medium text-[oklch(0.32_0_0)] mb-1">{n.title}</p>
+                        ) : null}
+                        <p>{n.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
