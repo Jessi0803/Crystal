@@ -2,6 +2,11 @@
   "framework": "vite",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm run build",
+  "functions": {
+    "api/trpc/[trpc].js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     { "source": "/api/oauth/callback", "destination": "/api/trpc/line-oauth-callback" },
     { "source": "/api/oauth/line/start", "destination": "/api/trpc/line-oauth-start" },
