@@ -21,8 +21,8 @@ export const OVERSEAS_SHIPPING_FEES: Record<OverseasShipCountryCode, number> = {
 };
 
 export const PAYMENT_FEE_RATES: Partial<Record<CheckoutPaymentMethod, number>> = {
-  credit: 0.02,
-  paypal: 0.06,
+  credit: 0,
+  paypal: 0,
 };
 
 export type CheckoutFeeItem = {
@@ -78,8 +78,7 @@ export function calcCheckoutFees(params: {
         : 0
       : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
 
-  const paymentFeeRate = appliesFees ? PAYMENT_FEE_RATES[params.paymentMethod] ?? 0 : 0;
-  const paymentFee = Math.ceil((chargeableSubtotal + shippingFee) * paymentFeeRate);
+  const paymentFee = 0;
   const total = subtotal + shippingFee + paymentFee;
 
   return {

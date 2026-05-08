@@ -97,8 +97,8 @@ export default function ShoppingGuide() {
               <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>付款方式</h2>
 
               <div className="space-y-2 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
-                <p>• 台灣地區（含離島）：轉帳、信用卡、Apple pay（信用卡、Apple pay需額外支付2%手續費）</p>
-                <p>• 台灣以外：Paypal（需額外支付6%手續費）</p>
+                <p>• 台灣地區（含離島）：轉帳、信用卡、Apple pay</p>
+                <p>• 台灣以外：Paypal</p>
               </div>
             </section>
 

@@ -241,16 +241,6 @@ export const orderRouter = router({
           image: "",
         });
       }
-      if (feeSummary.paymentFee > 0) {
-        feeItems.push({
-          id: "payment-fee",
-          baseProductId: "payment-fee",
-          name: paymentMethod === "paypal" ? "海外付款手續費（6%）" : "刷卡手續費（2%）",
-          price: feeSummary.paymentFee,
-          quantity: 1,
-          image: "",
-        });
-      }
       const orderItems = submittedItems.concat(feeItems);
       const totalAmount = feeSummary.total;
 

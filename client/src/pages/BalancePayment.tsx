@@ -269,10 +269,6 @@ export default function BalancePayment() {
                   <span className="text-[oklch(0.5_0_0)]">運費</span>
                   <span className="text-[oklch(0.12_0_0)]">NT$ {feeSummary.shippingFee.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between gap-4 text-sm font-body">
-                  <span className="text-[oklch(0.5_0_0)]">手續費{paymentMethod === "credit" ? "（2%）" : ""}</span>
-                  <span className="text-[oklch(0.12_0_0)]">NT$ {feeSummary.paymentFee.toLocaleString()}</span>
-                </div>
                 <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
                   <span className="text-[oklch(0.12_0_0)] font-medium">應付總額</span>
                   <span className="text-[oklch(0.12_0_0)] font-semibold">NT$ {payableAmount.toLocaleString()}</span>

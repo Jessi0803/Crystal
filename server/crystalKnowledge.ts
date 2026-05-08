@@ -207,7 +207,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-payment-methods",
     question: "支援哪些付款方式？",
-    answer: "台灣地區（含離島）：轉帳、信用卡、Apple Pay（信用卡及 Apple Pay 需額外支付 2% 手續費）。台灣以外地區：僅支援 PayPal（需額外支付 6% 手續費）。",
+    answer: "台灣地區（含離島）：轉帳、信用卡、Apple Pay。台灣以外地區：僅支援 PayPal。",
     embedText: "付款方式 支付 信用卡 轉帳 ATM Apple Pay Paypal 海外付款",
     keywords: ["付款方式", "信用卡", "轉帳", "ATM", "Apple Pay", "Paypal", "海外"],
     category: "常見問題",
@@ -311,7 +311,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-overseas-shipping",
     question: "可以寄送到海外嗎？",
-    answer: "可以，支援寄送至馬來西亞、香港、新加坡、美國、英國、澳洲，付款方式為 PayPal（需額外支付 6% 手續費）。",
+    answer: "可以，支援寄送至馬來西亞、香港、新加坡、美國、英國、澳洲，付款方式為 PayPal。",
     embedText: "海外寄送 寄到國外 海外配送 馬來西亞 香港 新加坡 美國 英國 澳洲 國際",
     keywords: ["海外", "國外", "馬來西亞", "香港", "新加坡", "美國", "英國", "澳洲", "國際"],
     category: "常見問題",

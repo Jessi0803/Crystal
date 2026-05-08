@@ -70,7 +70,6 @@ export default function Checkout() {
     overseasCountry: overseasCode,
   });
   const shippingFee = feeSummary.shippingFee;
-  const paymentFee = feeSummary.paymentFee;
   const finalTotal = feeSummary.total;
   // 超商選店資訊（由綠界地圖回傳）
   const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
@@ -726,7 +725,7 @@ export default function Checkout() {
                   <div>
                     <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">信用卡 / Apple Pay</p>
                     <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">VISA / Master / JCB</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)]">即時扣款，另加 2% 手續費</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)]">即時扣款</p>
                   </div>
                   <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                     paymentMethod === "credit" ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.8_0_0)]"
@@ -764,7 +763,7 @@ export default function Checkout() {
             {checkoutRegion === "overseas" && (
               <section className="border border-[oklch(0.88_0_0)] p-4 bg-[oklch(0.985_0_0)]">
                 <h2 className="text-sm tracking-[0.2em] font-body mb-2">付款方式</h2>
-                <p className="text-sm font-body text-[oklch(0.25_0_0)]">PayPal（另加 6% 手續費，送出後將前往 PayPal 安全付款頁面）</p>
+                <p className="text-sm font-body text-[oklch(0.25_0_0)]">PayPal（送出後將前往 PayPal 安全付款頁面）</p>
               </section>
             )}
 
@@ -850,17 +849,6 @@ export default function Checkout() {
                     <span className="text-green-600">免收</span>
                   ) : (
                     <span>NT$ {shippingFee}</span>
-                  )}
-                </div>
-                <div className="flex justify-between text-sm font-body">
-                  <span className="text-[oklch(0.5_0_0)]">
-                    手續費
-                    {checkoutRegion === "overseas" ? "（6%）" : paymentMethod === "credit" ? "（2%）" : ""}
-                  </span>
-                  {paymentFee === 0 ? (
-                    <span className="text-green-600">免收</span>
-                  ) : (
-                    <span>NT$ {paymentFee.toLocaleString()}</span>
                   )}
                 </div>
                 <div className="flex justify-between text-base font-medium border-t border-[oklch(0.93_0_0)] pt-3 mt-3">
