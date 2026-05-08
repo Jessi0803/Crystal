@@ -6,6 +6,7 @@ import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
+import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 
 interface FormData {
   name: string;
@@ -17,6 +18,7 @@ interface FormData {
   silverTube: "" | "yes" | "no";
   beadFrame: "" | "yes" | "no";
   claspType: "" | "lobster" | "magnet" | "elastic";
+  pendantCharm: "" | "yes" | "no";
   colorPreference: string;
   specialRequests: string;
   igHandle: string;
@@ -32,6 +34,7 @@ const EMPTY_FORM: FormData = {
   silverTube: "",
   beadFrame: "",
   claspType: "",
+  pendantCharm: "",
   colorPreference: "",
   specialRequests: "",
   igHandle: "",
@@ -50,6 +53,7 @@ function buildNote(form: FormData): string {
     `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
     `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
     `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
+    `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
     `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
     `其餘特殊需求：${form.specialRequests || "無"}`,
     `Instagram 帳號：${form.igHandle || "（未提供）"}`,
@@ -274,6 +278,17 @@ export default function CustomFormD() {
       ),
     },
     {
+      title: "要加吊飾嗎？",
+      subtitle: "以下為吊飾款式參考圖，可加掛於手鍊上；實際搭配可再與店家討論",
+      required: true,
+      field: (
+        <CustomFormPendantCharmField
+          value={form.pendantCharm}
+          onChange={(pendantCharm) => setForm({ ...form, pendantCharm })}
+        />
+      ),
+    },
+    {
       title: "有想要的水晶顏色嗎？",
       subtitle: "例如：偏粉色系、紫色、透明……沒有特別指定也沒關係，留空即可",
       required: false,
@@ -354,6 +369,7 @@ export default function CustomFormD() {
     if (!form.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
     if (!form.silverTube || !form.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
     if (!form.claspType) { toast.error("請選擇扣具"); return false; }
+    if (!form.pendantCharm) { toast.error("請選擇是否要加吊飾"); return false; }
     return true;
   };
 

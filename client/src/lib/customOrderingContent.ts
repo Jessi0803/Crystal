@@ -1,6 +1,9 @@
 /** 客製訂金商品／Custom 頁共用：官方 LINE */
 export const CUSTOM_LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
+/** 客製表單「吊飾」參考圖（檔案於 client/public，來源為專案 images/吊飾.jpg、吊飾2.jpg） */
+export const CUSTOM_PENDANT_CHARM_IMAGE_URLS = ["/吊飾.jpg", "/吊飾2.jpg"] as const;
+
 /** 四種客製化訂金商品 id（商品詳情與表單路徑對應） */
 export const CUSTOM_DEPOSIT_PRODUCT_IDS = [
   "custom-deposit-product",

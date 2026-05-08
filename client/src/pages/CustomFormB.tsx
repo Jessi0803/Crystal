@@ -6,6 +6,7 @@ import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
+import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -111,6 +112,7 @@ interface BraceletData {
   silverTube: "" | "yes" | "no";
   beadFrame: "" | "yes" | "no";
   claspType: "" | "lobster" | "magnet" | "elastic";
+  pendantCharm: "" | "yes" | "no";
   colorPreference: string;
   specialRequests: string;
   igHandle: string;
@@ -129,6 +131,7 @@ const EMPTY_BRACELET: BraceletData = {
   effect: "", wristSize: "", fitPreference: "",
   metalPreference: "", silverTube: "", beadFrame: "",
   claspType: "", colorPreference: "", specialRequests: "", igHandle: "",
+  pendantCharm: "",
 };
 
 function buildNote(tarot: TarotData, bracelet: BraceletData): string {
@@ -190,6 +193,7 @@ function buildNote(tarot: TarotData, bracelet: BraceletData): string {
     `加銀管：${bracelet.silverTube === "yes" ? "要" : bracelet.silverTube === "no" ? "不要" : "（未填）"}`,
     `珠框：${bracelet.beadFrame === "yes" ? "要" : bracelet.beadFrame === "no" ? "不要" : "（未填）"}`,
     `扣具：${bracelet.claspType === "lobster" ? "龍蝦扣（+200元）" : bracelet.claspType === "magnet" ? "磁扣（+200元）" : bracelet.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
+    `吊飾：${bracelet.pendantCharm === "yes" ? "要加" : bracelet.pendantCharm === "no" ? "不要" : "（未填）"}`,
     `特定顏色水晶：${bracelet.colorPreference || "無特別指定"}`,
     `其餘特殊需求：${bracelet.specialRequests || "無"}`,
     `Instagram 帳號：${bracelet.igHandle || "（未提供）"}`,
@@ -497,6 +501,17 @@ export default function CustomFormB() {
       ),
     },
     {
+      title: "要加吊飾嗎？",
+      subtitle: "以下為吊飾款式參考圖，可加掛於手鍊上；實際搭配可再與店家討論",
+      required: true,
+      field: (
+        <CustomFormPendantCharmField
+          value={bracelet.pendantCharm}
+          onChange={(pendantCharm) => setBracelet({ ...bracelet, pendantCharm })}
+        />
+      ),
+    },
+    {
       title: "有想要的水晶顏色嗎？",
       subtitle: "例如：偏粉色系、紫色、透明……沒有指定可以留空",
       required: false,
@@ -585,6 +600,7 @@ export default function CustomFormB() {
     if (!bracelet.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
     if (!bracelet.silverTube || !bracelet.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
     if (!bracelet.claspType) { toast.error("請選擇扣具"); return false; }
+    if (!bracelet.pendantCharm) { toast.error("請選擇是否要加吊飾"); return false; }
     return true;
   }
 
