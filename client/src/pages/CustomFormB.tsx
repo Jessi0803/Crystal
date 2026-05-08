@@ -525,7 +525,7 @@ export default function CustomFormB() {
             <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
               付完訂金後，請加入官方 LINE 並傳送<br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
-              設計師才能將客製化水晶的<strong>成品圖</strong>傳送給您！
+              設計師才能將客製化水晶的<strong>初版及成品圖</strong>傳送給您！
             </p>
             <a href="https://line.me/R/ti/p/@011tymeh" target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-sm transition-opacity hover:opacity-90"
