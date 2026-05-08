@@ -26,7 +26,7 @@ const plans = [
   {
     id: "A",
     title: "純客製水晶手鍊",
-    price: "1,500$ ± 300$",
+    priceLines: ["手鍊價格：NT$1,200 ~ 1,800"],
     icon: <Gem className="w-5 h-5" />,
     features: [
       "可提供想要的功效、色系、款式",
@@ -40,7 +40,7 @@ const plans = [
   {
     id: "B",
     title: "塔羅 × 水晶手鍊",
-    price: "2,399$ ± 300$",
+    priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "塔羅價格：依價目表 9 折"],
     icon: <Sparkles className="w-5 h-5" />,
     features: [
       "選擇想要搭配的塔羅方案，我會提供解析並透過解析去分析出你缺失的能量是什麼並進行水晶搭配！",
@@ -54,7 +54,7 @@ const plans = [
   {
     id: "C",
     title: "脈輪檢測 × 水晶手鍊",
-    price: "2,000$ ± 300$",
+    priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "脈輪檢測價格：NT$500"],
     icon: <Zap className="w-5 h-5" />,
     features: [
       "使用塔羅、靈擺，連結你的能量與高我對談，逐一分析七大脈輪個別能量。我會提供一份文字訊息報告，並透過此檢測分析出缺失的脈輪能量進行水晶搭配。",
@@ -67,7 +67,7 @@ const plans = [
   {
     id: "D",
     title: "生命靈數 × 水晶手鍊",
-    price: "2,000$ ± 300$",
+    priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "生命靈數解析價格：NT$500"],
     icon: <Fingerprint className="w-5 h-5" />,
     features: [
       "透過你的生命數、天賦數、星座數、先天數，去找到你的空缺數，並透過你的生命靈數與空缺數去搭配水晶，增強優勢，改善缺點",
@@ -174,9 +174,19 @@ export default function Custom() {
                   <h3 className="text-xl md:text-2xl font-serif-zh text-[#2f2f2f] mb-3 tracking-[0.12em] font-medium leading-snug">
                     {plan.title}
                   </h3>
-                  <p className="inline-block text-sm md:text-base font-serif-en text-[#8E735B] tracking-[0.06em] font-light italic px-3 py-1 rounded-full bg-white/55 ring-1 ring-[#8E735B]/10">
-                    費用：{plan.price}
-                  </p>
+                  <div className="inline-flex max-w-full flex-col gap-1.5 rounded-2xl bg-white/55 px-4 py-3 ring-1 ring-[#8E735B]/10">
+                    <p className="text-[10px] text-[#8E735B]/70 tracking-[0.26em] uppercase font-medium">
+                      費用
+                    </p>
+                    {plan.priceLines.map((priceLine) => (
+                      <p
+                        key={priceLine}
+                        className="text-sm md:text-base font-serif-zh text-[#8E735B] tracking-[0.04em] font-light leading-relaxed"
+                      >
+                        {priceLine}
+                      </p>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="w-12 max-w-full h-px bg-gradient-to-r from-transparent via-[#8E735B]/15 to-transparent mx-auto mb-8" />
