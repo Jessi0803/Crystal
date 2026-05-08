@@ -12,26 +12,50 @@ import {
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
 
-const tarotReadingPriceList = [
-  { name: "前世今生 3", originalPrice: 800, discountedPrice: 720 },
-  { name: "戀愛指南", originalPrice: 999, discountedPrice: 899 },
-  { name: "感情復合", originalPrice: 999, discountedPrice: 899 },
-  { name: "緣來暗戀", originalPrice: 999, discountedPrice: 899 },
-  { name: "旺桃花運", originalPrice: 999, discountedPrice: 899 },
-  { name: "財富密碼", originalPrice: 999, discountedPrice: 899 },
-  { name: "創業衝衝", originalPrice: 999, discountedPrice: 899 },
-  { name: "職涯探索", originalPrice: 999, discountedPrice: 899 },
-  { name: "面試勝經", originalPrice: 999, discountedPrice: 899 },
-  { name: "進化人生", originalPrice: 999, discountedPrice: 899 },
-  { name: "雙向之路", originalPrice: 999, discountedPrice: 899 },
-  { name: "友情可貴", originalPrice: 999, discountedPrice: 899 },
-  { name: "心靈療癒", originalPrice: 999, discountedPrice: 899 },
-  { name: "守護神", originalPrice: 1088, discountedPrice: 979 },
-  { name: "流年運勢 3", originalPrice: 1088, discountedPrice: 979 },
-  { name: "前世今生 1", originalPrice: 1288, discountedPrice: 1159 },
-  { name: "流年運勢 1", originalPrice: 1288, discountedPrice: 1159 },
-  { name: "流年運勢 2", originalPrice: 1588, discountedPrice: 1429 },
-  { name: "前世今生 2", originalPrice: 999, discountedPrice: 899 },
+const tarotReadingCategories = [
+  {
+    id: "love",
+    label: "感情關係",
+    items: [
+      { name: "戀愛指南", originalPrice: 999, discountedPrice: 899 },
+      { name: "感情復合", originalPrice: 999, discountedPrice: 899 },
+      { name: "緣來暗戀", originalPrice: 999, discountedPrice: 899 },
+      { name: "旺桃花運", originalPrice: 999, discountedPrice: 899 },
+      { name: "友情可貴", originalPrice: 999, discountedPrice: 899 },
+      { name: "雙向之路", originalPrice: 999, discountedPrice: 899 },
+    ],
+  },
+  {
+    id: "career",
+    label: "財富職涯",
+    items: [
+      { name: "財富密碼", originalPrice: 999, discountedPrice: 899 },
+      { name: "創業衝衝", originalPrice: 999, discountedPrice: 899 },
+      { name: "職涯探索", originalPrice: 999, discountedPrice: 899 },
+      { name: "面試勝經", originalPrice: 999, discountedPrice: 899 },
+    ],
+  },
+  {
+    id: "healing",
+    label: "人生療癒",
+    items: [
+      { name: "進化人生", originalPrice: 999, discountedPrice: 899 },
+      { name: "心靈療癒", originalPrice: 999, discountedPrice: 899 },
+      { name: "守護神", originalPrice: 1088, discountedPrice: 979 },
+    ],
+  },
+  {
+    id: "time",
+    label: "前世流年",
+    items: [
+      { name: "前世今生 3", originalPrice: 800, discountedPrice: 720 },
+      { name: "前世今生 2", originalPrice: 999, discountedPrice: 899 },
+      { name: "前世今生 1", originalPrice: 1288, discountedPrice: 1159 },
+      { name: "流年運勢 3", originalPrice: 1088, discountedPrice: 979 },
+      { name: "流年運勢 1", originalPrice: 1288, discountedPrice: 1159 },
+      { name: "流年運勢 2", originalPrice: 1588, discountedPrice: 1429 },
+    ],
+  },
 ];
 
 export default function ProductDetail() {
@@ -41,6 +65,7 @@ export default function ProductDetail() {
   const [activeTab, setActiveTab] = useState<
     "benefits" | "content" | "howto" | "notices"
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
+  const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
   const wristSizes = ["12", "12.5", "13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
   const claspChoices = [
     { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
@@ -99,6 +124,9 @@ export default function ProductDetail() {
     : isNumerologyDepositProduct
       ? "生命靈數解析價格"
       : "";
+  const activeTarotPriceList =
+    tarotReadingCategories.find((category) => category.id === activeTarotCategory)?.items ??
+    tarotReadingCategories[0].items;
 
   const handleAddToCart = () => {
     for (let i = 0; i < qty; i++) {
@@ -227,8 +255,27 @@ export default function ProductDetail() {
                             9 折優惠
                           </span>
                         </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+                          {tarotReadingCategories.map((category) => {
+                            const isActive = category.id === activeTarotCategory;
+                            return (
+                              <button
+                                key={category.id}
+                                type="button"
+                                onClick={() => setActiveTarotCategory(category.id)}
+                                className={`shrink-0 border px-3 py-2 text-xs font-body transition-colors ${
+                                  isActive
+                                    ? "border-[oklch(0.12_0_0)] bg-[oklch(0.12_0_0)] text-white"
+                                    : "border-[oklch(0.88_0_0)] bg-white text-[oklch(0.35_0_0)] hover:border-[oklch(0.55_0_0)]"
+                                }`}
+                              >
+                                {category.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                         <div className="grid gap-2 sm:grid-cols-2">
-                          {tarotReadingPriceList.map((item) => (
+                          {activeTarotPriceList.map((item) => (
                             <div
                               key={item.name}
                               className="flex items-center justify-between gap-3 bg-white border border-[oklch(0.92_0_0)] px-3 py-2.5"
