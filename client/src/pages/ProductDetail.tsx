@@ -17,43 +17,43 @@ const tarotReadingCategories = [
     id: "love",
     label: "感情關係",
     items: [
-      { name: "戀愛指南", originalPrice: 999, discountedPrice: 899 },
-      { name: "感情復合", originalPrice: 999, discountedPrice: 899 },
-      { name: "緣來暗戀", originalPrice: 999, discountedPrice: 899 },
-      { name: "旺桃花運", originalPrice: 999, discountedPrice: 899 },
-      { name: "友情可貴", originalPrice: 999, discountedPrice: 899 },
-      { name: "雙向之路", originalPrice: 999, discountedPrice: 899 },
+      { name: "戀愛指南", originalPrice: 999, discountedPrice: 899, details: ["他對你的想法", "你們適合嗎", "相處上的建議", "未來三個月你和他的感情運勢", "如何突破過往在愛情中的盲點"] },
+      { name: "感情復合", originalPrice: 999, discountedPrice: 899, details: ["他對復合的態度", "他對你的想法", "未來三個月有機會復合嗎", "你需要改善的點", "若要復合，你們的阻礙是甚麼"] },
+      { name: "緣來暗戀", originalPrice: 999, discountedPrice: 899, details: ["他喜歡你嗎", "他是我得正緣嗎", "他理想中的愛情是怎麼樣的", "他現在是否有喜歡的人", "是否要展開追求"] },
+      { name: "旺桃花運", originalPrice: 999, discountedPrice: 899, details: ["未來三個月的感情運勢", "如何提升感情運", "怎樣的人適合你", "你需要改善的點", "如何突破過往在愛情中的盲點"] },
+      { name: "友情可貴", originalPrice: 999, discountedPrice: 899, details: ["他對你的想法", "你們之間產生的問題", "問題如何解決", "對方隱藏的心結", "未來三個月的友情運勢"] },
+      { name: "雙向之路", originalPrice: 999, discountedPrice: 899, details: ["你當前的狀態", "選擇 A 的未來三個月發展", "選擇 B 的未來三個月發展", "選擇 A 的結果", "選擇 B 的結果"] },
     ],
   },
   {
     id: "career",
     label: "財富職涯",
     items: [
-      { name: "財富密碼", originalPrice: 999, discountedPrice: 899 },
-      { name: "創業衝衝", originalPrice: 999, discountedPrice: 899 },
-      { name: "職涯探索", originalPrice: 999, discountedPrice: 899 },
-      { name: "面試勝經", originalPrice: 999, discountedPrice: 899 },
+      { name: "財富密碼", originalPrice: 999, discountedPrice: 899, details: ["求財面對的阻礙", "支出風險", "有利於增加財富的條件", "暗示生活中帶來財富的機遇", "影響財運的原因"] },
+      { name: "創業衝衝", originalPrice: 999, discountedPrice: 899, details: ["現在的你是適合創業的嗎", "創業會成功嗎", "創業需注意的事", "如何解決困難", "創業會對你的生活帶來的影響"] },
+      { name: "職涯探索", originalPrice: 999, discountedPrice: 899, details: ["你適合什麼工作", "如何提升自己的工作能力", "你的優勢是什麼", "未來三個月的工作運勢", "如何獲得他人支持或幫助"] },
+      { name: "面試勝經", originalPrice: 999, discountedPrice: 899, details: ["內心糾結的問題", "眼前的工作機會適合自己嗎", "有機率成功嗎", "目前的阻礙", "這份工作機會最終的結果"] },
     ],
   },
   {
     id: "healing",
     label: "人生療癒",
     items: [
-      { name: "進化人生", originalPrice: 999, discountedPrice: 899 },
-      { name: "心靈療癒", originalPrice: 999, discountedPrice: 899 },
-      { name: "守護神", originalPrice: 1088, discountedPrice: 979 },
+      { name: "進化人生", originalPrice: 999, discountedPrice: 899, details: ["如何提升自信", "你的優勢與缺點", "你的人生使命", "未來三個月的整體運勢", "與他人相處上的建議或提醒"] },
+      { name: "心靈療癒", originalPrice: 999, discountedPrice: 899, details: ["痛苦真正的根源", "這件事帶給生活的影響", "如何讓自己平靜", "為了療癒自己，你要採取的行動", "療癒完能獲得的成長與改變"] },
+      { name: "守護神", originalPrice: 1088, discountedPrice: 979, details: ["我的守護星", "我的守護神", "守護神的過去與故事", "守護神與你之間的連結", "守護神想提醒你的事", "要如何與守護神有更深刻的感應"] },
     ],
   },
   {
     id: "time",
     label: "前世流年",
     items: [
-      { name: "前世今生 3", originalPrice: 800, discountedPrice: 720 },
-      { name: "前世今生 2", originalPrice: 999, discountedPrice: 899 },
-      { name: "前世今生 1", originalPrice: 1288, discountedPrice: 1159 },
-      { name: "流年運勢 3", originalPrice: 1088, discountedPrice: 979 },
-      { name: "流年運勢 1", originalPrice: 1288, discountedPrice: 1159 },
-      { name: "流年運勢 2", originalPrice: 1588, discountedPrice: 1429 },
+      { name: "前世今生 3", originalPrice: 800, discountedPrice: 720, details: ["以前世故事模式闡述前世的一生", "約 500-1000 字"] },
+      { name: "前世今生 2", originalPrice: 999, discountedPrice: 899, details: ["你和他前世的關係", "你和他前世如何相遇／發生了什麼事", "今生你們在這段關係的課題", "如何跨過你們今生的課題", "神諭卡祝福"] },
+      { name: "前世今生 1", originalPrice: 1288, discountedPrice: 1159, details: ["為何轉世來到今生", "前世的外在印象／外表個性特質", "前世的內心世界", "前世的家庭生活", "前世的情感與愛人", "前世的職涯方向", "今生的課題／想得到的一個目標"] },
+      { name: "流年運勢 3", originalPrice: 1088, discountedPrice: 979, details: ["未來一年主要會是怎樣的狀態", "春夏秋冬每季會遇到的事與建議", "神諭卡祝福"] },
+      { name: "流年運勢 1", originalPrice: 1288, discountedPrice: 1159, details: ["第一宮：整體運勢", "第二宮：財運", "第三宮：溝通、學習、交通", "第四宮：家庭、親情、房產", "第五宮：感情、創意、娛樂", "第六宮：健康、工作、日常事務", "第七宮：人際、合作、婚姻", "第八宮：潛意識、轉化、死亡", "第九宮：信仰、遠方、旅行", "第十宮：事業、社會地位、名聲", "第十一宮：友誼、理想、團體", "第十二宮：自我犧牲、困境、隱藏"] },
+      { name: "流年運勢 2", originalPrice: 1588, discountedPrice: 1429, details: ["未來一年主要會是怎樣的狀態", "未來一年每月會遇到的事與建議", "未來一年神諭卡祝福"] },
     ],
   },
 ];
@@ -66,6 +66,7 @@ export default function ProductDetail() {
     "benefits" | "content" | "howto" | "notices"
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
+  const [selectedTarotReadingName, setSelectedTarotReadingName] = useState(tarotReadingCategories[0].items[0].name);
   const wristSizes = ["12", "12.5", "13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
   const claspChoices = [
     { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
@@ -127,6 +128,9 @@ export default function ProductDetail() {
   const activeTarotPriceList =
     tarotReadingCategories.find((category) => category.id === activeTarotCategory)?.items ??
     tarotReadingCategories[0].items;
+  const selectedTarotReading =
+    activeTarotPriceList.find((item) => item.name === selectedTarotReadingName) ??
+    activeTarotPriceList[0];
 
   const handleAddToCart = () => {
     for (let i = 0; i < qty; i++) {
@@ -262,7 +266,10 @@ export default function ProductDetail() {
                               <button
                                 key={category.id}
                                 type="button"
-                                onClick={() => setActiveTarotCategory(category.id)}
+                                onClick={() => {
+                                  setActiveTarotCategory(category.id);
+                                  setSelectedTarotReadingName(category.items[0].name);
+                                }}
                                 className={`shrink-0 border px-3 py-2 text-xs font-body transition-colors ${
                                   isActive
                                     ? "border-[oklch(0.12_0_0)] bg-[oklch(0.12_0_0)] text-white"
@@ -276,9 +283,15 @@ export default function ProductDetail() {
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {activeTarotPriceList.map((item) => (
-                            <div
+                            <button
                               key={item.name}
-                              className="flex items-center justify-between gap-3 bg-white border border-[oklch(0.92_0_0)] px-3 py-2.5"
+                              type="button"
+                              onClick={() => setSelectedTarotReadingName(item.name)}
+                              className={`flex items-center justify-between gap-3 border px-3 py-2.5 text-left transition-colors ${
+                                selectedTarotReading.name === item.name
+                                  ? "border-[oklch(0.12_0_0)] bg-[oklch(0.98_0_0)]"
+                                  : "border-[oklch(0.92_0_0)] bg-white hover:border-[oklch(0.65_0_0)]"
+                              }`}
                             >
                               <p className="text-sm font-body text-[oklch(0.18_0_0)]">{item.name}</p>
                               <div className="text-right shrink-0">
@@ -289,8 +302,36 @@ export default function ProductDetail() {
                                   NT$ {item.originalPrice.toLocaleString()}
                                 </p>
                               </div>
-                            </div>
+                            </button>
                           ))}
+                        </div>
+                        <div className="mt-4 border border-[oklch(0.88_0_0)] bg-white px-4 py-4">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div>
+                              <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                                方案內容
+                              </p>
+                              <p className="text-lg font-medium text-[oklch(0.12_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                                {selectedTarotReading.name}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-medium text-[oklch(0.1_0_0)]">
+                                NT$ {selectedTarotReading.discountedPrice.toLocaleString()}
+                              </p>
+                              <p className="text-[0.65rem] font-body text-[oklch(0.65_0_0)] line-through">
+                                NT$ {selectedTarotReading.originalPrice.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          <ul className="space-y-2">
+                            {selectedTarotReading.details.map((detail) => (
+                              <li key={detail} className="flex gap-2 text-sm font-body leading-relaxed text-[oklch(0.28_0_0)]">
+                                <span className="mt-[0.55em] h-1 w-1 shrink-0 rounded-full bg-[oklch(0.55_0_0)]" />
+                                <span>{detail}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     </div>
