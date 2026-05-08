@@ -41,6 +41,7 @@ const plans = [
     id: "B",
     title: "塔羅 × 水晶手鍊",
     priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "塔羅價格：依價目表 9 折"],
+    priceNote: "各塔羅方案價格在表單內說明",
     icon: <Sparkles className="w-5 h-5" />,
     features: [
       "選擇想要搭配的塔羅方案，我會提供解析並透過解析去分析出你缺失的能量是什麼並進行水晶搭配！",
@@ -174,18 +175,23 @@ export default function Custom() {
                   <h3 className="text-xl md:text-2xl font-serif-zh text-[#2f2f2f] mb-3 tracking-[0.12em] font-medium leading-snug">
                     {plan.title}
                   </h3>
-                  <div className="inline-flex max-w-full flex-col gap-1.5 rounded-2xl bg-white/55 px-4 py-3 ring-1 ring-[#8E735B]/10">
-                    <p className="text-[10px] text-[#8E735B]/70 tracking-[0.26em] uppercase font-medium">
+                  <div className="inline-flex max-w-full flex-col gap-1 rounded-2xl bg-white/55 px-3.5 py-2.5 ring-1 ring-[#8E735B]/10">
+                    <p className="text-[9px] text-[#8E735B]/65 tracking-[0.24em] uppercase font-medium">
                       費用
                     </p>
                     {plan.priceLines.map((priceLine) => (
                       <p
                         key={priceLine}
-                        className="text-sm md:text-base font-serif-zh text-[#8E735B] tracking-[0.04em] font-light leading-relaxed"
+                        className="text-xs md:text-sm font-serif-zh text-[#8E735B] tracking-[0.03em] font-light leading-relaxed"
                       >
                         {priceLine}
                       </p>
                     ))}
+                    {"priceNote" in plan && plan.priceNote && (
+                      <p className="text-[10px] md:text-xs font-serif-zh text-[#8E735B]/65 tracking-[0.03em] font-light leading-relaxed">
+                        {plan.priceNote}
+                      </p>
+                    )}
                   </div>
                 </div>
 
