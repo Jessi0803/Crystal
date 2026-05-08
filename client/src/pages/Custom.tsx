@@ -19,11 +19,30 @@ import { Link } from "wouter";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
+/** 四方案卡片內共用：手鍊初版／維修與修改規範 */
+const BRACELET_NOTICES = [
+  {
+    title: "《初版、維修》",
+    body:
+      "我們提供免費一次改初版和維修，但是不接受改手圍、新增條件（要銀管、要珠框、不要紫色、要磁扣等等）～因為這樣屬重新打掉設計，需加收費用 200 元，請在預約時直接跟我說🤍",
+  },
+  {
+    title: null,
+    body:
+      "初版、維修可調整的部分為有不喜歡的配飾可以更改、水晶／配飾擺放順序，有不清楚的也可以詢問我～🤍",
+  },
+  {
+    title: null,
+    body: "另外，如想要再改第二次，需加收 200 元的費用～",
+  },
+];
+
 const plans = [
   {
     id: "A",
     title: "純客製水晶手鍊",
     price: "1,500$ ± 300$",
+    depositLine: "支付訂金 500 元以完成排單",
     icon: <Gem className="w-5 h-5" />,
     features: [
       "可提供想要的功效、色系、款式",
@@ -38,6 +57,7 @@ const plans = [
     id: "B",
     title: "塔羅 × 水晶手鍊",
     price: "2,399$ ± 300$",
+    depositLine: "支付訂金 1,399 元以完成排單",
     icon: <Sparkles className="w-5 h-5" />,
     features: [
       "選擇想要搭配的塔羅方案，我會提供解析並透過解析去分析出你缺失的能量是什麼並進行水晶搭配！",
@@ -52,6 +72,7 @@ const plans = [
     id: "C",
     title: "脈輪檢測 × 水晶手鍊",
     price: "2,000$ ± 300$",
+    depositLine: "支付訂金 1,000 元以完成排單",
     icon: <Zap className="w-5 h-5" />,
     features: [
       "使用塔羅、靈擺，連結你的能量與高我對談，逐一分析七大脈輪個別能量。我會提供一份文字訊息報告，並透過此檢測分析出缺失的脈輪能量進行水晶搭配。",
@@ -65,6 +86,7 @@ const plans = [
     id: "D",
     title: "生命靈數 × 水晶手鍊",
     price: "2,000$ ± 300$",
+    depositLine: "支付訂金 1,000 元以完成排單",
     icon: <Fingerprint className="w-5 h-5" />,
     features: [
       "透過你的生命數、天賦數、星座數、先天數，去找到你的空缺數，並透過你的生命靈數與空缺數去搭配水晶，增強優勢，改善缺點",
@@ -191,6 +213,42 @@ export default function Custom() {
                       </li>
                     ))}
                   </ul>
+                </div>
+
+                {/* 訂購流程 + 手鍊注意事項（四方案皆顯示） */}
+                <div className="mt-10 pt-10 border-t border-[#8E735B]/10 space-y-8">
+                  <div>
+                    <span className="text-xs text-[#8E735B]/70 tracking-[0.35em] uppercase block mb-4 text-center font-medium">
+                      訂購流程
+                    </span>
+                    <ol className="space-y-3 text-sm text-[#555] leading-relaxed font-light tracking-wide list-decimal list-inside marker:text-[#8E735B]/80">
+                      <li>
+                        確認本方案為「{plan.title}」，點擊下方填寫報名表單。
+                      </li>
+                      <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
+                      <li>{plan.depositLine}。</li>
+                      <li>等待水晶搭配圖。</li>
+                      <li>手鍊與設計確認完成後，將提供尾款報價。</li>
+                      <li>尾款支付完畢，準備出貨。</li>
+                    </ol>
+                  </div>
+
+                  <div className="rounded-2xl bg-white/60 border border-amber-200/50 px-5 py-5 shadow-sm">
+                    <p className="text-sm font-serif-zh text-[#6b5344] tracking-wide mb-3 flex items-center gap-2">
+                      <span className="text-amber-600">⚠️</span>
+                      手鍊注意事項
+                    </p>
+                    <div className="space-y-3 text-xs text-[#666] leading-relaxed font-light tracking-wide">
+                      {BRACELET_NOTICES.map((n, idx) => (
+                        <div key={idx}>
+                          {n.title ? (
+                            <p className="font-medium text-[#555] mb-1">{n.title}</p>
+                          ) : null}
+                          <p>{n.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* 按鈕 */}
