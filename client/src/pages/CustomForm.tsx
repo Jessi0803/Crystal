@@ -245,7 +245,7 @@ export default function CustomForm() {
     },
     {
       title: "要加吊飾嗎？",
-      subtitle: "以下為吊飾款式參考圖，可加掛於手鍊上；實際搭配可再與店家討論",
+      subtitle: "可加掛於手鍊上，請選擇是否需要；細節可下單後與店家討論",
       required: true,
       field: (
         <CustomFormPendantCharmField
