@@ -5,6 +5,7 @@ import { useLocation, Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
+import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -628,6 +629,7 @@ export default function CustomFormB() {
 
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">
+          <CustomFormOrderingIntro />
           <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
             <h2 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
               1. 想占卜哪個主題？

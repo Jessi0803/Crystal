@@ -407,7 +407,7 @@ export default function ProductDetail() {
                     <div>
                       <p className="eyebrow mb-3">訂購流程</p>
                       <ol className="ml-1 list-outside list-decimal space-y-2.5 pl-5 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed marker:font-medium marker:text-[oklch(0.55_0.08_70)]">
-                        <li>於表單中提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
+                        <li>填寫以下報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
                         <li>支付訂金。</li>
                         <li>
                           加入

@@ -5,6 +5,7 @@ import { useLocation, Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
+import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 
 interface FormData {
   name: string;
@@ -386,6 +387,7 @@ export default function CustomFormC() {
 
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">
+          <CustomFormOrderingIntro />
           {steps.map((item, index) => (
             <section key={item.title} className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
               <div className="flex items-start justify-between gap-4 mb-2">
