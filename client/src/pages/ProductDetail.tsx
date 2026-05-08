@@ -58,6 +58,32 @@ const tarotReadingCategories = [
   },
 ];
 
+function CustomPriceTile({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
+  return (
+    <div className="bg-[oklch(0.985_0_0)] border-l border-[oklch(0.75_0_0)] px-4 py-3.5">
+      <p className="text-[0.68rem] tracking-[0.16em] font-body text-[oklch(0.48_0_0)] mb-1.5">
+        {label}
+      </p>
+      <p className="text-xl sm:text-2xl font-light text-[oklch(0.12_0_0)] leading-snug" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+        {value}
+      </p>
+      {note && (
+        <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1.5 leading-relaxed">
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
@@ -118,6 +144,7 @@ export default function ProductDetail() {
   const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
   const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
+  const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
   const isNumerologyDepositProduct = product.id === "numerology-crystal-deposit-product";
   const splitCustomFeeLabel = isChakraDepositProduct
@@ -209,6 +236,11 @@ export default function ProductDetail() {
             )}
 
             {/* Name */}
+            {product.category === "custom" && (
+              <p className="text-[0.68rem] tracking-[0.22em] font-body text-[oklch(0.48_0_0)] mb-3">
+                客製化服務
+              </p>
+            )}
             <h1 className="heading-lg mb-2">{product.name}</h1>
             <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] mb-6 leading-relaxed">
               {product.category === "custom"
@@ -227,39 +259,25 @@ export default function ProductDetail() {
                 <>
                   {isTarotDepositProduct ? (
                     <div className="space-y-5">
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
-                          <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
-                            手鍊價格
-                          </p>
-                          <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                            NT$1,200 ~ 1,800
-                          </p>
-                        </div>
-                        <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
-                          <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
-                            塔羅價格
-                          </p>
-                          <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                            價目表 9 折
-                          </p>
-                        </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <CustomPriceTile label="手鍊價格" value="NT$1,200 ~ 1,800" />
+                        <CustomPriceTile label="塔羅價格" value="價目表 9 折" note="各塔羅方案可於下方切換查看" />
                       </div>
-                      <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.9_0_0)] px-4 py-4">
+                      <div className="bg-[oklch(0.99_0_0)] border border-[oklch(0.92_0_0)] px-4 py-4 sm:px-5 sm:py-5">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-3">
                           <div>
-                            <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                            <p className="text-[0.68rem] tracking-[0.18em] font-body text-[oklch(0.48_0_0)] mb-1">
                               塔羅價目表
                             </p>
-                            <p className="text-sm font-body text-[oklch(0.35_0_0)]">
+                            <p className="text-sm font-body text-[oklch(0.38_0_0)] leading-relaxed">
                               客製水晶搭配塔羅解析時，以下價格依原價 9 折計算
                             </p>
                           </div>
-                          <span className="text-xs font-body text-[oklch(0.48_0.06_35)] bg-white border border-[oklch(0.9_0_0)] px-2.5 py-1">
+                          <span className="text-xs font-body text-[oklch(0.42_0_0)] bg-white px-2.5 py-1 border border-[oklch(0.9_0_0)]">
                             9 折優惠
                           </span>
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+                        <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
                           {tarotReadingCategories.map((category) => {
                             const isActive = category.id === activeTarotCategory;
                             return (
@@ -270,10 +288,10 @@ export default function ProductDetail() {
                                   setActiveTarotCategory(category.id);
                                   setSelectedTarotReadingName(category.items[0].name);
                                 }}
-                                className={`shrink-0 border px-3 py-2 text-xs font-body transition-colors ${
+                                className={`shrink-0 border px-3.5 py-2 text-xs font-body transition-colors ${
                                   isActive
-                                    ? "border-[oklch(0.12_0_0)] bg-[oklch(0.12_0_0)] text-white"
-                                    : "border-[oklch(0.88_0_0)] bg-white text-[oklch(0.35_0_0)] hover:border-[oklch(0.55_0_0)]"
+                                    ? "border-[oklch(0.16_0_0)] bg-[oklch(0.16_0_0)] text-white"
+                                    : "border-[oklch(0.88_0_0)] bg-white text-[oklch(0.35_0_0)] hover:border-[oklch(0.58_0_0)]"
                                 }`}
                               >
                                 {category.label}
@@ -287,13 +305,13 @@ export default function ProductDetail() {
                               key={item.name}
                               type="button"
                               onClick={() => setSelectedTarotReadingName(item.name)}
-                              className={`flex items-center justify-between gap-3 border px-3 py-2.5 text-left transition-colors ${
+                              className={`flex items-center justify-between gap-3 border px-3.5 py-3 text-left transition-colors ${
                                 selectedTarotReading.name === item.name
-                                  ? "border-[oklch(0.12_0_0)] bg-[oklch(0.98_0_0)]"
-                                  : "border-[oklch(0.92_0_0)] bg-white hover:border-[oklch(0.65_0_0)]"
+                                  ? "border-[oklch(0.18_0_0)] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
+                                  : "border-[oklch(0.92_0_0)] bg-white hover:border-[oklch(0.68_0_0)]"
                               }`}
                             >
-                              <p className="text-sm font-body text-[oklch(0.18_0_0)]">{item.name}</p>
+                              <p className="text-sm font-body text-[oklch(0.18_0_0)] leading-snug">{item.name}</p>
                               <div className="text-right shrink-0">
                                 <p className="text-sm font-medium text-[oklch(0.1_0_0)]">
                                   NT$ {item.discountedPrice.toLocaleString()}
@@ -305,13 +323,13 @@ export default function ProductDetail() {
                             </button>
                           ))}
                         </div>
-                        <div className="mt-4 border border-[oklch(0.88_0_0)] bg-white px-4 py-4">
+                        <div className="mt-4 border-l border-[oklch(0.68_0_0)] bg-white px-4 py-4 sm:px-5 sm:py-5">
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div>
-                              <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
+                              <p className="text-[0.68rem] tracking-[0.18em] font-body text-[oklch(0.48_0_0)] mb-1">
                                 方案內容
                               </p>
-                              <p className="text-lg font-medium text-[oklch(0.12_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                              <p className="text-lg font-light text-[oklch(0.12_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                                 {selectedTarotReading.name}
                               </p>
                             </div>
@@ -327,7 +345,7 @@ export default function ProductDetail() {
                           <ul className="space-y-2">
                             {selectedTarotReading.details.map((detail) => (
                               <li key={detail} className="flex gap-2 text-sm font-body leading-relaxed text-[oklch(0.28_0_0)]">
-                                <span className="mt-[0.55em] h-1 w-1 shrink-0 rounded-full bg-[oklch(0.55_0_0)]" />
+                                <span className="mt-[0.58em] h-1 w-1 shrink-0 rounded-full bg-[oklch(0.5_0_0)]" />
                                 <span>{detail}</span>
                               </li>
                             ))}
@@ -335,24 +353,15 @@ export default function ProductDetail() {
                         </div>
                       </div>
                     </div>
+                  ) : isBasicCustomDepositProduct ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <CustomPriceTile label="手鍊價格" value="NT$1,200 ~ 1,800" />
+                      <CustomPriceTile label="訂金" value="NT$500" note="尾款由店家確認後另行通知" />
+                    </div>
                   ) : splitCustomFeeLabel ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
-                        <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
-                          手鍊價格
-                        </p>
-                        <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                          NT$1,200 ~ 1,800
-                        </p>
-                      </div>
-                      <div className="border border-[oklch(0.9_0_0)] px-4 py-3">
-                        <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.5_0_0)] mb-1">
-                          {splitCustomFeeLabel}
-                        </p>
-                        <p className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                          NT$500
-                        </p>
-                      </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <CustomPriceTile label="手鍊價格" value="NT$1,200 ~ 1,800" />
+                      <CustomPriceTile label={splitCustomFeeLabel} value="NT$500" />
                     </div>
                   ) : (
                     <>
