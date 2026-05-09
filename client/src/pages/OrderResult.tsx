@@ -8,6 +8,7 @@ import { useParams, useLocation, useSearch } from "wouter";
 import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -172,6 +173,11 @@ export default function OrderResult() {
     return order.paymentMethod;
   };
 
+  const bankInfo = {
+    ...STORE_BANK_INFO,
+    ...((order as any)?.bankInfo ?? {}),
+  };
+
   const getShippingMethodLabel = () => {
     if (!order) return "";
     if (order.shippingMethod === "cvs_711") return `7-11 超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
@@ -276,15 +282,17 @@ export default function OrderResult() {
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm font-body">
                     <span className="text-blue-700">銀行</span>
-                    <span className="font-medium text-blue-900">{(order as any).bankInfo?.bankName ?? "請見老闆提供的帳號"}</span>
+                    <span className="font-medium text-blue-900">{bankInfo.bankName}</span>
                   </div>
-                  <div className="flex justify-between text-sm font-body">
-                    <span className="text-blue-700">戶名</span>
-                    <span className="font-medium text-blue-900">{(order as any).bankInfo?.accountName ?? ""}</span>
-                  </div>
+                  {bankInfo.accountName && (
+                    <div className="flex justify-between text-sm font-body">
+                      <span className="text-blue-700">戶名</span>
+                      <span className="font-medium text-blue-900">{bankInfo.accountName}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-body">
                     <span className="text-blue-700">帳號</span>
-                    <span className="font-medium text-blue-900 tracking-wider">{(order as any).bankInfo?.accountNumber ?? ""}</span>
+                    <span className="font-medium text-blue-900 tracking-wider">{bankInfo.accountNumber}</span>
                   </div>
                   <div className="flex justify-between text-sm font-body border-t border-blue-200 pt-2 mt-2">
                     <span className="text-blue-700">轉帳金額</span>

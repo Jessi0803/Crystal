@@ -65,6 +65,7 @@ import {
 } from "@shared/overseasAddress";
 import { calcCheckoutFees } from "@shared/checkoutFees";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 
@@ -340,11 +341,7 @@ export const orderRouter = router({
           kind: "atm" as const,
           paymentMethod: "atm" as const,
           merchantTradeNo,
-          bankInfo: {
-            bankName: process.env.BANK_NAME ?? "",
-            accountName: process.env.BANK_ACCOUNT_NAME ?? "",
-            accountNumber: process.env.BANK_ACCOUNT_NUMBER ?? "",
-          },
+          bankInfo: STORE_BANK_INFO,
         };
       }
 
@@ -861,11 +858,7 @@ export const orderRouter = router({
           amount: totalAmount,
           shippingFee: feeSummary.shippingFee,
           paymentFee: feeSummary.paymentFee,
-          bankInfo: {
-            bankName: process.env.BANK_NAME ?? "",
-            accountName: process.env.BANK_ACCOUNT_NAME ?? "",
-            accountNumber: process.env.BANK_ACCOUNT_NUMBER ?? "",
-          },
+          bankInfo: STORE_BANK_INFO,
         };
       }
 

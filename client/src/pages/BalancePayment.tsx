@@ -16,6 +16,7 @@ import {
   isOverseasShipCountryCode,
 } from "@shared/overseasShipping";
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
+import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -569,17 +570,21 @@ export default function BalancePayment() {
                 <div className="w-full">
                   <p className="text-sm font-body font-medium text-blue-800 mb-3">轉帳資訊</p>
                   {(() => {
-                    const bankInfo = startCheckout.data?.kind === "atm" ? startCheckout.data.bankInfo : null;
+                    const bankInfo = startCheckout.data?.kind === "atm"
+                      ? { ...STORE_BANK_INFO, ...startCheckout.data.bankInfo }
+                      : STORE_BANK_INFO;
                     return bankInfo ? (
                       <div className="space-y-2 mb-4">
                         <div className="flex justify-between text-sm font-body">
                           <span className="text-blue-700">銀行</span>
-                          <span className="font-medium text-blue-900">{bankInfo.bankName || "請見老闆提供的帳號"}</span>
+                          <span className="font-medium text-blue-900">{bankInfo.bankName}</span>
                         </div>
-                        <div className="flex justify-between text-sm font-body">
-                          <span className="text-blue-700">戶名</span>
-                          <span className="font-medium text-blue-900">{bankInfo.accountName}</span>
-                        </div>
+                        {bankInfo.accountName && (
+                          <div className="flex justify-between text-sm font-body">
+                            <span className="text-blue-700">戶名</span>
+                            <span className="font-medium text-blue-900">{bankInfo.accountName}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm font-body">
                           <span className="text-blue-700">帳號</span>
                           <span className="font-medium text-blue-900 tracking-wider">{bankInfo.accountNumber}</span>
