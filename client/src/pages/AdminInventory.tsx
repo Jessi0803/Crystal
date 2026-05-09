@@ -88,7 +88,6 @@ function AdminInventoryRow({ product }: { product: Product }) {
             onChange={(e) => setForm((prev) => prev ? { ...prev, stock: e.target.value } : prev)}
             className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body disabled:bg-[oklch(0.96_0_0)]"
           />
-          <span className="block text-[10px] text-[oklch(0.58_0_0)] mt-1">-1 為無限庫存</span>
         </label>
 
         <label className="block">
@@ -254,7 +253,7 @@ export default function AdminInventory() {
               <div>
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">一般商品庫存</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  客製化商品不列入庫存管理；庫存 -1 代表無限庫存。{IN_STOCK_FULFILLMENT_NOTE}；{PREORDER_FULFILLMENT_NOTE}。
+                  客製化商品不列入庫存管理。{IN_STOCK_FULFILLMENT_NOTE}；{PREORDER_FULFILLMENT_NOTE}。
                 </p>
               </div>
             </div>

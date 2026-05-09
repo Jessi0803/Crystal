@@ -10,14 +10,20 @@ export interface CartItem {
   wristSize?: string;
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
+  isPreorder?: boolean;
 }
+
+type AddToCartOptions = {
+  unitPrice?: number;
+  wristSize?: string;
+  claspType?: "elastic" | "lobster" | "magnetic";
+  fitPreference?: "just-right" | "loose";
+  isPreorder?: boolean;
+};
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (
-    product: Product,
-    options?: { unitPrice?: number; wristSize?: string; claspType?: "elastic" | "lobster" | "magnetic"; fitPreference?: "just-right" | "loose" }
-  ) => void;
+  addToCart: (product: Product, options?: AddToCartOptions) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -35,7 +41,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback((
     product: Product,
-    options?: { unitPrice?: number; wristSize?: string; claspType?: "elastic" | "lobster" | "magnetic"; fitPreference?: "just-right" | "loose" }
+    options?: AddToCartOptions
   ) => {
     const unitPrice = options?.unitPrice ?? product.price;
     const itemId = `${product.id}-${options?.wristSize ?? "default"}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}`;
@@ -58,6 +64,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           wristSize: options?.wristSize,
           claspType: options?.claspType,
           fitPreference: options?.fitPreference,
+          isPreorder: options?.isPreorder,
         },
       ];
     });

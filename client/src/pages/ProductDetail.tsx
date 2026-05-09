@@ -164,8 +164,11 @@ export default function ProductDetail() {
   const selectedTarotReading =
     activeTarotPriceList.find((item) => item.name === selectedTarotReadingName) ??
     activeTarotPriceList[0];
-  const fulfillmentNote = availability?.isPreorder
-    ? availability.preorderNote || PREORDER_FULFILLMENT_NOTE
+  const isPreorderItem =
+    product.category !== "custom" &&
+    (availability?.isPreorder === true || (availability?.stock ?? 1) <= 0);
+  const fulfillmentNote = isPreorderItem
+    ? availability?.preorderNote || PREORDER_FULFILLMENT_NOTE
     : IN_STOCK_FULFILLMENT_NOTE;
 
   const handleAddToCart = () => {
@@ -173,8 +176,8 @@ export default function ProductDetail() {
       addToCart(
         product,
         isCustomizableProduct
-          ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType, fitPreference: selectedFitPreference }
-          : { fitPreference: selectedFitPreference }
+          ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType, fitPreference: selectedFitPreference, isPreorder: isPreorderItem }
+          : { fitPreference: selectedFitPreference, isPreorder: isPreorderItem }
       );
     }
     toast.success(`已加入購物袋：${product.name} × ${qty}`);
