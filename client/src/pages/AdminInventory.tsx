@@ -16,9 +16,10 @@ import { IN_STOCK_FULFILLMENT_NOTE, PREORDER_FULFILLMENT_NOTE } from "@shared/fu
 
 type InventoryForm = {
   stock: string;
-  allowPreorder: boolean;
   preorderNote: string;
 };
+
+const DEFAULT_STOCK = 5;
 
 function AdminInventoryRow({ product }: { product: Product }) {
   const utils = trpc.useUtils();
@@ -34,18 +35,16 @@ function AdminInventoryRow({ product }: { product: Product }) {
     onError: (err) => toast.error(err.message || "更新庫存失敗"),
   });
 
-  const currentStock = inventory?.stock ?? -1;
+  const currentStock = inventory?.stock ?? DEFAULT_STOCK;
   const currentAllowPreorder = inventory?.allowPreorder ?? false;
   const currentPreorderNote = inventory?.preorderNote ?? "";
   const editing = form !== null;
   const visibleStock = editing ? form.stock : String(currentStock);
-  const visibleAllowPreorder = editing ? form.allowPreorder : currentAllowPreorder;
   const visiblePreorderNote = editing ? form.preorderNote : currentPreorderNote;
 
   const startEditing = () => {
     setForm({
       stock: String(currentStock),
-      allowPreorder: currentAllowPreorder,
       preorderNote: currentPreorderNote,
     });
   };
@@ -60,8 +59,8 @@ function AdminInventoryRow({ product }: { product: Product }) {
       productId: product.id,
       productName: product.name,
       stock: parsedStock,
-      allowPreorder: visibleAllowPreorder,
-      preorderNote: visibleAllowPreorder
+      allowPreorder: currentAllowPreorder,
+      preorderNote: currentAllowPreorder
         ? visiblePreorderNote.trim() || PREORDER_FULFILLMENT_NOTE
         : undefined,
     });
@@ -69,7 +68,7 @@ function AdminInventoryRow({ product }: { product: Product }) {
 
   return (
     <div className="bg-white border border-[oklch(0.9_0_0)] px-4 py-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_130px_140px_minmax(180px,1fr)_110px] lg:items-center">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_130px_minmax(180px,1fr)_110px] lg:items-center">
         <div className="flex items-center gap-3 min-w-0">
           <img src={product.image} alt={product.name} className="w-14 h-14 object-cover bg-[oklch(0.94_0_0)] border border-[oklch(0.9_0_0)]" />
           <div className="min-w-0">
@@ -90,17 +89,6 @@ function AdminInventoryRow({ product }: { product: Product }) {
             className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body disabled:bg-[oklch(0.96_0_0)]"
           />
           <span className="block text-[10px] text-[oklch(0.58_0_0)] mt-1">-1 為無限庫存</span>
-        </label>
-
-        <label className="flex items-center gap-2 text-sm font-body text-[oklch(0.25_0_0)]">
-          <input
-            type="checkbox"
-            checked={visibleAllowPreorder}
-            disabled={!editing || isLoading || saveInventory.isPending}
-            onChange={(e) => setForm((prev) => prev ? { ...prev, allowPreorder: e.target.checked } : prev)}
-            className="w-4 h-4 accent-[oklch(0.2_0_0)]"
-          />
-          允許預購
         </label>
 
         <label className="block">
@@ -156,12 +144,20 @@ export default function AdminInventory() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [query, setQuery] = useState("");
+  const utils = trpc.useUtils();
+
+  const bulkSetStock = trpc.inventory.setInventory.useMutation({
+    onError: (err) => toast.error(err.message || "批次更新庫存失敗"),
+  });
+
+  const allInventoryProducts = useMemo(
+    () => products.filter((product) => product.category !== "custom" && !CUSTOM_PRODUCT_IDS.includes(product.id)),
+    []
+  );
 
   const inventoryProducts = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    return products
-      .filter((product) => product.category !== "custom" && !CUSTOM_PRODUCT_IDS.includes(product.id))
-      .filter((product) => {
+    return allInventoryProducts.filter((product) => {
         if (!keyword) return true;
         return (
           product.name.toLowerCase().includes(keyword) ||
@@ -169,7 +165,25 @@ export default function AdminInventory() {
           product.categoryLabel.toLowerCase().includes(keyword)
         );
       });
-  }, [query]);
+  }, [allInventoryProducts, query]);
+
+  const setAllStockToFive = async () => {
+    try {
+      for (const product of allInventoryProducts) {
+        await bulkSetStock.mutateAsync({
+          productId: product.id,
+          productName: product.name,
+          stock: DEFAULT_STOCK,
+          allowPreorder: false,
+          preorderNote: undefined,
+        });
+      }
+      await utils.inventory.getInventory.invalidate();
+      toast.success(`已將 ${allInventoryProducts.length} 個一般商品庫存改為 ${DEFAULT_STOCK}`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
@@ -207,6 +221,13 @@ export default function AdminInventory() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={setAllStockToFive}
+              disabled={bulkSetStock.isPending || allInventoryProducts.length === 0}
+              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2 disabled:opacity-50"
+            >
+              全部設為 5
+            </button>
             <button
               onClick={() => setLocation("/admin/revenue")}
               className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
