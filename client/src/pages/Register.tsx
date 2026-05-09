@@ -9,8 +9,12 @@ export default function Register() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const registerMutation = trpc.member.register.useMutation({
-    onSuccess: () => {
-      toast.success("註冊成功！歡迎加入 Crystal Aura");
+    onSuccess: (data) => {
+      if (data.verificationEmailSent) {
+        toast.success("註冊成功！Email 驗證信已寄出，請至信箱完成驗證");
+      } else {
+        toast.warning("註冊成功，但驗證信暫時無法寄出，請稍後到會員中心重新發送");
+      }
       navigate("/member");
     },
     onError: (err) => {
@@ -150,7 +154,7 @@ export default function Register() {
               disabled={registerMutation.isPending}
               className="w-full bg-[oklch(0.15_0_0)] text-white py-3.5 text-sm tracking-[0.12em] font-body hover:bg-[oklch(0.25_0_0)] transition-colors disabled:opacity-60"
             >
-              {registerMutation.isPending ? "建立中..." : "建立帳號"}
+              {registerMutation.isPending ? "建立帳號並寄送驗證信..." : "建立帳號"}
             </button>
 
             <p className="text-center text-[10px] text-[oklch(0.55_0_0)] font-body pt-1">或</p>

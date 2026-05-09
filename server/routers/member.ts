@@ -69,17 +69,23 @@ export const memberRouter = router({
       await db.setVerifyToken(input.email, verifyToken, verifyExpiresAt);
       const siteOrigin = input.origin ?? "https://goodaytarot.com";
       const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
+      let verificationEmailSent = false;
       try {
         await sendVerificationEmail({
           to: input.email,
           name: input.name,
           verifyUrl,
         });
+        verificationEmailSent = true;
       } catch (err) {
         console.error("[Email] 驗證信發送失敗:", err);
       }
 
-      return { success: true, user: { id: user.id, name: user.name, email: user.email } };
+      return {
+        success: true,
+        verificationEmailSent,
+        user: { id: user.id, name: user.name, email: user.email },
+      };
     }),
 
   /** 登入 */
