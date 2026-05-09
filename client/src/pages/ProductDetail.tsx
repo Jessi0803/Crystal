@@ -6,11 +6,13 @@ import { Plus, Minus, ShoppingBag } from "lucide-react";
 import { products } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import {
   CUSTOM_BRACELET_NOTICES,
   CUSTOM_LINE_URL,
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
+import { IN_STOCK_FULFILLMENT_NOTE, PREORDER_FULFILLMENT_NOTE } from "@shared/fulfillment";
 
 const tarotReadingCategories = [
   {
@@ -108,6 +110,10 @@ export default function ProductDetail() {
     { id: "loose" as const, label: "微鬆", desc: "可輕微滑動" },
   ];
   const { addToCart, setIsOpen } = useCart();
+  const { data: availability } = trpc.inventory.getAvailability.useQuery(
+    { productId: product?.id ?? "" },
+    { enabled: Boolean(product && product.category !== "custom") }
+  );
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -158,6 +164,9 @@ export default function ProductDetail() {
   const selectedTarotReading =
     activeTarotPriceList.find((item) => item.name === selectedTarotReadingName) ??
     activeTarotPriceList[0];
+  const fulfillmentNote = availability?.isPreorder
+    ? availability.preorderNote || PREORDER_FULFILLMENT_NOTE
+    : IN_STOCK_FULFILLMENT_NOTE;
 
   const handleAddToCart = () => {
     for (let i = 0; i < qty; i++) {
@@ -537,6 +546,17 @@ export default function ProductDetail() {
                 加入購物袋
               </button>
             </div>}
+
+            {product.category !== "custom" && (
+              <div className="mb-6 border border-[oklch(0.9_0_0)] bg-[oklch(0.985_0_0)] px-4 py-3">
+                <p className="text-[0.68rem] tracking-[0.14em] font-body text-[oklch(0.5_0_0)] mb-1">
+                  出貨時間
+                </p>
+                <p className="text-sm font-body text-[oklch(0.22_0_0)] leading-relaxed">
+                  {fulfillmentNote}
+                </p>
+              </div>
+            )}
 
             {/* LINE contact for custom products */}
             {product.category === "custom" && (

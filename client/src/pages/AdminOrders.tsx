@@ -583,6 +583,12 @@ export default function AdminOrders() {
               AI 客服
             </button>
             <button
+              onClick={() => setLocation("/admin/inventory")}
+              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+            >
+              庫存管理
+            </button>
+            <button
               onClick={() => setLocation("/admin/revenue")}
               className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
             >
