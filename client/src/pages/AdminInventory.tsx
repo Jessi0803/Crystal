@@ -125,11 +125,6 @@ export default function AdminInventory() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [query, setQuery] = useState("");
-  const utils = trpc.useUtils();
-
-  const bulkSetStock = trpc.inventory.setInventory.useMutation({
-    onError: (err) => toast.error(err.message || "批次更新庫存失敗"),
-  });
 
   const allInventoryProducts = useMemo(
     () => products.filter((product) => product.category !== "custom" && !CUSTOM_PRODUCT_IDS.includes(product.id)),
@@ -147,24 +142,6 @@ export default function AdminInventory() {
         );
       });
   }, [allInventoryProducts, query]);
-
-  const setAllStockToFive = async () => {
-    try {
-      for (const product of allInventoryProducts) {
-        await bulkSetStock.mutateAsync({
-          productId: product.id,
-          productName: product.name,
-          stock: DEFAULT_STOCK,
-          allowPreorder: false,
-          preorderNote: undefined,
-        });
-      }
-      await utils.inventory.getInventory.invalidate();
-      toast.success(`已將 ${allInventoryProducts.length} 個一般商品庫存改為 ${DEFAULT_STOCK}`);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
@@ -202,13 +179,6 @@ export default function AdminInventory() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={setAllStockToFive}
-              disabled={bulkSetStock.isPending || allInventoryProducts.length === 0}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2 disabled:opacity-50"
-            >
-              全部設為 5
-            </button>
             <button
               onClick={() => setLocation("/admin/revenue")}
               className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
