@@ -7,6 +7,7 @@ import { ENV } from './_core/env';
 const ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
+    "baby90522@gmail.com",
     ...(process.env.ADMIN_EMAILS?.split(",") ?? []),
   ]
     .map((email) => email.trim())
