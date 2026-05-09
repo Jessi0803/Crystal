@@ -12,11 +12,10 @@ import { products, type Product } from "@/lib/data";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
-import { IN_STOCK_FULFILLMENT_NOTE, PREORDER_FULFILLMENT_NOTE } from "@shared/fulfillment";
+import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
 
 type InventoryForm = {
   stock: string;
-  preorderNote: string;
 };
 
 const DEFAULT_STOCK = 5;
@@ -37,15 +36,12 @@ function AdminInventoryRow({ product }: { product: Product }) {
 
   const currentStock = inventory?.stock ?? DEFAULT_STOCK;
   const currentAllowPreorder = inventory?.allowPreorder ?? false;
-  const currentPreorderNote = inventory?.preorderNote ?? "";
   const editing = form !== null;
   const visibleStock = editing ? form.stock : String(currentStock);
-  const visiblePreorderNote = editing ? form.preorderNote : currentPreorderNote;
 
   const startEditing = () => {
     setForm({
       stock: String(currentStock),
-      preorderNote: currentPreorderNote,
     });
   };
 
@@ -60,15 +56,13 @@ function AdminInventoryRow({ product }: { product: Product }) {
       productName: product.name,
       stock: parsedStock,
       allowPreorder: currentAllowPreorder,
-      preorderNote: currentAllowPreorder
-        ? visiblePreorderNote.trim() || PREORDER_FULFILLMENT_NOTE
-        : undefined,
+      preorderNote: undefined,
     });
   };
 
   return (
     <div className="bg-white border border-[oklch(0.9_0_0)] px-4 py-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_130px_minmax(180px,1fr)_110px] lg:items-center">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_130px_110px] lg:items-center">
         <div className="flex items-center gap-3 min-w-0">
           <img src={product.image} alt={product.name} className="w-14 h-14 object-cover bg-[oklch(0.94_0_0)] border border-[oklch(0.9_0_0)]" />
           <div className="min-w-0">
@@ -86,18 +80,6 @@ function AdminInventoryRow({ product }: { product: Product }) {
             value={visibleStock}
             disabled={!editing || isLoading || saveInventory.isPending}
             onChange={(e) => setForm((prev) => prev ? { ...prev, stock: e.target.value } : prev)}
-            className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body disabled:bg-[oklch(0.96_0_0)]"
-          />
-        </label>
-
-        <label className="block">
-          <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">預購說明</span>
-          <input
-            type="text"
-            value={visiblePreorderNote}
-            disabled={!editing || isLoading || saveInventory.isPending}
-            onChange={(e) => setForm((prev) => prev ? { ...prev, preorderNote: e.target.value } : prev)}
-            placeholder={PREORDER_FULFILLMENT_NOTE}
             className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body disabled:bg-[oklch(0.96_0_0)]"
           />
         </label>
@@ -253,7 +235,7 @@ export default function AdminInventory() {
               <div>
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">一般商品庫存</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  客製化商品不列入庫存管理。{IN_STOCK_FULFILLMENT_NOTE}；{PREORDER_FULFILLMENT_NOTE}。
+                  客製化商品不列入庫存管理。{IN_STOCK_FULFILLMENT_NOTE}。
                 </p>
               </div>
             </div>

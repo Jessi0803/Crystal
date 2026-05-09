@@ -11,8 +11,14 @@ import {
   InsertInventoryLock,
   InsertProductInventory,
 } from "../drizzle/schema";
+import { CUSTOM_PRODUCT_IDS } from "../shared/const";
 
 const NO_EXPIRY_LOCK_DATE = new Date("2038-01-01T00:00:00.000Z");
+const NON_INVENTORY_PRODUCT_IDS = new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
+
+function shouldSkipInventory(productId: string) {
+  return NON_INVENTORY_PRODUCT_IDS.has(productId);
+}
 
 // ─── 庫存查詢 ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +65,10 @@ export async function acquireInventoryLock(
   const db = await getDb();
   if (!db) return { success: false, reason: "Database not available" };
 
+  if (shouldSkipInventory(productId)) {
+    return { success: true };
+  }
+
   // 先清除過期鎖定
   await releaseExpiredLocks();
 
@@ -67,6 +77,11 @@ export async function acquireInventoryLock(
 
   // 無限庫存（stock = -1）或未設定庫存 → 直接允許
   if (!inv || inv.stock === -1) {
+    await createLock(productId, quantity, sessionToken, ttlMs);
+    return { success: true };
+  }
+
+  if (inv.stock <= 0) {
     await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
@@ -159,7 +174,7 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
     .where(eq(orderItems.orderId, order.id));
 
   for (const item of items) {
-    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    if (shouldSkipInventory(item.productId)) continue;
     await db
       .update(productInventory)
       .set({ stock: sql`GREATEST(0, ${productInventory.stock} - ${item.quantity})` })
@@ -199,7 +214,7 @@ export async function acquireInventoryLocksForOrder(
   await releaseSessionLocks(merchantTradeNo);
 
   for (const item of items) {
-    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    if (shouldSkipInventory(item.productId)) continue;
     const result = await acquireInventoryLock(item.productId, item.quantity, merchantTradeNo, ttlMs);
     if (!result.success) {
       await releaseSessionLocks(merchantTradeNo);
@@ -220,6 +235,15 @@ export async function getProductAvailability(productId: string) {
   const inv = await getProductInventory(productId);
   if (!inv || inv.stock === -1) {
     return { available: true, stock: -1, isPreorder: false, preorderNote: null };
+  }
+
+  if (inv.stock <= 0) {
+    return {
+      available: true,
+      stock: inv.stock,
+      isPreorder: true,
+      preorderNote: inv.preorderNote ?? null,
+    };
   }
 
   await releaseExpiredLocks();

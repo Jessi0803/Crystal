@@ -79,7 +79,7 @@ export default function BalancePayment() {
       toast.success("已送出匯款末五碼，老闆確認後將更新狀態");
       refetch();
     },
-    onError: () => toast.error("送出失敗，請重試"),
+    onError: (err) => toast.error(err.message || "送出失敗，請重試"),
   });
 
   useEffect(() => {
