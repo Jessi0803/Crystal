@@ -31,7 +31,13 @@ import {
   updateBalancePaymentTransferCode,
   confirmBalanceTransfer,
 } from "../orderDb";
-import { acquireInventoryLock, releaseExpiredLocks, releaseSessionLocks, deductInventoryAfterPayment } from "../inventoryDb";
+import {
+  acquireInventoryLock,
+  releaseExpiredLocks,
+  releaseSessionLocks,
+  deductInventoryAfterPayment,
+  acquireInventoryLocksForOrder,
+} from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
   createCVSLogisticsOrder,
@@ -59,6 +65,8 @@ import {
 } from "@shared/overseasAddress";
 import { calcCheckoutFees } from "@shared/checkoutFees";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+
+const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 
 function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: string }) {
   const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
@@ -442,6 +450,13 @@ export const orderRouter = router({
       lastFive: z.string().length(5).regex(/^\d+$/),
     }))
     .mutation(async ({ input }) => {
+      const lock = await acquireInventoryLocksForOrder(input.merchantTradeNo, BANK_TRANSFER_INVENTORY_LOCK_TTL_MS);
+      if (!lock.success) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lock.reason ?? "庫存不足，請聯繫客服協助",
+        });
+      }
       await updateOrderTransferLastFive(input.merchantTradeNo, input.lastFive);
       return { success: true };
     }),
@@ -457,6 +472,7 @@ export const orderRouter = router({
       const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
       await confirmTransferPayment(order.merchantTradeNo);
+      await deductInventoryAfterPayment(order.merchantTradeNo);
       return { success: true };
     }),
 
@@ -474,6 +490,9 @@ export const orderRouter = router({
       const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
       await dbUpdateOrderStatus(order.merchantTradeNo, input.status);
+      if (input.status === "cancelled") {
+        await releaseSessionLocks(order.merchantTradeNo);
+      }
       if (input.status === "shipped") {
         await notifyLineSafely("order_shipped_manual", () => notifyLineOrderShipped(order.id));
       }

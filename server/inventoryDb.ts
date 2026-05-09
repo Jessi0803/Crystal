@@ -12,6 +12,8 @@ import {
   InsertProductInventory,
 } from "../drizzle/schema";
 
+const NO_EXPIRY_LOCK_DATE = new Date("2038-01-01T00:00:00.000Z");
+
 // ─── 庫存查詢 ─────────────────────────────────────────────────────────────────
 
 export async function getProductInventory(productId: string) {
@@ -45,13 +47,14 @@ export async function upsertProductInventory(data: InsertProductInventory) {
 // ─── 庫存鎖定 ─────────────────────────────────────────────────────────────────
 
 /**
- * 嘗試鎖定庫存（結帳保留 10 分鐘）
+ * 嘗試鎖定庫存（預設結帳保留 10 分鐘）
  * 回傳 { success: true } 或 { success: false, reason }
  */
 export async function acquireInventoryLock(
   productId: string,
   quantity: number,
-  sessionToken: string
+  sessionToken: string,
+  ttlMs: number | null = 10 * 60 * 1000
 ): Promise<{ success: boolean; reason?: string }> {
   const db = await getDb();
   if (!db) return { success: false, reason: "Database not available" };
@@ -64,7 +67,7 @@ export async function acquireInventoryLock(
 
   // 無限庫存（stock = -1）或未設定庫存 → 直接允許
   if (!inv || inv.stock === -1) {
-    await createLock(productId, quantity, sessionToken);
+    await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
 
@@ -86,21 +89,21 @@ export async function acquireInventoryLock(
   if (availableQty < quantity) {
     // 允許預購
     if (inv.allowPreorder) {
-      await createLock(productId, quantity, sessionToken);
+      await createLock(productId, quantity, sessionToken, ttlMs);
       return { success: true };
     }
     return { success: false, reason: "庫存不足，此商品目前已被其他客人保留中" };
   }
 
-  await createLock(productId, quantity, sessionToken);
+  await createLock(productId, quantity, sessionToken, ttlMs);
   return { success: true };
 }
 
-async function createLock(productId: string, quantity: number, sessionToken: string) {
+async function createLock(productId: string, quantity: number, sessionToken: string, ttlMs: number | null) {
   const db = await getDb();
   if (!db) return;
 
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 分鐘後
+  const expiresAt = ttlMs == null ? NO_EXPIRY_LOCK_DATE : new Date(Date.now() + ttlMs);
 
   await db.insert(inventoryLocks).values({
     productId,
@@ -169,6 +172,42 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
   }
 
   await releaseSessionLocks(merchantTradeNo);
+}
+
+/**
+ * 依訂單商品鎖定庫存；ttlMs 為 null 時代表長期保留，直到確認收款或取消訂單。
+ */
+export async function acquireInventoryLocksForOrder(
+  merchantTradeNo: string,
+  ttlMs: number | null
+): Promise<{ success: boolean; reason?: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, reason: "Database not available" };
+
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!order) return { success: false, reason: "找不到訂單" };
+
+  const items = await db
+    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id));
+
+  await releaseSessionLocks(merchantTradeNo);
+
+  for (const item of items) {
+    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    const result = await acquireInventoryLock(item.productId, item.quantity, merchantTradeNo, ttlMs);
+    if (!result.success) {
+      await releaseSessionLocks(merchantTradeNo);
+      return result;
+    }
+  }
+
+  return { success: true };
 }
 
 /**

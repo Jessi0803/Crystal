@@ -252,7 +252,10 @@ export async function updateOrderTransferLastFive(
 
   await db
     .update(orders)
-    .set({ transferLastFive: lastFive })
+    .set({
+      transferLastFive: lastFive,
+      paymentStatus: "transfer_pending",
+    })
     .where(eq(orders.merchantTradeNo, merchantTradeNo));
 }
 
