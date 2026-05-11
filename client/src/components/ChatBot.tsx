@@ -123,7 +123,7 @@ export default function ChatBot() {
         ...prev,
         {
           role: "assistant",
-          content: "抱歉，我現在遇到一點問題，請稍後再試，或透過 LINE 客服聯繫我們 💜",
+          content: "椛小助正在淨化充電中，暫時無法回覆。請稍後再試，或透過官方 LINE 聯繫我們，由真人小幫手為你服務。",
         },
       ]);
     },
