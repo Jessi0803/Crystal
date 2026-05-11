@@ -395,6 +395,16 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     relatedProductIds: ["d002-honey-realm"],
   },
   {
+    id: "rec-crystal-green-phantom-unavailable",
+    question: "想要綠幽靈手鍊，有推薦嗎？",
+    answer:
+      "目前現貨沒有綠幽靈手鍊。若是想找財運、事業、行動力方向，可改看「蜜光之境手鍊」（含銅髮晶、黃水晶、太陽石等，NT$1,580）作為替代參考；若想討論指定晶石或材料是否可用，可再透過 LINE 詢問店家。",
+    embedText: "綠幽靈 綠幽靈手鍊 綠幽靈推薦 有綠幽靈嗎 綠幽靈水晶 財運 事業 招財 替代款",
+    keywords: ["綠幽靈", "綠幽靈手鍊", "綠幽靈水晶"],
+    category: "商品推薦",
+    relatedProductIds: ["d002-honey-realm"],
+  },
+  {
     id: "rec-crystal-obsidian",
     question: "想要黑曜石手鍊，有推薦嗎？",
     answer:

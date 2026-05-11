@@ -191,6 +191,10 @@ const knowledgeChunks = [
     embedText: "黃水晶 銅髮晶 髮晶 招財水晶 財運水晶 想要黃水晶 黃水晶手鍊 銅髮晶手鍊 有黃水晶的手鍊嗎",
   },
   {
+    id: "rec-crystal-green-phantom-unavailable",
+    embedText: "綠幽靈 綠幽靈手鍊 綠幽靈推薦 有綠幽靈嗎 綠幽靈水晶 財運 事業 招財 替代款",
+  },
+  {
     id: "rec-crystal-obsidian",
     embedText: "黑曜石 黑曜石手鍊 想要黑曜石 黑曜石推薦 有黑曜石的手鍊嗎 避邪黑曜石",
   },
