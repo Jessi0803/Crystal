@@ -2,11 +2,12 @@
 // Design: Vacanza-inspired Minimalist Modern
 // Layout: Announcement → Split Hero → Brand Statement → 2-col Category → TOP ITEMS slider → Members Section → Footer
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
-import { products } from "@/lib/data";
+import { products as staticProducts } from "@/lib/data";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 const HERO_SPLIT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/hero-split-crystal-Jkr4xbR2BHRgjvpbW4VUS2.webp";
@@ -76,6 +77,18 @@ export default function Home() {
   const [isSliderPaused, setIsSliderPaused] = useState(false);
   const [quote] = useState(() => dailyQuotes[new Date().getDay() % dailyQuotes.length]);
   useScrollReveal();
+
+  const { data: dbProducts } = trpc.product.list.useQuery();
+  const products = useMemo(() => {
+    if (!dbProducts || dbProducts.length === 0) {
+      return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
+    }
+    const dbIds = new Set(dbProducts.map((p) => p.id));
+    const staticExtras = staticProducts.filter(
+      (p) => !dbIds.has(p.id) && p.category !== "test" && p.category !== "custom"
+    );
+    return [...dbProducts, ...staticExtras];
+  }, [dbProducts]);
 
   const scrollSlider = (dir: "left" | "right") => {
     const slider = sliderRef.current;

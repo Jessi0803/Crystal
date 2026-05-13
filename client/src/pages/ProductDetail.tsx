@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { Plus, Minus, ShoppingBag } from "lucide-react";
-import { products } from "@/lib/data";
+import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -88,7 +88,11 @@ function CustomPriceTile({
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const product = products.find((p) => p.id === id);
+  const { data: dbProduct } = trpc.product.getById.useQuery(
+    { id: id ?? "" },
+    { enabled: Boolean(id) }
+  );
+  const product = dbProduct ?? staticProducts.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<
     "benefits" | "content" | "howto" | "notices"
@@ -184,7 +188,7 @@ export default function ProductDetail() {
     setIsOpen(true);
   };
 
-  const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
+  const related = staticProducts.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
   const customFormPaths: Record<string, string> = {
     "custom-deposit-product": "/custom/form",
     "tarot-crystal-deposit-product": "/custom/form-b",

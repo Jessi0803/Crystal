@@ -124,6 +124,12 @@ function AdminInventoryRow({ product }: { product: Product }) {
 export default function AdminInventory() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
+
+  // 導向新版商品 + 庫存管理頁
+  if (!authLoading) {
+    setLocation("/admin/products");
+    return null;
+  }
   const [query, setQuery] = useState("");
 
   const allInventoryProducts = useMemo(

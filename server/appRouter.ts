@@ -6,6 +6,7 @@ import { orderRouter } from "./routers/order";
 import { chatbotRouter } from "./routers/chatbot";
 import { inventoryRouter } from "./routers/inventory";
 import { memberRouter } from "./routers/member";
+import { productRouter } from "./routers/products";
 
 export const appRouter = router({
   system: systemRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   chatbot: chatbotRouter,
   inventory: inventoryRouter,
   member: memberRouter,
+  product: productRouter,
 });
 
 export type AppRouter = typeof appRouter;

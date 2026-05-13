@@ -1,9 +1,9 @@
 // 日日好日 — Products Page
 // Design: Vacanza-inspired minimal grid layout
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
-import { products } from "@/lib/data";
+import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -38,9 +38,21 @@ export default function Products() {
   const [showFilter, setShowFilter] = useState(false);
   const { addToCart } = useCart();
   const { data: productSalesTotals = [] } = trpc.order.getProductSalesTotals.useQuery();
+  const { data: dbProducts } = trpc.product.list.useQuery();
   const salesQtyByProductId = new Map(
     productSalesTotals.map((item) => [item.productId, item.totalQty])
   );
+
+  const products = useMemo(() => {
+    if (!dbProducts || dbProducts.length === 0) {
+      return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
+    }
+    const dbIds = new Set(dbProducts.map((p) => p.id));
+    const staticExtras = staticProducts.filter(
+      (p) => !dbIds.has(p.id) && p.category !== "test" && p.category !== "custom"
+    );
+    return [...dbProducts, ...staticExtras];
+  }, [dbProducts]);
 
   useEffect(() => {
     const p = new URLSearchParams(search);
@@ -61,7 +73,7 @@ export default function Products() {
       return 0;
     });
 
-  const handleAddToCart = (product: typeof products[0], e: React.MouseEvent) => {
+  const handleAddToCart = (product: typeof staticProducts[0], e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     addToCart(product);

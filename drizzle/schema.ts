@@ -257,3 +257,34 @@ export const chatbotLogs = mysqlTable("chatbotLogs", {
 
 export type ChatbotLog = typeof chatbotLogs.$inferSelect;
 export type InsertChatbotLog = typeof chatbotLogs.$inferInsert;
+
+// ─── 商品表 ───────────────────────────────────────────────────────────────────
+export const dbProducts = mysqlTable("products", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  subtitle: varchar("subtitle", { length: 200 }).notNull().default(""),
+  category: varchar("category", { length: 64 }).notNull(),
+  categoryLabel: varchar("categoryLabel", { length: 64 }).notNull(),
+  price: int("price").notNull(),
+  originalPrice: int("originalPrice"),
+  priceRange: varchar("priceRange", { length: 200 }),
+  depositRange: varchar("depositRange", { length: 200 }),
+  image: text("image").notNull(),
+  tags: json("tags").$type<string[]>(),
+  description: text("description"),
+  story: text("story"),
+  benefits: json("benefits").$type<string[]>(),
+  suitableFor: json("suitableFor").$type<string[]>(),
+  howToUse: json("howToUse").$type<string[]>(),
+  disclaimer: text("disclaimer"),
+  crystalType: text("crystalType"),
+  color: varchar("color", { length: 100 }),
+  featured: boolean("featured").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DbProduct = typeof dbProducts.$inferSelect;
+export type InsertDbProduct = typeof dbProducts.$inferInsert;
