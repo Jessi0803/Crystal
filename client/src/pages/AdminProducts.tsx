@@ -541,15 +541,6 @@ function ProductModal({
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={form.featured}
-                onChange={(e) => setForm((p) => ({ ...p, featured: e.target.checked }))}
-                className="w-4 h-4"
-              />
-              <span className="text-xs font-body text-[oklch(0.35_0_0)]">精選商品（顯示在首頁）</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
                 checked={form.active}
                 onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
                 className="w-4 h-4"

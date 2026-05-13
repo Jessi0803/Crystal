@@ -130,6 +130,8 @@ export const orders = mysqlTable("orders", {
   adminNote: text("adminNote"),
   // 綠界回傳的完整通知資料（JSON）
   ecpayNotifyData: json("ecpayNotifyData"),
+  // 庫存是否已扣減（防止重複扣減）
+  inventoryDeducted: boolean("inventoryDeducted").default(false).notNull(),
   // 付款時間
   paidAt: timestamp("paidAt"),
   // 老闆確認收款時間（銀行轉帳用）

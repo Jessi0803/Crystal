@@ -13,6 +13,17 @@ import {
 } from "../drizzle/schema";
 import { CUSTOM_PRODUCT_IDS } from "../shared/const";
 
+let ordersColumnsEnsured = false;
+async function ensureOrdersColumns() {
+  if (ordersColumnsEnsured) return;
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
+  } catch { /* column already exists */ }
+  ordersColumnsEnsured = true;
+}
+
 const NO_EXPIRY_LOCK_DATE = new Date("2038-01-01T00:00:00.000Z");
 const NON_INVENTORY_PRODUCT_IDS = new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
 
@@ -156,17 +167,26 @@ export async function releaseSessionLocks(sessionToken: string) {
 /**
  * 付款成功後：扣減實際庫存 + 釋放鎖定
  * sessionToken 使用 merchantTradeNo
+ * 已扣減過（inventoryDeducted=true）則跳過，防止重複扣減
  */
 export async function deductInventoryAfterPayment(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) return;
 
+  await ensureOrdersColumns();
+
+  // 先釋放鎖定（無論是否需要扣減）
+  await releaseSessionLocks(merchantTradeNo);
+
   const [order] = await db
-    .select({ id: orders.id })
+    .select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted })
     .from(orders)
     .where(eq(orders.merchantTradeNo, merchantTradeNo))
     .limit(1);
   if (!order) return;
+
+  // 已扣減過則跳過（ATM 在下單時已扣減）
+  if (order.inventoryDeducted) return;
 
   const items = await db
     .select({ productId: orderItems.productId, quantity: orderItems.quantity })
@@ -186,7 +206,52 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
       );
   }
 
+  await db
+    .update(orders)
+    .set({ inventoryDeducted: true })
+    .where(eq(orders.merchantTradeNo, merchantTradeNo));
+}
+
+/**
+ * 取消訂單後：還原已扣減的庫存 + 釋放鎖定
+ * 若庫存從未扣減（inventoryDeducted=false）則只釋放鎖定
+ */
+export async function restoreInventoryOnCancel(merchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await ensureOrdersColumns();
+
+  // 先釋放鎖定
   await releaseSessionLocks(merchantTradeNo);
+
+  const [order] = await db
+    .select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted })
+    .from(orders)
+    .where(eq(orders.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!order) return;
+
+  // 庫存未扣減則無需還原
+  if (!order.inventoryDeducted) return;
+
+  const items = await db
+    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id));
+
+  for (const item of items) {
+    if (shouldSkipInventory(item.productId)) continue;
+    await db
+      .update(productInventory)
+      .set({ stock: sql`${productInventory.stock} + ${item.quantity}` })
+      .where(
+        and(
+          eq(productInventory.productId, item.productId),
+          sql`${productInventory.stock} != -1`
+        )
+      );
+  }
 }
 
 /**

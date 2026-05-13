@@ -37,6 +37,7 @@ import {
   releaseSessionLocks,
   deductInventoryAfterPayment,
   acquireInventoryLocksForOrder,
+  restoreInventoryOnCancel,
 } from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
@@ -281,8 +282,8 @@ export const orderRouter = router({
         orderRow.userId = ctx.user.id;
       }
 
-      // 信用卡／PayPal 結帳：先鎖定庫存（10 分鐘），付款未完成則自動釋放
-      if (paymentMethod === "credit" || paymentMethod === "paypal") {
+      // 結帳前先鎖定庫存（信用卡/PayPal 10 分鐘，ATM 立即扣減）
+      if (paymentMethod === "credit" || paymentMethod === "paypal" || paymentMethod === "atm") {
         for (const item of submittedItems) {
           const productId = item.baseProductId ?? item.id;
           const result = await acquireInventoryLock(productId, item.quantity, merchantTradeNo);
@@ -337,6 +338,8 @@ export const orderRouter = router({
       }
 
       if (paymentMethod === "atm") {
+        // ATM 下單即扣減庫存（confirmTransfer 時會因 inventoryDeducted=true 跳過）
+        await deductInventoryAfterPayment(merchantTradeNo);
         return {
           kind: "atm" as const,
           paymentMethod: "atm" as const,
@@ -488,7 +491,7 @@ export const orderRouter = router({
       if (!order) throw new Error("Order not found");
       await dbUpdateOrderStatus(order.merchantTradeNo, input.status);
       if (input.status === "cancelled") {
-        await releaseSessionLocks(order.merchantTradeNo);
+        await restoreInventoryOnCancel(order.merchantTradeNo);
       }
       if (input.status === "shipped") {
         await notifyLineSafely("order_shipped_manual", () => notifyLineOrderShipped(order.id));
