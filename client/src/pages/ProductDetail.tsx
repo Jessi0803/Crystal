@@ -580,19 +580,6 @@ export default function ProductDetail() {
               </p>
             )}
 
-            {/* Suitable For */}
-            {product.category !== "custom" && (
-              <div className="mb-6 pb-6 border-b border-[oklch(0.93_0_0)]">
-                <p className="eyebrow mb-3">SUITABLE FOR · 適合族群</p>
-                <div className="flex flex-wrap gap-2">
-                  {product.suitableFor.map((s) => (
-                    <span key={s} className="text-[0.65rem] font-body text-[oklch(0.4_0_0)] bg-[oklch(0.97_0_0)] px-3 py-1.5">
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Tabs */}
             <div>

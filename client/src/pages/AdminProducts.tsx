@@ -31,6 +31,8 @@ type FormState = {
   image: string;
   tags: string;
   description: string;
+  benefits: string;    // 每行一項功效
+  crystalType: string; // 每行一項內容，存檔時用 ｜ 串接
   featured: boolean;
   active: boolean;
   initialStock: string;
@@ -45,6 +47,8 @@ const DEFAULT_FORM: FormState = {
   image: "",
   tags: "",
   description: "",
+  benefits: "",
+  crystalType: "",
   featured: false,
   active: true,
   initialStock: "5",
@@ -249,6 +253,8 @@ function ProductModal({
           image: editing.image,
           tags: ((editing.tags as string[]) ?? []).join(", "),
           description: editing.description ?? "",
+          benefits: ((editing.benefits as string[]) ?? []).join("\n"),
+          crystalType: (editing.crystalType ?? "").split("｜").filter(Boolean).join("\n"),
           featured: editing.featured,
           active: editing.active,
           initialStock: "5",
@@ -326,11 +332,11 @@ function ProductModal({
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       description: form.description.trim(),
       story: editing?.story ?? "",
-      benefits: (editing?.benefits as string[]) ?? [],
-      suitableFor: (editing?.suitableFor as string[]) ?? [],
+      benefits: form.benefits.split("\n").map((s) => s.trim()).filter(Boolean),
+      suitableFor: [],
       howToUse: (editing?.howToUse as string[]) ?? [],
       disclaimer: editing?.disclaimer ?? "",
-      crystalType: editing?.crystalType ?? "",
+      crystalType: form.crystalType.split("\n").map((s) => s.trim()).filter(Boolean).join("｜"),
       color: editing?.color ?? "",
       featured: form.featured,
       active: form.active,
@@ -467,8 +473,32 @@ function ProductModal({
             <textarea
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              rows={3}
+              rows={2}
               placeholder="簡短描述這個商品…"
+              className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
+            />
+          </label>
+
+          {/* Benefits */}
+          <label className="block">
+            <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（每行一項）</span>
+            <textarea
+              value={form.benefits}
+              onChange={(e) => setForm((p) => ({ ...p, benefits: e.target.value }))}
+              rows={4}
+              placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n帶來平靜、安定的能量"}
+              className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
+            />
+          </label>
+
+          {/* Crystal Type / Content */}
+          <label className="block">
+            <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">商品內容（每行一項水晶或材質）</span>
+            <textarea
+              value={form.crystalType}
+              onChange={(e) => setForm((p) => ({ ...p, crystalType: e.target.value }))}
+              rows={3}
+              placeholder={"紫水晶\n白水晶\n925 純銀配件"}
               className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
             />
           </label>
