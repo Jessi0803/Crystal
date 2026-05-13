@@ -44,6 +44,30 @@ async function ensureProductsTable() {
   try {
     await db.execute(sql`ALTER TABLE \`products\` MODIFY COLUMN \`image\` mediumtext NOT NULL`);
   } catch { /* 已是 mediumtext 或其他無害錯誤，略過 */ }
+  // 一次性補值：更新四種客製化商品的注意事項
+  try {
+    const customDisclaimer = [
+      "《初版與維修》",
+      "免費提供一次初版修改或維修。",
+      "",
+      "可調整範圍：更換不喜歡的配飾、調整水晶或配飾的擺放順序。",
+      "",
+      "以下需加收 NT$200：",
+      "・更改手圍、新增條件（如要銀管、要珠框、不要紫色、要磁扣等）— 因屬重新設計，請在預約時直接告知。",
+      "・第二次或以上的修改。",
+    ].join("\n");
+    const customIds = [
+      "custom-deposit-product",
+      "tarot-crystal-deposit-product",
+      "chakra-crystal-deposit-product",
+      "numerology-crystal-deposit-product",
+    ];
+    for (const id of customIds) {
+      await db.execute(
+        sql`UPDATE \`products\` SET \`disclaimer\` = ${customDisclaimer} WHERE \`id\` = ${id} AND (\`disclaimer\` IS NULL OR \`disclaimer\` = '此商品為客製化服務訂金，實際尾款金額由老闆確認後另行通知。')`
+      );
+    }
+  } catch { /* 略過 */ }
   tableEnsured = true;
 }
 
