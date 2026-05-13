@@ -32,11 +32,7 @@ import {
   confirmBalanceTransfer,
 } from "../orderDb";
 import {
-  acquireInventoryLock,
-  releaseExpiredLocks,
-  releaseSessionLocks,
   deductInventoryAfterPayment,
-  acquireInventoryLocksForOrder,
   restoreInventoryOnCancel,
   ensureOrdersColumns,
 } from "../inventoryDb";
@@ -282,18 +278,6 @@ export const orderRouter = router({
       };
       if (ctx.user?.id != null) {
         orderRow.userId = ctx.user.id;
-      }
-
-      // 結帳前先鎖定庫存（信用卡/PayPal 10 分鐘，ATM 立即扣減）
-      if (paymentMethod === "credit" || paymentMethod === "paypal" || paymentMethod === "atm") {
-        for (const item of submittedItems) {
-          const productId = item.baseProductId ?? item.id;
-          const result = await acquireInventoryLock(productId, item.quantity, merchantTradeNo);
-          if (!result.success) {
-            await releaseSessionLocks(merchantTradeNo);
-            throw new TRPCError({ code: "BAD_REQUEST", message: result.reason ?? "庫存不足，請稍後再試" });
-          }
-        }
       }
 
       const createdOrderId = await createOrder(

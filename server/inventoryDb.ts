@@ -21,14 +21,6 @@ export async function ensureOrdersColumns() {
   try {
     await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch { /* column already exists */ }
-  // 清掉殭屍鎖：屬於已扣減庫存訂單但仍殘留的永久鎖定（由舊版 submitTransferCode 產生）
-  try {
-    await db.execute(sql`
-      DELETE il FROM \`inventoryLocks\` il
-      INNER JOIN \`orders\` o ON o.\`merchantTradeNo\` = il.\`sessionToken\`
-      WHERE o.\`inventoryDeducted\` = TRUE
-    `);
-  } catch { /* ignore */ }
   ordersColumnsEnsured = true;
 }
 
@@ -170,9 +162,7 @@ export async function releaseSessionLocks(sessionToken: string) {
 }
 
 /**
- * 付款成功後：扣減實際庫存 + 釋放鎖定
- * sessionToken 使用 merchantTradeNo
- * 已扣減過（inventoryDeducted=true）則跳過，防止重複扣減
+ * 庫存扣減：已扣減過（inventoryDeducted=true）則跳過，防止重複
  */
 export async function deductInventoryAfterPayment(merchantTradeNo: string) {
   const db = await getDb();
@@ -180,18 +170,12 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
 
   await ensureOrdersColumns();
 
-  // 先釋放鎖定（無論是否需要扣減）
-  await releaseSessionLocks(merchantTradeNo);
-
   const [order] = await db
     .select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted })
     .from(orders)
     .where(eq(orders.merchantTradeNo, merchantTradeNo))
     .limit(1);
-  if (!order) return;
-
-  // 已扣減過則跳過（ATM 在下單時已扣減）
-  if (order.inventoryDeducted) return;
+  if (!order || order.inventoryDeducted) return;
 
   const items = await db
     .select({ productId: orderItems.productId, quantity: orderItems.quantity })
@@ -218,8 +202,7 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
 }
 
 /**
- * 取消訂單後：還原已扣減的庫存 + 釋放鎖定
- * 若庫存從未扣減（inventoryDeducted=false）則只釋放鎖定
+ * 庫存還原：只有曾扣減過才加回
  */
 export async function restoreInventoryOnCancel(merchantTradeNo: string) {
   const db = await getDb();
@@ -227,18 +210,12 @@ export async function restoreInventoryOnCancel(merchantTradeNo: string) {
 
   await ensureOrdersColumns();
 
-  // 先釋放鎖定
-  await releaseSessionLocks(merchantTradeNo);
-
   const [order] = await db
     .select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted })
     .from(orders)
     .where(eq(orders.merchantTradeNo, merchantTradeNo))
     .limit(1);
-  if (!order) return;
-
-  // 庫存未扣減則無需還原
-  if (!order.inventoryDeducted) return;
+  if (!order || !order.inventoryDeducted) return;
 
   const items = await db
     .select({ productId: orderItems.productId, quantity: orderItems.quantity })
@@ -307,35 +284,10 @@ export async function getProductAvailability(productId: string) {
     return { available: true, stock: -1, isPreorder: false, preorderNote: null };
   }
 
-  if (inv.stock <= 0) {
-    return {
-      available: true,
-      stock: inv.stock,
-      isPreorder: true,
-      preorderNote: inv.preorderNote ?? null,
-    };
-  }
-
-  await releaseExpiredLocks();
-
-  const now = new Date();
-  const activeLocks = await db
-    .select()
-    .from(inventoryLocks)
-    .where(
-      and(
-        eq(inventoryLocks.productId, productId),
-        sql`${inventoryLocks.expiresAt} > NOW()`
-      )
-    );
-
-  const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
-  const availableQty = inv.stock - lockedQty;
-
   return {
     available: true,
-    stock: availableQty,
-    isPreorder: availableQty <= 0,
+    stock: inv.stock,
+    isPreorder: inv.stock <= 0,
     preorderNote: inv.preorderNote ?? null,
   };
 }
