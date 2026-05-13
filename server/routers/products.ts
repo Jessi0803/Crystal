@@ -68,6 +68,27 @@ async function ensureProductsTable() {
       );
     }
   } catch { /* 略過 */ }
+  // 一次性補值：更新四種客製化商品的下單流程
+  try {
+    const customHowToUse = JSON.stringify([
+      "填寫以下報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。",
+      "支付訂金。",
+      "加入官方 LINE，等待設計師傳送水晶搭配圖。",
+      "手鍊與設計確認完成後，將提供尾款報價。",
+      "尾款支付完畢，準備出貨。",
+    ]);
+    const customIds = [
+      "custom-deposit-product",
+      "tarot-crystal-deposit-product",
+      "chakra-crystal-deposit-product",
+      "numerology-crystal-deposit-product",
+    ];
+    for (const id of customIds) {
+      await db.execute(
+        sql`UPDATE \`products\` SET \`howToUse\` = ${customHowToUse} WHERE \`id\` = ${id}`
+      );
+    }
+  } catch { /* 略過 */ }
   tableEnsured = true;
 }
 
