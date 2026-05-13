@@ -30,7 +30,6 @@ type FormState = {
   priceRange: string;
   image: string;
   tags: string;
-  description: string;
   benefits: string;    // 每行一項功效
   crystalType: string; // 每行一項內容，存檔時用 ｜ 串接
   featured: boolean;
@@ -46,7 +45,6 @@ const DEFAULT_FORM: FormState = {
   priceRange: "",
   image: "",
   tags: "",
-  description: "",
   benefits: "",
   crystalType: "",
   featured: false,
@@ -252,7 +250,6 @@ function ProductModal({
           priceRange: editing.priceRange ?? "",
           image: editing.image,
           tags: ((editing.tags as string[]) ?? []).join(", "),
-          description: editing.description ?? "",
           benefits: ((editing.benefits as string[]) ?? []).join("\n"),
           crystalType: (editing.crystalType ?? "").split("｜").filter(Boolean).join("\n"),
           featured: editing.featured,
@@ -330,7 +327,7 @@ function ProductModal({
       priceRange: form.priceRange.trim() || undefined,
       image: imageUrl,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
-      description: form.description.trim(),
+      description: editing?.description ?? "",
       story: editing?.story ?? "",
       benefits: form.benefits.split("\n").map((s) => s.trim()).filter(Boolean),
       suitableFor: [],
@@ -466,18 +463,6 @@ function ProductModal({
               </label>
             )}
           </div>
-
-          {/* Description */}
-          <label className="block">
-            <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">商品描述</span>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              rows={2}
-              placeholder="簡短描述這個商品…"
-              className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
-            />
-          </label>
 
           {/* Benefits */}
           <label className="block">
@@ -709,16 +694,6 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* Count */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-body text-[oklch(0.5_0_0)]">
-            共 {filtered.length} 個商品（上架 {filtered.filter((p) => p.active).length} / 下架 {filtered.filter((p) => !p.active).length}）
-          </p>
-          <p className="text-xs font-body text-[oklch(0.6_0_0)] hidden sm:block">
-            點庫存數字可直接編輯
-          </p>
-        </div>
-
         {/* Product list */}
         {isLoading ? (
           <div className="space-y-3">
@@ -726,17 +701,40 @@ export default function AdminProducts() {
               <div key={i} className="bg-white border border-[oklch(0.9_0_0)] px-4 py-4 animate-pulse h-20" />
             ))}
           </div>
+        ) : filtered.length === 0 && dbProductList.length > 0 ? (
+          <div className="bg-white border border-[oklch(0.93_0_0)] p-10 text-center">
+            <p className="text-sm font-body text-[oklch(0.45_0_0)]">找不到符合的商品</p>
+          </div>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((product) => (
-              <ProductRow key={product.id} product={product} onEdit={openEdit} />
-            ))}
-            {filtered.length === 0 && dbProductList.length > 0 && (
-              <div className="bg-white border border-[oklch(0.93_0_0)] p-10 text-center">
-                <p className="text-sm font-body text-[oklch(0.45_0_0)]">找不到符合的商品</p>
+          <>
+            {/* 已上架 */}
+            {filtered.filter((p) => p.active).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] pb-1 border-b border-[oklch(0.92_0_0)]">
+                  已上架 · {filtered.filter((p) => p.active).length} 件
+                </p>
+                <div className="space-y-2">
+                  {filtered.filter((p) => p.active).map((product) => (
+                    <ProductRow key={product.id} product={product} onEdit={openEdit} />
+                  ))}
+                </div>
               </div>
             )}
-          </div>
+
+            {/* 已下架 */}
+            {filtered.filter((p) => !p.active).length > 0 && (
+              <div className="space-y-2 mt-6">
+                <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] pb-1 border-b border-[oklch(0.92_0_0)]">
+                  已下架 · {filtered.filter((p) => !p.active).length} 件
+                </p>
+                <div className="space-y-2 opacity-60">
+                  {filtered.filter((p) => !p.active).map((product) => (
+                    <ProductRow key={product.id} product={product} onEdit={openEdit} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
