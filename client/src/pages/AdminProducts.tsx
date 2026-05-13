@@ -161,8 +161,14 @@ function ProductRow({
         </div>
 
         <div className="text-center">
-          <p className="text-[10px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">庫存</p>
-          <StockCell productId={product.id} productName={product.name} />
+          {product.category === "custom" ? (
+            <span className="text-xs font-body text-[oklch(0.6_0_0)]">—</span>
+          ) : (
+            <>
+              <p className="text-[10px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">庫存</p>
+              <StockCell productId={product.id} productName={product.name} />
+            </>
+          )}
         </div>
 
         <div className="text-center">
