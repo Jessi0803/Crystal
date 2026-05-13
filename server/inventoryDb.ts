@@ -113,12 +113,9 @@ export async function acquireInventoryLock(
   const availableQty = inv.stock - lockedQty;
 
   if (availableQty < quantity) {
-    // 允許預購
-    if (inv.allowPreorder) {
-      await createLock(productId, quantity, sessionToken, ttlMs);
-      return { success: true };
-    }
-    return { success: false, reason: "庫存不足，此商品目前已被其他客人保留中" };
+    // 庫存不足仍允許下單（視為預購）
+    await createLock(productId, quantity, sessionToken, ttlMs);
+    return { success: true };
   }
 
   await createLock(productId, quantity, sessionToken, ttlMs);
@@ -328,9 +325,9 @@ export async function getProductAvailability(productId: string) {
   const availableQty = inv.stock - lockedQty;
 
   return {
-    available: availableQty > 0 || inv.allowPreorder,
+    available: true,
     stock: availableQty,
-    isPreorder: availableQty <= 0 && inv.allowPreorder,
+    isPreorder: availableQty <= 0,
     preorderNote: inv.preorderNote ?? null,
   };
 }
