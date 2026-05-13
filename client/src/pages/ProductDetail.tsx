@@ -88,7 +88,7 @@ function CustomPriceTile({
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: dbProduct } = trpc.product.getById.useQuery(
+  const { data: dbProduct, isLoading } = trpc.product.getById.useQuery(
     { id: id ?? "" },
     { enabled: Boolean(id) }
   );
@@ -126,6 +126,10 @@ export default function ProductDetail() {
     setActiveTab((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
     setHasSelectedClasp(false);
   }, [id]);
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-white" />;
+  }
 
   if (!product) {
     return (
