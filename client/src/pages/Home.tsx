@@ -80,7 +80,7 @@ export default function Home() {
   const scrollSlider = (dir: "left" | "right") => {
     if (!sliderRef.current) return;
     const w = sliderRef.current.clientWidth;
-    sliderRef.current.scrollBy({ left: dir === "right" ? w * 0.8 : -w * 0.8, behavior: "smooth" });
+    sliderRef.current.scrollBy({ left: dir === "right" ? w : -w, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export default function Home() {
         return;
       }
 
-      slider.scrollBy({ left: slider.clientWidth * 0.8, behavior: "smooth" });
+      slider.scrollBy({ left: slider.clientWidth, behavior: "smooth" });
     }, 1800);
 
     return () => window.clearInterval(timer);
