@@ -50,15 +50,26 @@ const DEFAULT_FORM: FormState = {
   initialStock: "5",
 };
 
-function fileToBase64(file: File): Promise<string> {
+function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(",")[1]);
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 900;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.78));
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("圖片讀取失敗")); };
+    img.src = url;
   });
 }
 
@@ -245,13 +256,11 @@ function ProductModal({
       : DEFAULT_FORM
   );
   const [imagePreview, setImagePreview] = useState<string>(editing?.image ?? "");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [showMoreFields, setShowMoreFields] = useState(false);
 
   const categoryLabel = CATEGORY_OPTIONS.find((c) => c.id === form.category)?.label ?? form.category;
 
-  const uploadImage = trpc.product.uploadImage.useMutation();
   const setInventory = trpc.inventory.setInventory.useMutation();
   const createProduct = trpc.product.create.useMutation({
     onSuccess: async ({ id }) => {
@@ -281,41 +290,29 @@ function ProductModal({
     onError: (err) => toast.error(err.message || "更新失敗"),
   });
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("圖片請小於 4MB");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("圖片請小於 10MB");
       return;
     }
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    setCompressing(true);
+    try {
+      const dataUrl = await compressImage(file);
+      setImagePreview(dataUrl);
+      setForm((p) => ({ ...p, image: dataUrl }));
+    } catch {
+      toast.error("圖片讀取失敗，請改用圖片網址");
+    }
+    setCompressing(false);
   };
 
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error("請填寫商品名稱"); return; }
     if (!form.price || isNaN(Number(form.price))) { toast.error("請填寫正確價格"); return; }
 
-    let imageUrl = form.image;
-
-    if (imageFile) {
-      setUploading(true);
-      try {
-        const base64 = await fileToBase64(imageFile);
-        const result = await uploadImage.mutateAsync({
-          filename: imageFile.name,
-          contentType: imageFile.type,
-          dataBase64: base64,
-        });
-        imageUrl = result.url;
-      } catch {
-        toast.error("圖片上傳失敗，請直接填入圖片網址");
-        setUploading(false);
-        return;
-      }
-      setUploading(false);
-    }
-
+    const imageUrl = form.image;
     if (!imageUrl) { toast.error("請上傳圖片或填入圖片網址"); return; }
 
     const data = {
@@ -347,7 +344,7 @@ function ProductModal({
     }
   };
 
-  const isPending = createProduct.isPending || updateProduct.isPending || uploading;
+  const isPending = createProduct.isPending || updateProduct.isPending || compressing;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8 px-4">
@@ -385,14 +382,13 @@ function ProductModal({
                   className="flex items-center gap-2 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] w-full"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {imageFile ? imageFile.name : "選擇圖片（建議 < 4MB）"}
+                  {compressing ? "處理中…" : "選擇圖片"}
                 </button>
                 <input
                   value={form.image}
                   onChange={(e) => {
                     setForm((p) => ({ ...p, image: e.target.value }));
                     setImagePreview(e.target.value);
-                    setImageFile(null);
                   }}
                   placeholder="或貼上圖片網址"
                   className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body outline-none focus:border-[oklch(0.2_0_0)]"
@@ -544,7 +540,7 @@ function ProductModal({
             className="flex items-center gap-2 px-5 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
-            {isPending ? (uploading ? "上傳中…" : "儲存中…") : (editing ? "儲存變更" : "新增商品")}
+            {compressing ? "處理圖片中…" : isPending ? "儲存中…" : (editing ? "儲存變更" : "新增商品")}
           </button>
         </div>
       </div>

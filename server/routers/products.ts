@@ -22,7 +22,7 @@ async function ensureProductsTable() {
       \`originalPrice\` int DEFAULT NULL,
       \`priceRange\` varchar(200) DEFAULT NULL,
       \`depositRange\` varchar(200) DEFAULT NULL,
-      \`image\` text NOT NULL,
+      \`image\` mediumtext NOT NULL,
       \`tags\` json DEFAULT NULL,
       \`description\` text DEFAULT NULL,
       \`story\` text DEFAULT NULL,
@@ -40,6 +40,10 @@ async function ensureProductsTable() {
       PRIMARY KEY (\`id\`)
     )
   `);
+  // 若資料表已存在但 image 欄位是 text（64KB 上限），升級為 mediumtext（16MB）
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` MODIFY COLUMN \`image\` mediumtext NOT NULL`);
+  } catch { /* 已是 mediumtext 或其他無害錯誤，略過 */ }
   tableEnsured = true;
 }
 
