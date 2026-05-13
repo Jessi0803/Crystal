@@ -200,7 +200,7 @@ export default function ProductDetail() {
     "numerology-crystal-deposit-product": "/custom/form-d",
   };
 
-  const showHowToTab = product.id !== "d003-venus";
+  const showHowToTab = product.category === "custom";
   const tabs = [
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
