@@ -30,8 +30,10 @@ type FormState = {
   priceRange: string;
   image: string;
   tags: string;
-  benefits: string;    // 每行一項功效
+  benefits: string;    // 每行一項功效（非客製化）
   crystalType: string; // 每行一項內容，存檔時用 ｜ 串接
+  howToUse: string;    // 每行一個步驟（客製化下單流程）
+  disclaimer: string;  // 注意事項（客製化）
   featured: boolean;
   active: boolean;
   initialStock: string;
@@ -47,6 +49,8 @@ const DEFAULT_FORM: FormState = {
   tags: "",
   benefits: "",
   crystalType: "",
+  howToUse: "",
+  disclaimer: "",
   featured: false,
   active: true,
   initialStock: "5",
@@ -252,6 +256,8 @@ function ProductModal({
           tags: ((editing.tags as string[]) ?? []).join(", "),
           benefits: ((editing.benefits as string[]) ?? []).join("\n"),
           crystalType: (editing.crystalType ?? "").split("｜").filter(Boolean).join("\n"),
+          howToUse: ((editing.howToUse as string[]) ?? []).join("\n"),
+          disclaimer: editing.disclaimer ?? "",
           featured: editing.featured,
           active: editing.active,
           initialStock: "5",
@@ -331,8 +337,8 @@ function ProductModal({
       story: editing?.story ?? "",
       benefits: form.benefits.split("\n").map((s) => s.trim()).filter(Boolean),
       suitableFor: [],
-      howToUse: (editing?.howToUse as string[]) ?? [],
-      disclaimer: editing?.disclaimer ?? "",
+      howToUse: form.howToUse.split("\n").map((s) => s.trim()).filter(Boolean),
+      disclaimer: form.disclaimer.trim(),
       crystalType: form.crystalType.split("\n").map((s) => s.trim()).filter(Boolean).join("｜"),
       color: editing?.color ?? "",
       featured: form.featured,
@@ -464,17 +470,42 @@ function ProductModal({
             )}
           </div>
 
-          {/* Benefits */}
-          <label className="block">
-            <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（每行一項）</span>
-            <textarea
-              value={form.benefits}
-              onChange={(e) => setForm((p) => ({ ...p, benefits: e.target.value }))}
-              rows={4}
-              placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n帶來平靜、安定的能量"}
-              className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
-            />
-          </label>
+          {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}
+          {form.category !== "custom" ? (
+            <label className="block">
+              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（每行一項）</span>
+              <textarea
+                value={form.benefits}
+                onChange={(e) => setForm((p) => ({ ...p, benefits: e.target.value }))}
+                rows={4}
+                placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n帶來平靜、安定的能量"}
+                className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
+              />
+            </label>
+          ) : (
+            <>
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">下單流程（每行一個步驟）</span>
+                <textarea
+                  value={form.howToUse}
+                  onChange={(e) => setForm((p) => ({ ...p, howToUse: e.target.value }))}
+                  rows={4}
+                  placeholder={"填寫報名表單\n支付訂金\n加入官方 LINE 等待設計師確認\n確認後支付尾款出貨"}
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">注意事項</span>
+                <textarea
+                  value={form.disclaimer}
+                  onChange={(e) => setForm((p) => ({ ...p, disclaimer: e.target.value }))}
+                  rows={4}
+                  placeholder={"手鍊屬易碎品，請輕拿輕放…"}
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
+                />
+              </label>
+            </>
+          )}
 
           {/* Crystal Type / Content */}
           <label className="block">
