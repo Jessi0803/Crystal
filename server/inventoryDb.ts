@@ -21,6 +21,14 @@ export async function ensureOrdersColumns() {
   try {
     await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch { /* column already exists */ }
+  // 清掉殭屍鎖：屬於已扣減庫存訂單但仍殘留的永久鎖定（由舊版 submitTransferCode 產生）
+  try {
+    await db.execute(sql`
+      DELETE il FROM \`inventoryLocks\` il
+      INNER JOIN \`orders\` o ON o.\`merchantTradeNo\` = il.\`sessionToken\`
+      WHERE o.\`inventoryDeducted\` = TRUE
+    `);
+  } catch { /* ignore */ }
   ordersColumnsEnsured = true;
 }
 

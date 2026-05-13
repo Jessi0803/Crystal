@@ -452,13 +452,6 @@ export const orderRouter = router({
       lastFive: z.string().length(5).regex(/^\d+$/),
     }))
     .mutation(async ({ input }) => {
-      const lock = await acquireInventoryLocksForOrder(input.merchantTradeNo, BANK_TRANSFER_INVENTORY_LOCK_TTL_MS);
-      if (!lock.success) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: lock.reason ?? "庫存不足，請聯繫客服協助",
-        });
-      }
       await updateOrderTransferLastFive(input.merchantTradeNo, input.lastFive);
       return { success: true };
     }),
