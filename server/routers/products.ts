@@ -1,10 +1,47 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { dbProducts, type DbProduct } from "../../drizzle/schema";
 import { storagePut } from "../storage";
+
+let tableEnsured = false;
+async function ensureProductsTable() {
+  if (tableEnsured) return;
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS \`products\` (
+      \`id\` varchar(64) NOT NULL,
+      \`name\` varchar(200) NOT NULL,
+      \`subtitle\` varchar(200) NOT NULL DEFAULT '',
+      \`category\` varchar(64) NOT NULL,
+      \`categoryLabel\` varchar(64) NOT NULL,
+      \`price\` int NOT NULL,
+      \`originalPrice\` int DEFAULT NULL,
+      \`priceRange\` varchar(200) DEFAULT NULL,
+      \`depositRange\` varchar(200) DEFAULT NULL,
+      \`image\` text NOT NULL,
+      \`tags\` json DEFAULT NULL,
+      \`description\` text DEFAULT NULL,
+      \`story\` text DEFAULT NULL,
+      \`benefits\` json DEFAULT NULL,
+      \`suitableFor\` json DEFAULT NULL,
+      \`howToUse\` json DEFAULT NULL,
+      \`disclaimer\` text DEFAULT NULL,
+      \`crystalType\` text DEFAULT NULL,
+      \`color\` varchar(100) DEFAULT NULL,
+      \`featured\` boolean NOT NULL DEFAULT false,
+      \`active\` boolean NOT NULL DEFAULT true,
+      \`sortOrder\` int NOT NULL DEFAULT 0,
+      \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+      \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`)
+    )
+  `);
+  tableEnsured = true;
+}
 
 function toFrontendProduct(p: DbProduct) {
   return {
@@ -58,6 +95,7 @@ const ProductInputSchema = z.object({
 
 export const productRouter = router({
   list: publicProcedure.query(async () => {
+    await ensureProductsTable();
     const db = await getDb();
     if (!db) return [];
     const rows = await db
@@ -73,6 +111,7 @@ export const productRouter = router({
   getById: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
+      await ensureProductsTable();
       const db = await getDb();
       if (!db) return null;
       const rows = await db
@@ -84,6 +123,7 @@ export const productRouter = router({
     }),
 
   adminList: adminProcedure.query(async () => {
+    await ensureProductsTable();
     const db = await getDb();
     if (!db) return [];
     const rows = await db.select().from(dbProducts);
@@ -95,6 +135,7 @@ export const productRouter = router({
   create: adminProcedure
     .input(ProductInputSchema)
     .mutation(async ({ input }) => {
+      await ensureProductsTable();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const id = `prod-${Date.now()}`;
@@ -105,6 +146,7 @@ export const productRouter = router({
   update: adminProcedure
     .input(ProductInputSchema.extend({ id: z.string() }))
     .mutation(async ({ input }) => {
+      await ensureProductsTable();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const { id, ...data } = input;
@@ -115,6 +157,7 @@ export const productRouter = router({
   toggleActive: adminProcedure
     .input(z.object({ id: z.string(), active: z.boolean() }))
     .mutation(async ({ input }) => {
+      await ensureProductsTable();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       await db.update(dbProducts).set({ active: input.active }).where(eq(dbProducts.id, input.id));
@@ -138,6 +181,7 @@ export const productRouter = router({
   seed: adminProcedure
     .input(z.array(ProductInputSchema.extend({ id: z.string() })))
     .mutation(async ({ input }) => {
+      await ensureProductsTable();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       let count = 0;
