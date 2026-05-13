@@ -14,7 +14,7 @@ import {
 import { CUSTOM_PRODUCT_IDS } from "../shared/const";
 
 let ordersColumnsEnsured = false;
-async function ensureOrdersColumns() {
+export async function ensureOrdersColumns() {
   if (ordersColumnsEnsured) return;
   const db = await getDb();
   if (!db) return;

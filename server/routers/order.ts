@@ -38,6 +38,7 @@ import {
   deductInventoryAfterPayment,
   acquireInventoryLocksForOrder,
   restoreInventoryOnCancel,
+  ensureOrdersColumns,
 } from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
@@ -183,6 +184,7 @@ export const orderRouter = router({
         })
     )
     .mutation(async ({ input, ctx }) => {
+      await ensureOrdersColumns();
       const isOverseas = input.checkoutRegion === "overseas";
       const shippingMethod = isOverseas ? ("home" as const) : input.shippingMethod;
       const paymentMethod = isOverseas ? ("paypal" as const) : input.paymentMethod;
