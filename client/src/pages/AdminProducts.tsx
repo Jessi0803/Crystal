@@ -118,7 +118,10 @@ function StockCell({ productId, productName }: { productId: string; productName:
   }
 
   return (
-    <button onClick={startEdit} className="text-xs font-body text-[oklch(0.3_0_0)] hover:underline">
+    <button
+      onClick={startEdit}
+      className="w-16 border border-[oklch(0.82_0_0)] px-2 py-1 text-xs font-body text-[oklch(0.3_0_0)] hover:border-[oklch(0.4_0_0)] bg-white text-center"
+    >
       {currentStock === -1 ? "無限" : currentStock}
     </button>
   );
