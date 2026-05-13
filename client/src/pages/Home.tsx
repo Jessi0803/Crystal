@@ -78,9 +78,13 @@ export default function Home() {
   useScrollReveal();
 
   const scrollSlider = (dir: "left" | "right") => {
-    if (!sliderRef.current) return;
-    const w = sliderRef.current.clientWidth;
-    sliderRef.current.scrollBy({ left: dir === "right" ? w : -w, behavior: "smooth" });
+    const slider = sliderRef.current;
+    if (!slider) return;
+    const firstItem = slider.querySelector<HTMLElement>('.scroll-item');
+    const gap = firstItem ? (parseFloat(getComputedStyle(slider).gap) || 16) : 16;
+    const itemPlusGap = firstItem ? firstItem.offsetWidth + gap : slider.clientWidth;
+    const pageWidth = Math.round(slider.clientWidth / itemPlusGap) * itemPlusGap;
+    slider.scrollBy({ left: dir === "right" ? pageWidth : -pageWidth, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -97,7 +101,11 @@ export default function Home() {
         return;
       }
 
-      slider.scrollBy({ left: slider.clientWidth, behavior: "smooth" });
+      const firstItem = slider.querySelector<HTMLElement>('.scroll-item');
+      const gap = firstItem ? (parseFloat(getComputedStyle(slider).gap) || 16) : 16;
+      const itemPlusGap = firstItem ? firstItem.offsetWidth + gap : slider.clientWidth;
+      const pageWidth = Math.round(slider.clientWidth / itemPlusGap) * itemPlusGap;
+      slider.scrollBy({ left: pageWidth, behavior: "smooth" });
     }, 1800);
 
     return () => window.clearInterval(timer);
