@@ -12,6 +12,7 @@ var __export = (target, all) => {
 var schema_exports = {};
 __export(schema_exports, {
   chatbotLogs: () => chatbotLogs,
+  dbProducts: () => dbProducts,
   inventoryLocks: () => inventoryLocks,
   logisticsOrders: () => logisticsOrders,
   orderBalancePayments: () => orderBalancePayments,
@@ -21,7 +22,7 @@ __export(schema_exports, {
   users: () => users
 });
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
-var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs;
+var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs, dbProducts;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -162,6 +163,8 @@ var init_schema = __esm({
       adminNote: text("adminNote"),
       // 綠界回傳的完整通知資料（JSON）
       ecpayNotifyData: json("ecpayNotifyData"),
+      // 庫存是否已扣減（防止重複扣減）
+      inventoryDeducted: boolean("inventoryDeducted").default(false).notNull(),
       // 付款時間
       paidAt: timestamp("paidAt"),
       // 老闆確認收款時間（銀行轉帳用）
@@ -275,6 +278,33 @@ var init_schema = __esm({
       index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
       index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt)
     ]);
+    dbProducts = mysqlTable("products", {
+      id: varchar("id", { length: 64 }).primaryKey(),
+      name: varchar("name", { length: 200 }).notNull(),
+      subtitle: varchar("subtitle", { length: 200 }).notNull().default(""),
+      category: varchar("category", { length: 64 }).notNull(),
+      categoryLabel: varchar("categoryLabel", { length: 64 }).notNull(),
+      price: int("price").notNull(),
+      originalPrice: int("originalPrice"),
+      priceRange: varchar("priceRange", { length: 200 }),
+      depositRange: varchar("depositRange", { length: 200 }),
+      image: text("image").notNull(),
+      tags: json("tags").$type(),
+      description: text("description"),
+      story: text("story"),
+      benefits: json("benefits").$type(),
+      suitableFor: json("suitableFor").$type(),
+      howToUse: json("howToUse").$type(),
+      disclaimer: text("disclaimer"),
+      crystalType: text("crystalType"),
+      color: varchar("color", { length: 100 }),
+      featured: boolean("featured").notNull().default(false),
+      active: boolean("active").notNull().default(true),
+      scheduledPublishAt: timestamp("scheduledPublishAt"),
+      sortOrder: int("sortOrder").notNull().default(0),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+    });
   }
 });
 
@@ -571,6 +601,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 var ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
+    "baby90522@gmail.com",
     ...process.env.ADMIN_EMAILS?.split(",") ?? []
   ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
 );
@@ -807,7 +838,10 @@ async function markOrderPaidPayPal(merchantTradeNo, paypalCaptureId, capturePayl
 async function updateOrderTransferLastFive(merchantTradeNo, lastFive) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(orders).set({ transferLastFive: lastFive }).where(eq2(orders.merchantTradeNo, merchantTradeNo));
+  await db.update(orders).set({
+    transferLastFive: lastFive,
+    paymentStatus: "transfer_pending"
+  }).where(eq2(orders.merchantTradeNo, merchantTradeNo));
 }
 async function confirmTransferPayment(merchantTradeNo) {
   const db = await getDb();
@@ -1125,6 +1159,22 @@ async function getOrdersForMember(opts) {
 // server/inventoryDb.ts
 import { eq as eq3, lt, and as and3, sql as sql3 } from "drizzle-orm";
 init_schema();
+var ordersColumnsEnsured = false;
+async function ensureOrdersColumns() {
+  if (ordersColumnsEnsured) return;
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
+  } catch {
+  }
+  ordersColumnsEnsured = true;
+}
+var NO_EXPIRY_LOCK_DATE = /* @__PURE__ */ new Date("2038-01-01T00:00:00.000Z");
+var NON_INVENTORY_PRODUCT_IDS = /* @__PURE__ */ new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
+function shouldSkipInventory(productId) {
+  return NON_INVENTORY_PRODUCT_IDS.has(productId);
+}
 async function getProductInventory(productId) {
   const db = await getDb();
   if (!db) return null;
@@ -1141,13 +1191,20 @@ async function upsertProductInventory(data) {
     await db.insert(productInventory).values(data);
   }
 }
-async function acquireInventoryLock(productId, quantity, sessionToken) {
+async function acquireInventoryLock(productId, quantity, sessionToken, ttlMs = 10 * 60 * 1e3) {
   const db = await getDb();
   if (!db) return { success: false, reason: "Database not available" };
+  if (shouldSkipInventory(productId)) {
+    return { success: true };
+  }
   await releaseExpiredLocks();
   const inv = await getProductInventory(productId);
   if (!inv || inv.stock === -1) {
-    await createLock(productId, quantity, sessionToken);
+    await createLock(productId, quantity, sessionToken, ttlMs);
+    return { success: true };
+  }
+  if (inv.stock <= 0) {
+    await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
   const now = /* @__PURE__ */ new Date();
@@ -1160,19 +1217,16 @@ async function acquireInventoryLock(productId, quantity, sessionToken) {
   const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
   const availableQty = inv.stock - lockedQty;
   if (availableQty < quantity) {
-    if (inv.allowPreorder) {
-      await createLock(productId, quantity, sessionToken);
-      return { success: true };
-    }
-    return { success: false, reason: "\u5EAB\u5B58\u4E0D\u8DB3\uFF0C\u6B64\u5546\u54C1\u76EE\u524D\u5DF2\u88AB\u5176\u4ED6\u5BA2\u4EBA\u4FDD\u7559\u4E2D" };
+    await createLock(productId, quantity, sessionToken, ttlMs);
+    return { success: true };
   }
-  await createLock(productId, quantity, sessionToken);
+  await createLock(productId, quantity, sessionToken, ttlMs);
   return { success: true };
 }
-async function createLock(productId, quantity, sessionToken) {
+async function createLock(productId, quantity, sessionToken, ttlMs) {
   const db = await getDb();
   if (!db) return;
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1e3);
+  const expiresAt = ttlMs == null ? NO_EXPIRY_LOCK_DATE : new Date(Date.now() + ttlMs);
   await db.insert(inventoryLocks).values({
     productId,
     quantity,
@@ -1194,11 +1248,12 @@ async function releaseSessionLocks(sessionToken) {
 async function deductInventoryAfterPayment(merchantTradeNo) {
   const db = await getDb();
   if (!db) return;
-  const [order] = await db.select({ id: orders.id }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
-  if (!order) return;
+  await ensureOrdersColumns();
+  const [order] = await db.select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!order || order.inventoryDeducted) return;
   const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
   for (const item of items) {
-    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    if (shouldSkipInventory(item.productId)) continue;
     await db.update(productInventory).set({ stock: sql3`GREATEST(0, ${productInventory.stock} - ${item.quantity})` }).where(
       and3(
         eq3(productInventory.productId, item.productId),
@@ -1206,7 +1261,24 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
       )
     );
   }
-  await releaseSessionLocks(merchantTradeNo);
+  await db.update(orders).set({ inventoryDeducted: true }).where(eq3(orders.merchantTradeNo, merchantTradeNo));
+}
+async function restoreInventoryOnCancel(merchantTradeNo) {
+  const db = await getDb();
+  if (!db) return;
+  await ensureOrdersColumns();
+  const [order] = await db.select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!order || !order.inventoryDeducted) return;
+  const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
+  for (const item of items) {
+    if (shouldSkipInventory(item.productId)) continue;
+    await db.update(productInventory).set({ stock: sql3`${productInventory.stock} + ${item.quantity}` }).where(
+      and3(
+        eq3(productInventory.productId, item.productId),
+        sql3`${productInventory.stock} != -1`
+      )
+    );
+  }
 }
 async function getProductAvailability(productId) {
   const db = await getDb();
@@ -1215,20 +1287,10 @@ async function getProductAvailability(productId) {
   if (!inv || inv.stock === -1) {
     return { available: true, stock: -1, isPreorder: false, preorderNote: null };
   }
-  await releaseExpiredLocks();
-  const now = /* @__PURE__ */ new Date();
-  const activeLocks = await db.select().from(inventoryLocks).where(
-    and3(
-      eq3(inventoryLocks.productId, productId),
-      sql3`${inventoryLocks.expiresAt} > NOW()`
-    )
-  );
-  const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
-  const availableQty = inv.stock - lockedQty;
   return {
-    available: availableQty > 0 || inv.allowPreorder,
-    stock: availableQty,
-    isPreorder: availableQty <= 0 && inv.allowPreorder,
+    available: true,
+    stock: inv.stock,
+    isPreorder: inv.stock <= 0,
     preorderNote: inv.preorderNote ?? null
   };
 }
@@ -1818,6 +1880,13 @@ function calcCheckoutFees(params) {
   };
 }
 
+// shared/bankAccount.ts
+var STORE_BANK_INFO = {
+  bankName: "\u9023\u7DDA\u9280\u884C\uFF08824\uFF09",
+  accountName: "",
+  accountNumber: "111004444556"
+};
+
 // server/routers/order.ts
 function siteBaseUrl(req) {
   const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
@@ -1919,6 +1988,7 @@ var orderRouter = router({
       }
     })
   ).mutation(async ({ input, ctx }) => {
+    await ensureOrdersColumns();
     const isOverseas = input.checkoutRegion === "overseas";
     const shippingMethod = isOverseas ? "home" : input.shippingMethod;
     const paymentMethod = isOverseas ? "paypal" : input.paymentMethod;
@@ -2003,16 +2073,6 @@ var orderRouter = router({
     if (ctx.user?.id != null) {
       orderRow.userId = ctx.user.id;
     }
-    if (paymentMethod === "credit" || paymentMethod === "paypal") {
-      for (const item of submittedItems) {
-        const productId = item.baseProductId ?? item.id;
-        const result = await acquireInventoryLock(productId, item.quantity, merchantTradeNo);
-        if (!result.success) {
-          await releaseSessionLocks(merchantTradeNo);
-          throw new TRPCError3({ code: "BAD_REQUEST", message: result.reason ?? "\u5EAB\u5B58\u4E0D\u8DB3\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
-        }
-      }
-    }
     const createdOrderId = await createOrder(
       orderRow,
       orderItems2.map((item) => ({
@@ -2052,15 +2112,12 @@ var orderRouter = router({
       }
     }
     if (paymentMethod === "atm") {
+      await deductInventoryAfterPayment(merchantTradeNo);
       return {
         kind: "atm",
         paymentMethod: "atm",
         merchantTradeNo,
-        bankInfo: {
-          bankName: process.env.BANK_NAME ?? "",
-          accountName: process.env.BANK_ACCOUNT_NAME ?? "",
-          accountNumber: process.env.BANK_ACCOUNT_NUMBER ?? ""
-        }
+        bankInfo: STORE_BANK_INFO
       };
     }
     const returnURL = `${input.origin}/api/ecpay/notify`;
@@ -2161,6 +2218,7 @@ var orderRouter = router({
     const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq5(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
     await confirmTransferPayment(order.merchantTradeNo);
+    await deductInventoryAfterPayment(order.merchantTradeNo);
     return { success: true };
   }),
   /**
@@ -2175,6 +2233,9 @@ var orderRouter = router({
     const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq5(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
     await updateOrderStatus(order.merchantTradeNo, input.status);
+    if (input.status === "cancelled") {
+      await restoreInventoryOnCancel(order.merchantTradeNo);
+    }
     if (input.status === "shipped") {
       await notifyLineSafely("order_shipped_manual", () => notifyLineOrderShipped(order.id));
     }
@@ -2464,11 +2525,7 @@ var orderRouter = router({
         amount: totalAmount,
         shippingFee: feeSummary.shippingFee,
         paymentFee: feeSummary.paymentFee,
-        bankInfo: {
-          bankName: process.env.BANK_NAME ?? "",
-          accountName: process.env.BANK_ACCOUNT_NAME ?? "",
-          accountNumber: process.env.BANK_ACCOUNT_NUMBER ?? ""
-        }
+        bankInfo: STORE_BANK_INFO
       };
     }
     const paymentParams = buildCreditPaymentParams({
@@ -2650,7 +2707,7 @@ var knowledgeChunks = [
   {
     id: "faq-free-revision",
     question: "\u53EF\u4EE5\u514D\u8CBB\u4FEE\u6539\u55CE\uFF1F\u521D\u7248\u6216\u7DAD\u4FEE\u80FD\u6539\u4EC0\u9EBC\uFF1F",
-    answer: "\u6211\u5011\u63D0\u4F9B\u514D\u8CBB\u4E00\u6B21\u6539\u521D\u7248\u8207\u7DAD\u4FEE\u53EF\u8ABF\u6574\u7BC4\u570D\u5167\u7684\u4FEE\u6539\uFF1B\u4F46\u4E0D\u63A5\u53D7\u6539\u624B\u570D\u3001\u65B0\u589E\u689D\u4EF6\uFF08\u4F8B\u5982\u8981\u9280\u7BA1\u3001\u8981\u73E0\u6846\u3001\u4E0D\u8981\u7D2B\u8272\u3001\u8981\u78C1\u6263\u7B49\uFF09\uFF0C\u56E0\u70BA\u9019\u4E9B\u5C6C\u65BC\u91CD\u65B0\u6253\u6389\u8A2D\u8A08\uFF0C\u9700\u52A0\u6536 200 \u5143\uFF0C\u8ACB\u5728\u9810\u7D04\u6642\u76F4\u63A5\u900F\u904E\u5B98\u65B9 LINE \u8DDF\u8001\u95C6\u8AAA\u660E\u{1F90D} \u521D\u7248\u8207\u7DAD\u4FEE\u5728\u514D\u8CBB\u7BC4\u570D\u5167\u53EF\u8ABF\u6574\u7684\u90E8\u5206\uFF1A\u6709\u4E0D\u559C\u6B61\u7684\u914D\u98FE\u53EF\u4EE5\u66F4\u63DB\u3001\u6C34\u6676\uFF0F\u914D\u98FE\u64FA\u653E\u9806\u5E8F\u53EF\u8ABF\u6574\uFF0C\u6709\u4E0D\u6E05\u695A\u7684\u4E5F\u6B61\u8FCE\u8A62\u554F\u3002\u82E5\u60F3\u518D\u6539\u7B2C\u4E8C\u6B21\uFF08\u542B\u8D85\u51FA\u514D\u8CBB\u7BC4\u570D\u7684\u8B8A\u66F4\uFF09\uFF0C\u9700\u52A0\u6536 200 \u5143\u3002LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh",
+    answer: "\u6211\u5011\u63D0\u4F9B\u514D\u8CBB\u4E00\u6B21\u6539\u521D\u7248\u8207\u7DAD\u4FEE\u53EF\u8ABF\u6574\u7BC4\u570D\u5167\u7684\u4FEE\u6539\uFF1B\u4F46\u4E0D\u63A5\u53D7\u6539\u624B\u570D\u3001\u65B0\u589E\u689D\u4EF6\uFF08\u4F8B\u5982\u8981\u9280\u7BA1\u3001\u8981\u73E0\u6846\u3001\u4E0D\u8981\u7D2B\u8272\u3001\u8981\u78C1\u6263\u7B49\uFF09\uFF0C\u56E0\u70BA\u9019\u4E9B\u5C6C\u65BC\u91CD\u65B0\u6253\u6389\u8A2D\u8A08\uFF0C\u9700\u52A0\u6536 200 \u5143\uFF0C\u8ACB\u5728\u9810\u7D04\u6642\u76F4\u63A5\u900F\u904E\u5B98\u65B9 LINE \u8DDF\u5E97\u5BB6\u8AAA\u660E\u{1F90D} \u521D\u7248\u8207\u7DAD\u4FEE\u5728\u514D\u8CBB\u7BC4\u570D\u5167\u53EF\u8ABF\u6574\u7684\u90E8\u5206\uFF1A\u6709\u4E0D\u559C\u6B61\u7684\u914D\u98FE\u53EF\u4EE5\u66F4\u63DB\u3001\u6C34\u6676\uFF0F\u914D\u98FE\u64FA\u653E\u9806\u5E8F\u53EF\u8ABF\u6574\uFF0C\u6709\u4E0D\u6E05\u695A\u7684\u4E5F\u6B61\u8FCE\u8A62\u554F\u3002\u82E5\u60F3\u518D\u6539\u7B2C\u4E8C\u6B21\uFF08\u542B\u8D85\u51FA\u514D\u8CBB\u7BC4\u570D\u7684\u8B8A\u66F4\uFF09\uFF0C\u9700\u52A0\u6536 200 \u5143\u3002LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh",
     embedText: "\u53EF\u4EE5\u514D\u8CBB\u4FEE\u6539\u55CE \u514D\u8CBB\u4FEE\u6539 \u521D\u7248 \u7DAD\u4FEE \u6539\u5E7E\u6B21 \u4FEE\u6539\u5E7E\u6B21 \u6539\u624B\u570D \u624B\u570D \u65B0\u589E\u689D\u4EF6 \u9280\u7BA1 \u73E0\u6846 \u984F\u8272 \u7D2B\u8272 \u78C1\u6263 \u9F8D\u8766\u6263 \u7B2C\u4E8C\u6B21\u4FEE\u6539 \u518D\u6539\u4E00\u6B21 \u52A0\u6536 200 \u91CD\u65B0\u8A2D\u8A08 \u6539\u8A2D\u8A08 \u4E0D\u6EFF\u610F",
     keywords: [
       "\u514D\u8CBB\u4FEE\u6539",
@@ -2679,7 +2736,7 @@ var knowledgeChunks = [
   {
     id: "faq-revision-extra-conditions",
     question: "\u60F3\u6539\u624B\u570D\u3001\u52A0\u9280\u7BA1\u6216\u73E0\u6846\u3001\u63DB\u78C1\u6263\u3001\u4E0D\u8981\u67D0\u500B\u984F\u8272\uFF0C\u8981\u52A0\u9322\u55CE\uFF1F",
-    answer: "\u53EF\u4EE5\uFF0C\u4F46\u9019\u985E\u5C6C\u65BC\u300C\u65B0\u589E\u689D\u4EF6\u300D\u6216\u6539\u624B\u570D\uFF0C\u7B49\u65BC\u91CD\u65B0\u6253\u6389\u8A2D\u8A08\uFF0C\u4E0D\u5728\u514D\u8CBB\u4E00\u6B21\u7BC4\u570D\u5167\uFF0C\u9700\u52A0\u6536 200 \u5143\u3002\u8ACB\u5728\u9810\u7D04\u6216\u8A0E\u8AD6\u8A2D\u8A08\u6642\u5C31\u5148\u900F\u904E\u5B98\u65B9 LINE \u8DDF\u8001\u95C6\u8AAA\u660E\u3002LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh",
+    answer: "\u53EF\u4EE5\uFF0C\u4F46\u9019\u985E\u5C6C\u65BC\u300C\u65B0\u589E\u689D\u4EF6\u300D\u6216\u6539\u624B\u570D\uFF0C\u7B49\u65BC\u91CD\u65B0\u6253\u6389\u8A2D\u8A08\uFF0C\u4E0D\u5728\u514D\u8CBB\u4E00\u6B21\u7BC4\u570D\u5167\uFF0C\u9700\u52A0\u6536 200 \u5143\u3002\u8ACB\u5728\u9810\u7D04\u6216\u8A0E\u8AD6\u8A2D\u8A08\u6642\u5C31\u5148\u900F\u904E\u5B98\u65B9 LINE \u8DDF\u5E97\u5BB6\u8AAA\u660E\u3002LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh",
     embedText: "\u6539\u624B\u570D \u63DB\u624B\u570D \u52A0\u9280\u7BA1 \u52A0\u73E0\u6846 \u8981\u9280\u7BA1 \u8981\u73E0\u6846 \u4E0D\u8981\u7D2B\u8272 \u63DB\u78C1\u6263 \u6539\u78C1\u6263 \u9F8D\u8766\u6263 \u52A0\u50F9 \u52A0\u9322 200 \u91CD\u65B0\u8A2D\u8A08 \u65B0\u589E\u689D\u4EF6 \u5BA2\u88FD\u4FEE\u6539",
     keywords: ["\u6539\u624B\u570D", "\u9280\u7BA1", "\u73E0\u6846", "\u78C1\u6263", "\u984F\u8272", "\u52A0\u50F9", "200", "\u65B0\u589E\u689D\u4EF6"],
     category: "\u5BA2\u88FD\u5316"
@@ -2902,6 +2959,15 @@ var knowledgeChunks = [
     relatedProductIds: ["d002-honey-realm"]
   },
   {
+    id: "rec-crystal-green-phantom-unavailable",
+    question: "\u60F3\u8981\u7DA0\u5E7D\u9748\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
+    answer: "\u76EE\u524D\u73FE\u8CA8\u6C92\u6709\u7DA0\u5E7D\u9748\u624B\u934A\u3002\u82E5\u662F\u60F3\u627E\u8CA1\u904B\u3001\u4E8B\u696D\u3001\u884C\u52D5\u529B\u65B9\u5411\uFF0C\u53EF\u6539\u770B\u300C\u871C\u5149\u4E4B\u5883\u624B\u934A\u300D\uFF08\u542B\u9285\u9AEE\u6676\u3001\u9EC3\u6C34\u6676\u3001\u592A\u967D\u77F3\u7B49\uFF0CNT$1,580\uFF09\u4F5C\u70BA\u66FF\u4EE3\u53C3\u8003\uFF1B\u82E5\u60F3\u8A0E\u8AD6\u6307\u5B9A\u6676\u77F3\u6216\u6750\u6599\u662F\u5426\u53EF\u7528\uFF0C\u53EF\u518D\u900F\u904E LINE \u8A62\u554F\u5E97\u5BB6\u3002",
+    embedText: "\u7DA0\u5E7D\u9748 \u7DA0\u5E7D\u9748\u624B\u934A \u7DA0\u5E7D\u9748\u63A8\u85A6 \u6709\u7DA0\u5E7D\u9748\u55CE \u7DA0\u5E7D\u9748\u6C34\u6676 \u8CA1\u904B \u4E8B\u696D \u62DB\u8CA1 \u66FF\u4EE3\u6B3E",
+    keywords: ["\u7DA0\u5E7D\u9748", "\u7DA0\u5E7D\u9748\u624B\u934A", "\u7DA0\u5E7D\u9748\u6C34\u6676"],
+    category: "\u5546\u54C1\u63A8\u85A6",
+    relatedProductIds: ["d002-honey-realm"]
+  },
+  {
     id: "rec-crystal-obsidian",
     question: "\u60F3\u8981\u9ED1\u66DC\u77F3\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
     answer: "\u73FE\u8CA8\u8A2D\u8A08\u4E2D\u300C\u871C\u5149\u4E4B\u5883\u624B\u934A\u300D\u914D\u65B9\u542B\u9ED1\u66DC\u77F3\uFF0C\u53EF\u8F14\u52A9\u7A69\u5B9A\u6C23\u5834\u8207\u9632\u8B77\u611F\uFF08NT$1,580\uFF09\u3002\u82E5\u5E0C\u671B\u4EE5\u9ED1\u66DC\u77F3\u70BA\u4E3B\u8EF8\uFF0C\u5EFA\u8B70\u4F7F\u7528\u5BA2\u88FD\u5316\u670D\u52D9\u8207\u8001\u95C6\u8A0E\u8AD6\u6BD4\u4F8B\u8207\u6B3E\u5F0F\u3002",
@@ -2994,8 +3060,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1399,
-    priceRange: "NT$2,220 ~ NT$2,929",
-    depositRange: "NT$1,220 ~ NT$1,929",
+    priceRange: "\u624B\u934A NT$1,200 ~ 1,800\uFF5C\u5854\u7F85\u4F9D\u50F9\u76EE\u8868 9 \u6298",
     image: "/images/custom-tarot2.jpg",
     tags: ["\u5854\u7F85"],
     description: "\u5854\u7F85 \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3020,7 +3085,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1e3,
-    priceRange: "NT$1,700 ~ NT$2,300",
+    priceRange: "\u624B\u934A NT$1,200 ~ 1,800\uFF5C\u8108\u8F2A\u6AA2\u6E2C NT$500",
     image: "/images/custom-chakra2.jpg",
     tags: ["\u8108\u8F2A"],
     description: "\u8108\u8F2A\u6AA2\u6E2C \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3045,7 +3110,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1e3,
-    priceRange: "NT$1,700 ~ NT$2,300",
+    priceRange: "\u624B\u934A NT$1,200 ~ 1,800\uFF5C\u751F\u547D\u9748\u6578\u89E3\u6790 NT$500",
     image: "/images/custom-numerology3.jpg",
     tags: ["\u751F\u547D\u9748\u6578"],
     description: "\u751F\u547D\u9748\u6578 \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3281,20 +3346,50 @@ var SYSTEM_PROMPT = `\u4F60\u662F\u300C\u691B\u02D9Crystal\u300D\u6C34\u6676\u5E
 \u4F60\u7684\u89D2\u8272\uFF1A
 - \u4EE5\u6EAB\u67D4\u3001\u5C08\u696D\u3001\u6709\u89AA\u548C\u529B\u7684\u53E3\u543B\u56DE\u7B54\u554F\u984C
 - \u6839\u64DA\u63D0\u4F9B\u7684\u77E5\u8B58\u5EAB\u5167\u5BB9\u56DE\u7B54\uFF0C\u4E0D\u8981\u7DE8\u9020\u4E0D\u5728\u77E5\u8B58\u5EAB\u4E2D\u7684\u8CC7\u8A0A
-- \u7576\u9867\u5BA2\u63CF\u8FF0\u80FD\u91CF\u9700\u6C42\uFF08\u5982\u62DB\u6843\u82B1\u3001\u63D0\u5347\u4EBA\u7DE3\u3001\u6539\u5584\u5065\u5EB7\u3001\u5316\u89E3\u5C0F\u4EBA\u7B49\uFF09\uFF0C\u82E5\u77E5\u8B58\u5EAB\u4E2D\u6C92\u6709\u5B8C\u5168\u7B26\u5408\u7684\u73FE\u8CA8\u5546\u54C1\uFF0C\u4E3B\u52D5\u63A8\u85A6\u5BA2\u88FD\u5316\u624B\u934A\u670D\u52D9\uFF0C\u8AAA\u660E\u53EF\u4EE5\u4F9D\u9700\u6C42\u91CF\u8EAB\u8A2D\u8A08\uFF0C\u4E26\u9644\u4E0A\u9023\u7D50 https://goodaytarot.com/custom
+- \u7576\u9867\u5BA2\u63CF\u8FF0\u80FD\u91CF\u9700\u6C42\uFF08\u5982\u62DB\u6843\u82B1\u3001\u63D0\u5347\u4EBA\u7DE3\u3001\u6539\u5584\u5065\u5EB7\u3001\u5316\u89E3\u5C0F\u4EBA\u7B49\uFF09\uFF0C\u82E5\u77E5\u8B58\u5EAB\u4E2D\u6C92\u6709\u5B8C\u5168\u7B26\u5408\u7684\u73FE\u8CA8\u5546\u54C1\uFF0C\u53EF\u63A8\u85A6\u5BA2\u88FD\u5316\u624B\u934A\u670D\u52D9\uFF0C\u8AAA\u660E\u53EF\u4EE5\u4F9D\u529F\u6548\u9700\u6C42\u91CF\u8EAB\u8A2D\u8A08\uFF0C\u4E26\u9644\u4E0A\u9023\u7D50 https://goodaytarot.com/custom
+- \u7576\u9867\u5BA2\u6307\u5B9A\u60F3\u627E\u7684\u6C34\u6676\u7A2E\u985E\uFF0C\u4F46\u77E5\u8B58\u5EAB\u6216\u73FE\u8CA8\u6E05\u55AE\u6C92\u6709\u8A72\u6676\u77F3\u6642\uFF0C\u5FC5\u9808\u8AA0\u5BE6\u8AAA\u300C\u76EE\u524D\u73FE\u8CA8\u6C92\u6709\u9019\u6B3E\u6676\u77F3\u300D\uFF1B\u53EF\u4EE5\u63D0\u4F9B\u529F\u6548\u76F8\u8FD1\u6216\u80FD\u91CF\u65B9\u5411\u76F8\u8FD1\u7684\u73FE\u8CA8\u66FF\u4EE3\u6B3E\u3002\u4E0D\u53EF\u8AAA\u5BA2\u88FD\u5316\u65B9\u6848\u4E00\u5B9A\u6703\u6709\u3001\u4E00\u5B9A\u80FD\u505A\u3001\u53EF\u6307\u5B9A\u53D6\u5F97\u8A72\u6676\u77F3\uFF1B\u82E5\u63D0\u5230\u5BA2\u88FD\u5316\uFF0C\u53EA\u80FD\u8AAA\u53EF\u8207\u5E97\u5BB6\u8A0E\u8AD6\u9700\u6C42\u8207\u53EF\u7528\u6750\u6599
 - \u5982\u679C\u77E5\u8B58\u5EAB\u4E2D\u6C92\u6709\u76F8\u95DC\u8CC7\u8A0A\u4E14\u4E0D\u5C6C\u65BC\u80FD\u91CF\u9700\u6C42\u985E\u554F\u984C\uFF0C\u8AA0\u5BE6\u544A\u77E5\u4E26\u5EFA\u8B70\u806F\u7E6B LINE \u5BA2\u670D\uFF1Ahttps://line.me/R/ti/p/@011tymeh
 - \u7576\u9867\u5BA2\u63CF\u8FF0\u9700\u6C42\uFF08\u5982\u60F3\u63D0\u5347\u81EA\u4FE1\u3001\u8CA1\u904B\u3001\u611B\u60C5\u7B49\uFF09\uFF0C\u6216\u6307\u5B9A\u60F3\u627E\u7684\u6C34\u6676\u7A2E\u985E\uFF08\u5982\u7C89\u6676\u3001\u8349\u8393\u6676\u3001\u6708\u5149\u77F3\u7B49\uFF09\uFF0C\u6839\u64DA\u77E5\u8B58\u5EAB\u63A8\u85A6\u9069\u5408\u7684\u73FE\u8CA8\u6B3E\u5F0F\u4E26\u9644\u4E0A\u5546\u54C1\u9023\u7D50
 - \u4F7F\u7528\u7E41\u9AD4\u4E2D\u6587\u56DE\u7B54
-- \u63A8\u85A6\u5546\u54C1\u6642\u8AAA\u660E\u9069\u5408\u539F\u56E0\uFF1B\u9664\u9808\u9010\u6B3E\u5BEB\u51FA\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u6E05\u55AE\u7684\u60C5\u5F62\u5916\uFF0C\u5176\u9918\u56DE\u7B54\u76E1\u91CF\u7CBE\u7C21\u5728\u7D04200\u5B57\u5167
+- \u5B57\u6578\uFF1A\u6574\u5247\u56DE\u7B54\u8ACB\u63A7\u5236\u5728 200 \u5B57\u4EE5\u5167\uFF1B\u4EE5\u8B80\u8005\u770B\u5230\u7684\u5B57\u5143\u70BA\u6E96\uFF0C\u6BCF\u4E00\u884C\u5B8C\u6574\u8CBC\u4E0A\u7684 https \u5546\u54C1\u9023\u7D50\u4E0D\u8A08\u5165 200 \u5B57\uFF0C\u5176\u9918\u8AAA\u660E\u3001\u54C1\u540D\u3001\u6A19\u9EDE\u3001\u63DB\u884C\u7686\u9808\u8A08\u5165
+- \u8A9E\u610F\u5B8C\u6574\uFF1A\u6BCF\u53E5\u8A71\u9808\u5BEB\u5230\u81EA\u7136\u7D50\u5C3E\uFF08\u53E5\u865F\u3001\u9A5A\u5606\u865F\u6216\u554F\u865F\u7686\u53EF\uFF09\uFF0C\u7981\u6B62\u505C\u5728\u534A\u53E5\u3001\u7834\u6298\u3001\u6216\u672A\u5BEB\u5B8C\u7684\u8A5E\uFF08\u4F8B\u5982\u300C\u691B\u5C0F\u300D\uFF09
+- \u958B\u982D\u7CBE\u7C21\uFF1A\u4E0D\u8981\u300C\u60A8\u597D\u300D\u300C\u611F\u8B1D\u60A8\u7684\u8A62\u554F\u300D\u7B49\u5197\u9577\u5BA2\u5957\uFF1B\u7B2C\u4E00\u53E5\u5C31\u5207\u5165\u91CD\u9EDE\uFF08\u4E5F\u7121\u9808\u518D\u6B21\u81EA\u7A31\u691B\u5C0F\u52A9\uFF09
 
 \u56DE\u7B54\u683C\u5F0F\uFF1A
 - \u76F4\u63A5\u56DE\u7B54\u554F\u984C\uFF0C\u4E0D\u9700\u8981\u81EA\u6211\u4ECB\u7D39
 - \u63A8\u85A6\u5546\u54C1\u6642\u5217\u51FA\u5546\u54C1\u540D\u7A31\u3001\u7C21\u77ED\u8AAA\u660E\u9069\u5408\u539F\u56E0\u3001\u5546\u54C1\u9023\u7D50
-- \u7576\u8A9E\u5883\u4E2D\u51FA\u73FE\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u4E14\u8A3B\u660E\u8207\u4E0B\u65B9\u5546\u54C1\u5361\u4E00\u81F4\u6642\uFF0C\u63A8\u85A6\u73FE\u8CA8**\u50C5\u80FD**\u4F7F\u7528\u8A72\u6E05\u55AE\u4E0A\u7684\u6B3E\u5F0F\uFF1B**\u6B3E\u6578\u3001\u54C1\u540D\u3001\u9023\u7D50\u9808\u8207\u6E05\u55AE\u5B8C\u5168\u4E00\u81F4**\uFF0C\u9808\u9010\u6B3E\u5BEB\u51FA\u4E26\u9644\u4E0A\u6E05\u55AE\u4E2D\u7684\u5B8C\u6574 https \u9023\u7D50\uFF0C**\u4E0D\u53EF\u53EA\u4ECB\u7D39\u5176\u4E2D\u5E7E\u6B3E**\uFF0C\u4E5F\u4E0D\u53EF\u65B0\u589E\u6E05\u55AE\u5916\u7684\u73FE\u8CA8\u54C1\u540D\uFF1B\u8AAA\u660E\u9069\u5408\u539F\u56E0\u6642\u4ECD\u53EF\u4F9D\u9867\u5BA2\u554F\u984C\u81EA\u7531\u767C\u63EE
+- \u7576\u8A9E\u5883\u4E2D\u51FA\u73FE\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u4E14\u8A3B\u660E\u8207\u4E0B\u65B9\u5546\u54C1\u5361\u4E00\u81F4\u6642\uFF0C\u63A8\u85A6\u73FE\u8CA8\u50C5\u80FD\u4F7F\u7528\u8A72\u6E05\u55AE\u4E0A\u7684\u6B3E\u5F0F\uFF1B\u6B3E\u6578\u3001\u54C1\u540D\u3001\u9023\u7D50\u9808\u8207\u6E05\u55AE\u5B8C\u5168\u4E00\u81F4\uFF0C\u9808\u9010\u6B3E\u5BEB\u51FA\u4E26\u9644\u4E0A\u6E05\u55AE\u4E2D\u7684\u5B8C\u6574 https \u9023\u7D50\uFF0C\u4E0D\u53EF\u53EA\u4ECB\u7D39\u5176\u4E2D\u5E7E\u6B3E\uFF0C\u4E5F\u4E0D\u53EF\u65B0\u589E\u6E05\u55AE\u5916\u7684\u73FE\u8CA8\u54C1\u540D\uFF1B\u8AAA\u660E\u9069\u5408\u539F\u56E0\u6642\u4ECD\u53EF\u4F9D\u9867\u5BA2\u554F\u984C\u81EA\u7531\u767C\u63EE
+- \u82E5\u9808\u4ECB\u7D39\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u6E05\u55AE\uFF0C\u8ACB\u5148\u9010\u6B3E\u5BEB\u51FA\u300C\u54C1\u540D\uFF0B\u8A72\u6B3E\u7684\u5B8C\u6574 https \u5546\u54C1\u9023\u7D50\u300D\uFF08\u53EF\u6BCF\u6B3E\u4E00\u884C\uFF09\uFF0C\u518D\u5BEB\u7C21\u77ED\u9069\u5408\u539F\u56E0\uFF0C\u907F\u514D\u56E0\u7BC7\u5E45\u6216\u622A\u65B7\u505C\u5728\u300C\u63A8\u85A6\u300D\u300C\u5982\u4E0B\u300D\u7B49\u672A\u63A5\u54C1\u540D\u3001\u672A\u8CBC\u9023\u7D50\u7684\u534A\u53E5
+- \u82E5\u5DF2\u6709\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u6E05\u55AE\uFF0C\u52FF\u5BEB\u300C\u6C92\u6709\u63A8\u85A6\u5546\u54C1\u300D\u300C\u6C92\u6709\u73FE\u8CA8\u53EF\u63A8\u85A6\u300D\u300C\u6C92\u6709\u7B26\u5408\u7684\u73FE\u8CA8\u300D\u7B49\u6982\u62EC\u5426\u5B9A\uFF08\u5F77\u5F7F\u5E97\u5167\u5B8C\u5168\u7121\u73FE\u8CA8\u53EF\u53C3\u8003\uFF09\u3002\u82E5\u9867\u5BA2\u9EDE\u540D\u7684\u4E3B\u77F3\u6216\u6B3E\u5F0F\u4E0D\u5728\u8A72\u6E05\u55AE\u5167\uFF0C\u8ACB\u5148\u7528\u4E00\u5169\u53E5\u8AAA\u660E\u843D\u5DEE\uFF08\u4F8B\u5982\u73FE\u8CA8\u7121\u8A72\u4E3B\u77F3\u70BA\u4E3B\u7684\u6B3E\u5F0F\uFF09\uFF1B\u82E5\u4F60\u63A5\u8457\u8981\u4ECB\u7D39\u6E05\u55AE\u4E0A\u7684\u6B3E\u5F0F\u4F5C\u70BA\u66FF\u4EE3\u53C3\u8003\uFF0C\u9808\u4F9D\u6E05\u55AE\u9010\u6B3E\u5BEB\u51FA\u54C1\u540D\u8207\u6E05\u55AE\u5167\u7684\u5B8C\u6574 https \u9023\u7D50\uFF0C\u8207\u4E0A\u6587\u8AAA\u660E\u929C\u63A5\u81EA\u7136\u5373\u53EF\u3002\u4E0D\u53EF\u88DC\u5145\u300C\u5BA2\u88FD\u5316\u5C31\u6703\u6709\u8A72\u6307\u5B9A\u6676\u77F3\u300D
 - \u82E5\u6709\u5217\u51FA\u9023\u7D50\uFF0C\u5FC5\u9808\u9010\u5B57\u8907\u88FD\u8A72\u5B8C\u6574 https \u7DB2\u5740\u5230\u56DE\u7B54\u4E2D\uFF0C\u4E0D\u53EF\u7701\u7565\u3001\u6539\u5BEB\uFF0C\u4E5F\u4E0D\u53EF\u4F7F\u7528\u300C\u8ACB\u63D2\u5165\u9023\u7D50\u300D\u300C\u77E5\u8B58\u5EAB\u672A\u63D0\u4F9B\u300D\u7B49\u5360\u4F4D\u6587\u5B57
 - \u4F7F\u7528\u9069\u7576\u7684\u63DB\u884C\u8B93\u56DE\u7B54\u6613\u8B80
 - \u4E0D\u4F7F\u7528 markdown \u683C\u5F0F\uFF0C\u4E0D\u4F7F\u7528 **\u7C97\u9AD4**\u3001*\u659C\u9AD4*\u3001# \u6A19\u984C\u7B49\u7B26\u865F`;
 var PUBLIC_SITE = "https://goodaytarot.com";
+function clipKnowledgeAnswer(text2, maxChars = 240) {
+  const t2 = text2.trim();
+  if (t2.length <= maxChars) return t2;
+  return `${t2.slice(0, maxChars)}\u2026\uFF08\u5F8C\u7565\uFF09`;
+}
+function productCitationAliases(name) {
+  const n = name.trim();
+  const aliases = /* @__PURE__ */ new Set();
+  if (n.length >= 2) aliases.add(n);
+  if (n.endsWith("\u624B\u934A") && n.length > "\u624B\u934A".length + 1) {
+    const base = n.slice(0, -2).trim();
+    if (base.length >= 2) aliases.add(base);
+  }
+  return Array.from(aliases);
+}
+function filterRelatedProductsCitedInReply(reply, related) {
+  return related.filter((p) => {
+    const abs = `${PUBLIC_SITE}/products/${p.id}`;
+    if (reply.includes(abs) || reply.includes(`/products/${p.id}`)) return true;
+    for (const alias of productCitationAliases(p.name)) {
+      if (reply.includes(alias)) return true;
+    }
+    return false;
+  });
+}
 async function generateAnswer(systemPrompt, history, userMessage, maxTokens = 2048) {
   const contents = [
     ...history.map((h) => ({
@@ -3321,9 +3416,16 @@ async function generateAnswer(systemPrompt, history, userMessage, maxTokens = 20
     throw new Error(`Gemini generateContent failed: ${res.status} \u2013 ${err}`);
   }
   const data = await res.json();
+  if (data.promptFeedback?.blockReason) {
+    console.warn("[chatbot] promptFeedback blockReason:", data.promptFeedback.blockReason);
+  }
   const candidate = data.candidates?.[0];
-  const text2 = candidate?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
-  if (candidate?.finishReason === "MAX_TOKENS" && text2.length > 0) {
+  if (!candidate) {
+    console.warn("[chatbot] empty candidates");
+    return "\u62B1\u6B49\uFF0C\u76EE\u524D\u7121\u6CD5\u5B8C\u6210\u56DE\u8986\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\uFF0C\u6216\u900F\u904E LINE \u806F\u7E6B\u5BA2\u670D\uFF1Ahttps://line.me/R/ti/p/@011tymeh";
+  }
+  const text2 = candidate.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  if (candidate.finishReason === "MAX_TOKENS" && text2.length > 0) {
     console.warn("[chatbot] reply hit maxOutputTokens (truncated):", text2.length, "chars");
   }
   return text2.trim() || "\u62B1\u6B49\uFF0C\u6211\u73FE\u5728\u7121\u6CD5\u56DE\u7B54\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002";
@@ -3406,13 +3508,13 @@ var chatbotRouter = router({
     let ragContext = "";
     if (relevantChunks.length > 0) {
       ragContext = "\n\n\u3010\u76F8\u95DC\u5E38\u898B\u554F\u984C\u3011\n" + relevantChunks.map((c) => `Q: ${c.question}
-A: ${c.answer}`).join("\n\n");
+A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
     }
     if (relatedProducts.length > 0) {
       const n = relatedProducts.length;
       ragContext += `
 
-\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\uFF08\u4EE5\u4E0B ${n} \u6B3E\u5373\u804A\u5929\u5BA4\u5C07\u986F\u793A\u7684\u5546\u54C1\u5361\uFF1B\u56DE\u7B54\u4E2D\u63A8\u85A6\u7684\u73FE\u8CA8\u5FC5\u9808\u8207\u6B64\u6E05\u55AE\u5B8C\u5168\u4E00\u81F4\uFF09\u3011
+\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\uFF08\u4EE5\u4E0B ${n} \u6B3E\uFF1B\u50C5\u7576\u4F60\u5728\u56DE\u7B54\u4E2D\u5BEB\u51FA\u8A72\u6B3E\u7684\u54C1\u540D\u6216\u5B8C\u6574\u5546\u54C1 https \u9023\u7D50\u6642\uFF0C\u804A\u5929\u5BA4\u624D\u6703\u986F\u793A\u5C0D\u61C9\u5546\u54C1\u5361\uFF1B\u63A8\u85A6\u7684\u73FE\u8CA8\u5FC5\u9808\u8207\u6B64\u6E05\u55AE\u5B8C\u5168\u4E00\u81F4\uFF09\u3011
 ` + relatedProducts.map(
         (p, i) => `${i + 1}. ${p.name}\uFF08NT$${p.price}\uFF09
    \u7C21\u8FF0\uFF1A${p.subtitle}
@@ -3421,7 +3523,7 @@ A: ${c.answer}`).join("\n\n");
     }
     const hasGoodMatch = relevantChunks.some((c) => c.score >= 0.5);
     if (!hasGoodMatch) {
-      ragContext += "\n\n\u3010\u5099\u63F4\u8CC7\u8A0A\u3011\n\u82E5\u9867\u5BA2\u7684\u9700\u6C42\u5728\u73FE\u6709\u5546\u54C1\u4E2D\u627E\u4E0D\u5230\u5B8C\u5168\u7B26\u5408\u7684\u6B3E\u5F0F\uFF0C\u53EF\u63A8\u85A6\u300C\u5BA2\u88FD\u5316\u6C34\u6676\u624B\u934A\u300D\u670D\u52D9\u3002\u8001\u95C6\u6703\u6839\u64DA\u9867\u5BA2\u7684\u529F\u6548\u9700\u6C42\uFF08\u5982\u62DB\u6843\u82B1\u3001\u6539\u5584\u5065\u5EB7\u3001\u5316\u89E3\u5C0F\u4EBA\u3001\u63D0\u5347\u67D0\u7A2E\u7279\u5B9A\u904B\u52E2\u7B49\uFF09\u91CF\u8EAB\u8A2D\u8A08\u5C08\u5C6C\u624B\u934A\u3002\u5BA2\u88FD\u5316\u65B9\u6848\u9801\u9762\uFF1Ahttps://goodaytarot.com/custom\n\u4E5F\u6B61\u8FCE\u900F\u904E LINE \u8A62\u554F\uFF1Ahttps://line.me/R/ti/p/@011tymeh";
+      ragContext += "\n\n\u3010\u5099\u63F4\u8CC7\u8A0A\u3011\n\u82E5\u9867\u5BA2\u7684\u529F\u6548\u9700\u6C42\u5728\u73FE\u6709\u5546\u54C1\u4E2D\u627E\u4E0D\u5230\u5B8C\u5168\u7B26\u5408\u7684\u6B3E\u5F0F\uFF0C\u53EF\u63A8\u85A6\u300C\u5BA2\u88FD\u5316\u6C34\u6676\u624B\u934A\u300D\u670D\u52D9\u3002\u8001\u95C6\u6703\u6839\u64DA\u529F\u6548\u9700\u6C42\uFF08\u5982\u62DB\u6843\u82B1\u3001\u6539\u5584\u5065\u5EB7\u3001\u5316\u89E3\u5C0F\u4EBA\u3001\u63D0\u5347\u67D0\u7A2E\u7279\u5B9A\u904B\u52E2\u7B49\uFF09\u91CF\u8EAB\u8A2D\u8A08\u5C08\u5C6C\u624B\u934A\u3002\u82E5\u9867\u5BA2\u6307\u5B9A\u67D0\u7A2E\u6676\u77F3\u4F46\u77E5\u8B58\u5EAB\u6216\u73FE\u8CA8\u6C92\u6709\uFF0C\u8ACB\u8AA0\u5BE6\u8AAA\u660E\u76EE\u524D\u73FE\u8CA8\u6C92\u6709\uFF0C\u512A\u5148\u63D0\u4F9B\u529F\u6548\u6216\u80FD\u91CF\u65B9\u5411\u76F8\u8FD1\u7684\u66FF\u4EE3\u73FE\u8CA8\uFF1B\u4E0D\u53EF\u627F\u8AFE\u5BA2\u88FD\u5316\u4E00\u5B9A\u6703\u6709\u8A72\u6307\u5B9A\u6676\u77F3\uFF0C\u53EA\u80FD\u8AAA\u53EF\u8207\u5E97\u5BB6\u8A0E\u8AD6\u9700\u6C42\u8207\u53EF\u7528\u6750\u6599\u3002\u5BA2\u88FD\u5316\u65B9\u6848\u9801\u9762\uFF1Ahttps://goodaytarot.com/custom\n\u4E5F\u6B61\u8FCE\u900F\u904E LINE \u8A62\u554F\uFF1Ahttps://line.me/R/ti/p/@011tymeh";
     }
     const reply = await generateAnswer(
       SYSTEM_PROMPT + ragContext,
@@ -3429,7 +3531,16 @@ A: ${c.answer}`).join("\n\n");
       input.message,
       2048
     );
-    const responseProducts = relatedProducts.map((p) => ({
+    const productsForClient = filterRelatedProductsCitedInReply(reply, relatedProducts);
+    if (relatedProducts.length > 0 && productsForClient.length < relatedProducts.length) {
+      console.warn(
+        "[chatbot] relatedProducts filtered to reply citations:",
+        productsForClient.length,
+        "/",
+        relatedProducts.length
+      );
+    }
+    const responseProducts = productsForClient.map((p) => ({
       id: p.id,
       name: p.name,
       price: p.price,
@@ -3444,7 +3555,7 @@ A: ${c.answer}`).join("\n\n");
     });
     return {
       reply,
-      relatedProducts: relatedProducts.map((p) => ({
+      relatedProducts: productsForClient.map((p) => ({
         id: p.id,
         name: p.name,
         price: p.price,
@@ -3996,16 +4107,22 @@ var memberRouter = router({
     await setVerifyToken(input.email, verifyToken, verifyExpiresAt);
     const siteOrigin = input.origin ?? "https://goodaytarot.com";
     const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
+    let verificationEmailSent = false;
     try {
       await sendVerificationEmail({
         to: input.email,
         name: input.name,
         verifyUrl
       });
+      verificationEmailSent = true;
     } catch (err) {
       console.error("[Email] \u9A57\u8B49\u4FE1\u767C\u9001\u5931\u6557:", err);
     }
-    return { success: true, user: { id: user.id, name: user.name, email: user.email } };
+    return {
+      success: true,
+      verificationEmailSent,
+      user: { id: user.id, name: user.name, email: user.email }
+    };
   }),
   /** 登入 */
   login: publicProcedure.input(
@@ -4032,8 +4149,8 @@ var memberRouter = router({
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq6 } = await import("drizzle-orm");
-        await db2.update(users2).set({ role: "admin" }).where(eq6(users2.id, user.id));
+        const { eq: eq7 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq7(users2.id, user.id));
         user = { ...user, role: "admin" };
       }
     }
@@ -4127,8 +4244,8 @@ var memberRouter = router({
     const db2 = await getDb();
     if (!db2) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq6 } = await import("drizzle-orm");
-    await db2.update(users2).set({ name: input.name }).where(eq6(users2.openId, ctx.user.openId));
+    const { eq: eq7 } = await import("drizzle-orm");
+    await db2.update(users2).set({ name: input.name }).where(eq7(users2.openId, ctx.user.openId));
     return { success: true };
   }),
   /** 查詢自己的訂單 */
@@ -4138,6 +4255,291 @@ var memberRouter = router({
       userId: currentUser?.id ?? ctx.user.id,
       email: currentUser?.email ?? ctx.user.email
     });
+  })
+});
+
+// server/routers/products.ts
+import { z as z6 } from "zod";
+import { eq as eq6, and as and5, sql as sql5 } from "drizzle-orm";
+import { TRPCError as TRPCError6 } from "@trpc/server";
+init_schema();
+
+// server/storage.ts
+function getStorageConfig() {
+  const baseUrl = ENV.forgeApiUrl;
+  const apiKey = ENV.forgeApiKey;
+  if (!baseUrl || !apiKey) {
+    throw new Error(
+      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
+    );
+  }
+  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
+}
+function buildUploadUrl(baseUrl, relKey) {
+  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
+  url.searchParams.set("path", normalizeKey(relKey));
+  return url;
+}
+function ensureTrailingSlash(value) {
+  return value.endsWith("/") ? value : `${value}/`;
+}
+function normalizeKey(relKey) {
+  return relKey.replace(/^\/+/, "");
+}
+function toFormData(data, contentType, fileName) {
+  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
+  const form = new FormData();
+  form.append("file", blob, fileName || "file");
+  return form;
+}
+function buildAuthHeaders(apiKey) {
+  return { Authorization: `Bearer ${apiKey}` };
+}
+async function storagePut(relKey, data, contentType = "application/octet-stream") {
+  const { baseUrl, apiKey } = getStorageConfig();
+  const key = normalizeKey(relKey);
+  const uploadUrl = buildUploadUrl(baseUrl, key);
+  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: buildAuthHeaders(apiKey),
+    body: formData
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+    );
+  }
+  const url = (await response.json()).url;
+  return { key, url };
+}
+
+// server/routers/products.ts
+var tableEnsured = false;
+async function ensureProductsTable() {
+  if (tableEnsured) return;
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql5`
+    CREATE TABLE IF NOT EXISTS \`products\` (
+      \`id\` varchar(64) NOT NULL,
+      \`name\` varchar(200) NOT NULL,
+      \`subtitle\` varchar(200) NOT NULL DEFAULT '',
+      \`category\` varchar(64) NOT NULL,
+      \`categoryLabel\` varchar(64) NOT NULL,
+      \`price\` int NOT NULL,
+      \`originalPrice\` int DEFAULT NULL,
+      \`priceRange\` varchar(200) DEFAULT NULL,
+      \`depositRange\` varchar(200) DEFAULT NULL,
+      \`image\` mediumtext NOT NULL,
+      \`tags\` json DEFAULT NULL,
+      \`description\` text DEFAULT NULL,
+      \`story\` text DEFAULT NULL,
+      \`benefits\` json DEFAULT NULL,
+      \`suitableFor\` json DEFAULT NULL,
+      \`howToUse\` json DEFAULT NULL,
+      \`disclaimer\` text DEFAULT NULL,
+      \`crystalType\` text DEFAULT NULL,
+      \`color\` varchar(100) DEFAULT NULL,
+      \`featured\` boolean NOT NULL DEFAULT false,
+      \`active\` boolean NOT NULL DEFAULT true,
+      \`scheduledPublishAt\` timestamp DEFAULT NULL,
+      \`sortOrder\` int NOT NULL DEFAULT 0,
+      \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+      \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`)
+    )
+  `);
+  try {
+    await db.execute(sql5`ALTER TABLE \`products\` MODIFY COLUMN \`image\` mediumtext NOT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`scheduledPublishAt\` timestamp NULL DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    const customDisclaimer = [
+      "\u300A\u521D\u7248\u8207\u7DAD\u4FEE\u300B",
+      "\u514D\u8CBB\u63D0\u4F9B\u4E00\u6B21\u521D\u7248\u4FEE\u6539\u6216\u7DAD\u4FEE\u3002",
+      "",
+      "\u53EF\u8ABF\u6574\u7BC4\u570D\uFF1A\u66F4\u63DB\u4E0D\u559C\u6B61\u7684\u914D\u98FE\u3001\u8ABF\u6574\u6C34\u6676\u6216\u914D\u98FE\u7684\u64FA\u653E\u9806\u5E8F\u3002",
+      "",
+      "\u4EE5\u4E0B\u9700\u52A0\u6536 NT$200\uFF1A",
+      "\u30FB\u66F4\u6539\u624B\u570D\u3001\u65B0\u589E\u689D\u4EF6\uFF08\u5982\u8981\u9280\u7BA1\u3001\u8981\u73E0\u6846\u3001\u4E0D\u8981\u7D2B\u8272\u3001\u8981\u78C1\u6263\u7B49\uFF09\u2014 \u56E0\u5C6C\u91CD\u65B0\u8A2D\u8A08\uFF0C\u8ACB\u5728\u9810\u7D04\u6642\u76F4\u63A5\u544A\u77E5\u3002",
+      "\u30FB\u7B2C\u4E8C\u6B21\u6216\u4EE5\u4E0A\u7684\u4FEE\u6539\u3002"
+    ].join("\n");
+    const customIds = [
+      "custom-deposit-product",
+      "tarot-crystal-deposit-product",
+      "chakra-crystal-deposit-product",
+      "numerology-crystal-deposit-product"
+    ];
+    for (const id of customIds) {
+      await db.execute(
+        sql5`UPDATE \`products\` SET \`disclaimer\` = ${customDisclaimer} WHERE \`id\` = ${id} AND (\`disclaimer\` IS NULL OR \`disclaimer\` = '此商品為客製化服務訂金，實際尾款金額由老闆確認後另行通知。')`
+      );
+    }
+  } catch {
+  }
+  try {
+    const customHowToUse = JSON.stringify([
+      "\u586B\u5BEB\u4EE5\u4E0B\u5831\u540D\u8868\u55AE\uFF0C\u63D0\u4F9B\u624B\u570D\u3001\u559C\u6B61\u91D1\u98FE\u6216\u9280\u98FE\uFF0C\u4E26\u78BA\u8A8D\u8A2D\u8A08\u9700\u6C42\u3002",
+      "\u652F\u4ED8\u8A02\u91D1\u3002",
+      "\u52A0\u5165\u5B98\u65B9 LINE\uFF0C\u7B49\u5F85\u8A2D\u8A08\u5E2B\u50B3\u9001\u6C34\u6676\u642D\u914D\u5716\u3002",
+      "\u624B\u934A\u8207\u8A2D\u8A08\u78BA\u8A8D\u5B8C\u6210\u5F8C\uFF0C\u5C07\u63D0\u4F9B\u5C3E\u6B3E\u5831\u50F9\u3002",
+      "\u5C3E\u6B3E\u652F\u4ED8\u5B8C\u7562\uFF0C\u6E96\u5099\u51FA\u8CA8\u3002"
+    ]);
+    const customIds = [
+      "custom-deposit-product",
+      "tarot-crystal-deposit-product",
+      "chakra-crystal-deposit-product",
+      "numerology-crystal-deposit-product"
+    ];
+    for (const id of customIds) {
+      await db.execute(
+        sql5`UPDATE \`products\` SET \`howToUse\` = ${customHowToUse} WHERE \`id\` = ${id}`
+      );
+    }
+  } catch {
+  }
+  tableEnsured = true;
+}
+async function publishDueProducts() {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(dbProducts).set({ active: true, scheduledPublishAt: null }).where(and5(eq6(dbProducts.active, false), sql5`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
+}
+function toFrontendProduct(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    subtitle: p.subtitle ?? "",
+    category: p.category,
+    categoryLabel: p.categoryLabel,
+    price: p.price,
+    originalPrice: p.originalPrice ?? void 0,
+    priceRange: p.priceRange ?? void 0,
+    depositRange: p.depositRange ?? void 0,
+    image: p.image,
+    tags: p.tags ?? [],
+    description: p.description ?? "",
+    story: p.story ?? "",
+    benefits: p.benefits ?? [],
+    suitableFor: p.suitableFor ?? [],
+    howToUse: p.howToUse ?? [],
+    disclaimer: p.disclaimer ?? "",
+    inStock: p.active,
+    featured: p.featured,
+    scheduledPublishAt: p.scheduledPublishAt ?? void 0,
+    crystalType: p.crystalType ?? "",
+    color: p.color ?? ""
+  };
+}
+var scheduledPublishAtSchema = z6.preprocess(
+  (value) => value === "" || value === void 0 ? null : value,
+  z6.coerce.date().nullable()
+);
+var ProductInputSchema = z6.object({
+  name: z6.string().min(1),
+  subtitle: z6.string().default(""),
+  category: z6.string().min(1),
+  categoryLabel: z6.string().min(1),
+  price: z6.number().int().min(0),
+  originalPrice: z6.number().int().min(0).optional(),
+  priceRange: z6.string().optional(),
+  depositRange: z6.string().optional(),
+  image: z6.string().min(1),
+  tags: z6.array(z6.string()).default([]),
+  description: z6.string().default(""),
+  story: z6.string().default(""),
+  benefits: z6.array(z6.string()).default([]),
+  suitableFor: z6.array(z6.string()).default([]),
+  howToUse: z6.array(z6.string()).default([]),
+  disclaimer: z6.string().default(""),
+  crystalType: z6.string().default(""),
+  color: z6.string().default(""),
+  featured: z6.boolean().default(false),
+  active: z6.boolean().default(true),
+  scheduledPublishAt: scheduledPublishAtSchema.default(null),
+  sortOrder: z6.number().int().default(0)
+});
+var productRouter = router({
+  list: publicProcedure.query(async () => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.select().from(dbProducts).where(and5(eq6(dbProducts.active, true)));
+    return rows.filter((p) => p.category !== "test").sort((a, b) => a.sortOrder - b.sortOrder || b.createdAt.getTime() - a.createdAt.getTime()).map(toFrontendProduct);
+  }),
+  getById: publicProcedure.input(z6.object({ id: z6.string() })).query(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) return null;
+    const rows = await db.select().from(dbProducts).where(and5(eq6(dbProducts.id, input.id), eq6(dbProducts.active, true))).limit(1);
+    return rows[0] ? toFrontendProduct(rows[0]) : null;
+  }),
+  adminList: adminProcedure.query(async () => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.select().from(dbProducts);
+    return rows.filter((p) => p.category !== "test").sort((a, b) => (a.active ? 0 : 1) - (b.active ? 0 : 1) || a.sortOrder - b.sortOrder);
+  }),
+  create: adminProcedure.input(ProductInputSchema).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    const id = `prod-${Date.now()}`;
+    await db.insert(dbProducts).values({ id, ...input });
+    return { id };
+  }),
+  update: adminProcedure.input(ProductInputSchema.extend({ id: z6.string() })).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    const { id, ...data } = input;
+    await db.update(dbProducts).set(data).where(eq6(dbProducts.id, id));
+    return { success: true };
+  }),
+  toggleActive: adminProcedure.input(z6.object({ id: z6.string(), active: z6.boolean() })).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq6(dbProducts.id, input.id));
+    return { success: true };
+  }),
+  uploadImage: adminProcedure.input(z6.object({
+    filename: z6.string(),
+    contentType: z6.string(),
+    dataBase64: z6.string().max(6e6)
+  })).mutation(async ({ input }) => {
+    const buf = Buffer.from(input.dataBase64, "base64");
+    const ext = input.filename.split(".").pop() ?? "jpg";
+    const key = `products/${Date.now()}.${ext}`;
+    const result = await storagePut(key, buf, input.contentType);
+    return { url: result.url };
+  }),
+  seed: adminProcedure.input(z6.array(ProductInputSchema.extend({ id: z6.string() }))).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    let count = 0;
+    for (const product of input) {
+      const existing = await db.select({ id: dbProducts.id }).from(dbProducts).where(eq6(dbProducts.id, product.id)).limit(1);
+      if (existing.length === 0) {
+        await db.insert(dbProducts).values(product);
+        count++;
+      }
+    }
+    return { count };
   })
 });
 
@@ -4157,7 +4559,8 @@ var appRouter = router({
   order: orderRouter,
   chatbot: chatbotRouter,
   inventory: inventoryRouter,
-  member: memberRouter
+  member: memberRouter,
+  product: productRouter
 });
 
 // server/_core/context.ts
@@ -4330,8 +4733,8 @@ async function lineOAuthCallback(req, res) {
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq6 } = await import("drizzle-orm");
-        await db2.update(users2).set({ role: "admin" }).where(eq6(users2.id, user.id));
+        const { eq: eq7 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq7(users2.id, user.id));
         user = await getUserByOpenId(openId);
       }
     }

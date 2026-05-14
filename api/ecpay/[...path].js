@@ -360,6 +360,8 @@ var orders = mysqlTable("orders", {
   adminNote: text("adminNote"),
   // 綠界回傳的完整通知資料（JSON）
   ecpayNotifyData: json("ecpayNotifyData"),
+  // 庫存是否已扣減（防止重複扣減）
+  inventoryDeducted: boolean("inventoryDeducted").default(false).notNull(),
   // 付款時間
   paidAt: timestamp("paidAt"),
   // 老闆確認收款時間（銀行轉帳用）
@@ -473,11 +475,39 @@ var chatbotLogs = mysqlTable("chatbotLogs", {
   index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
   index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt)
 ]);
+var dbProducts = mysqlTable("products", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  subtitle: varchar("subtitle", { length: 200 }).notNull().default(""),
+  category: varchar("category", { length: 64 }).notNull(),
+  categoryLabel: varchar("categoryLabel", { length: 64 }).notNull(),
+  price: int("price").notNull(),
+  originalPrice: int("originalPrice"),
+  priceRange: varchar("priceRange", { length: 200 }),
+  depositRange: varchar("depositRange", { length: 200 }),
+  image: text("image").notNull(),
+  tags: json("tags").$type(),
+  description: text("description"),
+  story: text("story"),
+  benefits: json("benefits").$type(),
+  suitableFor: json("suitableFor").$type(),
+  howToUse: json("howToUse").$type(),
+  disclaimer: text("disclaimer"),
+  crystalType: text("crystalType"),
+  color: varchar("color", { length: 100 }),
+  featured: boolean("featured").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  scheduledPublishAt: timestamp("scheduledPublishAt"),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
 
 // server/db.ts
 var ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
+    "baby90522@gmail.com",
     ...process.env.ADMIN_EMAILS?.split(",") ?? []
   ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
 );
@@ -496,6 +526,11 @@ async function getDb() {
 
 // shared/const.ts
 var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+var CUSTOM_PRODUCT_ID = "custom-deposit-product";
+var CUSTOM_TAROT_PRODUCT_ID = "tarot-crystal-deposit-product";
+var CUSTOM_CHAKRA_PRODUCT_ID = "chakra-crystal-deposit-product";
+var CUSTOM_NUMEROLOGY_PRODUCT_ID = "numerology-crystal-deposit-product";
+var CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID, CUSTOM_CHAKRA_PRODUCT_ID, CUSTOM_NUMEROLOGY_PRODUCT_ID];
 
 // server/orderDb.ts
 var balancePaymentLegacySelect = {
@@ -572,19 +607,30 @@ async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, noti
 
 // server/inventoryDb.ts
 import { eq as eq3, lt, and as and3, sql as sql3 } from "drizzle-orm";
-async function releaseSessionLocks(sessionToken) {
+var ordersColumnsEnsured = false;
+async function ensureOrdersColumns() {
+  if (ordersColumnsEnsured) return;
   const db = await getDb();
   if (!db) return;
-  await db.delete(inventoryLocks).where(eq3(inventoryLocks.sessionToken, sessionToken));
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
+  } catch {
+  }
+  ordersColumnsEnsured = true;
+}
+var NON_INVENTORY_PRODUCT_IDS = /* @__PURE__ */ new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
+function shouldSkipInventory(productId) {
+  return NON_INVENTORY_PRODUCT_IDS.has(productId);
 }
 async function deductInventoryAfterPayment(merchantTradeNo) {
   const db = await getDb();
   if (!db) return;
-  const [order] = await db.select({ id: orders.id }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
-  if (!order) return;
+  await ensureOrdersColumns();
+  const [order] = await db.select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!order || order.inventoryDeducted) return;
   const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
   for (const item of items) {
-    if (item.productId === "shipping-fee" || item.productId === "payment-fee") continue;
+    if (shouldSkipInventory(item.productId)) continue;
     await db.update(productInventory).set({ stock: sql3`GREATEST(0, ${productInventory.stock} - ${item.quantity})` }).where(
       and3(
         eq3(productInventory.productId, item.productId),
@@ -592,7 +638,7 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
       )
     );
   }
-  await releaseSessionLocks(merchantTradeNo);
+  await db.update(orders).set({ inventoryDeducted: true }).where(eq3(orders.merchantTradeNo, merchantTradeNo));
 }
 
 // server/ecpayRoutes.ts

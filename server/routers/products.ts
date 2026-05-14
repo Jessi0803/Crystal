@@ -34,6 +34,7 @@ async function ensureProductsTable() {
       \`color\` varchar(100) DEFAULT NULL,
       \`featured\` boolean NOT NULL DEFAULT false,
       \`active\` boolean NOT NULL DEFAULT true,
+      \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
       \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
@@ -44,6 +45,9 @@ async function ensureProductsTable() {
   try {
     await db.execute(sql`ALTER TABLE \`products\` MODIFY COLUMN \`image\` mediumtext NOT NULL`);
   } catch { /* 已是 mediumtext 或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`scheduledPublishAt\` timestamp NULL DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   // 一次性補值：更新四種客製化商品的注意事項
   try {
     const customDisclaimer = [
@@ -92,6 +96,15 @@ async function ensureProductsTable() {
   tableEnsured = true;
 }
 
+async function publishDueProducts() {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(dbProducts)
+    .set({ active: true, scheduledPublishAt: null })
+    .where(and(eq(dbProducts.active, false), sql`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
+}
+
 function toFrontendProduct(p: DbProduct) {
   return {
     id: p.id,
@@ -113,10 +126,16 @@ function toFrontendProduct(p: DbProduct) {
     disclaimer: p.disclaimer ?? "",
     inStock: p.active,
     featured: p.featured,
+    scheduledPublishAt: p.scheduledPublishAt ?? undefined,
     crystalType: p.crystalType ?? "",
     color: p.color ?? "",
   };
 }
+
+const scheduledPublishAtSchema = z.preprocess(
+  (value) => value === "" || value === undefined ? null : value,
+  z.coerce.date().nullable()
+);
 
 const ProductInputSchema = z.object({
   name: z.string().min(1),
@@ -139,12 +158,14 @@ const ProductInputSchema = z.object({
   color: z.string().default(""),
   featured: z.boolean().default(false),
   active: z.boolean().default(true),
+  scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z.number().int().default(0),
 });
 
 export const productRouter = router({
   list: publicProcedure.query(async () => {
     await ensureProductsTable();
+    await publishDueProducts();
     const db = await getDb();
     if (!db) return [];
     const rows = await db
@@ -161,18 +182,20 @@ export const productRouter = router({
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       await ensureProductsTable();
+      await publishDueProducts();
       const db = await getDb();
       if (!db) return null;
       const rows = await db
         .select()
         .from(dbProducts)
-        .where(eq(dbProducts.id, input.id))
+        .where(and(eq(dbProducts.id, input.id), eq(dbProducts.active, true)))
         .limit(1);
       return rows[0] ? toFrontendProduct(rows[0]) : null;
     }),
 
   adminList: adminProcedure.query(async () => {
     await ensureProductsTable();
+    await publishDueProducts();
     const db = await getDb();
     if (!db) return [];
     const rows = await db.select().from(dbProducts);
@@ -185,6 +208,7 @@ export const productRouter = router({
     .input(ProductInputSchema)
     .mutation(async ({ input }) => {
       await ensureProductsTable();
+      await publishDueProducts();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const id = `prod-${Date.now()}`;
@@ -196,6 +220,7 @@ export const productRouter = router({
     .input(ProductInputSchema.extend({ id: z.string() }))
     .mutation(async ({ input }) => {
       await ensureProductsTable();
+      await publishDueProducts();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const { id, ...data } = input;
@@ -207,9 +232,10 @@ export const productRouter = router({
     .input(z.object({ id: z.string(), active: z.boolean() }))
     .mutation(async ({ input }) => {
       await ensureProductsTable();
+      await publishDueProducts();
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
-      await db.update(dbProducts).set({ active: input.active }).where(eq(dbProducts.id, input.id));
+      await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq(dbProducts.id, input.id));
       return { success: true };
     }),
 

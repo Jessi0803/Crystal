@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Package, Plus, Search, Save, X, Upload, ImageIcon,
-  Eye, EyeOff, Pencil, ChevronDown, ChevronUp
+  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -36,6 +36,7 @@ type FormState = {
   disclaimer: string;  // 注意事項（客製化）
   featured: boolean;
   active: boolean;
+  scheduledPublishAt: string;
   initialStock: string;
 };
 
@@ -53,8 +54,40 @@ const DEFAULT_FORM: FormState = {
   disclaimer: "",
   featured: false,
   active: true,
+  scheduledPublishAt: "",
   initialStock: "5",
 };
+
+function formatDateTimeLocal(value?: Date | string | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join("-") + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatAdminDateTime(value?: Date | string | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function parseScheduledPublishAt(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -153,6 +186,7 @@ function ProductRow({
   onEdit: (p: DbProduct) => void;
 }) {
   const utils = trpc.useUtils();
+  const isScheduled = !product.active && product.scheduledPublishAt && new Date(product.scheduledPublishAt).getTime() > Date.now();
   const toggleActive = trpc.product.toggleActive.useMutation({
     onSuccess: async () => {
       toast.success(product.active ? "商品已下架" : "商品已上架");
@@ -173,6 +207,12 @@ function ProductRow({
         <div className="min-w-0">
           <p className="text-sm font-medium text-[oklch(0.12_0_0)] truncate">{product.name}</p>
           <p className="text-xs text-[oklch(0.5_0_0)] font-body mt-0.5">{product.categoryLabel}</p>
+          {isScheduled && (
+            <p className="text-xs text-amber-700 font-body mt-0.5 flex items-center gap-1">
+              <CalendarClock className="w-3 h-3" />
+              {formatAdminDateTime(product.scheduledPublishAt)} 上架
+            </p>
+          )}
           {product.priceRange ? (
             <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">{product.priceRange}</p>
           ) : (
@@ -193,11 +233,13 @@ function ProductRow({
 
         <div className="text-center">
           <span className={`inline-block text-[10px] tracking-widest px-2 py-0.5 font-body ${
-            product.active
+            isScheduled
+              ? "bg-amber-50 text-amber-700 border border-amber-200"
+              : product.active
               ? "bg-green-50 text-green-700 border border-green-200"
               : "bg-[oklch(0.94_0_0)] text-[oklch(0.5_0_0)] border border-[oklch(0.88_0_0)]"
           }`}>
-            {product.active ? "上架" : "下架"}
+            {isScheduled ? "預約" : product.active ? "上架" : "下架"}
           </span>
         </div>
 
@@ -260,6 +302,7 @@ function ProductModal({
           disclaimer: editing.disclaimer ?? "",
           featured: editing.featured,
           active: editing.active,
+          scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
           initialStock: "5",
         }
       : DEFAULT_FORM
@@ -323,6 +366,12 @@ function ProductModal({
 
     const imageUrl = form.image;
     if (!imageUrl) { toast.error("請上傳圖片或填入圖片網址"); return; }
+    const scheduledPublishAt = parseScheduledPublishAt(form.scheduledPublishAt);
+    if (form.scheduledPublishAt && !scheduledPublishAt) { toast.error("請填寫正確的預約上架時間"); return; }
+    if (scheduledPublishAt && scheduledPublishAt.getTime() <= Date.now()) {
+      toast.error("預約上架時間需晚於現在");
+      return;
+    }
 
     const data = {
       name: form.name.trim(),
@@ -342,7 +391,8 @@ function ProductModal({
       crystalType: form.crystalType.split("\n").map((s) => s.trim()).filter(Boolean).join("｜"),
       color: editing?.color ?? "",
       featured: form.featured,
-      active: form.active,
+      active: scheduledPublishAt ? false : form.active,
+      scheduledPublishAt,
       sortOrder: editing?.sortOrder ?? 0,
     };
 
@@ -553,15 +603,30 @@ function ProductModal({
           )}
 
           {/* Toggles */}
-          <div className="flex gap-6 pt-1">
+          <div className="space-y-3 pt-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.active}
+                disabled={Boolean(form.scheduledPublishAt)}
                 onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
                 className="w-4 h-4"
               />
-              <span className="text-xs font-body text-[oklch(0.35_0_0)]">立即上架</span>
+              <span className="text-xs font-body text-[oklch(0.35_0_0)]">
+                {form.scheduledPublishAt ? "已設定預約，時間到自動上架" : "立即上架"}
+              </span>
+            </label>
+            <label className="block">
+              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">預約上架時間</span>
+              <div className="relative">
+                <CalendarClock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[oklch(0.55_0_0)]" />
+                <input
+                  type="datetime-local"
+                  value={form.scheduledPublishAt}
+                  onChange={(e) => setForm((p) => ({ ...p, scheduledPublishAt: e.target.value, active: e.target.value ? false : p.active }))}
+                  className="w-full border border-[oklch(0.86_0_0)] pl-9 pr-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                />
+              </div>
             </label>
           </div>
         </div>
@@ -709,7 +774,7 @@ export default function AdminProducts() {
               <div>
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">商品與庫存管理</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  點「編輯」修改商品資訊，點庫存數字調整庫存，點「上架/下架」控制顯示。
+                  點「編輯」修改商品資訊，點庫存數字調整庫存，也可設定預約上架時間。
                 </p>
               </div>
             </div>
@@ -738,14 +803,39 @@ export default function AdminProducts() {
           </div>
         ) : (
           <>
+            {(() => {
+              const activeProducts = filtered.filter((p) => p.active);
+              const scheduledProducts = filtered.filter(
+                (p) => !p.active && p.scheduledPublishAt && new Date(p.scheduledPublishAt).getTime() > Date.now()
+              );
+              const inactiveProducts = filtered.filter(
+                (p) => !p.active && (!p.scheduledPublishAt || new Date(p.scheduledPublishAt).getTime() <= Date.now())
+              );
+
+              return (
+                <>
             {/* 已上架 */}
-            {filtered.filter((p) => p.active).length > 0 && (
+            {activeProducts.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] pb-1 border-b border-[oklch(0.92_0_0)]">
-                  已上架 · {filtered.filter((p) => p.active).length} 件
+                  已上架 · {activeProducts.length} 件
                 </p>
                 <div className="space-y-2">
-                  {filtered.filter((p) => p.active).map((product) => (
+                  {activeProducts.map((product) => (
+                    <ProductRow key={product.id} product={product} onEdit={openEdit} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 預約上架 */}
+            {scheduledProducts.length > 0 && (
+              <div className="space-y-2 mt-6">
+                <p className="text-xs tracking-widest font-body text-amber-700 pb-1 border-b border-amber-200">
+                  預約上架 · {scheduledProducts.length} 件
+                </p>
+                <div className="space-y-2">
+                  {scheduledProducts.map((product) => (
                     <ProductRow key={product.id} product={product} onEdit={openEdit} />
                   ))}
                 </div>
@@ -753,18 +843,21 @@ export default function AdminProducts() {
             )}
 
             {/* 已下架 */}
-            {filtered.filter((p) => !p.active).length > 0 && (
+            {inactiveProducts.length > 0 && (
               <div className="space-y-2 mt-6">
                 <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] pb-1 border-b border-[oklch(0.92_0_0)]">
-                  已下架 · {filtered.filter((p) => !p.active).length} 件
+                  已下架 · {inactiveProducts.length} 件
                 </p>
                 <div className="space-y-2 opacity-60">
-                  {filtered.filter((p) => !p.active).map((product) => (
+                  {inactiveProducts.map((product) => (
                     <ProductRow key={product.id} product={product} onEdit={openEdit} />
                   ))}
                 </div>
               </div>
             )}
+                </>
+              );
+            })()}
           </>
         )}
       </div>
