@@ -3,9 +3,9 @@
  * 路由：/admin/chatbot
  * 僅限 admin 角色存取
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Bot, MessageCircle, RefreshCw, Search, User, XCircle } from "lucide-react";
+import { ArrowLeft, Bot, CalendarDays, MessageCircle, RefreshCw, Search, User, XCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -20,6 +20,21 @@ function formatDate(value: Date | string) {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+function formatMonthKey(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "未分類";
+  return date.toLocaleDateString("zh-TW", {
+    year: "numeric",
+    month: "long",
   });
 }
 
@@ -55,6 +70,34 @@ export default function AdminChatbot() {
     { enabled: user?.role === "admin" }
   );
 
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const groupedItems = useMemo(() => {
+    const groups: Array<{
+      key: string;
+      label: string;
+      items: typeof items;
+    }> = [];
+
+    for (const item of items) {
+      const key = formatMonthKey(item.createdAt);
+      const existing = groups.find((group) => group.key === key);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.push({
+          key,
+          label: formatMonthLabel(item.createdAt),
+          items: [item],
+        });
+      }
+    }
+
+    return groups;
+  }, [items]);
+
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
     return null;
@@ -74,11 +117,6 @@ export default function AdminChatbot() {
       </div>
     );
   }
-
-  const items = data?.items ?? [];
-  const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -189,68 +227,86 @@ export default function AdminChatbot() {
             <p className="text-sm font-body text-[oklch(0.5_0_0)]">目前沒有 chatbot 問答紀錄</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {items.map((item) => {
-              const isExpanded = expandedId === item.id;
-              const products = normalizeJsonArray(item.relatedProducts);
-              const retrievedQuestions = normalizeJsonArray(item.retrievedQuestions);
-              return (
-                <div key={item.id} className="bg-white border border-[oklch(0.93_0_0)]">
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                    className="w-full text-left p-5 hover:bg-[oklch(0.985_0_0)] transition-colors"
-                  >
-                    <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                      <div className="lg:w-40 shrink-0">
-                        <p className="text-xs font-body text-[oklch(0.5_0_0)]">{formatDate(item.createdAt)}</p>
-                        <div className="flex items-center gap-1.5 mt-2 text-xs font-body text-[oklch(0.45_0_0)]">
-                          <User className="w-3.5 h-3.5" />
-                          <span className="truncate">
-                            {item.customerName || item.customerEmail || "匿名訪客"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] mb-1">顧客問題</p>
-                        <p className="text-sm font-body text-[oklch(0.12_0_0)] line-clamp-2 whitespace-pre-wrap">
-                          {item.customerQuestion}
-                        </p>
-                        <p className="text-xs font-body text-[oklch(0.55_0_0)] mt-2">
-                          來源頁面：{item.pagePath || "-"} · 推薦商品：{products.length > 0 ? products.join("、") : "無"}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="border-t border-[oklch(0.93_0_0)] p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
-                      <div>
-                        <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] mb-2">完整問題</p>
-                        <p className="text-sm font-body text-[oklch(0.18_0_0)] whitespace-pre-wrap leading-relaxed">
-                          {item.customerQuestion}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] mb-2">AI 回答</p>
-                        <p className="text-sm font-body text-[oklch(0.18_0_0)] whitespace-pre-wrap leading-relaxed">
-                          {item.botReply}
-                        </p>
-                      </div>
-                      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-body text-[oklch(0.45_0_0)]">
-                        <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4">
-                          <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">推薦商品</p>
-                          <p>{products.length > 0 ? products.join("、") : "無"}</p>
-                        </div>
-                        <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4">
-                          <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">命中的知識庫問題</p>
-                          <p>{retrievedQuestions.length > 0 ? retrievedQuestions.join("、") : "無"}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+          <div className="space-y-8">
+            {groupedItems.map((group) => (
+              <section key={group.key} className="space-y-3">
+                <div className="flex items-center justify-between border-b border-[oklch(0.9_0_0)] pb-2">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-[oklch(0.35_0_0)]" />
+                    <h2 className="text-sm font-medium text-[oklch(0.12_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+                      {group.label}
+                    </h2>
+                  </div>
+                  <span className="text-[11px] tracking-widest font-body text-[oklch(0.5_0_0)]">
+                    {group.items.length} 筆
+                  </span>
                 </div>
-              );
-            })}
+
+                <div className="space-y-3">
+                  {group.items.map((item) => {
+                    const isExpanded = expandedId === item.id;
+                    const products = normalizeJsonArray(item.relatedProducts);
+                    const retrievedQuestions = normalizeJsonArray(item.retrievedQuestions);
+                    return (
+                      <div key={item.id} className="bg-white border border-[oklch(0.93_0_0)]">
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                          className="w-full text-left p-5 hover:bg-[oklch(0.985_0_0)] transition-colors"
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                            <div className="lg:w-40 shrink-0">
+                              <p className="text-xs font-body text-[oklch(0.5_0_0)]">{formatDate(item.createdAt)}</p>
+                              <div className="flex items-center gap-1.5 mt-2 text-xs font-body text-[oklch(0.45_0_0)]">
+                                <User className="w-3.5 h-3.5" />
+                                <span className="truncate">
+                                  {item.customerName || item.customerEmail || "匿名訪客"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] mb-1">顧客問題</p>
+                              <p className="text-sm font-body text-[oklch(0.12_0_0)] line-clamp-2 whitespace-pre-wrap">
+                                {item.customerQuestion}
+                              </p>
+                              <p className="text-xs font-body text-[oklch(0.55_0_0)] mt-2">
+                                來源頁面：{item.pagePath || "-"} · 推薦商品：{products.length > 0 ? products.join("、") : "無"}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-[oklch(0.93_0_0)] p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            <div>
+                              <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] mb-2">完整問題</p>
+                              <p className="text-sm font-body text-[oklch(0.18_0_0)] whitespace-pre-wrap leading-relaxed">
+                                {item.customerQuestion}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs tracking-widest font-body text-[oklch(0.55_0_0)] mb-2">AI 回答</p>
+                              <p className="text-sm font-body text-[oklch(0.18_0_0)] whitespace-pre-wrap leading-relaxed">
+                                {item.botReply}
+                              </p>
+                            </div>
+                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-body text-[oklch(0.45_0_0)]">
+                              <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4">
+                                <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">推薦商品</p>
+                                <p>{products.length > 0 ? products.join("、") : "無"}</p>
+                              </div>
+                              <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4">
+                                <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">命中的知識庫問題</p>
+                                <p>{retrievedQuestions.length > 0 ? retrievedQuestions.join("、") : "無"}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
