@@ -7,6 +7,55 @@ import { dbProducts, type DbProduct } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 
 let tableEnsured = false;
+
+const CATEGORY_LABELS: Record<string, string> = {
+  love: "愛情桃花",
+  wealth: "財運事業",
+  protect: "能量防護",
+  healing: "療癒系列",
+  necklace: "項鍊",
+  pendant: "吊飾",
+  "energy-perfume": "能量香水",
+  other: "其他",
+  custom: "客製化",
+  test: "測試",
+};
+
+const PRODUCT_CATEGORY_OVERRIDES: Record<string, string[]> = {
+  "d001-moon-secret": ["healing", "protect", "love"],
+  "d002-honey-realm": ["wealth", "love", "protect", "healing"],
+  "d003-venus": ["pendant", "wealth", "healing"],
+  "d004-morning-whisper": ["love", "healing", "protect"],
+  "d005-moon-clear-heart": ["healing", "love"],
+};
+
+function labelsForCategories(categories: string[]) {
+  return categories.map((category) => CATEGORY_LABELS[category] ?? category);
+}
+
+function inferProductCategories(p: Pick<DbProduct, "id" | "category" | "benefits" | "tags" | "crystalType">) {
+  const override = PRODUCT_CATEGORY_OVERRIDES[p.id];
+  if (override) return override;
+
+  const text = [
+    ...((p.benefits as string[] | null) ?? []),
+    ...((p.tags as string[] | null) ?? []),
+    p.crystalType ?? "",
+  ].join(" ");
+  const categories = new Set<string>([p.category]);
+  if (/愛情|桃花|人緣|魅力|關係/.test(text)) categories.add("love");
+  if (/財|招財|事業|行動力|自信|目標/.test(text)) categories.add("wealth");
+  if (/防護|保護|負能量|氣場|淨化/.test(text)) categories.add("protect");
+  if (/療癒|情緒|穩定|平衡|壓力|焦慮|安全感|內在/.test(text)) categories.add("healing");
+  return Array.from(categories);
+}
+
+function normalizeProductCategories(p: DbProduct) {
+  const categories = p.categories?.length ? p.categories : inferProductCategories(p);
+  const categoryLabels = p.categoryLabels?.length ? p.categoryLabels : labelsForCategories(categories);
+  return { categories, categoryLabels };
+}
+
 async function ensureProductsTable() {
   if (tableEnsured) return;
   const db = await getDb();
@@ -60,6 +109,17 @@ async function ensureProductsTable() {
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`categoryLabels\` json DEFAULT NULL`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
+      await db.execute(sql`
+        UPDATE \`products\`
+        SET \`categories\` = ${JSON.stringify(categories)},
+            \`categoryLabels\` = ${JSON.stringify(labelsForCategories(categories))}
+        WHERE \`id\` = ${id}
+          AND (\`categories\` IS NULL OR JSON_LENGTH(\`categories\`) = 0)
+      `);
+    }
+  } catch { /* 補分類失敗不影響商品列表 */ }
   // 一次性補值：更新四種客製化商品的注意事項
   try {
     const customDisclaimer = [
@@ -118,8 +178,7 @@ async function publishDueProducts() {
 }
 
 function toFrontendProduct(p: DbProduct) {
-  const categories = p.categories?.length ? p.categories : [p.category];
-  const categoryLabels = p.categoryLabels?.length ? p.categoryLabels : [p.categoryLabel];
+  const { categories, categoryLabels } = normalizeProductCategories(p);
   return {
     id: p.id,
     name: p.name,
@@ -221,7 +280,8 @@ export const productRouter = router({
     const rows = await db.select().from(dbProducts);
     return rows
       .filter((p) => p.category !== "test")
-      .sort((a, b) => (a.active ? 0 : 1) - (b.active ? 0 : 1) || a.sortOrder - b.sortOrder);
+      .sort((a, b) => (a.active ? 0 : 1) - (b.active ? 0 : 1) || a.sortOrder - b.sortOrder)
+      .map((p) => ({ ...p, ...normalizeProductCategories(p) }));
   }),
 
   create: adminProcedure

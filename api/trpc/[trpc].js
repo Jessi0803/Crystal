@@ -3137,6 +3137,8 @@ var products = [
     subtitle: "\u6DE8\u5316\u58D3\u529B\uFF0C\u559A\u9192\u5167\u5728\u5E73\u975C\u8207\u9B45\u529B",
     category: "healing",
     categoryLabel: "\u7642\u7652\u7CFB\u5217",
+    categories: ["healing", "protect", "love"],
+    categoryLabels: ["\u7642\u7652\u7CFB\u5217", "\u80FD\u91CF\u9632\u8B77", "\u611B\u60C5\u6843\u82B1"],
     price: 1480,
     originalPrice: 1880,
     image: "/images/d-design/d001.jpg",
@@ -3168,6 +3170,8 @@ var products = [
     subtitle: "\u8CA1\u5BCC\u3001\u4EBA\u7DE3\u8207\u4FDD\u8B77\u80FD\u91CF\u4E00\u6B21\u5230\u4F4D",
     category: "wealth",
     categoryLabel: "\u8CA1\u904B\u4E8B\u696D",
+    categories: ["wealth", "love", "protect", "healing"],
+    categoryLabels: ["\u8CA1\u904B\u4E8B\u696D", "\u611B\u60C5\u6843\u82B1", "\u80FD\u91CF\u9632\u8B77", "\u7642\u7652\u7CFB\u5217"],
     price: 1580,
     originalPrice: 1880,
     image: "/images/d-design/d002.jpg",
@@ -3199,6 +3203,8 @@ var products = [
     subtitle: "\u559A\u9192\u81EA\u4FE1\u8207\u5438\u5F15\u529B\u7684\u65E5\u5E38\u914D\u6234\u6B3E",
     category: "pendant",
     categoryLabel: "\u540A\u98FE",
+    categories: ["pendant", "wealth", "healing"],
+    categoryLabels: ["\u540A\u98FE", "\u8CA1\u904B\u4E8B\u696D", "\u7642\u7652\u7CFB\u5217"],
     price: 950,
     image: "/images/d-design/d003.jpg",
     tags: ["\u81EA\u4FE1", "\u9B45\u529B"],
@@ -3227,6 +3233,8 @@ var products = [
     subtitle: "\u5728\u6EAB\u67D4\u4E2D\u5EFA\u7ACB\u4FDD\u8B77\u8207\u611B\u7684\u5E73\u8861",
     category: "love",
     categoryLabel: "\u611B\u60C5\u6843\u82B1",
+    categories: ["love", "healing", "protect"],
+    categoryLabels: ["\u611B\u60C5\u6843\u82B1", "\u7642\u7652\u7CFB\u5217", "\u80FD\u91CF\u9632\u8B77"],
     price: 1800,
     originalPrice: 2100,
     image: "/images/d-design/d004.jpg",
@@ -3256,6 +3264,8 @@ var products = [
     subtitle: "\u67D4\u548C\u6DE8\u5316\uFF0C\u56DE\u5230\u7A69\u5B9A\u4E14\u88AB\u611B\u7684\u72C0\u614B",
     category: "healing",
     categoryLabel: "\u7642\u7652\u7CFB\u5217",
+    categories: ["healing", "love"],
+    categoryLabels: ["\u7642\u7652\u7CFB\u5217", "\u611B\u60C5\u6843\u82B1"],
     price: 1500,
     originalPrice: 1800,
     image: "/images/d-design/d005.jpg",
@@ -4320,6 +4330,48 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
 
 // server/routers/products.ts
 var tableEnsured = false;
+var CATEGORY_LABELS = {
+  love: "\u611B\u60C5\u6843\u82B1",
+  wealth: "\u8CA1\u904B\u4E8B\u696D",
+  protect: "\u80FD\u91CF\u9632\u8B77",
+  healing: "\u7642\u7652\u7CFB\u5217",
+  necklace: "\u9805\u934A",
+  pendant: "\u540A\u98FE",
+  "energy-perfume": "\u80FD\u91CF\u9999\u6C34",
+  other: "\u5176\u4ED6",
+  custom: "\u5BA2\u88FD\u5316",
+  test: "\u6E2C\u8A66"
+};
+var PRODUCT_CATEGORY_OVERRIDES = {
+  "d001-moon-secret": ["healing", "protect", "love"],
+  "d002-honey-realm": ["wealth", "love", "protect", "healing"],
+  "d003-venus": ["pendant", "wealth", "healing"],
+  "d004-morning-whisper": ["love", "healing", "protect"],
+  "d005-moon-clear-heart": ["healing", "love"]
+};
+function labelsForCategories(categories) {
+  return categories.map((category) => CATEGORY_LABELS[category] ?? category);
+}
+function inferProductCategories(p) {
+  const override = PRODUCT_CATEGORY_OVERRIDES[p.id];
+  if (override) return override;
+  const text2 = [
+    ...p.benefits ?? [],
+    ...p.tags ?? [],
+    p.crystalType ?? ""
+  ].join(" ");
+  const categories = /* @__PURE__ */ new Set([p.category]);
+  if (/愛情|桃花|人緣|魅力|關係/.test(text2)) categories.add("love");
+  if (/財|招財|事業|行動力|自信|目標/.test(text2)) categories.add("wealth");
+  if (/防護|保護|負能量|氣場|淨化/.test(text2)) categories.add("protect");
+  if (/療癒|情緒|穩定|平衡|壓力|焦慮|安全感|內在/.test(text2)) categories.add("healing");
+  return Array.from(categories);
+}
+function normalizeProductCategories(p) {
+  const categories = p.categories?.length ? p.categories : inferProductCategories(p);
+  const categoryLabels = p.categoryLabels?.length ? p.categoryLabels : labelsForCategories(categories);
+  return { categories, categoryLabels };
+}
 async function ensureProductsTable() {
   if (tableEnsured) return;
   const db = await getDb();
@@ -4378,6 +4430,18 @@ async function ensureProductsTable() {
   } catch {
   }
   try {
+    for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
+      await db.execute(sql5`
+        UPDATE \`products\`
+        SET \`categories\` = ${JSON.stringify(categories)},
+            \`categoryLabels\` = ${JSON.stringify(labelsForCategories(categories))}
+        WHERE \`id\` = ${id}
+          AND (\`categories\` IS NULL OR JSON_LENGTH(\`categories\`) = 0)
+      `);
+    }
+  } catch {
+  }
+  try {
     const customDisclaimer = [
       "\u300A\u521D\u7248\u8207\u7DAD\u4FEE\u300B",
       "\u514D\u8CBB\u63D0\u4F9B\u4E00\u6B21\u521D\u7248\u4FEE\u6539\u6216\u7DAD\u4FEE\u3002",
@@ -4430,8 +4494,7 @@ async function publishDueProducts() {
   await db.update(dbProducts).set({ active: true, scheduledPublishAt: null }).where(and5(eq6(dbProducts.active, false), sql5`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
 }
 function toFrontendProduct(p) {
-  const categories = p.categories?.length ? p.categories : [p.category];
-  const categoryLabels = p.categoryLabels?.length ? p.categoryLabels : [p.categoryLabel];
+  const { categories, categoryLabels } = normalizeProductCategories(p);
   return {
     id: p.id,
     name: p.name,
@@ -4514,7 +4577,7 @@ var productRouter = router({
     const db = await getDb();
     if (!db) return [];
     const rows = await db.select().from(dbProducts);
-    return rows.filter((p) => p.category !== "test").sort((a, b) => (a.active ? 0 : 1) - (b.active ? 0 : 1) || a.sortOrder - b.sortOrder);
+    return rows.filter((p) => p.category !== "test").sort((a, b) => (a.active ? 0 : 1) - (b.active ? 0 : 1) || a.sortOrder - b.sortOrder).map((p) => ({ ...p, ...normalizeProductCategories(p) }));
   }),
   create: adminProcedure.input(ProductInputSchema).mutation(async ({ input }) => {
     await ensureProductsTable();
