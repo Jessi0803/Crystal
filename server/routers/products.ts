@@ -34,6 +34,7 @@ async function ensureProductsTable() {
       \`color\` varchar(100) DEFAULT NULL,
       \`featured\` boolean NOT NULL DEFAULT false,
       \`active\` boolean NOT NULL DEFAULT true,
+      \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -47,6 +48,9 @@ async function ensureProductsTable() {
   } catch { /* 已是 mediumtext 或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`scheduledPublishAt\` timestamp NULL DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`isMonthlyLimited\` boolean NOT NULL DEFAULT false`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   // 一次性補值：更新四種客製化商品的注意事項
   try {
@@ -126,6 +130,7 @@ function toFrontendProduct(p: DbProduct) {
     disclaimer: p.disclaimer ?? "",
     inStock: p.active,
     featured: p.featured,
+    isMonthlyLimited: p.isMonthlyLimited,
     scheduledPublishAt: p.scheduledPublishAt ?? undefined,
     crystalType: p.crystalType ?? "",
     color: p.color ?? "",
@@ -158,6 +163,7 @@ const ProductInputSchema = z.object({
   color: z.string().default(""),
   featured: z.boolean().default(false),
   active: z.boolean().default(true),
+  isMonthlyLimited: z.boolean().default(false),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z.number().int().default(0),
 });

@@ -36,6 +36,7 @@ type FormState = {
   disclaimer: string;  // 注意事項（客製化）
   featured: boolean;
   active: boolean;
+  isMonthlyLimited: boolean;
   scheduledPublishAt: string;
   initialStock: string;
 };
@@ -54,6 +55,7 @@ const DEFAULT_FORM: FormState = {
   disclaimer: "",
   featured: false,
   active: true,
+  isMonthlyLimited: false,
   scheduledPublishAt: "",
   initialStock: "5",
 };
@@ -244,11 +246,18 @@ function ProductRow({
         </div>
 
         <div className="text-center">
-          {product.featured && (
-            <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-amber-50 text-amber-700 border border-amber-200">
-              精選
-            </span>
-          )}
+          <div className="flex flex-col items-center gap-1">
+            {product.featured && (
+              <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-amber-50 text-amber-700 border border-amber-200">
+                精選
+              </span>
+            )}
+            {product.isMonthlyLimited && (
+              <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-rose-50 text-rose-700 border border-rose-200">
+                月限
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2">
@@ -302,6 +311,7 @@ function ProductModal({
           disclaimer: editing.disclaimer ?? "",
           featured: editing.featured,
           active: editing.active,
+          isMonthlyLimited: editing.isMonthlyLimited,
           scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
           initialStock: "5",
         }
@@ -391,6 +401,7 @@ function ProductModal({
       crystalType: form.crystalType.split("\n").map((s) => s.trim()).filter(Boolean).join("｜"),
       color: editing?.color ?? "",
       featured: form.featured,
+      isMonthlyLimited: form.isMonthlyLimited,
       active: scheduledPublishAt ? false : form.active,
       scheduledPublishAt,
       sortOrder: editing?.sortOrder ?? 0,
@@ -604,6 +615,15 @@ function ProductModal({
 
           {/* Toggles */}
           <div className="space-y-3 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isMonthlyLimited}
+                onChange={(e) => setForm((p) => ({ ...p, isMonthlyLimited: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <span className="text-xs font-body text-[oklch(0.35_0_0)]">每月限量</span>
+            </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

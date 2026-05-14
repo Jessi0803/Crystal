@@ -300,6 +300,7 @@ var init_schema = __esm({
       color: varchar("color", { length: 100 }),
       featured: boolean("featured").notNull().default(false),
       active: boolean("active").notNull().default(true),
+      isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
       scheduledPublishAt: timestamp("scheduledPublishAt"),
       sortOrder: int("sortOrder").notNull().default(0),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -4344,6 +4345,7 @@ async function ensureProductsTable() {
       \`color\` varchar(100) DEFAULT NULL,
       \`featured\` boolean NOT NULL DEFAULT false,
       \`active\` boolean NOT NULL DEFAULT true,
+      \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -4357,6 +4359,10 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`scheduledPublishAt\` timestamp NULL DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`isMonthlyLimited\` boolean NOT NULL DEFAULT false`);
   } catch {
   }
   try {
@@ -4432,6 +4438,7 @@ function toFrontendProduct(p) {
     disclaimer: p.disclaimer ?? "",
     inStock: p.active,
     featured: p.featured,
+    isMonthlyLimited: p.isMonthlyLimited,
     scheduledPublishAt: p.scheduledPublishAt ?? void 0,
     crystalType: p.crystalType ?? "",
     color: p.color ?? ""
@@ -4462,6 +4469,7 @@ var ProductInputSchema = z6.object({
   color: z6.string().default(""),
   featured: z6.boolean().default(false),
   active: z6.boolean().default(true),
+  isMonthlyLimited: z6.boolean().default(false),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z6.number().int().default(0)
 });

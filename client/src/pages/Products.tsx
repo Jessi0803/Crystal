@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 const categories = [
   { id: "all", label: "全部商品" },
+  { id: "monthly", label: "每月限量" },
   { id: "love", label: "愛情桃花" },
   { id: "wealth", label: "財運事業" },
   { id: "protect", label: "能量防護" },
@@ -61,9 +62,11 @@ export default function Products() {
   }, [search]);
 
   const filtered = products
-    .filter((p) =>
-      activeCategory === "all" || p.category === activeCategory
-    )
+    .filter((p) => {
+      if (activeCategory === "all") return true;
+      if (activeCategory === "monthly") return "isMonthlyLimited" in p && p.isMonthlyLimited === true;
+      return p.category === activeCategory;
+    })
     .sort((a, b) => {
       if (sortBy === "sales" || sortBy === "default") {
         return (salesQtyByProductId.get(b.id) ?? 0) - (salesQtyByProductId.get(a.id) ?? 0);

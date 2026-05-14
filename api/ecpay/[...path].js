@@ -497,6 +497,7 @@ var dbProducts = mysqlTable("products", {
   color: varchar("color", { length: 100 }),
   featured: boolean("featured").notNull().default(false),
   active: boolean("active").notNull().default(true),
+  isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
