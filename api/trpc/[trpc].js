@@ -284,6 +284,8 @@ var init_schema = __esm({
       subtitle: varchar("subtitle", { length: 200 }).notNull().default(""),
       category: varchar("category", { length: 64 }).notNull(),
       categoryLabel: varchar("categoryLabel", { length: 64 }).notNull(),
+      categories: json("categories").$type(),
+      categoryLabels: json("categoryLabels").$type(),
       price: int("price").notNull(),
       originalPrice: int("originalPrice"),
       priceRange: varchar("priceRange", { length: 200 }),
@@ -4329,6 +4331,8 @@ async function ensureProductsTable() {
       \`subtitle\` varchar(200) NOT NULL DEFAULT '',
       \`category\` varchar(64) NOT NULL,
       \`categoryLabel\` varchar(64) NOT NULL,
+      \`categories\` json DEFAULT NULL,
+      \`categoryLabels\` json DEFAULT NULL,
       \`price\` int NOT NULL,
       \`originalPrice\` int DEFAULT NULL,
       \`priceRange\` varchar(200) DEFAULT NULL,
@@ -4363,6 +4367,14 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`isMonthlyLimited\` boolean NOT NULL DEFAULT false`);
+  } catch {
+  }
+  try {
+    await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`categories\` json DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`categoryLabels\` json DEFAULT NULL`);
   } catch {
   }
   try {
@@ -4418,12 +4430,16 @@ async function publishDueProducts() {
   await db.update(dbProducts).set({ active: true, scheduledPublishAt: null }).where(and5(eq6(dbProducts.active, false), sql5`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
 }
 function toFrontendProduct(p) {
+  const categories = p.categories?.length ? p.categories : [p.category];
+  const categoryLabels = p.categoryLabels?.length ? p.categoryLabels : [p.categoryLabel];
   return {
     id: p.id,
     name: p.name,
     subtitle: p.subtitle ?? "",
     category: p.category,
-    categoryLabel: p.categoryLabel,
+    categoryLabel: categoryLabels.join("\u3001"),
+    categories,
+    categoryLabels,
     price: p.price,
     originalPrice: p.originalPrice ?? void 0,
     priceRange: p.priceRange ?? void 0,
@@ -4453,6 +4469,8 @@ var ProductInputSchema = z6.object({
   subtitle: z6.string().default(""),
   category: z6.string().min(1),
   categoryLabel: z6.string().min(1),
+  categories: z6.array(z6.string()).default([]),
+  categoryLabels: z6.array(z6.string()).default([]),
   price: z6.number().int().min(0),
   originalPrice: z6.number().int().min(0).optional(),
   priceRange: z6.string().optional(),

@@ -18,6 +18,8 @@ async function ensureProductsTable() {
       \`subtitle\` varchar(200) NOT NULL DEFAULT '',
       \`category\` varchar(64) NOT NULL,
       \`categoryLabel\` varchar(64) NOT NULL,
+      \`categories\` json DEFAULT NULL,
+      \`categoryLabels\` json DEFAULT NULL,
       \`price\` int NOT NULL,
       \`originalPrice\` int DEFAULT NULL,
       \`priceRange\` varchar(200) DEFAULT NULL,
@@ -51,6 +53,12 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`isMonthlyLimited\` boolean NOT NULL DEFAULT false`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`categories\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`categoryLabels\` json DEFAULT NULL`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   // 一次性補值：更新四種客製化商品的注意事項
   try {
@@ -110,12 +118,16 @@ async function publishDueProducts() {
 }
 
 function toFrontendProduct(p: DbProduct) {
+  const categories = p.categories?.length ? p.categories : [p.category];
+  const categoryLabels = p.categoryLabels?.length ? p.categoryLabels : [p.categoryLabel];
   return {
     id: p.id,
     name: p.name,
     subtitle: p.subtitle ?? "",
     category: p.category,
-    categoryLabel: p.categoryLabel,
+    categoryLabel: categoryLabels.join("、"),
+    categories,
+    categoryLabels,
     price: p.price,
     originalPrice: p.originalPrice ?? undefined,
     priceRange: p.priceRange ?? undefined,
@@ -147,6 +159,8 @@ const ProductInputSchema = z.object({
   subtitle: z.string().default(""),
   category: z.string().min(1),
   categoryLabel: z.string().min(1),
+  categories: z.array(z.string()).default([]),
+  categoryLabels: z.array(z.string()).default([]),
   price: z.number().int().min(0),
   originalPrice: z.number().int().min(0).optional(),
   priceRange: z.string().optional(),

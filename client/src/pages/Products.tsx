@@ -28,6 +28,10 @@ const sortOptions = [
   { id: "newest", label: "最新商品" },
 ];
 
+function getProductCategories(product: { category: string; categories?: string[] }) {
+  return product.categories?.length ? product.categories : [product.category];
+}
+
 export default function Products() {
   const search = useSearch();
   const params = new URLSearchParams(search);
@@ -65,7 +69,7 @@ export default function Products() {
     .filter((p) => {
       if (activeCategory === "all") return true;
       if (activeCategory === "monthly") return "isMonthlyLimited" in p && p.isMonthlyLimited === true;
-      return p.category === activeCategory;
+      return getProductCategories(p).includes(activeCategory);
     })
     .sort((a, b) => {
       if (sortBy === "sales" || sortBy === "default") {

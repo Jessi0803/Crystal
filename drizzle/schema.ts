@@ -267,6 +267,8 @@ export const dbProducts = mysqlTable("products", {
   subtitle: varchar("subtitle", { length: 200 }).notNull().default(""),
   category: varchar("category", { length: 64 }).notNull(),
   categoryLabel: varchar("categoryLabel", { length: 64 }).notNull(),
+  categories: json("categories").$type<string[]>(),
+  categoryLabels: json("categoryLabels").$type<string[]>(),
   price: int("price").notNull(),
   originalPrice: int("originalPrice"),
   priceRange: varchar("priceRange", { length: 200 }),

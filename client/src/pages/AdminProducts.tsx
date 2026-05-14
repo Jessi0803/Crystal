@@ -25,7 +25,7 @@ const CATEGORY_OPTIONS = [
 type FormState = {
   name: string;
   subtitle: string;
-  category: string;
+  categories: string[];
   price: string;
   priceRange: string;
   image: string;
@@ -44,7 +44,7 @@ type FormState = {
 const DEFAULT_FORM: FormState = {
   name: "",
   subtitle: "",
-  category: "healing",
+  categories: ["healing"],
   price: "",
   priceRange: "",
   image: "",
@@ -89,6 +89,14 @@ function parseScheduledPublishAt(value: string) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getCategoryLabel(category: string) {
+  return CATEGORY_OPTIONS.find((c) => c.id === category)?.label ?? category;
+}
+
+function getProductCategoryLabels(product: DbProduct) {
+  return product.categoryLabels?.length ? product.categoryLabels : [product.categoryLabel];
 }
 
 function compressImage(file: File): Promise<string> {
@@ -208,7 +216,7 @@ function ProductRow({
 
         <div className="min-w-0">
           <p className="text-sm font-medium text-[oklch(0.12_0_0)] truncate">{product.name}</p>
-          <p className="text-xs text-[oklch(0.5_0_0)] font-body mt-0.5">{product.categoryLabel}</p>
+          <p className="text-xs text-[oklch(0.5_0_0)] font-body mt-0.5">{getProductCategoryLabels(product).join("、")}</p>
           {isScheduled && (
             <p className="text-xs text-amber-700 font-body mt-0.5 flex items-center gap-1">
               <CalendarClock className="w-3 h-3" />
@@ -300,7 +308,7 @@ function ProductModal({
       ? {
           name: editing.name,
           subtitle: editing.subtitle ?? "",
-          category: editing.category,
+          categories: editing.categories?.length ? editing.categories : [editing.category],
           price: String(editing.price),
           priceRange: editing.priceRange ?? "",
           image: editing.image,
@@ -321,7 +329,9 @@ function ProductModal({
   const [compressing, setCompressing] = useState(false);
   const [showMoreFields, setShowMoreFields] = useState(false);
 
-  const categoryLabel = CATEGORY_OPTIONS.find((c) => c.id === form.category)?.label ?? form.category;
+  const selectedCategories = form.categories;
+  const primaryCategory = selectedCategories[0] ?? "";
+  const categoryLabels = selectedCategories.map(getCategoryLabel);
 
   const setInventory = trpc.inventory.setInventory.useMutation();
   const createProduct = trpc.product.create.useMutation({
@@ -373,6 +383,7 @@ function ProductModal({
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error("請填寫商品名稱"); return; }
     if (!form.price || isNaN(Number(form.price))) { toast.error("請填寫正確價格"); return; }
+    if (selectedCategories.length === 0) { toast.error("請至少選擇一個分類"); return; }
 
     const imageUrl = form.image;
     if (!imageUrl) { toast.error("請上傳圖片或填入圖片網址"); return; }
@@ -386,8 +397,10 @@ function ProductModal({
     const data = {
       name: form.name.trim(),
       subtitle: form.subtitle.trim(),
-      category: form.category,
-      categoryLabel,
+      category: primaryCategory,
+      categoryLabel: categoryLabels[0] ?? primaryCategory,
+      categories: selectedCategories,
+      categoryLabels,
       price: parseInt(form.price, 10),
       priceRange: form.priceRange.trim() || undefined,
       image: imageUrl,
@@ -480,19 +493,28 @@ function ProductModal({
           </label>
 
           {/* Category + Price row */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
               <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">分類 *</span>
-              <select
-                value={form.category}
-                onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body bg-white outline-none focus:border-[oklch(0.2_0_0)]"
-              >
+              <div className="grid grid-cols-2 gap-2 border border-[oklch(0.86_0_0)] p-2">
                 {CATEGORY_OPTIONS.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
+                  <label key={c.id} className="flex items-center gap-2 text-xs font-body text-[oklch(0.35_0_0)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.categories.includes(c.id)}
+                      onChange={(e) => setForm((p) => {
+                        const categories = e.target.checked
+                          ? [...p.categories, c.id]
+                          : p.categories.filter((id) => id !== c.id);
+                        return { ...p, categories };
+                      })}
+                      className="w-4 h-4"
+                    />
+                    {c.label}
+                  </label>
                 ))}
-              </select>
-            </label>
+              </div>
+            </div>
             <label className="block">
               <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">價格（NT$）*</span>
               <input
@@ -532,7 +554,7 @@ function ProductModal({
           </div>
 
           {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}
-          {form.category !== "custom" ? (
+          {primaryCategory !== "custom" ? (
             <label className="block">
               <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（每行一項）</span>
               <textarea
@@ -702,7 +724,7 @@ export default function AdminProducts() {
     return dbProductList.filter(
       (p) =>
         p.name.toLowerCase().includes(keyword) ||
-        p.categoryLabel.toLowerCase().includes(keyword)
+        getProductCategoryLabels(p).join("、").toLowerCase().includes(keyword)
     );
   }, [dbProductList, query]);
 

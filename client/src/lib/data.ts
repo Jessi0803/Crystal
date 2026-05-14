@@ -7,6 +7,8 @@ export interface Product {
   subtitle: string;
   category: string;
   categoryLabel: string;
+  categories?: string[];
+  categoryLabels?: string[];
   price: number;
   originalPrice?: number;
   priceRange?: string;
@@ -21,6 +23,7 @@ export interface Product {
   disclaimer: string;
   inStock: boolean;
   featured: boolean;
+  isMonthlyLimited?: boolean;
   crystalType: string;
   color: string;
 }
