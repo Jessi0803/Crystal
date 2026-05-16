@@ -3,7 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { dbProducts, type DbProduct } from "../../drizzle/schema";
+import { dbProducts, productInventory, type DbProduct } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 
 let tableEnsured = false;
@@ -316,6 +316,17 @@ export const productRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq(dbProducts.id, input.id));
+      return { success: true };
+    }),
+
+  remove: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      await ensureProductsTable();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
+      await db.delete(dbProducts).where(eq(dbProducts.id, input.id));
+      await db.delete(productInventory).where(eq(productInventory.productId, input.id));
       return { success: true };
     }),
 

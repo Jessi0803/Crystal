@@ -4605,6 +4605,14 @@ var productRouter = router({
     await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq6(dbProducts.id, input.id));
     return { success: true };
   }),
+  remove: adminProcedure.input(z6.object({ id: z6.string() })).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    await db.delete(dbProducts).where(eq6(dbProducts.id, input.id));
+    await db.delete(productInventory).where(eq6(productInventory.productId, input.id));
+    return { success: true };
+  }),
   uploadImage: adminProcedure.input(z6.object({
     filename: z6.string(),
     contentType: z6.string(),

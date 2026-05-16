@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Package, Plus, Search, Save, X, Upload, ImageIcon,
-  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock
+  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -204,10 +204,23 @@ function ProductRow({
     },
     onError: (err) => toast.error(err.message || "操作失敗"),
   });
+  const removeProduct = trpc.product.remove.useMutation({
+    onSuccess: async () => {
+      toast.success("商品已刪除");
+      await utils.product.adminList.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "刪除失敗"),
+  });
+
+  const handleRemove = () => {
+    const confirmed = window.confirm(`確定要刪除「${product.name}」嗎？刪除後前台不會再顯示此商品。`);
+    if (!confirmed) return;
+    removeProduct.mutate({ id: product.id });
+  };
 
   return (
     <div className="bg-white border border-[oklch(0.9_0_0)] px-4 py-3">
-      <div className="grid gap-3 items-center" style={{ gridTemplateColumns: "56px 1fr 80px 70px 80px 120px" }}>
+      <div className="grid gap-3 items-center" style={{ gridTemplateColumns: "56px 1fr 80px 70px 80px 176px" }}>
         <img
           src={product.image}
           alt={product.name}
@@ -278,7 +291,7 @@ function ProductRow({
           </button>
           <button
             onClick={() => toggleActive.mutate({ id: product.id, active: !product.active })}
-            disabled={toggleActive.isPending}
+            disabled={toggleActive.isPending || removeProduct.isPending}
             className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-body border disabled:opacity-50 ${
               product.active
                 ? "border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-red-300 hover:text-red-600"
@@ -286,6 +299,14 @@ function ProductRow({
             }`}
           >
             {product.active ? <><EyeOff className="w-3 h-3" />下架</> : <><Eye className="w-3 h-3" />上架</>}
+          </button>
+          <button
+            onClick={handleRemove}
+            disabled={removeProduct.isPending || toggleActive.isPending}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            <Trash2 className="w-3 h-3" />
+            刪除
           </button>
         </div>
       </div>
