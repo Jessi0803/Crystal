@@ -91,6 +91,28 @@ function parseScheduledPublishAt(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function formatPriceRange(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const normalized = trimmed.replace(/\s*~\s*/g, " ~ ");
+  const numbers = normalized.match(/\d[\d,]*/g);
+
+  if (numbers && numbers.length >= 2 && /^[\s$NTnt,.~\d-]+$/.test(normalized)) {
+    const [min, max] = numbers.map((n) => Number(n.replace(/,/g, "")));
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      return `NT$${min.toLocaleString()} ~ ${max.toLocaleString()}`;
+    }
+  }
+
+  if (numbers && numbers.length === 1 && /^[\s$NTnt,.\d]+$/.test(normalized)) {
+    const amount = Number(numbers[0].replace(/,/g, ""));
+    if (Number.isFinite(amount)) return `NT$${amount.toLocaleString()}`;
+  }
+
+  return /^NT\$/i.test(normalized) ? normalized.replace(/^nt\$/i, "NT$") : normalized;
+}
+
 function getCategoryLabel(category: string) {
   return CATEGORY_OPTIONS.find((c) => c.id === category)?.label ?? category;
 }
@@ -415,6 +437,7 @@ function ProductModal({
       return;
     }
 
+    const formattedPriceRange = formatPriceRange(form.priceRange);
     const data = {
       name: form.name.trim(),
       subtitle: form.subtitle.trim(),
@@ -423,7 +446,7 @@ function ProductModal({
       categories: selectedCategories,
       categoryLabels,
       price: parseInt(form.price, 10),
-      priceRange: form.priceRange.trim() || undefined,
+      priceRange: formattedPriceRange || undefined,
       image: imageUrl,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       description: editing?.description ?? "",
@@ -649,6 +672,7 @@ function ProductModal({
                 <input
                   value={form.priceRange}
                   onChange={(e) => setForm((p) => ({ ...p, priceRange: e.target.value }))}
+                  onBlur={() => setForm((p) => ({ ...p, priceRange: formatPriceRange(p.priceRange) }))}
                   placeholder="例：NT$1,200 ~ 1,800"
                   className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                 />

@@ -183,7 +183,7 @@ export default function ProductDetail() {
   const fulfillmentNote = isPreorderItem
     ? availability?.preorderNote || PREORDER_FULFILLMENT_NOTE
     : isSoldOutItem
-      ? "本月限量商品已售完，無預購機制。"
+      ? "本月限量商品已售完"
     : IN_STOCK_FULFILLMENT_NOTE;
 
   const handleAddToCart = () => {
