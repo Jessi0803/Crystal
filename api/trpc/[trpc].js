@@ -1178,6 +1178,12 @@ var NON_INVENTORY_PRODUCT_IDS = /* @__PURE__ */ new Set(["shipping", "shipping-f
 function shouldSkipInventory(productId) {
   return NON_INVENTORY_PRODUCT_IDS.has(productId);
 }
+async function isMonthlyLimitedProduct(productId) {
+  const db = await getDb();
+  if (!db) return false;
+  const [product] = await db.select({ isMonthlyLimited: dbProducts.isMonthlyLimited }).from(dbProducts).where(eq3(dbProducts.id, productId)).limit(1);
+  return product?.isMonthlyLimited === true;
+}
 async function getProductInventory(productId) {
   const db = await getDb();
   if (!db) return null;
@@ -1202,11 +1208,15 @@ async function acquireInventoryLock(productId, quantity, sessionToken, ttlMs = 1
   }
   await releaseExpiredLocks();
   const inv = await getProductInventory(productId);
+  const monthlyLimited = await isMonthlyLimitedProduct(productId);
   if (!inv || inv.stock === -1) {
     await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
   if (inv.stock <= 0) {
+    if (monthlyLimited) {
+      return { success: false, reason: "\u5546\u54C1\u5DF2\u552E\u5B8C" };
+    }
     await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
@@ -1220,6 +1230,9 @@ async function acquireInventoryLock(productId, quantity, sessionToken, ttlMs = 1
   const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
   const availableQty = inv.stock - lockedQty;
   if (availableQty < quantity) {
+    if (monthlyLimited) {
+      return { success: false, reason: "\u5546\u54C1\u5EAB\u5B58\u4E0D\u8DB3" };
+    }
     await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
@@ -1285,16 +1298,27 @@ async function restoreInventoryOnCancel(merchantTradeNo) {
 }
 async function getProductAvailability(productId) {
   const db = await getDb();
-  if (!db) return { available: true, stock: -1, isPreorder: false, preorderNote: null };
+  if (!db) return { available: true, stock: -1, isPreorder: false, preorderNote: null, isMonthlyLimited: false };
   const inv = await getProductInventory(productId);
+  const monthlyLimited = await isMonthlyLimitedProduct(productId);
   if (!inv || inv.stock === -1) {
-    return { available: true, stock: -1, isPreorder: false, preorderNote: null };
+    return { available: true, stock: -1, isPreorder: false, preorderNote: null, isMonthlyLimited: monthlyLimited };
+  }
+  if (monthlyLimited && inv.stock <= 0) {
+    return {
+      available: false,
+      stock: inv.stock,
+      isPreorder: false,
+      preorderNote: null,
+      isMonthlyLimited: true
+    };
   }
   return {
     available: true,
     stock: inv.stock,
     isPreorder: inv.stock <= 0,
-    preorderNote: inv.preorderNote ?? null
+    preorderNote: inv.preorderNote ?? null,
+    isMonthlyLimited: monthlyLimited
   };
 }
 
@@ -2001,6 +2025,16 @@ var orderRouter = router({
     });
     if (submittedItems.length === 0) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8CFC\u7269\u8ECA\u6C92\u6709\u53EF\u7D50\u5E33\u5546\u54C1" });
+    }
+    for (const item of submittedItems) {
+      const productId = item.baseProductId ?? item.id;
+      const availability = await getProductAvailability(productId);
+      if (availability.isMonthlyLimited && (!availability.available || availability.stock !== -1 && availability.stock < item.quantity)) {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: `\u300C${item.name}\u300D\u5DF2\u552E\u5B8C\uFF0C\u7121\u6CD5\u9810\u8CFC\u3002`
+        });
+      }
     }
     const merchantTradeNo = generateMerchantTradeNo();
     const isPreorder = submittedItems.some((i) => i.isPreorder);

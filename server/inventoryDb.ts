@@ -8,6 +8,7 @@ import {
   inventoryLocks,
   orders,
   orderItems,
+  dbProducts,
   InsertInventoryLock,
   InsertProductInventory,
 } from "../drizzle/schema";
@@ -29,6 +30,17 @@ const NON_INVENTORY_PRODUCT_IDS = new Set(["shipping", "shipping-fee", "payment-
 
 function shouldSkipInventory(productId: string) {
   return NON_INVENTORY_PRODUCT_IDS.has(productId);
+}
+
+async function isMonthlyLimitedProduct(productId: string) {
+  const db = await getDb();
+  if (!db) return false;
+  const [product] = await db
+    .select({ isMonthlyLimited: dbProducts.isMonthlyLimited })
+    .from(dbProducts)
+    .where(eq(dbProducts.id, productId))
+    .limit(1);
+  return product?.isMonthlyLimited === true;
 }
 
 // ─── 庫存查詢 ─────────────────────────────────────────────────────────────────
@@ -85,6 +97,7 @@ export async function acquireInventoryLock(
 
   // 查詢商品庫存設定
   const inv = await getProductInventory(productId);
+  const monthlyLimited = await isMonthlyLimitedProduct(productId);
 
   // 無限庫存（stock = -1）或未設定庫存 → 直接允許
   if (!inv || inv.stock === -1) {
@@ -93,6 +106,9 @@ export async function acquireInventoryLock(
   }
 
   if (inv.stock <= 0) {
+    if (monthlyLimited) {
+      return { success: false, reason: "商品已售完" };
+    }
     await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
   }
@@ -113,6 +129,9 @@ export async function acquireInventoryLock(
   const availableQty = inv.stock - lockedQty;
 
   if (availableQty < quantity) {
+    if (monthlyLimited) {
+      return { success: false, reason: "商品庫存不足" };
+    }
     // 庫存不足仍允許下單（視為預購）
     await createLock(productId, quantity, sessionToken, ttlMs);
     return { success: true };
@@ -277,11 +296,22 @@ export async function acquireInventoryLocksForOrder(
  */
 export async function getProductAvailability(productId: string) {
   const db = await getDb();
-  if (!db) return { available: true, stock: -1, isPreorder: false, preorderNote: null };
+  if (!db) return { available: true, stock: -1, isPreorder: false, preorderNote: null, isMonthlyLimited: false };
 
   const inv = await getProductInventory(productId);
+  const monthlyLimited = await isMonthlyLimitedProduct(productId);
   if (!inv || inv.stock === -1) {
-    return { available: true, stock: -1, isPreorder: false, preorderNote: null };
+    return { available: true, stock: -1, isPreorder: false, preorderNote: null, isMonthlyLimited: monthlyLimited };
+  }
+
+  if (monthlyLimited && inv.stock <= 0) {
+    return {
+      available: false,
+      stock: inv.stock,
+      isPreorder: false,
+      preorderNote: null,
+      isMonthlyLimited: true,
+    };
   }
 
   return {
@@ -289,5 +319,6 @@ export async function getProductAvailability(productId: string) {
     stock: inv.stock,
     isPreorder: inv.stock <= 0,
     preorderNote: inv.preorderNote ?? null,
+    isMonthlyLimited: monthlyLimited,
   };
 }

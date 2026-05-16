@@ -35,6 +35,7 @@ import {
   deductInventoryAfterPayment,
   restoreInventoryOnCancel,
   ensureOrdersColumns,
+  getProductAvailability,
 } from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
@@ -190,6 +191,19 @@ export const orderRouter = router({
       });
       if (submittedItems.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "購物車沒有可結帳商品" });
+      }
+      for (const item of submittedItems) {
+        const productId = item.baseProductId ?? item.id;
+        const availability = await getProductAvailability(productId);
+        if (
+          availability.isMonthlyLimited &&
+          (!availability.available || (availability.stock !== -1 && availability.stock < item.quantity))
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `「${item.name}」已售完，無法預購。`,
+          });
+        }
       }
 
       const merchantTradeNo = generateMerchantTradeNo();

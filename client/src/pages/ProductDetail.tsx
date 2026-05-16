@@ -174,12 +174,23 @@ export default function ProductDetail() {
     activeTarotPriceList[0];
   const isPreorderItem =
     product.category !== "custom" &&
+    availability?.available !== false &&
     (availability?.isPreorder === true || (availability?.stock ?? 1) <= 0);
+  const isSoldOutItem =
+    product.category !== "custom" &&
+    availability?.isMonthlyLimited === true &&
+    availability.available === false;
   const fulfillmentNote = isPreorderItem
     ? availability?.preorderNote || PREORDER_FULFILLMENT_NOTE
+    : isSoldOutItem
+      ? "本月限量商品已售完，無預購機制。"
     : IN_STOCK_FULFILLMENT_NOTE;
 
   const handleAddToCart = () => {
+    if (isSoldOutItem) {
+      toast.error("此每月限量商品已售完，無法預購");
+      return;
+    }
     for (let i = 0; i < qty; i++) {
       addToCart(
         product,
@@ -551,10 +562,11 @@ export default function ProductDetail() {
               </div>
               <button
                 onClick={handleAddToCart}
-                className="btn-primary flex-1 justify-center"
+                disabled={isSoldOutItem}
+                className="btn-primary flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingBag className="w-4 h-4" />
-                加入購物袋
+                {isSoldOutItem ? "售完" : "加入購物袋"}
               </button>
             </div>}
 
