@@ -189,10 +189,19 @@ function StockCell({ productId, productName }: { productId: string; productName:
           className="w-16 border border-[oklch(0.86_0_0)] px-2 py-1 text-xs font-body"
           autoFocus
         />
-        <button onClick={save} disabled={saveMutation.isPending} className="p-1 text-[oklch(0.15_0_0)] hover:opacity-70">
+        <button
+          onClick={save}
+          disabled={saveMutation.isPending}
+          aria-label="儲存庫存"
+          className="p-1 text-[oklch(0.15_0_0)] hover:opacity-70"
+        >
           <Save className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => setEditing(false)} className="p-1 text-[oklch(0.5_0_0)] hover:opacity-70">
+        <button
+          onClick={() => setEditing(false)}
+          aria-label="取消庫存編輯"
+          className="p-1 text-[oklch(0.5_0_0)] hover:opacity-70"
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -202,6 +211,7 @@ function StockCell({ productId, productName }: { productId: string; productName:
   return (
     <button
       onClick={startEdit}
+      aria-label={`編輯 ${productName} 庫存`}
       className="w-16 border border-[oklch(0.82_0_0)] px-2 py-1 text-xs font-body text-[oklch(0.3_0_0)] hover:border-[oklch(0.4_0_0)] bg-white text-center"
     >
       {currentStock === -1 ? "無限" : currentStock}

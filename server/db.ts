@@ -1,6 +1,7 @@
 import { eq, and, gt, sql } from "drizzle-orm";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql, { type Pool } from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -22,12 +23,47 @@ export function shouldGrantAdminRole(openId: string, email?: string | null) {
 }
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
+
+function shouldUseTls(databaseUrl: string) {
+  if (process.env.DATABASE_SSL === "true") return true;
+
+  try {
+    const url = new URL(databaseUrl);
+    return url.hostname.includes("tidbcloud.com");
+  } catch {
+    return false;
+  }
+}
+
+function createDb(databaseUrl: string) {
+  if (!shouldUseTls(databaseUrl)) {
+    return drizzle(databaseUrl);
+  }
+
+  const url = new URL(databaseUrl);
+  _pool = mysql.createPool({
+    host: url.hostname,
+    port: Number(url.port || 3306),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DATABASE_CONNECTION_LIMIT || 10),
+    ssl: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
+    },
+  });
+
+  return drizzle(_pool);
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = createDb(process.env.DATABASE_URL);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

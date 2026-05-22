@@ -5,11 +5,13 @@ import { toast } from "sonner";
 
 export default function Register() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const registerMutation = trpc.member.register.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      await utils.auth.me.invalidate();
       if (data.verificationEmailSent) {
         toast.success("註冊成功！Email 驗證信已寄出，請至信箱完成驗證");
       } else {
