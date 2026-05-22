@@ -329,6 +329,10 @@ try {
   }
 
   await connection.execute(
+    `DELETE FROM chatbotLogs WHERE sessionId = 'e2e-seed-session'`
+  );
+
+  await connection.execute(
     `INSERT INTO chatbotLogs
       (sessionId, customerName, customerEmail, customerQuestion, botReply, relatedProducts, retrievedQuestions, pagePath)
      VALUES
