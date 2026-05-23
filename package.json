@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ecpay-sandbox": "RUN_ECPAY_SANDBOX=true playwright test tests/e2e/ecpay-sandbox.spec.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:test:check": "node scripts/db-test-check.mjs",
     "db:test:migrate": "node scripts/db-test-migrate.mjs",

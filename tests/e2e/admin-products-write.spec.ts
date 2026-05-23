@@ -30,5 +30,5 @@ test("admin can create a product and edit its inline stock", async ({ page }) =>
   await page.locator('input[type="number"]').fill("4");
   await page.getByRole("button", { name: "儲存庫存" }).click();
 
-  await expect(page.getByRole("button", { name: "4" })).toBeVisible();
+  await expect(page.getByRole("button", { name: `編輯 ${productName} 庫存` })).toHaveText("4");
 });

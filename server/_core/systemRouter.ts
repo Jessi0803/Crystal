@@ -24,6 +24,7 @@ export const systemRouter = router({
     ecpayMerchantId: process.env.ECPAY_MERCHANT_ID || "(empty)",
     hasEcpayHashKey: !!process.env.ECPAY_HASH_KEY,
     ecpayHashKeyPrefix: process.env.ECPAY_HASH_KEY ? process.env.ECPAY_HASH_KEY.substring(0, 6) + "..." : "(empty)",
+    ecpaySandbox: process.env.ECPAY_SANDBOX === "true",
     // 綠界物流
     hasEcpayLogisticsMerchantId: !!process.env.ECPAY_LOGISTICS_MERCHANT_ID,
     ecpayLogisticsMerchantId: process.env.ECPAY_LOGISTICS_MERCHANT_ID || "(empty)",

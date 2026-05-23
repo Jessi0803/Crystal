@@ -22,9 +22,9 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   webServer: {
-    command: `PORT=${PORT} NODE_ENV=development DOTENV_CONFIG_PATH=.env.test.local JWT_SECRET=e2e-local-jwt-secret-min-32-chars VITE_ANALYTICS_ENDPOINT=__e2e_analytics VITE_ANALYTICS_WEBSITE_ID=e2e pnpm exec tsx server/_core/index.ts`,
+    command: `PORT=${PORT} NODE_ENV=development DOTENV_CONFIG_PATH=.env.test.local JWT_SECRET=e2e-local-jwt-secret-min-32-chars ECPAY_SANDBOX=true ECPAY_MERCHANT_ID=3002607 ECPAY_HASH_KEY=pwFHCqoQZGmho4w6 ECPAY_HASH_IV=EkRm7iFT261dpevs ECPAY_LOGISTICS_SANDBOX=true ECPAY_LOGISTICS_MERCHANT_ID=2000933 ECPAY_LOGISTICS_HASH_KEY=XBERn1YOvpM9nfZc ECPAY_LOGISTICS_HASH_IV=h1ONHk4P4yqbl5LK SENDER_NAME=Tester SENDER_PHONE=0912345678 SENDER_ZIPCODE=100 SENDER_ADDRESS=TestAddress VITE_ANALYTICS_ENDPOINT=__e2e_analytics VITE_ANALYTICS_WEBSITE_ID=e2e pnpm exec tsx server/_core/index.ts`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

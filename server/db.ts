@@ -22,7 +22,6 @@ export function shouldGrantAdminRole(openId: string, email?: string | null) {
   return ADMIN_EMAIL_ALLOWLIST.has(normalizeOrderEmail(email));
 }
 
-let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
 
 function shouldUseTls(databaseUrl: string) {
@@ -58,6 +57,8 @@ function createDb(databaseUrl: string) {
 
   return drizzle(_pool);
 }
+
+let _db: ReturnType<typeof createDb> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {

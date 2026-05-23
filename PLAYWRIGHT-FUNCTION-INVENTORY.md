@@ -200,7 +200,9 @@
 - 已加入 `@playwright/test`、`playwright.config.ts`、`tests/e2e` 與 `pnpm test:e2e`。
 - 已加入測試資料庫工具：`db:test:check`、`db:test:migrate`、`db:test:push`、`db:test:reset`、`db:test:seed`。
 - Playwright global setup 會先執行 `db:test:seed`，測試資料庫 helper 會限制可操作的 DB 名稱，避免誤用正式資料庫。
-- 目前完整 suite 覆蓋桌機 Chromium 與 mobile Chrome，最新本機結果：`74 passed`。
+- 綠界測試固定設定 `ECPAY_SANDBOX=true` 與 `ECPAY_LOGISTICS_SANDBOX=true`，信用卡導向 `payment-stage.ecpay.com.tw`，物流導向 `logistics-stage.ecpay.com.tw`；不測正式端點。
+- 日常 `pnpm test:e2e` 不建立外部綠界 sandbox 交易；要驗綠界 stage 串接時執行 `pnpm test:e2e:ecpay-sandbox`。
+- 目前完整 suite 覆蓋桌機 Chromium 與 mobile Chrome：日常回歸 `pnpm test:e2e` 結果為 `74 passed, 6 skipped`（略過外部綠界 sandbox 案例）；綠界 stage 整合 `pnpm test:e2e:ecpay-sandbox` 結果為 `6 passed`。
 
 ### 現有測試檔對照
 
@@ -213,6 +215,7 @@
 | `tests/e2e/custom-forms.spec.ts` | 客製化入口、一般客製化表單到訂金結帳 |
 | `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單 |
 | `tests/e2e/balance-payment.spec.ts` | 客製化訂金確認、產生尾款連結、尾款 ATM 末五碼 |
+| `tests/e2e/ecpay-sandbox.spec.ts` | 綠界信用卡 stage 導轉、物流 stage 選店入口、stage C2C 建立物流訂單 |
 | `tests/e2e/account.spec.ts` | 註冊、會員資料更新、忘記密碼中性成功狀態 |
 | `tests/e2e/auth-admin.spec.ts` | 會員登入、admin 登入、非 admin 後台阻擋 |
 | `tests/e2e/admin-management.spec.ts` | admin 商品搜尋、確認轉帳訂單 |

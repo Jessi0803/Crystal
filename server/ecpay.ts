@@ -13,17 +13,18 @@
 import crypto from "crypto";
 import { ENV } from "./_core/env";
 
-// 正式環境憑證（從 ENV 讀取，確保正式環境正確注入）
-// 沙盒 fallback 僅供本地開發測試用
-const isProduction = ENV.isProduction;
+export const usePaymentSandbox = process.env.ECPAY_SANDBOX === "true";
+
+const paymentBaseURL = usePaymentSandbox
+  ? "https://payment-stage.ecpay.com.tw"
+  : "https://payment.ecpay.com.tw";
 
 export const ECPAY_CONFIG = {
   MerchantID: ENV.ecpayMerchantId || "3002607",
   HashKey: ENV.ecpayHashKey || "pwFHCqoQZGmho4w6",
   HashIV: ENV.ecpayHashIV || "EkRm7iFT261dpevs",
-  // 永遠使用正式端點（憑證是正式帳號）
-  PaymentURL: "https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5",
-  QueryURL: "https://payment.ecpay.com.tw/Cashier/QueryTradeInfo/V5",
+  PaymentURL: `${paymentBaseURL}/Cashier/AioCheckOut/V5`,
+  QueryURL: `${paymentBaseURL}/Cashier/QueryTradeInfo/V5`,
 };
 
 /**
@@ -58,17 +59,11 @@ export function generateCheckMacValue(params: Record<string, string>): string {
     sortedKeys.map((k) => `${k}=${params[k]}`).join("&") +
     `&HashIV=${ECPAY_CONFIG.HashIV}`;
 
-  console.log("[ECPay] Raw string for CheckMacValue:", raw);
-
   // 3. 整串做 URL encode（綠界 .NET 規格）
   const encoded = ecpayUrlEncode(raw).toLowerCase();
 
-  console.log("[ECPay] Encoded string:", encoded);
-
   // 4. SHA256 → 大寫
   const hash = crypto.createHash("sha256").update(encoded).digest("hex").toUpperCase();
-
-  console.log("[ECPay] CheckMacValue:", hash);
 
   return hash;
 }
@@ -80,7 +75,6 @@ export function verifyCheckMacValue(params: Record<string, string>): boolean {
   const { CheckMacValue, ...rest } = params;
   if (!CheckMacValue) return false;
   const expected = generateCheckMacValue(rest);
-  console.log("[ECPay Verify] Expected:", expected, "Got:", CheckMacValue);
   return expected === CheckMacValue;
 }
 
