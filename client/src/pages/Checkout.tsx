@@ -191,6 +191,7 @@ export default function Checkout() {
           price: i.unitPrice,
           quantity: i.quantity,
           image: i.product.image,
+          isPreorder: i.isPreorder,
         })),
         origin: window.location.origin,
         customerNote: customConsultationNote,
