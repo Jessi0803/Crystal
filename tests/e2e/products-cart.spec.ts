@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+test("known product detail renders while latest database product query is pending", async ({ page }) => {
+  await page.route("**/api/trpc/product.getById**", async route => {
+    await new Promise(resolve => setTimeout(resolve, 2_000));
+    await route.continue();
+  });
+
+  await page.goto("/products/d001-moon-secret");
+
+  await expect(page.getByRole("heading", { name: "月下密語手鍊" })).toBeVisible({ timeout: 1_000 });
+});
+
 test("product detail can add seeded product to cart and continue to checkout", async ({ page }) => {
   await page.goto("/products");
   await expect(page.getByText("E2E 現貨手鍊")).toBeVisible();

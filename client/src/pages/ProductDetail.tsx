@@ -88,11 +88,14 @@ function CustomPriceTile({
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
+  const utils = trpc.useUtils();
   const { data: dbProduct, isLoading } = trpc.product.getById.useQuery(
     { id: id ?? "" },
     { enabled: Boolean(id) }
   );
-  const product = dbProduct ?? staticProducts.find((p) => p.id === id);
+  const staticProduct = staticProducts.find((p) => p.id === id);
+  const cachedProduct = utils.product.list.getData()?.find((p) => p.id === id);
+  const product = dbProduct ?? (isLoading ? cachedProduct ?? staticProduct : staticProduct);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<
     "benefits" | "content" | "howto" | "notices" | "warranty" | "wrist"
@@ -125,10 +128,27 @@ export default function ProductDetail() {
   useEffect(() => {
     setActiveTab((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
     setHasSelectedClasp(false);
-  }, [id]);
+  }, [id, product?.id]);
 
-  if (isLoading) {
-    return <div className="min-h-screen bg-white" />;
+  if (isLoading && !product) {
+    return (
+      <div className="min-h-screen bg-white page-enter">
+        <div className="border-b border-[oklch(0.93_0_0)] px-4 sm:px-6 lg:px-8 py-3">
+          <div className="max-w-[1440px] mx-auto h-4 w-44 bg-[oklch(0.95_0_0)] animate-pulse" />
+        </div>
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
+            <div className="bg-[oklch(0.96_0_0)] aspect-square animate-pulse" />
+            <div className="space-y-5 py-3">
+              <div className="h-4 w-24 bg-[oklch(0.95_0_0)] animate-pulse" />
+              <div className="h-10 w-2/3 bg-[oklch(0.94_0_0)] animate-pulse" />
+              <div className="h-4 w-full max-w-md bg-[oklch(0.95_0_0)] animate-pulse" />
+              <div className="h-8 w-28 bg-[oklch(0.94_0_0)] animate-pulse mt-8" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!product) {
