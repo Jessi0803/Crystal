@@ -138,19 +138,19 @@ export default function Home() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* ─── HERO SPLIT ─── */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 min-h-[85vh]">
+      <section className="grid grid-cols-1 lg:grid-cols-2 lg:min-h-[85vh]">
         {/* Left: Image */}
-        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] min-h-[50vw] lg:min-h-[85vh]">
+        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] h-[46svh] min-h-[330px] max-h-[470px] lg:h-auto lg:min-h-[85vh] lg:max-h-none">
           <img
             src={HERO_SPLIT_IMG}
             alt="日日好日能量水晶"
-            className="absolute inset-0 w-full h-full object-cover object-center"
+            className="absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center"
           />
         </div>
 
         {/* Right: Text */}
-        <div className="flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-20 py-16 bg-white">
-          <h1 className="mb-4" style={{
+        <div className="flex flex-col justify-center px-5 pt-8 pb-9 sm:px-12 sm:py-16 lg:px-16 xl:px-20 bg-white">
+          <h1 className="mb-3 sm:mb-4" style={{
             fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif",
             fontSize: "clamp(2.2rem, 5vw, 3.5rem)",
             fontWeight: 300,
@@ -161,37 +161,37 @@ export default function Home() {
             找到屬於你的<br />
             <em className="not-italic" style={{color: "oklch(0.72 0.09 70)", fontWeight: 400}}>能量水晶</em>
           </h1>
-          <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-10 max-w-sm">
+          <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-7 sm:mb-10 max-w-sm">
             提升愛情、財運與內在平衡，從今天開始改變你的能量場。
             每一顆天然水晶，都是大地億萬年的結晶。
           </p>
-          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
-            <Link href="/products?category=monthly">
-              <button className="btn-primary">
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-row sm:flex-wrap sm:gap-3">
+            <Link href="/products?category=monthly" className="col-span-2 sm:col-auto">
+              <button className="btn-primary w-full justify-between sm:w-auto sm:justify-center">
                 每月限量 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </Link>
             <Link href="/products">
-              <button className="btn-outline">
+              <button className="btn-outline w-full justify-center">
                 固定設計款
               </button>
             </Link>
             <Link href="/custom">
-              <button className="btn-outline">
+              <button className="btn-outline w-full justify-center">
                 客製款
               </button>
             </Link>
           </div>
 
           {/* Stats */}
-          <div className="flex gap-8 mt-12 pt-8 border-t border-[oklch(0.93_0_0)]">
+          <div className="grid grid-cols-3 gap-x-3 mt-9 pt-6 sm:flex sm:gap-8 sm:mt-12 sm:pt-8 border-t border-[oklch(0.93_0_0)]">
             {[
               { num: "10,000+", label: "滿意顧客" },
               { num: "4.9", label: "平均評分" },
               { num: "100%", label: "天然水晶", note: "無染色・無酸洗・無加工・有合作檢定廠商" },
             ].map((s) => (
               <div key={s.label}>
-                <div className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
+                <div className="text-xl sm:text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
                 <div className="eyebrow mt-0.5">{s.label}</div>
                 {"note" in s && s.note && (
                   <div className="text-[0.58rem] font-body text-[oklch(0.55_0_0)] mt-0.5 leading-relaxed">（{s.note}）</div>
