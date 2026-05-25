@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { products as staticProducts } from "@/lib/data";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -350,7 +351,7 @@ export default function Home() {
                       </div>
                       <p className="product-card-name">{product.name}</p>
                       {product.priceRange ? (
-                        <p className="product-card-price">{product.priceRange}</p>
+                        <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
                       ) : (
                         <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
                       )}

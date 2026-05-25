@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import {
+  CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
 } from "@/lib/customOrderingContent";
 
@@ -26,7 +27,7 @@ const plans = [
   {
     id: "A",
     title: "純客製水晶手鍊",
-    priceLines: ["手鍊價格：NT$1,200 ~ 1,800"],
+    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`],
     icon: <Gem className="w-5 h-5" />,
     features: [
       "可提供想要的功效、色系、款式",
@@ -40,7 +41,7 @@ const plans = [
   {
     id: "B",
     title: "塔羅 × 水晶手鍊",
-    priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "塔羅價格：依價目表 9 折"],
+    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`, "塔羅價格：依價目表 9 折"],
     priceNote: "各塔羅方案價格在表單內說明",
     icon: <Sparkles className="w-5 h-5" />,
     features: [
@@ -56,7 +57,7 @@ const plans = [
   {
     id: "C",
     title: "脈輪檢測 × 水晶手鍊",
-    priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "脈輪檢測價格：NT$500"],
+    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`, "脈輪檢測價格：NT$500"],
     icon: <Zap className="w-5 h-5" />,
     features: [
       "使用塔羅、靈擺，連結你的能量與高我對談，逐一分析七大脈輪個別能量。店家會提供一份文字訊息報告，並透過此檢測分析出缺失的脈輪能量進行水晶搭配。",
@@ -70,7 +71,7 @@ const plans = [
   {
     id: "D",
     title: "生命靈數 × 水晶手鍊",
-    priceLines: ["手鍊價格：NT$1,200 ~ 1,800", "生命靈數解析價格：NT$500"],
+    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`, "生命靈數解析價格：NT$500"],
     icon: <Fingerprint className="w-5 h-5" />,
     features: [
       "透過你的生命數、天賦數、星座數、先天數，去找到你的空缺數，並透過你的生命靈數與空缺數去搭配水晶，增強優勢，改善缺點",
@@ -224,7 +225,7 @@ export default function Custom() {
                       type="button"
                       className="w-full py-4 rounded-xl bg-[#8E735B] text-white text-sm tracking-[0.35em] border border-[#7a634e] shadow-md shadow-[#8E735B]/15 hover:bg-[#7a634e] hover:shadow-lg hover:shadow-[#8E735B]/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
                     >
-                      填寫報名表單
+                      填寫你的客製需求
                       <ArrowRight
                         size={16}
                         className="opacity-90 group-hover/btn:translate-x-1 transition-transform"

@@ -18,6 +18,13 @@ export function isCustomDepositProduct(id: string): id is CustomDepositProductId
   return (CUSTOM_DEPOSIT_PRODUCT_IDS as readonly string[]).includes(id);
 }
 
+export const CUSTOM_BRACELET_PRICE_DISPLAY = "NT$1,500 ± NT$300";
+
+export function getCustomPriceDisplay(productId: string, priceRange: string) {
+  if (!isCustomDepositProduct(productId)) return priceRange;
+  return priceRange.replace("NT$1,200 ~ 1,800", CUSTOM_BRACELET_PRICE_DISPLAY);
+}
+
 /** 手鍊初版／維修與修改規範（與 Custom 頁一致） */
 export const CUSTOM_BRACELET_NOTICES: { title: string | null; body: string }[] = [
   {

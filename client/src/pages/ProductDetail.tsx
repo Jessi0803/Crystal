@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
   CUSTOM_BRACELET_NOTICES,
+  CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
+  getCustomPriceDisplay,
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
 import { IN_STOCK_FULFILLMENT_NOTE, PREORDER_FULFILLMENT_NOTE } from "@shared/fulfillment";
@@ -313,7 +315,7 @@ export default function ProductDetail() {
                   {isTarotDepositProduct ? (
                     <div className="space-y-5">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <CustomPriceTile label="手鍊價格" value="NT$1,200 ~ 1,800" />
+                        <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
                         <CustomPriceTile label="塔羅價格" value="價目表 9 折" note="各塔羅方案可於下方切換查看" />
                       </div>
                       <div className="bg-[oklch(0.99_0_0)] border border-[oklch(0.92_0_0)] px-4 py-4 sm:px-5 sm:py-5">
@@ -408,19 +410,19 @@ export default function ProductDetail() {
                     </div>
                   ) : isBasicCustomDepositProduct ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <CustomPriceTile label="手鍊價格" value="NT$1,200 ~ 1,800" />
+                      <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
                       <CustomPriceTile label="訂金" value="NT$500" note="尾款由店家確認後另行通知" />
                     </div>
                   ) : splitCustomFeeLabel ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <CustomPriceTile label="手鍊價格" value="NT$1,200 ~ 1,800" />
+                      <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
                       <CustomPriceTile label={splitCustomFeeLabel} value="NT$500" />
                     </div>
                   ) : (
                     <>
                       <div className="flex items-baseline gap-3">
                         <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                          {product.priceRange}
+                          {getCustomPriceDisplay(product.id, product.priceRange)}
                         </span>
                       </div>
                       <p className="text-sm font-body text-[oklch(0.5_0_0)]">

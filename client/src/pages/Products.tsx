@@ -5,6 +5,7 @@ import { Link, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
+import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -205,7 +206,7 @@ export default function Products() {
                     <p className="product-card-name">{product.name}</p>
                     <div className="flex flex-col gap-0.5 mt-1">
                       {product.priceRange ? (
-                        <p className="product-card-price">{product.priceRange}</p>
+                        <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
                       ) : (
                         <div className="flex items-center gap-2">
                           <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
