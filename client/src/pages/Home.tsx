@@ -114,7 +114,7 @@ export default function Home() {
 
     const timer = window.setInterval(() => {
       setHeroSlide((current) => (current + 1) % heroSlides.length);
-    }, 3800);
+    }, 3200);
 
     return () => window.clearInterval(timer);
   }, [isHeroPaused]);
@@ -166,18 +166,20 @@ export default function Home() {
           onFocusCapture={() => setIsHeroPaused(true)}
           onBlurCapture={() => setIsHeroPaused(false)}
         >
-          {heroSlides.map((slide, index) => (
-            <img
-              key={slide.src}
-              src={slide.src}
-              alt={index === heroSlide ? slide.alt : ""}
-              aria-hidden={index !== heroSlide}
-              loading={index === 0 ? "eager" : "lazy"}
-              className={`absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center transition-opacity duration-[800ms] ease-out ${
-                index === heroSlide ? "opacity-100" : "opacity-0"
-              }`}
-            />
-          ))}
+          <Link href="/products" className="absolute inset-0 block" aria-label="查看全部商品">
+            {heroSlides.map((slide, index) => (
+              <img
+                key={slide.src}
+                src={slide.src}
+                alt={index === heroSlide ? slide.alt : ""}
+                aria-hidden={index !== heroSlide}
+                loading={index === 0 ? "eager" : "lazy"}
+                className={`absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center transition-opacity duration-[800ms] ease-out ${
+                  index === heroSlide ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            ))}
+          </Link>
           <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center">
             {heroSlides.map((slide, index) => (
               <button
