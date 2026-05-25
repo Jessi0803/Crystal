@@ -184,8 +184,8 @@ export default function Home() {
           <div className="flex gap-8 mt-12 pt-8 border-t border-[oklch(0.93_0_0)]">
             {[
               { num: "10,000+", label: "滿意顧客" },
-              { num: "100%", label: "天然水晶", note: "無染色・無酸洗・無加工・有合作檢定廠商" },
               { num: "4.9", label: "平均評分" },
+              { num: "100%", label: "天然水晶", note: "無染色・無酸洗・無加工・有合作檢定廠商" },
             ].map((s) => (
               <div key={s.label}>
                 <div className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
