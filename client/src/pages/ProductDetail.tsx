@@ -660,7 +660,7 @@ export default function ProductDetail() {
                   {[
                     "3個月內有免費1次的保固",
                     "免費保固項目：換線、五金汰換、損壞維修",
-                    "但水晶不見要補差額",
+                    "水晶不見要補差額",
                     "如需改尺寸、改設計屬於重新設計，不包含在免費保固的範圍內，如有需要，需酌收200$重新設計費",
                   ].map((item) => (
                     <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
