@@ -114,7 +114,7 @@ export default function Home() {
 
     const timer = window.setInterval(() => {
       setHeroSlide((current) => (current + 1) % heroSlides.length);
-    }, 3200);
+    }, 2800);
 
     return () => window.clearInterval(timer);
   }, [isHeroPaused]);
