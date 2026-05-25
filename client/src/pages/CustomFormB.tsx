@@ -655,7 +655,7 @@ export default function CustomFormB() {
             {/* 動態總價顯示 */}
             {tarot.group !== "single_q" && (
               <div className="mb-5 flex items-baseline gap-2">
-                <span className="text-sm font-body text-[oklch(0.5_0_0)]">手鍊＋占卜金額：</span>
+                <span className="text-sm font-body text-[oklch(0.5_0_0)]">手鍊訂金＋占卜金額：</span>
                 <span className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
                   NT$ {(BASE_TOTAL + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
                 </span>
