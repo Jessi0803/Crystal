@@ -47,12 +47,15 @@ const categoryCards = [
   },
 ];
 
+// index 0=日 1=一 2=二 3=三 4=四 5=五 6=六
 const dailyQuotes = [
+  "愛自己，是一切美好的起點。",
   "每一天都是嶄新的開始，讓水晶的能量陪伴你前行。",
   "你所散發的能量，決定你所吸引的一切。",
   "靜下心來，感受水晶傳遞給你的訊息。",
   "相信自己的直覺，它會引導你找到最適合的能量。",
-  "愛自己，是一切美好的起點。",
+  "放下過去的重量，讓能量自由流動，迎接新的豐盛。",
+  "每一顆水晶都在等待與你共鳴的那一刻。",
 ];
 
 function useScrollReveal() {
@@ -75,7 +78,7 @@ export default function Home() {
   const { addToCart } = useCart();
   const sliderRef = useRef<HTMLDivElement>(null);
   const [isSliderPaused, setIsSliderPaused] = useState(false);
-  const [quote] = useState(() => dailyQuotes[new Date().getDay() % dailyQuotes.length]);
+  const [quote] = useState(() => dailyQuotes[new Date().getDay()]);
   useScrollReveal();
 
   const { data: dbProducts } = trpc.product.list.useQuery();
