@@ -25,6 +25,18 @@ export function getCustomPriceDisplay(productId: string, priceRange: string) {
   return priceRange.replace("NT$1,200 ~ 1,800", CUSTOM_BRACELET_PRICE_DISPLAY);
 }
 
+export const CUSTOM_WRIST_SIZE_MIN = 13;
+export const CUSTOM_WRIST_SIZE_MAX = 19;
+export const CUSTOM_WRIST_SIZE_STEP = 0.5;
+
+export function isValidCustomWristSize(value: string) {
+  const size = Number(value);
+  if (!Number.isFinite(size) || size < CUSTOM_WRIST_SIZE_MIN || size > CUSTOM_WRIST_SIZE_MAX) {
+    return false;
+  }
+  return Number.isInteger((size - CUSTOM_WRIST_SIZE_MIN) / CUSTOM_WRIST_SIZE_STEP);
+}
+
 /** 手鍊初版／維修與修改規範（與 Custom 頁一致） */
 export const CUSTOM_BRACELET_NOTICES: { title: string | null; body: string }[] = [
   {

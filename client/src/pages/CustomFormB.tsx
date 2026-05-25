@@ -7,6 +7,7 @@ import { products } from "@/lib/data";
 import { toast } from "sonner";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
+import { CUSTOM_WRIST_SIZE_MAX, CUSTOM_WRIST_SIZE_MIN, CUSTOM_WRIST_SIZE_STEP, isValidCustomWristSize } from "@/lib/customOrderingContent";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -387,12 +388,12 @@ export default function CustomFormB() {
     },
     {
       title: "手圍尺寸是多少？",
-      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減",
+      subtitle: "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減",
       required: true,
       field: (
         <div className="flex items-center gap-3">
           <input type="number" value={bracelet.wristSize} onChange={(e) => setBracelet({ ...bracelet, wristSize: e.target.value })}
-            placeholder="例如：15.5" step="0.5" min="10" max="25"
+            placeholder="例如：15.5" step={CUSTOM_WRIST_SIZE_STEP} min={CUSTOM_WRIST_SIZE_MIN} max={CUSTOM_WRIST_SIZE_MAX}
             className="w-48 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]" />
           <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
         </div>
@@ -596,6 +597,7 @@ export default function CustomFormB() {
 
   function validateBraceletData(): boolean {
     if (!bracelet.wristSize) { toast.error("請填寫手圍尺寸"); return false; }
+    if (!isValidCustomWristSize(bracelet.wristSize)) { toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）"); return false; }
     if (!bracelet.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
     if (!bracelet.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
     if (!bracelet.silverTube || !bracelet.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }

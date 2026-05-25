@@ -7,6 +7,7 @@ import { products } from "@/lib/data";
 import { toast } from "sonner";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
+import { CUSTOM_WRIST_SIZE_MAX, CUSTOM_WRIST_SIZE_MIN, CUSTOM_WRIST_SIZE_STEP, isValidCustomWristSize } from "@/lib/customOrderingContent";
 
 interface FormData {
   name: string;
@@ -114,7 +115,7 @@ export default function CustomFormD() {
     },
     {
       title: "手圍尺寸是多少？",
-      subtitle: "請用皮尺量淨手圍（cm），不需要自行加減，我們會幫您調整鬆緊",
+      subtitle: "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減，我們會幫您調整鬆緊",
       required: true,
       field: (
         <div className="space-y-4">
@@ -124,9 +125,9 @@ export default function CustomFormD() {
               value={form.wristSize}
               onChange={(e) => setForm({ ...form, wristSize: e.target.value })}
               placeholder="例如：15.5"
-              step="0.5"
-              min="10"
-              max="25"
+              step={CUSTOM_WRIST_SIZE_STEP}
+              min={CUSTOM_WRIST_SIZE_MIN}
+              max={CUSTOM_WRIST_SIZE_MAX}
               className="w-48 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
             />
             <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
@@ -365,6 +366,7 @@ export default function CustomFormD() {
     if (!form.name.trim()) { toast.error("請填寫姓名"); return false; }
     if (!form.birthday.trim()) { toast.error("請填寫西元生日"); return false; }
     if (!form.wristSize) { toast.error("請填寫手圍尺寸"); return false; }
+    if (!isValidCustomWristSize(form.wristSize)) { toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）"); return false; }
     if (!form.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
     if (!form.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
     if (!form.silverTube || !form.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
