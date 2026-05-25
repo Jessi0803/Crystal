@@ -10,7 +10,7 @@ import { products as staticProducts } from "@/lib/data";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-const HERO_SPLIT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/hero-split-crystal-Jkr4xbR2BHRgjvpbW4VUS2.webp";
+const HERO_SPLIT_IMG = "/hero-cover.jpg";
 const CATEGORY_LOVE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-love-X75rNAvxcwjFRqwpUsjeai.webp";
 const CATEGORY_WEALTH_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-wealth-SRBHHLNZEuUcHwN4ofwAxa.webp";
 const CATEGORY_PROTECT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-protect-HSkaBEr6CpuJ465gjEc5jR.webp";
