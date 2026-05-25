@@ -114,7 +114,7 @@ export default function Home() {
 
     const timer = window.setInterval(() => {
       setHeroSlide((current) => (current + 1) % heroSlides.length);
-    }, 5200);
+    }, 3800);
 
     return () => window.clearInterval(timer);
   }, [isHeroPaused]);
@@ -173,7 +173,7 @@ export default function Home() {
               alt={index === heroSlide ? slide.alt : ""}
               aria-hidden={index !== heroSlide}
               loading={index === 0 ? "eager" : "lazy"}
-              className={`absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center transition-opacity duration-[1200ms] ease-out ${
+              className={`absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center transition-opacity duration-[800ms] ease-out ${
                 index === heroSlide ? "opacity-100" : "opacity-0"
               }`}
             />
