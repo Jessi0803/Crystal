@@ -95,7 +95,7 @@ export default function ProductDetail() {
   const product = dbProduct ?? staticProducts.find((p) => p.id === id);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<
-    "benefits" | "content" | "howto" | "notices"
+    "benefits" | "content" | "howto" | "notices" | "warranty"
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
   const [selectedTarotReadingName, setSelectedTarotReadingName] = useState(tarotReadingCategories[0].items[0].name);
@@ -219,6 +219,7 @@ export default function ProductDetail() {
     ...(product.category === "custom" && product.disclaimer
       ? [{ id: "notices" as const, label: "注意事項" }]
       : []),
+    ...(product.category !== "custom" ? [{ id: "warranty" as const, label: "保固與維修" }] : []),
   ];
   const contentItems = product.crystalType.includes("｜")
     ? product.crystalType.split("｜")
@@ -653,6 +654,21 @@ export default function ProductDetail() {
                     ))}
                   </div>
                 </div>
+              )}
+              {product.category !== "custom" && activeTab === "warranty" && (
+                <ul className="space-y-2">
+                  {[
+                    "3個月內有免費1次的保固",
+                    "免費保固項目：換線、五金汰換、損壞維修",
+                    "但水晶不見要補差額",
+                    "如需改尺寸、改設計屬於重新設計，不包含在免費保固的範圍內，如有需要，需酌收200$重新設計費",
+                  ].map((item) => (
+                    <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
+                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 
