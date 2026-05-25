@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createAtmCustomDepositOrder, login } from "./helpers";
 
 test("custom deposit order can receive a balance payment link and submit ATM balance transfer code", async ({ page }) => {
+  test.setTimeout(90_000);
   const depositOrderNo = await createAtmCustomDepositOrder(page, `e2e-balance-${Date.now()}@example.com`);
 
   await login(page, "e2e-admin@example.com");
@@ -43,4 +44,18 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
 
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
   await expect(page.locator("body")).toContainText("67890");
+
+  await page.goto("/admin/orders");
+  await page.locator("button").filter({ hasText: depositOrderNo }).click();
+  await expect(page.locator("body")).toContainText("67890");
+  page.once("dialog", async dialog => {
+    expect(dialog.message()).toContain("確認已收到尾款轉帳");
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "確認收到尾款" }).click();
+  await expect(page.locator("body")).toContainText("尾款已確認收款");
+  await expect(page.locator("body")).toContainText("已付款");
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await expect(page.locator("body")).toContainText("尾款已完成付款", { timeout: 30_000 });
 });

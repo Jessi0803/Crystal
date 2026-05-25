@@ -17,6 +17,14 @@ test("admin revenue dashboard shows confirmed order metrics and top products", a
   await expect(page.locator("body")).toContainText("月營收趨勢");
   await expect(page.locator("body")).toContainText("熱銷商品排行");
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
+
+  const reportPeriod = page.locator("select").filter({ has: page.locator('option[value="3"]') });
+  await reportPeriod.selectOption("3");
+  await expect(reportPeriod).toHaveValue("3");
+  await expect(page.locator("body")).toContainText("月營收趨勢");
+  await reportPeriod.selectOption("12");
+  await expect(reportPeriod).toHaveValue("12");
+  await expect(page.locator("body")).toContainText("熱銷商品排行");
 });
 
 test("admin chatbot log page can search and expand seeded conversations", async ({ page }) => {
@@ -34,6 +42,12 @@ test("admin chatbot log page can search and expand seeded conversations", async 
   await page.getByRole("button", { name: /我想提升自信/ }).first().click();
   await expect(page.locator("body")).toContainText("完整問題");
   await expect(page.locator("body")).toContainText("可以先參考 E2E 現貨手鍊");
+
+  await page.locator('input[placeholder^="搜尋顧客問題"]').fill("e2e-user@example.com");
+  await page.getByRole("button", { name: "搜尋" }).click();
+  await expect(page.locator("body")).toContainText("我想提升自信，推薦哪款？");
+  await page.getByRole("button", { name: "清除" }).click();
+  await expect(page.locator("body")).toContainText("我想提升自信，推薦哪款？");
 });
 
 test("legacy admin inventory route redirects admins to product management", async ({ page }) => {

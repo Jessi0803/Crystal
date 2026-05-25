@@ -306,11 +306,11 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "rec-confidence",
     question: "哪款手鍊適合提升自信、魅力或吸引力？",
     answer:
-      "推薦「維納斯 Venus」（提升自信與行動力、招財聚能、穩定情緒，輕量日常款，NT$950）和「蜜光之境」（增強自信、吸引人緣、穩定氣場，NT$1,580）。兩款都適合想建立自信氣場的你！",
+      "推薦「維納斯 Venus」（提升自信與行動力，輕量日常款，NT$950）、「蜜光之境」（增強自信、吸引人緣、穩定氣場，NT$1,580）和「月下密語」（釋放壓力並提升表達勇氣，NT$1,480起）。",
     embedText: "提升自信 自信心 魅力 吸引力 氣場 行動力 增強自信 建立自信 想變自信 自我提升",
     keywords: ["自信", "魅力", "吸引力", "氣場", "行動力", "提升自信"],
     category: "商品推薦",
-    relatedProductIds: ["d003-venus", "d002-honey-realm"],
+    relatedProductIds: ["d003-venus", "d002-honey-realm", "d001-moon-secret"],
   },
   {
     id: "rec-wealth",
@@ -336,21 +336,21 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "rec-healing",
     question: "哪款手鍊適合療癒、釋放壓力或安撫情緒？",
     answer:
-      "推薦「月下密語」（淨化負能量、釋放壓力焦慮、增強直覺靈感，NT$1,480）和「月映淨心」（安撫情緒、淨化放大正向能量、帶來溫柔安全感，NT$1,500）。",
+      "推薦「月下密語」（淨化負能量、釋放壓力焦慮，NT$1,480起）、「月映淨心」（安撫情緒並帶來安全感，NT$1,500）和「晨光輕語」（柔化情緒並穩定氣場，NT$1,800）。",
     embedText: "療癒 壓力 焦慮 情緒 安撫 紓壓 放鬆 不安 釋放壓力 情緒穩定 心情不好 負面情緒",
     keywords: ["療癒", "壓力", "焦慮", "情緒", "安撫", "紓壓", "放鬆", "心情不好"],
     category: "商品推薦",
-    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart"],
+    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"],
   },
   {
     id: "rec-protection",
     question: "哪款手鍊適合防護負能量、保護氣場？",
     answer:
-      "推薦「月下密語」（淨化並防護外在負能量、平衡身心靈，NT$1,480）和「蜜光之境」（強化保護力與穩定氣場、放大個人能量，NT$1,580）。",
+      "推薦「月下密語」（淨化並防護外在負能量，NT$1,480起）、「蜜光之境」（強化保護力與穩定氣場，NT$1,580）和「晨光輕語」（淨化負能量並維持柔和氣場，NT$1,800）。",
     embedText: "防護 負能量 保護 氣場 淨化 穩定 防小人 避邪 保護能量 驅邪",
     keywords: ["防護", "負能量", "保護", "氣場", "淨化", "防小人", "驅邪"],
     category: "商品推薦",
-    relatedProductIds: ["d001-moon-secret", "d002-honey-realm"],
+    relatedProductIds: ["d001-moon-secret", "d002-honey-realm", "d004-morning-whisper"],
   },
   {
     id: "rec-crystal-rose-quartz",

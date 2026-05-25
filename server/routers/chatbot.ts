@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, or, sql } from "drizzle-orm";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { searchKnowledge } from "../crystalKnowledge";
+import { searchKnowledge, type ScoredChunk } from "../crystalKnowledge";
 import { ENV } from "../_core/env";
 import { products } from "../../client/src/lib/data";
 import { chatbotLogs } from "../../drizzle/schema";
@@ -150,6 +150,26 @@ type ChatbotRelatedProduct = {
   href: string;
 };
 
+export function selectRelatedProductIds(
+  relevantChunks: ScoredChunk[],
+  scoreMin = 0.55,
+  maxProducts = 4
+): string[] {
+  const matchingChunks = relevantChunks
+    .filter(
+      (chunk) =>
+        chunk.category === "商品推薦" &&
+        (chunk.relatedProductIds?.length ?? 0) > 0 &&
+        chunk.score >= scoreMin
+    )
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+
+  return Array.from(
+    new Set(matchingChunks.flatMap((chunk) => chunk.relatedProductIds ?? []))
+  ).slice(0, maxProducts);
+}
+
 async function saveChatbotLog(params: {
   sessionId: string;
   userId?: number | null;
@@ -224,16 +244,14 @@ export const chatbotRouter = router({
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
 
-      // 3. 關聯商品：在檢索到的前幾筆中，取「分數最高的商品推薦」chunk（避免組合型問題時第一名非商品推薦就沒連結）
+      // 3. 關聯商品：合併最高分的相關推薦，讓複合需求可看到更多但仍精準的選項。
       const PRODUCT_SCORE_MIN = 0.55;
-      const productCandidates = relevantChunks.filter(
-        (c) => c.category === "商品推薦" && (c.relatedProductIds?.length ?? 0) > 0
+      const relatedProductIds = selectRelatedProductIds(
+        relevantChunks,
+        PRODUCT_SCORE_MIN
       );
-      const bestProductChunk = productCandidates.sort((a, b) => b.score - a.score)[0];
-      const isProductQuery =
-        !!bestProductChunk && bestProductChunk.score >= PRODUCT_SCORE_MIN;
-      const relatedProducts = isProductQuery
-        ? (bestProductChunk!.relatedProductIds ?? [])
+      const relatedProducts = relatedProductIds.length > 0
+        ? relatedProductIds
             .map((id) => products.find((p) => p.id === id))
             .filter((p): p is (typeof products)[number] => !!p)
         : [];

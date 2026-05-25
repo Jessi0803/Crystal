@@ -252,7 +252,7 @@ function ProductRow({
 
   return (
     <div className="bg-white border border-[oklch(0.9_0_0)] px-4 py-3">
-      <div className="grid gap-3 items-center" style={{ gridTemplateColumns: "56px 1fr 80px 70px 80px 176px" }}>
+      <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-3 items-start lg:grid-cols-[56px_minmax(0,1fr)_80px_70px_80px_176px] lg:items-center">
         <img
           src={product.image}
           alt={product.name}
@@ -275,7 +275,7 @@ function ProductRow({
           )}
         </div>
 
-        <div className="text-center">
+        <div className="col-start-2 text-left lg:col-auto lg:text-center">
           {product.category === "custom" ? (
             <span className="text-xs font-body text-[oklch(0.6_0_0)]">—</span>
           ) : (
@@ -286,7 +286,7 @@ function ProductRow({
           )}
         </div>
 
-        <div className="text-center">
+        <div className="col-start-2 text-left lg:col-auto lg:text-center">
           <span className={`inline-block text-[10px] tracking-widest px-2 py-0.5 font-body ${
             isScheduled
               ? "bg-amber-50 text-amber-700 border border-amber-200"
@@ -298,8 +298,8 @@ function ProductRow({
           </span>
         </div>
 
-        <div className="text-center">
-          <div className="flex flex-col items-center gap-1">
+        <div className="col-start-2 text-left lg:col-auto lg:text-center">
+          <div className="flex flex-wrap items-center gap-1 lg:flex-col">
             {product.featured && (
               <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-amber-50 text-amber-700 border border-amber-200">
                 精選
@@ -313,7 +313,7 @@ function ProductRow({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="col-start-2 flex flex-wrap items-center justify-start gap-2 lg:col-auto lg:justify-end">
           <button
             onClick={() => onEdit(product)}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
