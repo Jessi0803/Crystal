@@ -317,7 +317,7 @@ export default function Custom() {
               rel="noopener noreferrer"
               className="px-12 py-5 bg-[#8E735B] text-white rounded-full transition-all shadow-[0_15px_35px_rgba(142,115,91,0.15)] hover:shadow-[0_20px_45px_rgba(142,115,91,0.25)] hover:-translate-y-1 flex items-center gap-3 tracking-widest text-sm font-serif-zh"
             >
-              私訊店長 Mina <MessageCircle size={18} />
+              私訊店長 Lana <MessageCircle size={18} />
             </a>
           </div>
         </div>
