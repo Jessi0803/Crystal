@@ -162,15 +162,20 @@ export default function Home() {
             提升愛情、財運與內在平衡，從今天開始改變你的能量場。
             每一顆天然水晶，都是大地億萬年的結晶。
           </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link href="/products">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+            <Link href="/products?category=monthly">
               <button className="btn-primary">
-                開始探索 <ArrowRight className="w-3.5 h-3.5" />
+                每月限量 <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </Link>
+            <Link href="/products">
+              <button className="btn-outline">
+                固定設計款
               </button>
             </Link>
             <Link href="/custom">
               <button className="btn-outline">
-                客製化方案
+                客製款
               </button>
             </Link>
           </div>
@@ -179,12 +184,15 @@ export default function Home() {
           <div className="flex gap-8 mt-12 pt-8 border-t border-[oklch(0.93_0_0)]">
             {[
               { num: "10,000+", label: "滿意顧客" },
-              { num: "100%", label: "天然水晶" },
+              { num: "100%", label: "天然水晶", note: "無染色・無酸洗・無加工・有合作檢定廠商" },
               { num: "4.9", label: "平均評分" },
             ].map((s) => (
               <div key={s.label}>
                 <div className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
                 <div className="eyebrow mt-0.5">{s.label}</div>
+                {"note" in s && s.note && (
+                  <div className="text-[0.58rem] font-body text-[oklch(0.55_0_0)] mt-0.5 leading-relaxed">（{s.note}）</div>
+                )}
               </div>
             ))}
           </div>
