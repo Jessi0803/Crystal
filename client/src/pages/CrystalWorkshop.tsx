@@ -172,7 +172,7 @@ export default function CrystalWorkshop() {
                       </p>
                     </div>
                     <div className="col-span-2 aspect-[16/9] bg-[#3D3D3D] rounded-2xl overflow-hidden relative group">
-                      <img src="/workshop-banner.jpg" className="w-full h-full object-contain opacity-60 transition-transform duration-700 group-hover:scale-110" alt="水晶課程圖" />
+                      <img src="/images/d-design/d002.jpg" className="w-full h-full object-cover object-center opacity-60 transition-transform duration-700 group-hover:scale-110" alt="水晶課程圖" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <p className="text-white font-serif-zh tracking-[0.5em] text-lg">小班制教、學、體、驗</p>
                       </div>
