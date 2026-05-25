@@ -76,7 +76,7 @@ export default function CrystalWorkshop() {
               <div className="md:col-span-5 scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
                 <div className="aspect-[3/4] bg-white p-4 shadow-xl rotate-[-2deg] transition-transform hover:rotate-0 duration-700">
                   <div className="w-full h-full bg-[#E5DCD5] flex items-center justify-center overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=2070&auto=format&fit=crop" alt="體驗課情境圖" className="object-cover w-full h-full opacity-80" />
+                    <img src="/workshop-cover.jpg" alt="體驗課情境圖" className="object-cover w-full h-full opacity-80" />
                   </div>
                   <p className="mt-4 font-serif-zh text-xs tracking-widest text-center text-[#8E735B]">生命靈數 · 水晶手鍊體驗</p>
                 </div>
@@ -163,7 +163,7 @@ export default function CrystalWorkshop() {
                 <div className="scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-300">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="aspect-square bg-[#E5DCD5] rounded-2xl overflow-hidden shadow-lg">
-                      <img src="/images/d-design/d001.jpg" className="w-full h-full object-cover" alt="課程細節圖" />
+                      <img src="/workshop-cover.jpg" className="w-full h-full object-cover" alt="課程細節圖" />
                     </div>
                     <div className="aspect-square bg-[#D8C3BD]/30 rounded-2xl p-6 flex flex-col justify-center">
                       <Sparkles className="w-8 h-8 text-[#8E735B] mb-4" />
@@ -172,7 +172,7 @@ export default function CrystalWorkshop() {
                       </p>
                     </div>
                     <div className="col-span-2 aspect-[16/9] bg-[#3D3D3D] rounded-2xl overflow-hidden relative group">
-                      <img src="https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=2070&auto=format&fit=crop" className="w-full h-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110" alt="水晶課程圖" />
+                      <img src="/workshop-cover.jpg" className="w-full h-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110" alt="水晶課程圖" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <p className="text-white font-serif-zh tracking-[0.5em] text-lg">小班制教、學、體、驗</p>
                       </div>
