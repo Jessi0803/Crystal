@@ -10,7 +10,11 @@ import { products as staticProducts } from "@/lib/data";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-const HERO_SPLIT_IMG = "/hero-cover.jpg";
+const heroSlides = [
+  { src: "/hero-cover.jpg", alt: "白水晶與銀色飾件設計手鍊" },
+  { src: "/images/d-design/d003.jpg", alt: "D003 金色珍珠水晶設計手鍊" },
+  { src: "/images/d-design/d004.jpg", alt: "D004 淡粉色水晶設計手鍊" },
+];
 const CATEGORY_LOVE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-love-X75rNAvxcwjFRqwpUsjeai.webp";
 const CATEGORY_WEALTH_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-wealth-SRBHHLNZEuUcHwN4ofwAxa.webp";
 const CATEGORY_PROTECT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-protect-HSkaBEr6CpuJ465gjEc5jR.webp";
@@ -77,6 +81,8 @@ function useScrollReveal() {
 export default function Home() {
   const { addToCart } = useCart();
   const sliderRef = useRef<HTMLDivElement>(null);
+  const [heroSlide, setHeroSlide] = useState(0);
+  const [isHeroPaused, setIsHeroPaused] = useState(false);
   const [isSliderPaused, setIsSliderPaused] = useState(false);
   const [quote] = useState(() => dailyQuotes[new Date().getDay()]);
   useScrollReveal();
@@ -102,6 +108,16 @@ export default function Home() {
     const pageWidth = Math.round(slider.clientWidth / itemPlusGap) * itemPlusGap;
     slider.scrollBy({ left: dir === "right" ? pageWidth : -pageWidth, behavior: "smooth" });
   };
+
+  useEffect(() => {
+    if (isHeroPaused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const timer = window.setInterval(() => {
+      setHeroSlide((current) => (current + 1) % heroSlides.length);
+    }, 5200);
+
+    return () => window.clearInterval(timer);
+  }, [isHeroPaused]);
 
   useEffect(() => {
     if (isSliderPaused) return;
@@ -140,12 +156,46 @@ export default function Home() {
       {/* ─── HERO SPLIT ─── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 lg:min-h-[85vh]">
         {/* Left: Image */}
-        <div className="relative overflow-hidden bg-[oklch(0.97_0_0)] h-[46svh] min-h-[330px] max-h-[470px] lg:h-auto lg:min-h-[85vh] lg:max-h-none">
-          <img
-            src={HERO_SPLIT_IMG}
-            alt="日日好日能量水晶"
-            className="absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center"
-          />
+        <div
+          className="relative overflow-hidden bg-[oklch(0.97_0_0)] h-[46svh] min-h-[330px] max-h-[470px] lg:h-auto lg:min-h-[85vh] lg:max-h-none"
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="封面精選設計"
+          onMouseEnter={() => setIsHeroPaused(true)}
+          onMouseLeave={() => setIsHeroPaused(false)}
+          onFocusCapture={() => setIsHeroPaused(true)}
+          onBlurCapture={() => setIsHeroPaused(false)}
+        >
+          {heroSlides.map((slide, index) => (
+            <img
+              key={slide.src}
+              src={slide.src}
+              alt={index === heroSlide ? slide.alt : ""}
+              aria-hidden={index !== heroSlide}
+              loading={index === 0 ? "eager" : "lazy"}
+              className={`absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center transition-opacity duration-[1200ms] ease-out ${
+                index === heroSlide ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ))}
+          <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center">
+            {heroSlides.map((slide, index) => (
+              <button
+                key={slide.src}
+                type="button"
+                aria-label={`顯示第 ${index + 1} 張封面照片`}
+                aria-current={index === heroSlide}
+                onClick={() => setHeroSlide(index)}
+                className="flex h-11 w-12 items-center justify-center"
+              >
+                <span
+                  className={`block h-px transition-all duration-500 ${
+                    index === heroSlide ? "w-10 bg-[oklch(0.2_0_0)]" : "w-6 bg-[oklch(0.2_0_0)]/30"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Right: Text */}
