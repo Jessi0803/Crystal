@@ -73,6 +73,30 @@ test("ATM preorder order is displayed as preorder after it is stored", async ({ 
   await page.getByRole("button", { name: "確認下單" }).click();
 
   await expect(page).toHaveURL(/\/order\//);
+  const orderNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";
+  expect(orderNo).not.toBe("");
   await expect(page.locator("body")).toContainText("預購商品");
   await expect(page.locator("body")).toContainText("（預購）");
+
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+  await page.getByRole("button", { name: "轉帳待確認" }).click();
+  await page.getByText(orderNo).click();
+  await expect(page.locator("body")).toContainText("預購");
+});
+
+test("zero-stock preorder and sold-out monthly fixtures produce distinct storefront outcomes", async ({ page }) => {
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+  await page.goto("/admin/products");
+  await page.locator('input[placeholder="搜尋商品名稱或分類"]').fill("E2E 預購手鍊");
+  await expect(page.getByRole("button", { name: "編輯 E2E 預購手鍊 庫存" })).toHaveText("0");
+
+  await page.goto("/products/e2e-bracelet-preorder");
+  await expect(page.getByRole("button", { name: /加入購物袋/ })).toBeEnabled();
+  await expect(page.locator("body")).toContainText("預購");
+
+  await page.goto("/products/e2e-monthly-sold-out");
+  await expect(page.getByRole("button", { name: "售完" })).toBeDisabled();
+  await expect(page.locator("body")).toContainText("本月限量商品已售完");
 });

@@ -4,7 +4,7 @@ if (!process.argv.includes("--yes")) {
   throw new Error("Refusing to reset test database without --yes");
 }
 
-const { connection, config } = await connectToTestDatabase();
+const { connection, config } = await connectToTestDatabase({ write: true });
 
 try {
   const [rows] = await connection.query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");

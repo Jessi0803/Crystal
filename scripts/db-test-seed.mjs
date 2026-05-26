@@ -20,7 +20,7 @@ const products = [
     story: "此商品只供 E2E 測試使用。",
     benefits: ["穩定情緒", "提升自信"],
     suitableFor: ["Playwright 測試"],
-    howToUse: ["手圍可選 12-19 公分", "標準為彈力繩版本；若改龍蝦扣或磁扣需加收 200 元"],
+    howToUse: ["手圍可選 13-19 公分", "標準為彈力繩版本；若改龍蝦扣或磁扣需加收 200 元"],
     disclaimer: "測試商品，非正式販售。",
     crystalType: "白水晶｜月光石",
     color: "白色",
@@ -48,7 +48,7 @@ const products = [
     story: "此商品只供 E2E 測試使用。",
     benefits: ["招財聚能", "提升行動力"],
     suitableFor: ["Playwright 測試"],
-    howToUse: ["手圍可選 12-19 公分", "標準為彈力繩版本；若改龍蝦扣或磁扣需加收 200 元"],
+    howToUse: ["手圍可選 13-19 公分", "標準為彈力繩版本；若改龍蝦扣或磁扣需加收 200 元"],
     disclaimer: "測試商品，非正式販售。",
     crystalType: "黃水晶｜太陽石",
     color: "金色",
@@ -225,7 +225,7 @@ function json(value) {
   return JSON.stringify(value ?? []);
 }
 
-const { connection, config } = await connectToTestDatabase();
+const { connection, config } = await connectToTestDatabase({ write: true });
 
 try {
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);

@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { Resend } from "resend";
 
-const externalEmailTest = process.env.RUN_RESEND_E2E === "true" ? test : test.skip;
+const externalEmailTest =
+  process.env.RUN_RESEND_E2E === "true" && process.env.E2E_ALLOW_RESEND_DELIVERY === "true"
+    ? test
+    : test.skip;
 
 async function findSentEmailId(resend: Resend, email: string, subject: string, excludedId?: string) {
   let sentEmailId: string | undefined;

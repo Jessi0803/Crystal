@@ -7,6 +7,14 @@ import {
   submitAtmCustomDepositCheckout,
 } from "./helpers";
 
+async function getWristInput(page: import("@playwright/test").Page, path: string) {
+  await page.goto(path);
+  if (path === "/custom/form-b") {
+    await page.getByRole("button", { name: /財富密碼/ }).click();
+  }
+  return page.locator('input[type="number"]').first();
+}
+
 test("custom service page links to every consultation form", async ({ page }) => {
   await page.goto("/custom");
 
@@ -17,11 +25,31 @@ test("custom service page links to every consultation form", async ({ page }) =>
   }
 });
 
+test("all four custom forms constrain wrist size to 13 through 19 cm", async ({ page }) => {
+  for (const path of ["/custom/form", "/custom/form-b", "/custom/form-c", "/custom/form-d"]) {
+    const wristInput = await getWristInput(page, path);
+    await expect(wristInput).toHaveAttribute("min", "13");
+    await expect(wristInput).toHaveAttribute("max", "19");
+    await expect(wristInput).toHaveAttribute("step", "0.5");
+  }
+});
+
+test("pure custom form blocks a legacy wrist size below 13 cm", async ({ page }) => {
+  await page.goto("/custom/form");
+  await page.locator("textarea").first().fill("E2E 手圍邊界驗證");
+  await page.locator('input[type="number"]').fill("12.5");
+  await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
+
+  await expect(page.locator("body")).toContainText("手圍尺寸請輸入 13 至 19 cm");
+  await expect(page).toHaveURL(/\/custom\/form$/);
+});
+
 test("pure custom form stores consultation note and continues to deposit checkout", async ({ page }) => {
   await fillPureCustomDepositForm(page);
   await expect(page.locator("body")).toContainText("客製化商品");
   await expect(page.locator("body")).toContainText("購買人資訊");
   await expect(page.locator("body")).toContainText("訂單摘要");
+  await expect(page.locator("body")).toContainText("NT$ 500");
 });
 
 async function expectConsultationNoteInAdmin(page: import("@playwright/test").Page, orderNo: string, expectedText: string) {
@@ -45,7 +73,8 @@ test("chakra custom form creates an ATM deposit order with its consultation note
     page,
     "/custom/form-c",
     "脈輪檢測 × 水晶手鍊客製化商品",
-    "E2E 脈輪客戶"
+    "E2E 脈輪客戶",
+    "19",
   );
   const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-chakra-${Date.now()}@example.com`);
 
@@ -58,7 +87,8 @@ test("numerology custom form creates an ATM deposit order with its consultation 
     page,
     "/custom/form-d",
     "生命靈數 × 水晶手鍊客製化商品",
-    "E2E 靈數客戶"
+    "E2E 靈數客戶",
+    "13",
   );
   const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-numerology-${Date.now()}@example.com`);
 

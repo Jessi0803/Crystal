@@ -113,3 +113,30 @@ test("admin can schedule a test product and keep it hidden before release", asyn
 
   await removeProduct(page, name);
 });
+
+test("mobile admin can tap edit and schedule a test product", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chrome", "This regression targets the mobile product-row layout.");
+  test.setTimeout(60_000);
+  const name = `E2E 手機編輯商品 ${Date.now()}`;
+  const editedName = `${name} 已排程`;
+
+  await openProductsAdmin(page);
+  await createProduct(page, name);
+  await page.getByRole("button", { name: "編輯" }).last().click();
+  await expect(page.getByRole("heading", { name: "編輯商品" })).toBeVisible();
+
+  await page.locator('input[placeholder="例：紫水晶手鍊"]').fill(editedName);
+  const futureDateTime = await page.evaluate(() => {
+    const releaseAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${releaseAt.getFullYear()}-${pad(releaseAt.getMonth() + 1)}-${pad(releaseAt.getDate())}T${pad(releaseAt.getHours())}:${pad(releaseAt.getMinutes())}`;
+  });
+  await page.locator('input[type="datetime-local"]').fill(futureDateTime);
+  await page.getByRole("button", { name: "儲存變更" }).click();
+
+  await page.locator(productSearch).fill(editedName);
+  await expect(page.locator("body")).toContainText(editedName);
+  await expect(page.locator("body")).toContainText("預約");
+
+  await removeProduct(page, editedName);
+});

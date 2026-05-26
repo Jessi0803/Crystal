@@ -71,6 +71,27 @@ test("bracelet options and cart controls update line price and quantity", async 
   await expect(drawer).toContainText("你的購物袋是空的");
 });
 
+test("adjustable bracelets offer only 13 to 19 cm and retain a boundary size in checkout", async ({ page }) => {
+  await page.goto("/products/e2e-bracelet-in-stock");
+
+  const sizeSelect = page.getByRole("combobox");
+  await expect(sizeSelect).toBeVisible();
+  const sizes = await sizeSelect.locator("option").evaluateAll((options) =>
+    options.map((option) => (option as HTMLOptionElement).value)
+  );
+  expect(sizes).toEqual(["13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"]);
+
+  await sizeSelect.selectOption("19");
+  await page.getByRole("button", { name: /彈力繩/ }).click();
+  await page.getByRole("button", { name: /加入購物袋/ }).click();
+
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText("手圍 19 cm");
+  await drawer.getByRole("button", { name: "前往結帳" }).click();
+  await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("手圍 19 cm");
+});
+
 test("domestic shipping switches from home fee to convenience-store fee", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-in-stock");
   await page.getByRole("button", { name: /彈力繩/ }).click();

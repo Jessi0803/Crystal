@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { connectToTestDatabase } from "./test-db-helpers.mjs";
 
-const { connection, config } = await connectToTestDatabase();
+const { connection, config } = await connectToTestDatabase({ write: true });
 await connection.end();
 
 console.log(`Pushing current schema to test database: ${config.database}`);

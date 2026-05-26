@@ -13,6 +13,8 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ecpay-sandbox": "RUN_ECPAY_SANDBOX=true playwright test tests/e2e/ecpay-sandbox.spec.ts",
+    "test:e2e:resend": "RUN_RESEND_E2E=true E2E_ALLOW_RESEND_DELIVERY=true playwright test tests/e2e/resend-email.spec.ts",
+    "e2e:safety:check": "node scripts/e2e-safety-check.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:test:check": "node scripts/db-test-check.mjs",
     "db:test:migrate": "node scripts/db-test-migrate.mjs",

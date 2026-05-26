@@ -192,17 +192,40 @@
 |------|------|----------|
 | Mock E2E | 快速驗 UI 與流程，不依賴外部金流、物流、LLM、Email | Playwright route 攔截 `/api/trpc/*`、金流表單、PayPal approval URL、LINE OAuth |
 | DB Integration E2E | 驗真實資料庫寫入、庫存扣減、訂單狀態與後台 | 使用測試資料庫或 staging DB，每次測試建立唯一 email / 商品 / 訂單並清理 |
-| External Sandbox | 驗綠界、PayPal、LINE、Email 服務串接 | 獨立開關，例如 `RUN_ECPAY=1`、`RUN_PAYPAL=1`、`RUN_EMAIL=1`，避免日常 E2E 被外部服務拖慢 |
+| External Sandbox | 驗綠界、PayPal、LINE、Email 服務串接 | 綠界只以 `pnpm test:e2e:ecpay-sandbox` 跑 stage；Resend 只以 `pnpm test:e2e:resend` 寄往 `@resend.dev` 測試收件地址 |
 | Visual Smoke | 防白屏、遮擋、RWD 版面回歸 | 桌機 1440x900、平板 768x1024、手機 375x812 截圖比對 |
 
 ### 目前自動化狀態
 
 - 已加入 `@playwright/test`、`playwright.config.ts`、`tests/e2e` 與 `pnpm test:e2e`。
 - 已加入測試資料庫工具：`db:test:check`、`db:test:migrate`、`db:test:push`、`db:test:reset`、`db:test:seed`。
-- Playwright global setup 會先執行 `db:test:seed`，測試資料庫 helper 會限制可操作的 DB 名稱，避免誤用正式資料庫。
+- Playwright global setup 會先執行 `e2e:safety:check` 再執行 `db:test:seed`。資料庫 helper 會同時驗證測試資料庫名稱、已確認的 TiDB project ID 與寫入允許旗標；僅資料庫名稱叫 `test` 不足以通過。
+- Playwright 啟動網站伺服器時會將 `DATABASE_URL` 明確固定為 `.env.test.local` 中的值，不會採用終端機或正式環境中已存在的連線字串。
 - 綠界測試固定設定 `ECPAY_SANDBOX=true` 與 `ECPAY_LOGISTICS_SANDBOX=true`，信用卡導向 `payment-stage.ecpay.com.tw`，物流導向 `logistics-stage.ecpay.com.tw`；不測正式端點。
 - 日常 `pnpm test:e2e` 不建立外部綠界 sandbox 交易；要驗綠界 stage 串接時執行 `pnpm test:e2e:ecpay-sandbox`。
+- 日常 `pnpm test:e2e` 啟動的伺服器會清空 `RESEND_API_KEY`，不會寄出外部 Email；要測 Resend 時僅執行 `pnpm test:e2e:resend`，且測試固定寄往 Resend 測試地址。
 - 目前完整 suite 覆蓋桌機 Chromium 與 mobile Chrome：日常回歸 `pnpm test:e2e` 結果為 `74 passed, 6 skipped`（略過外部綠界 sandbox 案例）；綠界 stage 整合 `pnpm test:e2e:ecpay-sandbox` 結果為 `6 passed`。
+- 2026-05-26 第一批最近變更回歸：手圍、客製價格、首頁輪播、手機後台編輯／排程、預購與月限售完案例於桌機及手機執行結果為 `45 passed, 1 skipped`；略過項目為桌機專案中的手機專屬案例，手機專案已通過。
+
+### 執行前安全設定
+
+`.env.test.local` 必須只指向已確認的測試 TiDB project，並設定以下非機密安全標記：
+
+```dotenv
+NODE_ENV=test
+PAYPAL_SANDBOX=1
+ECPAY_SANDBOX=true
+ECPAY_LOGISTICS_SANDBOX=true
+E2E_TEST_DATABASE_NAME=test
+E2E_TIDB_PROJECT_ID=<測試 TiDB project ID>
+E2E_ALLOW_TEST_DB_WRITES=true
+```
+
+- `pnpm e2e:safety:check` 只檢查設定，不連線或寫入資料庫。
+- `pnpm db:test:check` 會連線確認測試資料庫，但只執行讀取查詢。
+- `pnpm test:e2e` 會在安全檢查通過後 seed 測試資料庫，因此一定會寫入測試資料庫。
+- `pnpm test:e2e:ecpay-sandbox` 可能在綠界 stage 建立 sandbox 交易，不會呼叫正式綠界端點。
+- `pnpm test:e2e:resend` 僅在此指令下載入 `.env.resend.local` 的 Resend key 並真正寄送測試信，收件地址固定為 `@resend.dev`。
 
 ### 現有測試檔對照
 
@@ -213,13 +236,16 @@
 | `tests/e2e/products-filtering.spec.ts` | 商品分類、空分類、排序 |
 | `tests/e2e/quiz-and-order-pages.spec.ts` | 水晶測驗、找不到訂單、PayPal cancel return |
 | `tests/e2e/custom-forms.spec.ts` | 客製化入口、一般客製化表單到訂金結帳 |
+| `tests/e2e/recent-storefront-regressions.spec.ts` | 客製價格顯示、首頁封面三張輪播、自動切換與商品頁連結 |
 | `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單 |
+| `tests/e2e/inventory-order.spec.ts` | 庫存扣減與取消回補、預購訂單標示、月限售完與零庫存預購差異 |
 | `tests/e2e/balance-payment.spec.ts` | 客製化訂金確認、產生尾款連結、尾款 ATM 末五碼 |
 | `tests/e2e/ecpay-sandbox.spec.ts` | 綠界信用卡 stage 導轉、物流 stage 選店入口、stage C2C 建立物流訂單 |
 | `tests/e2e/account.spec.ts` | 註冊、會員資料更新、忘記密碼中性成功狀態 |
 | `tests/e2e/auth-admin.spec.ts` | 會員登入、admin 登入、非 admin 後台阻擋 |
 | `tests/e2e/admin-management.spec.ts` | admin 商品搜尋、確認轉帳訂單 |
 | `tests/e2e/admin-products-write.spec.ts` | admin 建立商品、行內庫存編輯 |
+| `tests/e2e/admin-products-lifecycle.spec.ts` | 商品編輯／上下架／排程／刪除，以及手機版編輯與預約上架操作 |
 | `tests/e2e/admin-reporting.spec.ts` | 營收報表、熱銷商品、AI 客服紀錄搜尋/展開、舊 inventory route redirect |
 
 ### Playwright 技術注意
