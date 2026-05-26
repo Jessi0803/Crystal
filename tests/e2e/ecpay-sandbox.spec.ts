@@ -67,3 +67,28 @@ sandboxTest("admin creates a convenience-store logistics order through the ECPay
   await expect(page.locator("body")).toContainText("沙盒物流訂單建立成功");
   await expect(page.locator("body")).toContainText("物流編號");
 });
+
+sandboxTest("admin creates a home-delivery logistics order through the ECPay sandbox", async ({ page }) => {
+  await expectSandboxConfiguration(page);
+  await goToCheckoutWithSeededBracelet(page);
+  await fillDomesticHomeCheckout(page, `e2e-home-logistics-${Date.now()}@example.com`);
+  await page.locator('input[placeholder^="郵遞區號"]').fill("100");
+  await page.locator('input[placeholder^="縣市"]').fill("台北市");
+  await page.locator('input[placeholder^="鄉鎮市區"]').fill("中正區");
+  await page.locator('input[placeholder^="路名"]').fill("忠孝西路一段49號");
+  await page.getByRole("button", { name: /^轉帳/ }).click();
+  await page.getByRole("button", { name: "確認下單" }).click();
+  await expect(page).toHaveURL(/\/order\//);
+  const merchantTradeNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";
+  expect(merchantTradeNo).not.toBe("");
+
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+  await page.getByText(merchantTradeNo).click();
+  await page.getByRole("button", { name: "確認收款" }).click();
+  await expect(page.getByRole("button", { name: "建立沙盒物流訂單" })).toBeVisible();
+  await page.getByRole("button", { name: "建立沙盒物流訂單" }).click();
+
+  await expect(page.locator("body")).toContainText("沙盒物流訂單建立成功");
+  await expect(page.locator("body")).toContainText("物流編號");
+});

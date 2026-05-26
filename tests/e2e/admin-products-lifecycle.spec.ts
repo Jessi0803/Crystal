@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { resolve } from "node:path";
 import { login } from "./helpers";
 
 const productSearch = 'input[placeholder="搜尋商品名稱或分類"]';
@@ -139,4 +140,62 @@ test("mobile admin can tap edit and schedule a test product", async ({ page }, t
   await expect(page.locator("body")).toContainText("預約");
 
   await removeProduct(page, editedName);
+});
+
+test("admin can upload a product image and blocks files larger than 10 MB", async ({ page }) => {
+  test.setTimeout(60_000);
+  const name = `E2E 圖片商品 ${Date.now()}`;
+
+  await openProductsAdmin(page);
+  await page.getByRole("button", { name: "新增商品" }).click();
+  const imageInput = page.locator('input[type="file"]');
+  await imageInput.setInputFiles({
+    name: "too-large.png",
+    mimeType: "image/png",
+    buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+  });
+  await expect(page.locator("body")).toContainText("圖片請小於 10MB");
+
+  await imageInput.setInputFiles(resolve("client/public/logo.png"));
+  await expect(page.locator('img[src^="data:image/"]')).toBeVisible();
+  await page.locator('input[placeholder="例：紫水晶手鍊"]').fill(name);
+  await page.locator('input[placeholder="1200"]').fill("888");
+  await page.locator('input[placeholder="紫水晶, 愛情"]').fill("E2E, 圖片");
+  await page.locator('input[type="number"]').last().fill("1");
+  await page.locator("textarea").first().fill("後台圖片上傳測試使用");
+  await page.locator("textarea").last().fill("白水晶");
+  await page.getByRole("button", { name: "新增商品" }).last().click();
+
+  await page.locator(productSearch).fill(name);
+  await expect(page.locator("body")).toContainText(name);
+  await removeProduct(page, name);
+});
+
+test("scheduled product is automatically published after its release time", async ({ page }) => {
+  test.setTimeout(90_000);
+  const name = `E2E 到期上架 ${Date.now()}`;
+
+  await openProductsAdmin(page);
+  await createProduct(page, name);
+  await page.getByRole("button", { name: "編輯" }).last().click();
+
+  const schedule = await page.evaluate(() => {
+    const releaseAt = new Date(Date.now() + 12_000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return {
+      value: `${releaseAt.getFullYear()}-${pad(releaseAt.getMonth() + 1)}-${pad(releaseAt.getDate())}T${pad(releaseAt.getHours())}:${pad(releaseAt.getMinutes())}:${pad(releaseAt.getSeconds())}`,
+      timestamp: releaseAt.getTime(),
+    };
+  });
+  await page.locator('input[type="datetime-local"]').fill(schedule.value);
+  await page.getByRole("button", { name: "儲存變更" }).click();
+  await page.goto("/products");
+  await expect(page.locator("body")).not.toContainText(name);
+
+  const waitMs = Math.max(schedule.timestamp - Date.now() + 1500, 0);
+  await page.waitForTimeout(waitMs);
+  await page.reload();
+  await expect(page.locator("body")).toContainText(name);
+
+  await removeProduct(page, name);
 });

@@ -49,3 +49,14 @@ test("admin order filters and page size include a newly created pending transfer
   await page.getByRole("button", { name: "全部" }).click();
   await expect(page.locator("body")).toContainText(orderNo);
 });
+
+test("admin can mark a delivery test order as shipped and then not picked up", async ({ page }) => {
+  test.setTimeout(60_000);
+  const orderNo = await createAtmHomeDeliveryOrder(page, `e2e-shipping-status-${Date.now()}@example.com`);
+
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+  await updateStatus(page, orderNo, "轉帳待確認", "processing", "備貨中");
+  await updateStatus(page, orderNo, "備貨中", "shipped", "已出貨");
+  await updateStatus(page, orderNo, "已出貨", "not_picked", "未取貨");
+});

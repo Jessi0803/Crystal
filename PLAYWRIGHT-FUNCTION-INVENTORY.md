@@ -204,8 +204,11 @@
 - 綠界測試固定設定 `ECPAY_SANDBOX=true` 與 `ECPAY_LOGISTICS_SANDBOX=true`，信用卡導向 `payment-stage.ecpay.com.tw`，物流導向 `logistics-stage.ecpay.com.tw`；不測正式端點。
 - 日常 `pnpm test:e2e` 不建立外部綠界 sandbox 交易；要驗綠界 stage 串接時執行 `pnpm test:e2e:ecpay-sandbox`。
 - 日常 `pnpm test:e2e` 啟動的伺服器會清空 `RESEND_API_KEY`，不會寄出外部 Email；要測 Resend 時僅執行 `pnpm test:e2e:resend`，且測試固定寄往 Resend 測試地址。
-- 目前完整 suite 覆蓋桌機 Chromium 與 mobile Chrome：日常回歸 `pnpm test:e2e` 結果為 `74 passed, 6 skipped`（略過外部綠界 sandbox 案例）；綠界 stage 整合 `pnpm test:e2e:ecpay-sandbox` 結果為 `6 passed`。
+- 第一批完成時的完整 suite 基準覆蓋桌機 Chromium 與 mobile Chrome：日常回歸 `pnpm test:e2e` 結果為 `74 passed, 6 skipped`（當時略過外部綠界 sandbox 案例）；綠界 stage 整合結果為 `6 passed`。
 - 2026-05-26 第一批最近變更回歸：手圍、客製價格、首頁輪播、手機後台編輯／排程、預購與月限售完案例於桌機及手機執行結果為 `45 passed, 1 skipped`；略過項目為桌機專案中的手機專屬案例，手機專案已通過。
+- 2026-05-26 第二批後台／外部服務回歸：訂單出貨至未取貨、營收取消排除、Chatbot 推薦卡與失敗提示於桌機及手機執行結果為 `18 passed`；Chatbot 測試使用 route mock，不送真實 AI 請求。
+- 2026-05-26 第二批中，商品圖片超過 10MB 阻擋、圖片預覽/新增/刪除、預約商品到期自動上架，以及 PayPal return capture 成功畫面均已在桌機及手機通過；PayPal 案使用 route mock，不送 PayPal 交易。
+- 2026-05-26 綠界 Sandbox 補測：付款 stage 導向、選店 stage、超商物流均通過；宅配物流首次以虛構地址遭黑貓 Sandbox 拒絕，改用可識別地址後單獨重跑通過。只建立 Sandbox 物流資料與測試 TiDB 訂單。
 
 ### 執行前安全設定
 
@@ -235,18 +238,21 @@ E2E_ALLOW_TEST_DB_WRITES=true
 | `tests/e2e/products-cart.spec.ts` | 商品詳情、購物袋、空結帳、庫存/預購/售完狀態 |
 | `tests/e2e/products-filtering.spec.ts` | 商品分類、空分類、排序 |
 | `tests/e2e/quiz-and-order-pages.spec.ts` | 水晶測驗、找不到訂單、PayPal cancel return |
+| `tests/e2e/paypal-return-ui.spec.ts` | mock PayPal return/capture 成功後的訂單已付款畫面與 query 清理 |
 | `tests/e2e/custom-forms.spec.ts` | 客製化入口、一般客製化表單到訂金結帳 |
 | `tests/e2e/recent-storefront-regressions.spec.ts` | 客製價格顯示、首頁封面三張輪播、自動切換與商品頁連結 |
 | `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單 |
 | `tests/e2e/inventory-order.spec.ts` | 庫存扣減與取消回補、預購訂單標示、月限售完與零庫存預購差異 |
 | `tests/e2e/balance-payment.spec.ts` | 客製化訂金確認、產生尾款連結、尾款 ATM 末五碼 |
-| `tests/e2e/ecpay-sandbox.spec.ts` | 綠界信用卡 stage 導轉、物流 stage 選店入口、stage C2C 建立物流訂單 |
+| `tests/e2e/ecpay-sandbox.spec.ts` | 綠界信用卡 stage 導轉、物流 stage 選店入口、stage 超商與宅配建立物流訂單 |
 | `tests/e2e/account.spec.ts` | 註冊、會員資料更新、忘記密碼中性成功狀態 |
 | `tests/e2e/auth-admin.spec.ts` | 會員登入、admin 登入、非 admin 後台阻擋 |
 | `tests/e2e/admin-management.spec.ts` | admin 商品搜尋、確認轉帳訂單 |
 | `tests/e2e/admin-products-write.spec.ts` | admin 建立商品、行內庫存編輯 |
-| `tests/e2e/admin-products-lifecycle.spec.ts` | 商品編輯／上下架／排程／刪除，以及手機版編輯與預約上架操作 |
-| `tests/e2e/admin-reporting.spec.ts` | 營收報表、熱銷商品、AI 客服紀錄搜尋/展開、舊 inventory route redirect |
+| `tests/e2e/admin-order-workflow.spec.ts` | 後台 ATM 訂單從待確認進到取貨、出貨後未取貨，以及分頁/篩選 |
+| `tests/e2e/admin-products-lifecycle.spec.ts` | 商品編輯／上下架／排程／到期自動上架／圖片上傳與大小限制／刪除，以及手機版編輯與預約上架操作 |
+| `tests/e2e/admin-reporting.spec.ts` | 營收報表、取消已付款訂單後排除營收、熱銷商品、AI 客服紀錄搜尋/展開、舊 inventory route redirect |
+| `tests/e2e/chatbot-ui.spec.ts` | mock AI 回覆的前台推薦商品跳轉，以及 API 錯誤時 LINE fallback |
 
 ### Playwright 技術注意
 

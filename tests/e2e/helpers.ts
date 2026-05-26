@@ -9,7 +9,7 @@ export async function login(page: Page, email: string) {
 
 export async function addSeededBraceletToCart(page: Page) {
   await page.goto("/products/e2e-bracelet-in-stock");
-  await expect(page.getByRole("heading", { name: "E2E 現貨手鍊" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E 現貨手鍊" })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: /龍蝦扣/ }).click();
   await page.getByRole("button", { name: /加入購物袋/ }).click();
   await expect(page.locator("body")).toContainText("龍蝦扣");

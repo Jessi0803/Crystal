@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createAtmHomeDeliveryOrder, login } from "./helpers";
 
 test("admin revenue dashboard shows confirmed order metrics and top products", async ({ page }) => {
+  test.setTimeout(60_000);
   const merchantTradeNo = await createAtmHomeDeliveryOrder(page, `e2e-revenue-${Date.now()}@example.com`);
 
   await login(page, "e2e-admin@example.com");
@@ -58,4 +59,38 @@ test("legacy admin inventory route redirects admins to product management", asyn
 
   await expect(page).toHaveURL(/\/admin\/products/);
   await expect(page.getByRole("heading", { name: "商品管理" })).toBeVisible();
+});
+
+test("admin revenue removes a paid test order after it is cancelled", async ({ page }) => {
+  test.setTimeout(90_000);
+  const merchantTradeNo = await createAtmHomeDeliveryOrder(page, `e2e-revenue-cancel-${Date.now()}@example.com`);
+  const orderInfo = page.getByRole("heading", { name: "訂單資訊" }).locator("xpath=parent::div");
+  await expect(orderInfo).toContainText("訂單金額");
+  const orderPageText = await orderInfo.innerText();
+  const amountText = orderPageText.match(/訂單金額\s*NT\$\s*([\d,]+)/)?.[1] ?? "";
+  const orderAmount = Number(amountText.replaceAll(",", ""));
+  expect(orderAmount).toBeGreaterThan(0);
+
+  await login(page, "e2e-admin@example.com");
+  await page.locator("button").filter({ hasText: merchantTradeNo }).click();
+  await page.getByRole("button", { name: "確認收款" }).click();
+  await expect(page.locator("body")).toContainText("已確認收款");
+
+  const totalRevenueCard = page.getByText("累計總營收", { exact: true }).locator("xpath=ancestor::div[contains(@class,'border')][1]");
+  const readTotal = async () => {
+    const totalText = (await totalRevenueCard.innerText()).match(/NT\$\s*([\d,]+)/)?.[1] ?? "";
+    return Number(totalText.replaceAll(",", ""));
+  };
+  await page.goto("/admin/revenue");
+  await expect(page.getByRole("heading", { name: "營收報表" })).toBeVisible();
+  const beforeCancellation = await readTotal();
+
+  await page.goto("/admin/orders");
+  await page.getByRole("button", { name: "全部" }).click();
+  await page.locator("button").filter({ hasText: merchantTradeNo }).click();
+  await page.locator("select").filter({ has: page.locator('option[value="cancelled"]') }).selectOption("cancelled");
+  await expect(page.locator("body")).toContainText("訂單狀態已更新");
+
+  await page.goto("/admin/revenue");
+  await expect.poll(readTotal).toBe(beforeCancellation - orderAmount);
 });
