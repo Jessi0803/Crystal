@@ -213,6 +213,7 @@
 - 2026-05-28 第一批重要補測：後台 ATM 測試訂單可從待確認一路切到備貨中、已出貨、已到店、已取貨、已完成，且前台訂單結果頁會優先顯示物流/履約狀態，不再只顯示「付款成功！」；桌機與手機合計 `6 passed`。
 - 2026-05-28 第一批重要補測：客製訂金 ATM 訂單會顯示「等待轉帳確認」，後台確認訂金後前台會顯示「訂金付款成功」，再產生尾款連結、送出尾款 ATM 後五碼、後台確認尾款；桌機與手機均通過。
 - 2026-05-28 第一批重要補測：新增真實 Chatbot 回答回歸測試，但預設跳過；只有同時設定 `RUN_CHATBOT_REAL_E2E=true` 與 `E2E_ALLOW_REAL_CHATBOT=true` 才會載入 `.env` 的 Gemini key 並實際測「尾款何時付、綠幽靈是否有貨、醫療保證、投資預測」四類問題。一般 `pnpm test:e2e` 不呼叫 Gemini。
+- 2026-05-28 第二批重要補測：後台商品新增後前台列表與詳情頁可見、下架/刪除後前台列表消失且詳情頁顯示找不到、排程到期後自動上架；會員中心會同步後台確認收款、備貨中、已取消；綠界物流 sandbox notify 可把訂單同步到已到店與已取貨。目標批次結果為 `21 passed, 1 skipped`，skipped 為桌機專案略過手機專屬後台操作案例。
 
 ### 執行前安全設定
 
@@ -247,7 +248,8 @@ E2E_ALLOW_TEST_DB_WRITES=true
 | `tests/e2e/order-status-ui.spec.ts` | mock 付款失敗結果頁；已完成、已出貨、已到店、已取貨會優先顯示履約狀態，而不是只顯示付款成功 |
 | `tests/e2e/custom-forms.spec.ts` | 客製化入口、一般客製化表單到訂金結帳 |
 | `tests/e2e/recent-storefront-regressions.spec.ts` | 客製價格顯示、首頁封面三張輪播、自動切換與商品頁連結 |
-| `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單 |
+| `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單，以及會員中心同步後台確認收款、備貨中、取消狀態 |
+| `tests/e2e/ecpay-logistics-callback.spec.ts` | 綠界物流 sandbox notify 簽名驗證、已到店/已取貨 callback 後同步訂單狀態與前台結果頁 |
 | `tests/e2e/inventory-order.spec.ts` | 庫存扣減與取消回補、預購訂單標示、月限售完與零庫存預購差異 |
 | `tests/e2e/balance-payment.spec.ts` | 客製化訂金等待轉帳、訂金確認成功、產生尾款連結、尾款 ATM 末五碼與後台確認尾款 |
 | `tests/e2e/ecpay-sandbox.spec.ts` | 綠界信用卡 stage 導轉、物流 stage 選店入口、stage 超商與宅配建立物流訂單 |
@@ -257,7 +259,7 @@ E2E_ALLOW_TEST_DB_WRITES=true
 | `tests/e2e/admin-management.spec.ts` | admin 商品搜尋、確認轉帳訂單 |
 | `tests/e2e/admin-products-write.spec.ts` | admin 建立商品、行內庫存編輯 |
 | `tests/e2e/admin-order-workflow.spec.ts` | 後台 ATM 測試訂單從待確認進到備貨中、已出貨、已到店、已取貨、已完成、未取貨，以及分頁/篩選 |
-| `tests/e2e/admin-products-lifecycle.spec.ts` | 商品編輯／上下架／排程／到期自動上架／圖片上傳與大小限制／刪除，以及手機版編輯與預約上架操作 |
+| `tests/e2e/admin-products-lifecycle.spec.ts` | 商品編輯／上下架／排程／到期自動上架／圖片上傳與大小限制／刪除，並確認前台列表與詳情頁同步顯示/隱藏；包含手機版編輯與預約上架操作 |
 | `tests/e2e/admin-reporting.spec.ts` | 營收報表、取消已付款訂單後排除營收、熱銷商品、AI 客服紀錄搜尋/展開、舊 inventory route redirect |
 | `tests/e2e/admin-chatbot-pagination-ui.spec.ts` | mock 後台 AI 紀錄分頁、來源頁面、推薦商品與命中知識顯示 |
 | `tests/e2e/chatbot-ui.spec.ts` | mock AI 回覆的前台推薦商品跳轉，以及 API 錯誤時 LINE fallback |

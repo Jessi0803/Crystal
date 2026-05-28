@@ -32,6 +32,26 @@ async function findProduct(page: Page, name: string) {
   await expect(page.locator("body")).toContainText(name);
 }
 
+async function expectProductVisibleOnStorefront(page: Page, name: string) {
+  await page.goto("/products");
+  const productLink = page.locator('a[href^="/products/"]').filter({ hasText: name }).first();
+  await expect(productLink).toBeVisible();
+  const href = await productLink.getAttribute("href");
+  expect(href).toBeTruthy();
+  await productLink.click();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+  return href ?? "";
+}
+
+async function expectProductHiddenOnStorefront(page: Page, name: string, href?: string) {
+  await page.goto("/products");
+  await expect(page.locator("body")).not.toContainText(name);
+  if (href) {
+    await page.goto(href);
+    await expect(page.locator("body")).toContainText("找不到此商品");
+  }
+}
+
 async function removeProduct(page: Page, name: string) {
   await findProduct(page, name);
   page.once("dialog", async dialog => {
@@ -61,24 +81,20 @@ test("admin can edit, unpublish, republish and remove a test product", async ({ 
   await expect(page.locator("body")).toContainText("NT$ 999");
   await expect(page.locator("body")).toContainText("月限");
 
-  await page.goto("/products");
-  await expect(page.locator("body")).toContainText(editedName);
+  const productHref = await expectProductVisibleOnStorefront(page, editedName);
 
   await findProduct(page, editedName);
   await page.getByRole("button", { name: "下架" }).last().click();
   await expect(page.locator("body")).toContainText("商品已下架");
-  await page.goto("/products");
-  await expect(page.locator("body")).not.toContainText(editedName);
+  await expectProductHiddenOnStorefront(page, editedName, productHref);
 
   await findProduct(page, editedName);
   await page.getByRole("button", { name: "上架" }).last().click();
   await expect(page.locator("body")).toContainText("商品已上架");
-  await page.goto("/products");
-  await expect(page.locator("body")).toContainText(editedName);
+  await expectProductVisibleOnStorefront(page, editedName);
 
   await removeProduct(page, editedName);
-  await page.goto("/products");
-  await expect(page.locator("body")).not.toContainText(editedName);
+  await expectProductHiddenOnStorefront(page, editedName, productHref);
 });
 
 test("admin can schedule a test product and keep it hidden before release", async ({ page }) => {
@@ -195,7 +211,8 @@ test("scheduled product is automatically published after its release time", asyn
   const waitMs = Math.max(schedule.timestamp - Date.now() + 1500, 0);
   await page.waitForTimeout(waitMs);
   await page.reload();
-  await expect(page.locator("body")).toContainText(name);
+  await expectProductVisibleOnStorefront(page, name);
 
   await removeProduct(page, name);
+  await expectProductHiddenOnStorefront(page, name);
 });

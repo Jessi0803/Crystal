@@ -1,5 +1,16 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createAtmHomeDeliveryOrder, fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet, login } from "./helpers";
+
+async function openAdminOrder(page: Page, merchantTradeNo: string) {
+  await page.goto("/admin/orders");
+  await expect(page.locator("body")).toContainText(merchantTradeNo);
+  await page.locator("button").filter({ hasText: merchantTradeNo }).click();
+}
+
+async function updateExpandedAdminOrderStatus(page: Page, status: string, expectedText: string) {
+  await page.locator(`select:has(option[value="${status}"])`).first().selectOption(status);
+  await expect(page.locator("body")).toContainText(expectedText);
+}
 
 test("checkout validates required domestic home delivery fields", async ({ page }) => {
   await goToCheckoutWithSeededBracelet(page);
@@ -57,4 +68,47 @@ test("logged-in member sees a newly created ATM order in member center", async (
   await page.getByText(`訂單 #${merchantTradeNo}`).click();
   await expect(page.locator("body")).toContainText("轉帳待確認");
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
+});
+
+test("member center reflects admin payment confirmation, processing and cancellation changes", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const memberContext = await browser.newContext();
+  const adminContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  const adminPage = await adminContext.newPage();
+
+  try {
+    await login(memberPage, "e2e-user@example.com");
+    await expect(memberPage).toHaveURL(/\/products/);
+    const merchantTradeNo = await createAtmHomeDeliveryOrder(memberPage, "e2e-user@example.com");
+
+    await memberPage.goto("/member");
+    await expect(memberPage.locator("body")).toContainText(`訂單 #${merchantTradeNo}`);
+    await expect(memberPage.locator("body")).toContainText("待付款");
+
+    await login(adminPage, "e2e-admin@example.com");
+    await expect(adminPage).toHaveURL(/\/admin\/orders/);
+    await openAdminOrder(adminPage, merchantTradeNo);
+    await adminPage.getByRole("button", { name: "確認收款" }).click();
+    await expect(adminPage.locator("body")).toContainText("已確認收款");
+
+    await memberPage.goto("/member");
+    await expect(memberPage.locator("body")).toContainText(`訂單 #${merchantTradeNo}`);
+    await expect(memberPage.locator("body")).toContainText("已付款（待出貨）");
+    await memberPage.getByText(`訂單 #${merchantTradeNo}`).click();
+    await expect(memberPage.locator("body")).toContainText("已確認收款");
+
+    await openAdminOrder(adminPage, merchantTradeNo);
+    await updateExpandedAdminOrderStatus(adminPage, "processing", "備貨中");
+    await memberPage.reload();
+    await expect(memberPage.locator("body")).toContainText("備貨中");
+
+    await openAdminOrder(adminPage, merchantTradeNo);
+    await updateExpandedAdminOrderStatus(adminPage, "cancelled", "已取消");
+    await memberPage.reload();
+    await expect(memberPage.locator("body")).toContainText("已取消");
+  } finally {
+    await memberContext.close();
+    await adminContext.close();
+  }
 });
