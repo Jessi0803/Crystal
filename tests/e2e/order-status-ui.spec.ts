@@ -5,6 +5,7 @@ function trpcSuccess(data: unknown) {
 }
 
 async function mockOrder(page: Page, paymentStatus: string, orderStatus: string) {
+  await page.unroute("**/api/trpc/order.getOrder**").catch(() => undefined);
   await page.route("**/api/trpc/order.getOrder**", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -36,10 +37,26 @@ test("order result displays failed payment status", async ({ page }) => {
 });
 
 test("completed paid order displays its completed fulfillment status", async ({ page }) => {
-  test.fixme(true, "Known issue: paid status currently takes precedence over completed fulfillment status.");
   await mockOrder(page, "paid", "completed");
   await page.goto("/order/E2E-completed");
 
   await expect(page.getByRole("heading", { name: "訂單已完成" })).toBeVisible();
   await expect(page.locator("body")).toContainText("✅ 已完成");
+});
+
+test("paid shipped, arrived, and picked up orders prioritize fulfillment status over payment success", async ({ page }) => {
+  await mockOrder(page, "paid", "shipped");
+  await page.goto("/order/E2E-shipped");
+  await expect(page.getByRole("heading", { name: "已出貨" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("🚚 已出貨");
+
+  await mockOrder(page, "paid", "arrived");
+  await page.goto("/order/E2E-arrived");
+  await expect(page.getByRole("heading", { name: "包裹已到店" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("📦 已到店");
+
+  await mockOrder(page, "paid", "picked_up");
+  await page.goto("/order/E2E-picked_up");
+  await expect(page.getByRole("heading", { name: "已取貨" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("✅ 已取貨");
 });

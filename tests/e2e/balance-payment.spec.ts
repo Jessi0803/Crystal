@@ -5,12 +5,22 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
   test.setTimeout(90_000);
   const depositOrderNo = await createAtmCustomDepositOrder(page, `e2e-balance-${Date.now()}@example.com`);
 
+  await expect(page.getByRole("heading", { name: "等待轉帳確認" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("客製化商品");
+
   await login(page, "e2e-admin@example.com");
   await expect(page).toHaveURL(/\/admin\/orders/);
 
   await page.locator("button").filter({ hasText: depositOrderNo }).click();
   await page.getByRole("button", { name: "確認收款" }).click();
   await expect(page.locator("body")).toContainText("產生尾款連結");
+
+  await page.goto(`/order/${depositOrderNo}`);
+  await expect(page.getByRole("heading", { name: "訂金付款成功" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("已付訂金");
+
+  await page.goto("/admin/orders");
+  await page.locator("button").filter({ hasText: depositOrderNo }).click();
 
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("請輸入尾款金額");

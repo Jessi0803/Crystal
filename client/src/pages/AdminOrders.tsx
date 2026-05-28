@@ -77,6 +77,7 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
   { key: "shipped", label: "已出貨" },
   { key: "arrived", label: "已到店" },
   { key: "picked_up", label: "已取貨" },
+  { key: "completed", label: "已完成" },
   { key: "not_picked", label: "未取貨" },
   { key: "cancelled", label: "已取消" },
 ];
@@ -345,6 +346,7 @@ function OrderRowCard({
                     <option value="shipped">已出貨</option>
                     <option value="arrived">已到店</option>
                     <option value="picked_up">已取貨</option>
+                    <option value="completed">已完成</option>
                     <option value="not_picked">未取貨</option>
                     <option value="cancelled">取消訂單</option>
                   </select>

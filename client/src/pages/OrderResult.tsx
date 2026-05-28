@@ -101,22 +101,13 @@ export default function OrderResult() {
         bg: "bg-blue-50",
       };
     }
-    if (order.paymentStatus === "confirmed" || order.paymentStatus === "paid") {
-      if (order.orderStatus === "deposit_paid") {
-        return {
-          icon: <CheckCircle className="w-12 h-12 text-rose-500" />,
-          title: "訂金付款成功",
-          desc: "我們已收到您的訂金，接下來會由老闆建立尾款付款連結給您。",
-          color: "text-rose-600",
-          bg: "bg-rose-50",
-        };
-      }
+    if ((order.paymentStatus === "confirmed" || order.paymentStatus === "paid") && order.orderStatus === "deposit_paid") {
       return {
-        icon: <CheckCircle className="w-12 h-12 text-green-500" />,
-        title: "付款成功！",
-        desc: "感謝您的購買，我們將盡快為您處理出貨事宜。",
-        color: "text-green-600",
-        bg: "bg-green-50",
+        icon: <CheckCircle className="w-12 h-12 text-rose-500" />,
+        title: "訂金付款成功",
+        desc: "我們已收到您的訂金，接下來會由老闆建立尾款付款連結給您。",
+        color: "text-rose-600",
+        bg: "bg-rose-50",
       };
     }
     if (order.orderStatus === "shipped") {
@@ -137,6 +128,15 @@ export default function OrderResult() {
         bg: "bg-amber-50",
       };
     }
+    if (order.orderStatus === "picked_up") {
+      return {
+        icon: <CheckCircle className="w-12 h-12 text-emerald-500" />,
+        title: "已取貨",
+        desc: "感謝您的取貨，祝您配戴愉快！",
+        color: "text-emerald-600",
+        bg: "bg-emerald-50",
+      };
+    }
     if (order.orderStatus === "completed") {
       return {
         icon: <CheckCircle className="w-12 h-12 text-emerald-500" />,
@@ -144,6 +144,15 @@ export default function OrderResult() {
         desc: "感謝您的購買，希望水晶能為您帶來滿滿的能量！",
         color: "text-emerald-600",
         bg: "bg-emerald-50",
+      };
+    }
+    if (order.paymentStatus === "confirmed" || order.paymentStatus === "paid") {
+      return {
+        icon: <CheckCircle className="w-12 h-12 text-green-500" />,
+        title: "付款成功！",
+        desc: "感謝您的購買，我們將盡快為您處理出貨事宜。",
+        color: "text-green-600",
+        bg: "bg-green-50",
       };
     }
     if (order.paymentStatus === "failed" || order.orderStatus === "cancelled") {

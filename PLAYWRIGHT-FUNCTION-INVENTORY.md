@@ -210,7 +210,9 @@
 - 2026-05-26 第二批中，商品圖片超過 10MB 阻擋、圖片預覽/新增/刪除、預約商品到期自動上架，以及 PayPal return capture 成功畫面均已在桌機及手機通過；PayPal 案使用 route mock，不送 PayPal 交易。
 - 2026-05-26 綠界 Sandbox 補測：付款 stage 導向、選店 stage、超商物流均通過；宅配物流首次以虛構地址遭黑貓 Sandbox 拒絕，改用可識別地址後單獨重跑通過。只建立 Sandbox 物流資料與測試 TiDB 訂單。
 - 2026-05-26 第三批 UI 回歸：LINE 登入入口/歡迎彈窗、知識分類與購物說明互動、付款失敗結果頁、後台 AI 紀錄分頁/推薦資料於桌機及手機執行結果為 `14 passed, 2 skipped`；LINE 與 AI 紀錄均使用 route mock，不呼叫外部服務。
-- 第三批的 `2 skipped` 為明確標記的已知缺陷：訂單同時為 `paymentStatus = paid` 與 `orderStatus = completed` 時，結果頁仍顯示「付款成功！」而非「訂單已完成」；修復網站顯示順序後應解除 `fixme`。
+- 2026-05-28 第一批重要補測：後台 ATM 測試訂單可從待確認一路切到備貨中、已出貨、已到店、已取貨、已完成，且前台訂單結果頁會優先顯示物流/履約狀態，不再只顯示「付款成功！」；桌機與手機合計 `6 passed`。
+- 2026-05-28 第一批重要補測：客製訂金 ATM 訂單會顯示「等待轉帳確認」，後台確認訂金後前台會顯示「訂金付款成功」，再產生尾款連結、送出尾款 ATM 後五碼、後台確認尾款；桌機與手機均通過。
+- 2026-05-28 第一批重要補測：新增真實 Chatbot 回答回歸測試，但預設跳過；只有同時設定 `RUN_CHATBOT_REAL_E2E=true` 與 `E2E_ALLOW_REAL_CHATBOT=true` 才會載入 `.env` 的 Gemini key 並實際測「尾款何時付、綠幽靈是否有貨、醫療保證、投資預測」四類問題。一般 `pnpm test:e2e` 不呼叫 Gemini。
 
 ### 執行前安全設定
 
@@ -242,24 +244,25 @@ E2E_ALLOW_TEST_DB_WRITES=true
 | `tests/e2e/products-filtering.spec.ts` | 商品分類、空分類、排序 |
 | `tests/e2e/quiz-and-order-pages.spec.ts` | 水晶測驗、找不到訂單、PayPal cancel return |
 | `tests/e2e/paypal-return-ui.spec.ts` | mock PayPal return/capture 成功後的訂單已付款畫面與 query 清理 |
-| `tests/e2e/order-status-ui.spec.ts` | mock 付款失敗結果頁；已完成訂單標題為已知缺陷 `fixme` |
+| `tests/e2e/order-status-ui.spec.ts` | mock 付款失敗結果頁；已完成、已出貨、已到店、已取貨會優先顯示履約狀態，而不是只顯示付款成功 |
 | `tests/e2e/custom-forms.spec.ts` | 客製化入口、一般客製化表單到訂金結帳 |
 | `tests/e2e/recent-storefront-regressions.spec.ts` | 客製價格顯示、首頁封面三張輪播、自動切換與商品頁連結 |
 | `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單 |
 | `tests/e2e/inventory-order.spec.ts` | 庫存扣減與取消回補、預購訂單標示、月限售完與零庫存預購差異 |
-| `tests/e2e/balance-payment.spec.ts` | 客製化訂金確認、產生尾款連結、尾款 ATM 末五碼 |
+| `tests/e2e/balance-payment.spec.ts` | 客製化訂金等待轉帳、訂金確認成功、產生尾款連結、尾款 ATM 末五碼與後台確認尾款 |
 | `tests/e2e/ecpay-sandbox.spec.ts` | 綠界信用卡 stage 導轉、物流 stage 選店入口、stage 超商與宅配建立物流訂單 |
 | `tests/e2e/account.spec.ts` | 註冊、會員資料更新、忘記密碼中性成功狀態 |
 | `tests/e2e/line-login-ui.spec.ts` | mock LINE OAuth 入口導向、合法 returnTo 與登入歡迎彈窗 |
 | `tests/e2e/auth-admin.spec.ts` | 會員登入、admin 登入、非 admin 後台阻擋 |
 | `tests/e2e/admin-management.spec.ts` | admin 商品搜尋、確認轉帳訂單 |
 | `tests/e2e/admin-products-write.spec.ts` | admin 建立商品、行內庫存編輯 |
-| `tests/e2e/admin-order-workflow.spec.ts` | 後台 ATM 訂單從待確認進到取貨、出貨後未取貨，以及分頁/篩選 |
+| `tests/e2e/admin-order-workflow.spec.ts` | 後台 ATM 測試訂單從待確認進到備貨中、已出貨、已到店、已取貨、已完成、未取貨，以及分頁/篩選 |
 | `tests/e2e/admin-products-lifecycle.spec.ts` | 商品編輯／上下架／排程／到期自動上架／圖片上傳與大小限制／刪除，以及手機版編輯與預約上架操作 |
 | `tests/e2e/admin-reporting.spec.ts` | 營收報表、取消已付款訂單後排除營收、熱銷商品、AI 客服紀錄搜尋/展開、舊 inventory route redirect |
 | `tests/e2e/admin-chatbot-pagination-ui.spec.ts` | mock 後台 AI 紀錄分頁、來源頁面、推薦商品與命中知識顯示 |
 | `tests/e2e/chatbot-ui.spec.ts` | mock AI 回覆的前台推薦商品跳轉，以及 API 錯誤時 LINE fallback |
 | `tests/e2e/chatbot-conversation-admin.spec.ts` | mock 前台 Chatbot 多輪 history、推薦文字與商品卡一致性、空白輸入不送出、超長輸入限制 500 字、長 prompt-injection 類輸入無商品卡、後台 AI 紀錄搜尋/空結果/清除搜尋與展開檢查 |
+| `tests/e2e/chatbot-real-answer.spec.ts` | gated 真實 Chatbot 回答回歸；預設跳過，只有開啟 `RUN_CHATBOT_REAL_E2E=true` 與 `E2E_ALLOW_REAL_CHATBOT=true` 才會呼叫 Gemini |
 
 ### Playwright 技術注意
 
@@ -335,7 +338,7 @@ E2E_ALLOW_TEST_DB_WRITES=true
 - Email、LINE、PayPal、綠界金流 / 物流都屬外部服務，日常 Playwright 應以 mock 為主，真實串接放獨立 integration。
 - 客製化表單內容透過 `sessionStorage.customConsultationNote` 帶到結帳，測試需在送出表單後同一 browser context 內完成結帳。
 - 商品資料來源同時包含資料庫商品與靜態備援資料，E2E fixture 需要明確指定商品 ID，避免 staging 資料變動造成斷言不穩。
-- 訂單結果頁目前在已付款且已完成時優先顯示付款成功文案，尚未呈現完成配送狀態；`order-status-ui.spec.ts` 已以 `fixme` 留下回歸驗證。
+- 真實 Chatbot 回答測試預設跳過，避免日常 E2E 誤打 Gemini；需要人工確認測試環境與 key 後，再用雙旗標執行。
 
 ---
 

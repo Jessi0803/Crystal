@@ -8,6 +8,8 @@ const testEnv = dotenv.parse(readFileSync(".env.test.local"));
 const testDatabaseUrl = testEnv.DATABASE_URL;
 const allowResendDelivery =
   process.env.RUN_RESEND_E2E === "true" && process.env.E2E_ALLOW_RESEND_DELIVERY === "true";
+const allowRealChatbot =
+  process.env.RUN_CHATBOT_REAL_E2E === "true" && process.env.E2E_ALLOW_REAL_CHATBOT === "true";
 
 if (!testDatabaseUrl) {
   throw new Error(".env.test.local must define DATABASE_URL for Playwright");
@@ -17,6 +19,13 @@ if (allowResendDelivery) {
   dotenv.config({ path: ".env.resend.local", override: false, quiet: true });
   if (!process.env.RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY must be configured in .env.resend.local for Resend E2E");
+  }
+}
+
+if (allowRealChatbot) {
+  dotenv.config({ path: ".env", override: false, quiet: true });
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY must be configured in .env for real Chatbot E2E");
   }
 }
 
@@ -60,6 +69,7 @@ export default defineConfig({
       SENDER_ZIPCODE: "100",
       SENDER_ADDRESS: "TestAddress",
       RESEND_API_KEY: allowResendDelivery ? process.env.RESEND_API_KEY ?? "" : "",
+      GEMINI_API_KEY: allowRealChatbot ? process.env.GEMINI_API_KEY ?? "" : "",
       VITE_ANALYTICS_ENDPOINT: "__e2e_analytics",
       VITE_ANALYTICS_WEBSITE_ID: "e2e",
     },
