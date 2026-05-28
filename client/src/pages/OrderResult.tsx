@@ -92,6 +92,15 @@ export default function OrderResult() {
   const getStatusConfig = () => {
     if (!order) return null;
 
+    if (order.paymentStatus === "failed" || order.orderStatus === "cancelled") {
+      return {
+        icon: <XCircle className="w-12 h-12 text-red-400" />,
+        title: order.paymentStatus === "failed" ? "付款失敗" : "訂單已取消",
+        desc: order.paymentStatus === "failed" ? "付款未成功，請重新嘗試或選擇其他付款方式。" : "此訂單已取消。",
+        color: "text-red-600",
+        bg: "bg-red-50",
+      };
+    }
     if (order.paymentStatus === "transfer_pending") {
       return {
         icon: <Banknote className="w-12 h-12 text-blue-400" />,
@@ -137,6 +146,15 @@ export default function OrderResult() {
         bg: "bg-emerald-50",
       };
     }
+    if (order.orderStatus === "not_picked") {
+      return {
+        icon: <Package className="w-12 h-12 text-orange-500" />,
+        title: "未取貨",
+        desc: "物流顯示包裹未取貨或已退回，請聯繫我們協助後續處理。",
+        color: "text-orange-600",
+        bg: "bg-orange-50",
+      };
+    }
     if (order.orderStatus === "completed") {
       return {
         icon: <CheckCircle className="w-12 h-12 text-emerald-500" />,
@@ -153,15 +171,6 @@ export default function OrderResult() {
         desc: "感謝您的購買，我們將盡快為您處理出貨事宜。",
         color: "text-green-600",
         bg: "bg-green-50",
-      };
-    }
-    if (order.paymentStatus === "failed" || order.orderStatus === "cancelled") {
-      return {
-        icon: <XCircle className="w-12 h-12 text-red-400" />,
-        title: order.paymentStatus === "failed" ? "付款失敗" : "訂單已取消",
-        desc: order.paymentStatus === "failed" ? "付款未成功，請重新嘗試或選擇其他付款方式。" : "此訂單已取消。",
-        color: "text-red-600",
-        bg: "bg-red-50",
       };
     }
     // 預設：待付款

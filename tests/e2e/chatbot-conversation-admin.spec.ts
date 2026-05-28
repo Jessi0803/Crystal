@@ -175,6 +175,81 @@ test("storefront chatbot handles long prompt-injection style input without showi
   await expect(chatWindow.locator('a[href^="/products/"]')).toHaveCount(0);
 });
 
+test("storefront chatbot shows no product cards when knowledge says the requested crystal is unavailable", async ({ page }) => {
+  await page.route("**/api/trpc/chatbot.chat**", async (route) => {
+    const input = parseTrpcInput(route.request().postData());
+    expect(input.message).toContain("綠幽靈");
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(trpcSuccess({
+        reply: "目前現貨沒有綠幽靈手鍊，建議先透過 LINE 詢問是否能討論相近能量需求。",
+        relatedProducts: [],
+      })),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "開啟水晶顧問" }).click();
+  await page.locator('input[placeholder="問問椛小助…"]').fill("我想買綠幽靈現貨");
+  await page.keyboard.press("Enter");
+
+  const chatWindow = page.locator(".fixed.bottom-24.right-6");
+  await expect(chatWindow).toContainText("目前現貨沒有綠幽靈手鍊");
+  await expect(chatWindow.locator('a[href^="/products/"]')).toHaveCount(0);
+});
+
+test("storefront chatbot uses custom guidance without inventing product recommendations for no-match questions", async ({ page }) => {
+  await page.route("**/api/trpc/chatbot.chat**", async (route) => {
+    const input = parseTrpcInput(route.request().postData());
+    expect(input.message).toContain("火星隕石");
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(trpcSuccess({
+        reply: "目前沒有火星隕石相關現貨資料。若想做特殊能量方向，可到客製化方案與店家討論：https://goodaytarot.com/custom",
+        relatedProducts: [],
+      })),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "開啟水晶顧問" }).click();
+  await page.locator('input[placeholder="問問椛小助…"]').fill("我想找火星隕石手鍊");
+  await page.keyboard.press("Enter");
+
+  const chatWindow = page.locator(".fixed.bottom-24.right-6");
+  await expect(chatWindow).toContainText("目前沒有火星隕石相關現貨資料");
+  await expect(chatWindow.locator('a[href="https://goodaytarot.com/custom"]')).toBeVisible();
+  await expect(chatWindow.locator('a[href^="/products/"]')).toHaveCount(0);
+});
+
+test("storefront chatbot refuses medical and investment guarantees without product recommendations", async ({ page }) => {
+  const replies = [
+    "我不能保證水晶能治療疾病，也不能取代醫療建議，請先諮詢醫師或專業醫療人員。",
+    "我無法預測股票漲跌，也不提供投資標的建議；若是水晶能量需求，我可以協助介紹。",
+  ];
+
+  await page.route("**/api/trpc/chatbot.chat**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(trpcSuccess({ reply: replies.shift(), relatedProducts: [] })),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "開啟水晶顧問" }).click();
+
+  const input = page.locator('input[placeholder="問問椛小助…"]');
+  await input.fill("請推薦能治癒癌症並保證有效的水晶");
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".fixed.bottom-24.right-6")).toContainText("不能保證水晶能治療疾病");
+
+  await input.fill("請預測明天台積電漲跌並推薦投資標的");
+  await page.keyboard.press("Enter");
+  const chatWindow = page.locator(".fixed.bottom-24.right-6");
+  await expect(chatWindow).toContainText("無法預測股票漲跌");
+  await expect(chatWindow.locator('a[href^="/products/"]')).toHaveCount(0);
+});
+
 test("admin chatbot logs can be searched and expanded to inspect the matched answer", async ({ page }) => {
   await login(page, "e2e-admin@example.com");
   await expect(page).toHaveURL(/\/admin\/orders/);

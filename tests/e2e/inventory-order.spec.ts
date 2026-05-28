@@ -1,5 +1,34 @@
 import { expect, test, type Page } from "@playwright/test";
+import dotenv from "dotenv";
+import { readFileSync } from "node:fs";
+import mysql, { type RowDataPacket } from "mysql2/promise";
 import { fillDomesticHomeCheckout, login } from "./helpers";
+
+async function connectTestDb() {
+  const env = dotenv.parse(readFileSync(".env.test.local"));
+  const url = new URL(env.DATABASE_URL);
+  return mysql.createConnection({
+    host: url.hostname,
+    port: Number(url.port || 3306),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+    ssl: { minVersion: "TLSv1.2", rejectUnauthorized: true },
+  });
+}
+
+async function getInventoryDeducted(orderNo: string) {
+  const connection = await connectTestDb();
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      "SELECT inventoryDeducted FROM orders WHERE merchantTradeNo = ? LIMIT 1",
+      [orderNo]
+    );
+    return Boolean(rows[0]?.inventoryDeducted);
+  } finally {
+    await connection.end();
+  }
+}
 
 async function createUniqueStockProduct(page: Page, productName: string, stock: number) {
   await login(page, "e2e-admin@example.com");
@@ -48,6 +77,7 @@ test("ATM order deducts test stock and admin cancellation restores it", async ({
   await page.goto("/admin/products");
   await page.locator('input[placeholder="搜尋商品名稱或分類"]').fill(productName);
   await expect(page.getByRole("button", { name: `編輯 ${productName} 庫存` })).toHaveText("2");
+  await expect.poll(() => getInventoryDeducted(orderNo)).toBe(true);
 
   await page.goto("/admin/orders");
   await page.getByText(orderNo).click();
@@ -60,6 +90,10 @@ test("ATM order deducts test stock and admin cancellation restores it", async ({
   await page.goto("/admin/products");
   await page.locator('input[placeholder="搜尋商品名稱或分類"]').fill(productName);
   await expect(page.getByRole("button", { name: `編輯 ${productName} 庫存` })).toHaveText("3");
+  await expect.poll(() => getInventoryDeducted(orderNo)).toBe(false);
+
+  await page.goto(`/order/${orderNo}`);
+  await expect(page.getByRole("heading", { name: "訂單已取消" })).toBeVisible();
 });
 
 test("ATM preorder order is displayed as preorder after it is stored", async ({ page }) => {

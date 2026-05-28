@@ -253,6 +253,11 @@ export async function restoreInventoryOnCancel(merchantTradeNo: string) {
         )
       );
   }
+
+  await db
+    .update(orders)
+    .set({ inventoryDeducted: false })
+    .where(eq(orders.merchantTradeNo, merchantTradeNo));
 }
 
 /**

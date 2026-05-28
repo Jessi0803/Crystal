@@ -29,7 +29,7 @@ async function createPaidOrderWithLogistics() {
         shippingAddress, receiverZipCode, inventoryDeducted, confirmedAt, createdAt, updatedAt
       ) VALUES (?, 'confirmed', 'atm', 'domestic', 'cvs_711', 'shipped', 1880,
         'E2E 物流測試', ?, '0912345678', '測試門市', '100', true, NOW(), NOW(), NOW())`,
-      [orderNo, `${orderNo.toLowerCase()}@example.com`]
+      [orderNo, "e2e-user@example.com"]
     );
     const [rows] = await connection.execute<RowDataPacket[]>(
       "SELECT id FROM orders WHERE merchantTradeNo = ? LIMIT 1",
@@ -80,7 +80,7 @@ async function postLogisticsNotify(request: APIRequestContext, logisticsNo: stri
     MerchantID: env.ECPAY_LOGISTICS_MERCHANT_ID ?? "2000933",
     MerchantTradeNo: logisticsNo,
     RtnCode: rtnCode,
-    RtnMsg: rtnCode === "300" ? "已到店" : "已取貨",
+    RtnMsg: rtnCode === "300" ? "已到店" : rtnCode === "3024" ? "已取貨" : "退件",
     AllPayLogisticsID: "E2ELOGISTICSID",
     LogisticsType: "CVS",
     LogisticsSubType: "UNIMARTC2C",
@@ -115,4 +115,27 @@ test("ECPay logistics notify updates order and storefront result status", async 
   });
   await page.goto(`/order/${orderNo}`);
   await expect(page.getByRole("heading", { name: "已取貨" })).toBeVisible();
+});
+
+test("ECPay logistics returned notify marks the order as not picked and updates member center", async ({ page, request }) => {
+  const { orderNo, logisticsNo } = await createPaidOrderWithLogistics();
+
+  await postLogisticsNotify(request, logisticsNo, "3022");
+  await expect.poll(() => getOrderAndLogisticsStatus(orderNo)).toMatchObject({
+    orderStatus: "not_picked",
+    logisticsStatus: "returned",
+  });
+
+  await page.goto(`/order/${orderNo}`);
+  await expect(page.getByRole("heading", { name: "未取貨" })).toBeVisible();
+
+  await page.goto("/login");
+  await page.locator('input[type="email"]').fill("e2e-user@example.com");
+  await page.locator('input[type="password"]').fill("Test123456");
+  await page.locator('button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/products/);
+
+  await page.goto("/member");
+  await expect(page.locator("body")).toContainText(`訂單 #${orderNo}`);
+  await expect(page.locator("body")).toContainText("未取貨");
 });
