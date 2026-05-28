@@ -24,6 +24,8 @@ const QUICK_QUESTIONS = [
   "如何開啟水晶能量？",
 ];
 
+const MAX_CHATBOT_MESSAGE_LENGTH = 500;
+
 const WELCOME_MESSAGE: Message = {
   role: "assistant",
   content:
@@ -106,6 +108,8 @@ export default function ChatBot() {
   const [showQuickQuestions, setShowQuickQuestions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isAtMessageLimit = input.length >= MAX_CHATBOT_MESSAGE_LENGTH;
+  const shouldShowMessageCount = input.length >= Math.floor(MAX_CHATBOT_MESSAGE_LENGTH * 0.8);
 
   const chatMutation = trpc.chatbot.chat.useMutation({
     onSuccess: (data) => {
@@ -153,9 +157,21 @@ export default function ChatBot() {
   }, []);
 
   const sendMessage = async (text: string) => {
-    if (!text.trim() || chatMutation.isPending) return;
+    const trimmedText = text.trim();
+    if (!trimmedText || chatMutation.isPending) return;
 
-    const userMessage: Message = { role: "user", content: text };
+    if (trimmedText.length > MAX_CHATBOT_MESSAGE_LENGTH) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `你的問題太長了，請縮短到 ${MAX_CHATBOT_MESSAGE_LENGTH} 字以內，我會更準確地幫你回答。`,
+        },
+      ]);
+      return;
+    }
+
+    const userMessage: Message = { role: "user", content: trimmedText };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setShowQuickQuestions(false);
@@ -167,7 +183,7 @@ export default function ChatBot() {
       .map((m) => ({ role: m.role, content: m.content }));
 
     chatMutation.mutate({
-      message: text,
+      message: trimmedText,
       history,
       sessionId: getChatbotSessionId(),
       pagePath: window.location.pathname,
@@ -433,34 +449,45 @@ export default function ChatBot() {
           {/* 輸入框 */}
           <form
             onSubmit={handleSubmit}
-            className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0"
+            className="px-3 py-2.5 flex-shrink-0"
             style={{ borderTop: "1px solid rgba(192, 132, 212, 0.2)" }}
           >
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="問問椛小助…"
-              className="flex-1 text-sm px-3 py-2 rounded-full outline-none"
-              style={{
-                background: "rgba(192, 132, 212, 0.08)",
-                border: "1px solid rgba(192, 132, 212, 0.25)",
-                color: "oklch(0.2 0 0)",
-                fontFamily: "'Noto Sans TC', sans-serif",
-              }}
-              disabled={chatMutation.isPending}
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || chatMutation.isPending}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                background: "linear-gradient(135deg, #c084d4, #9b59b6)",
-              }}
-            >
-              <Send className="w-4 h-4 text-white" />
-            </button>
+            {(shouldShowMessageCount || isAtMessageLimit) && (
+              <div
+                className={`mb-1.5 text-[0.65rem] font-body ${isAtMessageLimit ? "text-red-500" : "text-[oklch(0.55_0_0)]"}`}
+                role="status"
+              >
+                {isAtMessageLimit ? `請輸入 ${MAX_CHATBOT_MESSAGE_LENGTH} 字內` : `${input.length} / ${MAX_CHATBOT_MESSAGE_LENGTH}`}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                maxLength={MAX_CHATBOT_MESSAGE_LENGTH}
+                placeholder="問問椛小助…"
+                className="flex-1 text-sm px-3 py-2 rounded-full outline-none"
+                style={{
+                  background: "rgba(192, 132, 212, 0.08)",
+                  border: isAtMessageLimit ? "1px solid rgba(239, 68, 68, 0.65)" : "1px solid rgba(192, 132, 212, 0.25)",
+                  color: "oklch(0.2 0 0)",
+                  fontFamily: "'Noto Sans TC', sans-serif",
+                }}
+                disabled={chatMutation.isPending}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || chatMutation.isPending}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: "linear-gradient(135deg, #c084d4, #9b59b6)",
+                }}
+              >
+                <Send className="w-4 h-4 text-white" />
+              </button>
+            </div>
           </form>
         </div>
       )}
