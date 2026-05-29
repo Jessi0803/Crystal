@@ -215,6 +215,7 @@
 - 2026-05-28 第一批重要補測：新增真實 Chatbot 回答回歸測試，但預設跳過；只有同時設定 `RUN_CHATBOT_REAL_E2E=true` 與 `E2E_ALLOW_REAL_CHATBOT=true` 才會載入 `.env` 的 Gemini key 並實際測「尾款何時付、綠幽靈是否有貨、醫療保證、投資預測」四類問題。一般 `pnpm test:e2e` 不呼叫 Gemini。
 - 2026-05-28 第二批重要補測：後台商品新增後前台列表與詳情頁可見、下架/刪除後前台列表消失且詳情頁顯示找不到、排程到期後自動上架；會員中心會同步後台確認收款、備貨中、已取消；綠界物流 sandbox notify 可把訂單同步到已到店與已取貨。目標批次結果為 `21 passed, 1 skipped`，skipped 為桌機專案略過手機專屬後台操作案例。
 - 2026-05-28 第三批重要補測：綠界物流 sandbox 退件 callback 會同步為未取貨，前台訂單結果與會員中心同步；取消已扣庫存訂單會回補庫存並清除扣庫存旗標，避免重複取消造成庫存重複加回；Chatbot 對無現貨、無資料、醫療保證、投資預測問題不顯示商品推薦卡。目標批次結果為 `30 passed, 2 skipped`，skipped 為預設關閉的真實 Gemini Chatbot 測試。
+- 2026-05-29 第四批重要補測：結帳直接打 API 的空購物車與售完月限商品會被拒絕且不建立訂單，ATM 結帳連點只建立一張訂單；綠界付款 notify 的錯誤 CheckMacValue 不會改訂單或扣庫存，重複正確 notify 不會重複扣庫存，PayPal capture 失敗不會標已付款；未登入與一般會員直接打後台 tRPC API 會被擋。目標批次結果為 `20 passed`。
 
 ### 執行前安全設定
 
@@ -249,7 +250,10 @@ E2E_ALLOW_TEST_DB_WRITES=true
 | `tests/e2e/order-status-ui.spec.ts` | mock 付款失敗結果頁；已完成、已出貨、已到店、已取貨會優先顯示履約狀態，而不是只顯示付款成功 |
 | `tests/e2e/custom-forms.spec.ts` | 客製化入口、一般客製化表單到訂金結帳 |
 | `tests/e2e/recent-storefront-regressions.spec.ts` | 客製價格顯示、首頁封面三張輪播、自動切換與商品頁連結 |
+| `tests/e2e/checkout-guardrails.spec.ts` | 海外地址驗證不送單、售完月限商品繞過前端仍拒絕、空購物車直接打 API 拒絕、ATM 結帳連點只建立一張訂單 |
 | `tests/e2e/checkout-order.spec.ts` | 結帳必填驗證、超商取貨阻擋、ATM 下單、會員中心訂單，以及會員中心同步後台確認收款、備貨中、取消狀態 |
+| `tests/e2e/payment-callback-guardrails.spec.ts` | 綠界付款 notify 錯誤簽名不改訂單、重複正確 notify 不重複扣庫存、PayPal capture 失敗不標已付款 |
+| `tests/e2e/admin-api-guardrails.spec.ts` | 未登入與一般會員直接呼叫後台訂單、商品、庫存、營收、AI 紀錄 tRPC API 會被拒絕 |
 | `tests/e2e/ecpay-logistics-callback.spec.ts` | 綠界物流 sandbox notify 簽名驗證、已到店/已取貨/退件 callback 後同步訂單狀態、前台結果頁與會員中心 |
 | `tests/e2e/inventory-order.spec.ts` | 庫存扣減與取消回補、取消後清除扣庫存旗標、預購訂單標示、月限售完與零庫存預購差異 |
 | `tests/e2e/balance-payment.spec.ts` | 客製化訂金等待轉帳、訂金確認成功、產生尾款連結、尾款 ATM 末五碼與後台確認尾款 |
