@@ -475,14 +475,29 @@ export const orderRouter = router({
   updateOrderStatus: adminProcedure
     .input(z.object({
       orderId: z.number(),
-      status: z.enum(["pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled"]),
+      status: z.enum(["pending_payment", "transfer_pending", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled"]),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
+
+      // 轉帳待確認屬於「付款狀態」(paymentStatus)，不是訂單狀態(orderStatus)，
+      // 列表與統計也是用 paymentStatus 篩選，因此直接更新 paymentStatus。
+      if (input.status === "transfer_pending") {
+        await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq(orders.id, order.id));
+        return { success: true };
+      }
+
       await dbUpdateOrderStatus(order.merchantTradeNo, input.status);
+
+      if (input.status === "paid") {
+        // 改為已付款：標記付款並扣庫存，與綠界付款通知 / 確認轉帳的邏輯一致。
+        // deductInventoryAfterPayment 以 inventoryDeducted 旗標防止重複扣減。
+        await db.update(orders).set({ paymentStatus: "paid", paidAt: new Date() }).where(eq(orders.id, order.id));
+        await deductInventoryAfterPayment(order.merchantTradeNo);
+      }
       if (input.status === "cancelled") {
         await restoreInventoryOnCancel(order.merchantTradeNo);
       }

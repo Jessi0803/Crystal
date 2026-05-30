@@ -342,6 +342,9 @@ function OrderRowCard({
                     }}
                   >
                     <option value="">更新狀態...</option>
+                    <option value="transfer_pending">轉帳待確認</option>
+                    <option value="deposit_paid">已付訂金</option>
+                    <option value="paid">已付款</option>
                     <option value="processing">備貨中</option>
                     <option value="shipped">已出貨</option>
                     <option value="arrived">已到店</option>
