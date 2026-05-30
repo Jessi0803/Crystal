@@ -26,6 +26,17 @@ import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
+// 只允許導回本站的相對路徑（必須以單一 "/" 開頭），避免開放轉址。
+// 不合法時退回結帳頁。
+function safeReturnPath(p: unknown): string {
+  if (typeof p !== "string") return "/checkout";
+  // 去掉可能夾帶的 query/hash，只留路徑本身
+  const path = p.split(/[?#]/)[0];
+  if (!path.startsWith("/") || path.startsWith("//")) return "/checkout";
+  if (path.includes(":")) return "/checkout";
+  return path;
+}
+
 export function registerECPayRoutes(app: Application) {
   /**
    * 綠界金流付款結果通知（ReturnURL）
@@ -135,8 +146,12 @@ export function registerECPayRoutes(app: Application) {
     const forwardedProto1 = req.headers['x-forwarded-proto'] as string | undefined;
     const protocol1 = forwardedProto1 ? forwardedProto1.split(',')[0].trim() : req.protocol;
     const origin = `${protocol1}://${req.get("host")}`;
-    const serverReplyURL = `${origin}/api/ecpay/cvs-map-reply`;
-    const clientReplyURL = clientReturn || `${origin}/checkout`;
+    // 選完門市後要導回的前端頁面（結帳頁 /checkout 或尾款頁 /balance/xxx）。
+    // 把這個路徑帶進 ServerReplyURL 的 query，綠界 POST 回來時 cvs-map-reply 才知道
+    // 該 302 回哪一頁。safeReturnPath 防開放轉址（只允許本站相對路徑）。
+    const returnPath = safeReturnPath(clientReturn);
+    const serverReplyURL = `${origin}/api/ecpay/cvs-map-reply?to=${encodeURIComponent(returnPath)}`;
+    const clientReplyURL = `${origin}${returnPath}`;
 
     const params = buildCVSMapParams({
       logisticsMerchantTradeNo: tradeNo,
@@ -179,14 +194,16 @@ ${inputs}
       const cvsType = data.LogisticsSubType || ""; // UNIMART or FAMI
 
       // 同分頁跳轉：綠界選完門市後是整頁 POST 回來（top-level），直接 302 導回
-      // /checkout 並把門市資訊帶在 query string。不用 popup / opener / window.close，
-      // 桌機、手機、LINE 內建瀏覽器都能穩定回到結帳頁。
+      // 原本的前端頁面（結帳頁 /checkout 或尾款頁 /balance/xxx，由 ServerReplyURL
+      // 的 ?to= 帶過來），並把門市資訊帶在 query string。不用 popup / opener /
+      // window.close，桌機、手機、LINE 內建瀏覽器都能穩定回到原頁。
+      const returnPath = safeReturnPath(req.query.to);
       const qs = new URLSearchParams({
         cvsStoreId: storeId,
         cvsStoreName: storeName,
         cvsType,
       }).toString();
-      res.redirect(302, `/checkout?${qs}`);
+      res.redirect(302, `${returnPath}?${qs}`);
     } catch (err) {
       console.error("[ECPay CVS Map Reply] Error:", err);
       res.status(500).send("Error");

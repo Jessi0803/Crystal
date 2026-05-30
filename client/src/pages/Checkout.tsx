@@ -307,7 +307,7 @@ export default function Checkout() {
     }
     const subType = "UNIMARTC2C";
     const tradeNo = `MAP${Date.now()}`;
-    const clientReturn = encodeURIComponent(`${window.location.origin}/checkout`);
+    const clientReturn = encodeURIComponent(window.location.pathname);
     const mapURL = `/api/ecpay/cvs-map?tradeNo=${encodeURIComponent(tradeNo)}&subType=${subType}&clientReturn=${clientReturn}`;
     window.location.href = mapURL;
   };

@@ -22,6 +22,10 @@ type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
 type CheckoutRegion = "domestic" | "overseas";
 
+// 同分頁跳轉去綠界選店前暫存尾款頁表單，回來時還原（手機 / LINE 內建瀏覽器
+// 不支援 popup + window.close，必須整頁跳轉）。
+const BALANCE_FORM_KEY = "balance_form_state";
+
 export default function BalancePayment() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
@@ -83,20 +87,69 @@ export default function BalancePayment() {
     onError: (err) => toast.error(err.message || "送出失敗，請重試"),
   });
 
+  const applyStore = useRef((payload: { storeId?: string; storeName?: string; cvsType?: string }) => {
+    if (!payload?.storeId && !payload?.storeName) return;
+    setCvsStore({
+      storeId: payload.storeId ?? "",
+      storeName: payload.storeName ?? "",
+      cvsType: payload.cvsType ?? "",
+    });
+    setShippingMethod("cvs_711");
+    toast.success(`已選擇門市：${payload.storeName ?? ""}`);
+    if (cvsWindowRef.current && !cvsWindowRef.current.closed) {
+      cvsWindowRef.current.close();
+    }
+  }).current;
+
+  // 同分頁跳轉回來：綠界選完門市後 cvs-map-reply 會 302 導回本頁並把門市資訊帶在
+  // query string。不依賴 popup / opener / window.close，全裝置通用。
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const storeId = sp.get("cvsStoreId");
+    const storeName = sp.get("cvsStoreName");
+    if (!storeId && !storeName) return;
+
+    try {
+      const raw = sessionStorage.getItem(BALANCE_FORM_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod);
+        if (saved.checkoutRegion) setCheckoutRegion(saved.checkoutRegion);
+        if (saved.shippingMethod) setShippingMethod(saved.shippingMethod);
+        if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      sessionStorage.removeItem(BALANCE_FORM_KEY);
+    }
+
+    applyStore({
+      storeId: storeId ?? "",
+      storeName: storeName ?? "",
+      cvsType: sp.get("cvsType") ?? "",
+    });
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [applyStore]);
+
+  // 後備：若某些瀏覽器仍把選店開成新分頁，沿用 BroadcastChannel / postMessage 接收
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === "CVS_STORE_SELECTED") {
-        const { storeId, storeName, cvsType } = event.data;
-        setCvsStore({ storeId, storeName, cvsType });
-        toast.success(`已選擇門市：${storeName}`);
-        if (cvsWindowRef.current && !cvsWindowRef.current.closed) {
-          cvsWindowRef.current.close();
-        }
-      }
+      if (event.data?.type === "CVS_STORE_SELECTED") applyStore(event.data);
     };
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      channel = new BroadcastChannel("cvs_store_selected");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "CVS_STORE_SELECTED") applyStore(event.data);
+      };
+    }
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      channel?.close();
+    };
+  }, [applyStore]);
 
   const handleSubmitCode = () => {
     if (transferCode.length !== 5 || !/^\d+$/.test(transferCode)) {
@@ -187,15 +240,21 @@ export default function BalancePayment() {
     return Object.keys(nextErrors).length === 0;
   };
 
+  // 同分頁整頁跳轉去綠界選店（取代彈出視窗），桌機/手機/LINE 內建瀏覽器都能用。
+  // 跳轉前暫存表單，選完門市由 cvs-map-reply 302 導回本頁（?to= 帶本頁路徑）後還原。
   const handleSelectCvsStore = () => {
-    const tradeNo = `MAP${Date.now()}`;
-    const mapURL = `/api/ecpay/cvs-map?tradeNo=${encodeURIComponent(tradeNo)}&subType=UNIMARTC2C`;
-    const popup = window.open(mapURL, "ecpay_cvs_map", "width=1024,height=768,scrollbars=yes");
-    if (!popup) {
-      toast.error("無法開啟選店視窗，請允許彈出視窗後再試");
-      return;
+    try {
+      sessionStorage.setItem(
+        BALANCE_FORM_KEY,
+        JSON.stringify({ paymentMethod, checkoutRegion, shippingMethod, form })
+      );
+    } catch {
+      /* 暫存失敗仍可繼續 */
     }
-    cvsWindowRef.current = popup;
+    const tradeNo = `MAP${Date.now()}`;
+    const clientReturn = encodeURIComponent(window.location.pathname);
+    const mapURL = `/api/ecpay/cvs-map?tradeNo=${encodeURIComponent(tradeNo)}&subType=UNIMARTC2C&clientReturn=${clientReturn}`;
+    window.location.href = mapURL;
   };
 
   const startBalanceCheckout = () => {
