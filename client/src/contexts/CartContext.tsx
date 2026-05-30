@@ -1,6 +1,23 @@
 // Crystal Aura — 購物車狀態管理
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { Product } from "@/lib/data";
+
+// 購物車存進 sessionStorage：讓使用者在「同分頁跳轉去綠界選店」再回來時，
+// 購物車不會被清空（純記憶體 state 會在整頁導頁後消失）。sessionStorage 會
+// 在分頁關閉時自動清掉，不會像 localStorage 那樣長期殘留。
+const CART_STORAGE_KEY = "cart_items";
+
+function loadStoredCart(): CartItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export interface CartItem {
   id: string;
@@ -36,8 +53,17 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(loadStoredCart);
   const [isOpen, setIsOpen] = useState(false);
+
+  // items 變動時同步寫回 sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      /* 容量超過或無法寫入時略過，不影響購物流程 */
+    }
+  }, [items]);
 
   const addToCart = useCallback((
     product: Product,

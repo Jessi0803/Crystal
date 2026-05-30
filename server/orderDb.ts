@@ -110,6 +110,16 @@ async function attachItemsAndLogisticsForOrders(
   }));
 }
 
+// productImage 欄位是 TEXT（約 64KB）。內嵌 base64 圖（data: 開頭）或過長字串
+// 都會讓 insert 失敗，這裡一律不存（回傳 null），只保留正常網址。
+const MAX_PRODUCT_IMAGE_LEN = 60000;
+function sanitizeProductImage(image: string | null | undefined): string | null {
+  if (!image) return null;
+  if (image.startsWith("data:")) return null;
+  if (image.length > MAX_PRODUCT_IMAGE_LEN) return null;
+  return image;
+}
+
 export async function createOrder(
   orderData: InsertOrder,
   items: InsertOrderItem[]
@@ -130,6 +140,10 @@ export async function createOrder(
   const itemsWithOrderId = items.map((item) => ({
     ...item,
     orderId: created.id,
+    // productImage 欄位是 MySQL TEXT（上限約 64KB）。商品圖若是內嵌的
+    // base64 data URI（測試商品常見），長度動輒數百 KB，會讓 insert 直接失敗，
+    // 也會讓每筆訂單暴肥。這類圖片不存（存 null），只保留正常的網址圖。
+    productImage: sanitizeProductImage(item.productImage),
   }));
   await db.insert(orderItems).values(itemsWithOrderId);
 

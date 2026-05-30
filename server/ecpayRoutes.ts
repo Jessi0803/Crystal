@@ -178,65 +178,15 @@ ${inputs}
       const storeName = data.CVSStoreName || "";
       const cvsType = data.LogisticsSubType || ""; // UNIMART or FAMI
 
-      // 用 postMessage 把門市資訊傳回父視窗，然後關閉自己
-      const storeIdJson = JSON.stringify(storeId);
-      const storeNameJson = JSON.stringify(storeName);
-      const cvsTypeJson = JSON.stringify(cvsType);
-      const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>選店完成</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #fafafa; }
-  .card { background: white; border-radius: 12px; padding: 32px 24px; max-width: 320px; margin: 0 auto; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-  .icon { font-size: 48px; margin-bottom: 16px; }
-  h2 { font-size: 18px; color: #1a1a1a; margin: 0 0 8px; }
-  p { font-size: 14px; color: #666; margin: 0 0 24px; }
-  .store-name { font-size: 16px; font-weight: 600; color: #1a1a1a; background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 24px; }
-  button { background: #1a1a1a; color: white; border: none; padding: 14px 32px; border-radius: 8px; font-size: 15px; cursor: pointer; width: 100%; }
-  button:active { opacity: 0.8; }
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="icon">✅</div>
-  <h2>選店完成</h2>
-  <div class="store-name">${storeName}</div>
-  <p>門市資訊已傳回結帳頁面</p>
-  <button onclick="closeWindow()">關閉此視窗</button>
-</div>
-<script>
-  function sendMessage() {
-    try {
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'CVS_STORE_SELECTED',
-          storeId: ${storeIdJson},
-          storeName: ${storeNameJson},
-          cvsType: ${cvsTypeJson}
-        }, '*');
-      }
-    } catch(e) { console.error(e); }
-  }
-  function closeWindow() {
-    sendMessage();
-    try { window.close(); } catch(e) {}
-    // 備用：如果 close 被阻擋，嘗試導回結帳頁
-    setTimeout(function() {
-      if (!window.closed) {
-        try { window.location.href = window.opener ? 'about:blank' : '/checkout'; } catch(e) {}
-      }
-    }, 300);
-  }
-  // 自動發送 postMessage 並嘗試關閉
-  sendMessage();
-  setTimeout(function() {
-    try { window.close(); } catch(e) {}
-  }, 800);
-<\/script>
-</body>
-</html>`;
-      res.send(html);
+      // 同分頁跳轉：綠界選完門市後是整頁 POST 回來（top-level），直接 302 導回
+      // /checkout 並把門市資訊帶在 query string。不用 popup / opener / window.close，
+      // 桌機、手機、LINE 內建瀏覽器都能穩定回到結帳頁。
+      const qs = new URLSearchParams({
+        cvsStoreId: storeId,
+        cvsStoreName: storeName,
+        cvsType,
+      }).toString();
+      res.redirect(302, `/checkout?${qs}`);
     } catch (err) {
       console.error("[ECPay CVS Map Reply] Error:", err);
       res.status(500).send("Error");
