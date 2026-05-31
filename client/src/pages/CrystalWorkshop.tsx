@@ -166,9 +166,6 @@ export default function CrystalWorkshop() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="aspect-square bg-[#3D3D3D] rounded-2xl overflow-hidden shadow-lg relative group">
                       <img src="/images/workshop-small-class.jpg" className="w-full h-full object-cover object-center opacity-80 transition-transform duration-700 group-hover:scale-105" alt="小班制教學體驗" />
-                      <div className="absolute inset-x-0 bottom-0 px-5 py-4 bg-gradient-to-t from-black/45 to-transparent">
-                        <p className="font-serif-en text-[0.65rem] tracking-[0.24em] text-white/90 uppercase">Bracelet · Charm · Necklace</p>
-                      </div>
                     </div>
                     <div className="aspect-square bg-[#D8C3BD]/30 rounded-2xl p-6 flex flex-col justify-center">
                       <Sparkles className="w-8 h-8 text-[#8E735B] mb-4" />
@@ -178,8 +175,12 @@ export default function CrystalWorkshop() {
                     </div>
                     <div className="col-span-2 aspect-[16/9] bg-[#3D3D3D] rounded-2xl overflow-hidden relative group">
                       <img src="/images/workshop-products.jpg" className="w-full h-full object-cover object-center opacity-60 transition-transform duration-700 group-hover:scale-110" alt="手鍊吊飾項鍊作品展示" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-white font-serif-zh tracking-[0.5em] text-lg">3件商品實戰</p>
+                      <div className="absolute inset-x-0 top-0 grid grid-cols-3 px-4 pt-6 text-center">
+                        {["Bracelet", "Necklace", "Charm"].map((label) => (
+                          <p key={label} className="font-serif-en text-[0.65rem] tracking-[0.24em] text-white/90 uppercase">
+                            {label}
+                          </p>
+                        ))}
                       </div>
                     </div>
                   </div>
