@@ -364,7 +364,7 @@
 
   .category-title-en {
     font-family: 'Cormorant Garamond', 'Noto Serif TC', 'Times New Roman', serif;
-    font-size: clamp(0.95rem, 1.38vw, 1.32rem);
+    font-size: clamp(1.05rem, 1.55vw, 1.48rem);
     font-weight: 300;
     line-height: 1.18;
     letter-spacing: 0.16em;
@@ -375,7 +375,7 @@
   .category-title-zh {
     margin-top: 0.55rem;
     font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
-    font-size: clamp(0.68rem, 0.9vw, 0.82rem);
+    font-size: clamp(0.74rem, 1vw, 0.92rem);
     font-weight: 300;
     letter-spacing: 0.22em;
     color: oklch(1 0 0 / 0.82);
@@ -384,13 +384,13 @@
 
   @media (max-width: 639px) {
     .category-title-en {
-      font-size: 0.78rem;
+      font-size: 0.86rem;
       letter-spacing: 0.12em;
     }
 
     .category-title-zh {
       margin-top: 0.4rem;
-      font-size: 0.62rem;
+      font-size: 0.68rem;
       letter-spacing: 0.16em;
     }
   }
