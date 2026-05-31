@@ -162,8 +162,11 @@ export default function CrystalWorkshop() {
                 </div>
                 <div className="scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-300">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="aspect-square bg-[#E5DCD5] rounded-2xl overflow-hidden shadow-lg">
-                      <img src="/workshop-cover.jpg" className="w-full h-full object-cover" alt="課程細節圖" />
+                    <div className="aspect-square bg-[#3D3D3D] rounded-2xl overflow-hidden shadow-lg relative group">
+                      <img src="/images/workshop-products.jpg" className="w-full h-full object-cover object-center opacity-80 transition-transform duration-700 group-hover:scale-105" alt="手鍊吊飾項鍊作品展示" />
+                      <div className="absolute inset-x-0 bottom-0 px-5 py-4 bg-gradient-to-t from-black/45 to-transparent">
+                        <p className="font-serif-en text-[0.65rem] tracking-[0.24em] text-white/90 uppercase">Bracelet · Charm · Necklace</p>
+                      </div>
                     </div>
                     <div className="aspect-square bg-[#D8C3BD]/30 rounded-2xl p-6 flex flex-col justify-center">
                       <Sparkles className="w-8 h-8 text-[#8E735B] mb-4" />
