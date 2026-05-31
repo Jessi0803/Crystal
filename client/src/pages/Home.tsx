@@ -23,10 +23,11 @@ const heroSlides = [
   { src: "/images/d-design/d003.jpg", alt: "D003 金色珍珠水晶設計手鍊" },
   { src: "/images/d-design/d004.jpg", alt: "D004 淡粉色水晶設計手鍊" },
 ];
-const CATEGORY_LOVE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-love-X75rNAvxcwjFRqwpUsjeai.webp";
-const CATEGORY_WEALTH_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-wealth-SRBHHLNZEuUcHwN4ofwAxa.webp";
-const CATEGORY_PROTECT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-protect-HSkaBEr6CpuJ465gjEc5jR.webp";
-const HERO_BANNER2_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/hero-banner-2-ef9YyJoSCCnxBrg7VtEVxu.webp";
+const CATEGORY_LOVE_IMG = "/images/categories/love.jpg";
+const CATEGORY_WEALTH_IMG = "/images/categories/wealth.jpg";
+const CATEGORY_PROTECT_IMG = "/images/categories/protect.jpg";
+const CATEGORY_HEALING_IMG = "/images/categories/healing.jpg";
+const HERO_BANNER2_IMG = "/images/categories/healing.jpg";
 const customerReviewImages = Array.from(
   { length: 15 },
   (_, index) => `/reviews/review-${String(index + 1).padStart(2, "0")}.jpg`
@@ -59,7 +60,7 @@ const categoryCards = [
     zh: "療癒系列",
     desc: "舒緩焦慮・內在平衡",
     href: "/products?category=healing",
-    img: HERO_BANNER2_IMG,
+    img: CATEGORY_HEALING_IMG,
   },
 ];
 
@@ -306,9 +307,7 @@ export default function Home() {
               <div className="split-card h-[55vw] sm:h-[40vw] lg:h-[60vh]">
                 <img src={cat.img} alt={cat.zh} loading="lazy" />
                 <div className="split-card-overlay">
-                  <p className="text-[0.6rem] tracking-[0.2em] text-white/80 font-body mb-1">{cat.en}</p>
-                  <h3 className="text-xl text-white font-medium" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{cat.zh}</h3>
-                  <p className="text-[0.65rem] text-white/70 font-body mt-1">{cat.desc}</p>
+                  <h3 className="category-title-en">{cat.en}</h3>
                 </div>
               </div>
             </Link>
