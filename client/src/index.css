@@ -344,53 +344,54 @@
 
   .split-card-overlay {
     position: absolute;
+    top: 0;
     bottom: 0;
     left: 0;
     right: 0;
     display: flex;
-    min-height: 54%;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: center;
     padding: clamp(1.25rem, 3vw, 2.5rem);
     text-align: center;
     background: linear-gradient(
-      to top,
-      oklch(0 0 0 / 0.46) 0%,
-      oklch(0 0 0 / 0.18) 48%,
-      transparent 100%
+      to bottom,
+      oklch(0 0 0 / 0.1) 0%,
+      oklch(0 0 0 / 0.28) 48%,
+      oklch(0 0 0 / 0.12) 100%
     );
   }
 
   .category-title-en {
-    font-family: 'Cormorant Garamond', 'Times New Roman', serif;
-    font-size: clamp(1.2rem, 2vw, 1.85rem);
+    font-family: 'Cormorant Garamond', 'Noto Serif TC', 'Times New Roman', serif;
+    font-size: clamp(0.95rem, 1.38vw, 1.32rem);
     font-weight: 300;
-    line-height: 1.05;
-    letter-spacing: 0.1em;
-    color: oklch(1 0 0 / 0.92);
-    text-shadow: 0 2px 18px oklch(0 0 0 / 0.28);
+    line-height: 1.18;
+    letter-spacing: 0.16em;
+    color: oklch(1 0 0 / 0.9);
+    text-shadow: 0 2px 18px oklch(0 0 0 / 0.3);
   }
 
   .category-title-zh {
-    margin-top: 0.45rem;
-    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: clamp(0.72rem, 1vw, 0.9rem);
+    margin-top: 0.55rem;
+    font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+    font-size: clamp(0.68rem, 0.9vw, 0.82rem);
     font-weight: 300;
-    letter-spacing: 0.18em;
-    color: oklch(1 0 0 / 0.86);
+    letter-spacing: 0.22em;
+    color: oklch(1 0 0 / 0.82);
     text-shadow: 0 2px 14px oklch(0 0 0 / 0.24);
   }
 
   @media (max-width: 639px) {
     .category-title-en {
-      font-size: 0.95rem;
-      letter-spacing: 0.08em;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
     }
 
     .category-title-zh {
-      font-size: 0.68rem;
-      letter-spacing: 0.14em;
+      margin-top: 0.4rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
     }
   }
 
