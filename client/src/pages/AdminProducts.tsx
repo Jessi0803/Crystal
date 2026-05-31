@@ -560,7 +560,7 @@ function ProductModal({
       categoryLabels,
       price: parseInt(form.price, 10),
       originalPrice,
-      priceRange: formattedPriceRange || undefined,
+      priceRange: formattedPriceRange || null,
       image: imageUrl,
       images: galleryImages,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),

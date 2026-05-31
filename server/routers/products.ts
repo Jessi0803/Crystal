@@ -237,7 +237,7 @@ const ProductInputSchema = z.object({
   categoryLabels: z.array(z.string()).default([]),
   price: z.number().int().min(0),
   originalPrice: z.number().int().min(0).nullable().optional(),
-  priceRange: z.string().optional(),
+  priceRange: z.string().nullable().optional(),
   depositRange: z.string().optional(),
   image: z.string().min(1),
   images: z.array(z.string().min(1)).default([]),
