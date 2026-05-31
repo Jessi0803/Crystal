@@ -118,7 +118,7 @@ const knowledgeChunks = [
   },
   {
     id: "faq-workshop-price",
-    embedText: "水晶創業全能班費用 創業班費用 課程內容 大綱 12888 桃園 報名",
+    embedText: "水晶創業全能班費用 創業班費用 課程內容 大綱 12888 桃園 報名 彈力繩 磁扣 龍蝦扣 U型扣 項鍊 吊飾",
   },
   {
     id: "faq-crystal-energy-real",

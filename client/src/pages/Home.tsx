@@ -308,6 +308,7 @@ export default function Home() {
                 <img src={cat.img} alt={cat.zh} loading="lazy" />
                 <div className="split-card-overlay">
                   <h3 className="category-title-en">{cat.en}</h3>
+                  <p className="category-title-zh">{cat.zh}</p>
                 </div>
               </div>
             </Link>

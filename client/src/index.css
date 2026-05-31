@@ -372,10 +372,25 @@
     text-shadow: 0 2px 18px oklch(0 0 0 / 0.28);
   }
 
+  .category-title-zh {
+    margin-top: 0.45rem;
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: clamp(0.72rem, 1vw, 0.9rem);
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    color: oklch(1 0 0 / 0.86);
+    text-shadow: 0 2px 14px oklch(0 0 0 / 0.24);
+  }
+
   @media (max-width: 639px) {
     .category-title-en {
       font-size: 0.95rem;
       letter-spacing: 0.08em;
+    }
+
+    .category-title-zh {
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
     }
   }
 
