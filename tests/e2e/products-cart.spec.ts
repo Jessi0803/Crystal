@@ -71,6 +71,29 @@ test("bracelet options and cart controls update line price and quantity", async 
   await expect(drawer).toContainText("你的購物袋是空的");
 });
 
+test("monthly limited products keep wrist size through checkout without clasp options", async ({ page }) => {
+  await page.goto("/products/e2e-monthly-in-stock");
+
+  await page.getByRole("combobox").selectOption("16.5");
+  await expect(page.locator("body")).not.toContainText("扣件類型");
+  await expect(page.getByRole("button", { name: /龍蝦扣/ })).toHaveCount(0);
+  await page.getByRole("button", { name: /微鬆/ }).click();
+  await page.getByRole("button", { name: /加入購物袋/ }).click();
+
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText("手圍 16.5 cm");
+  await expect(drawer).not.toContainText("龍蝦扣");
+  await expect(drawer).toContainText("微鬆");
+  await expect(drawer).toContainText("NT$ 980");
+
+  await drawer.getByRole("button", { name: "前往結帳" }).click();
+  await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("E2E 月限現貨商品");
+  await expect(page.locator("body")).toContainText("手圍 16.5 cm");
+  await expect(page.locator("body")).not.toContainText("龍蝦扣");
+  await expect(page.locator("body")).toContainText("微鬆");
+});
+
 test("adjustable bracelets offer only 13 to 19 cm and retain a boundary size in checkout", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-in-stock");
 

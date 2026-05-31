@@ -194,8 +194,10 @@ export default function ProductDetail() {
     );
   }
 
-  const isCustomizableProduct =
+  const usesTieredBraceletPricing =
     product.id !== "d003-venus" && product.howToUse.some((line) => line.includes("手圍"));
+  const hasWristSizeOption = product.category !== "custom" && (product.isMonthlyLimited === true || usesTieredBraceletPricing);
+  const hasClaspOption = usesTieredBraceletPricing;
   const visibleTags = product.tags;
   const galleryImages = getProductImages(product);
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
@@ -204,14 +206,14 @@ export default function ProductDetail() {
   const wristSizeNumber = Number(selectedWristSize);
   const isMoonClearHeart = product.id === "d005-moon-clear-heart";
   const isMorningWhisper = product.id === "d004-morning-whisper";
-  const basePrice = isCustomizableProduct
+  const basePrice = usesTieredBraceletPricing
     ? wristSizeNumber <= 13.5
       ? isMorningWhisper ? 1700 : isMoonClearHeart ? 1400 : 1480
       : wristSizeNumber <= 17
         ? isMorningWhisper ? 1800 : isMoonClearHeart ? 1500 : 1580
         : isMorningWhisper ? 1900 : isMoonClearHeart ? 1600 : 1680
     : product.price;
-  const claspExtra = isCustomizableProduct && selectedClaspType !== "elastic" ? 200 : 0;
+  const claspExtra = hasClaspOption && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
   const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
@@ -250,8 +252,14 @@ export default function ProductDetail() {
     for (let i = 0; i < qty; i++) {
       addToCart(
         product,
-        isCustomizableProduct
-          ? { unitPrice: currentPrice, wristSize: selectedWristSize, claspType: selectedClaspType, fitPreference: selectedFitPreference, isPreorder: isPreorderItem }
+        hasWristSizeOption
+          ? {
+              unitPrice: currentPrice,
+              wristSize: selectedWristSize,
+              claspType: hasClaspOption ? selectedClaspType : undefined,
+              fitPreference: selectedFitPreference,
+              isPreorder: isPreorderItem,
+            }
           : { fitPreference: selectedFitPreference, isPreorder: isPreorderItem }
       );
     }
@@ -525,7 +533,7 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {isCustomizableProduct && (
+            {hasWristSizeOption && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
                 <div>
                   <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">手圍尺寸</p>
@@ -541,38 +549,40 @@ export default function ProductDetail() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">扣件類型</p>
-                    <p className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2">點選看示意圖</p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {claspChoices.map((opt) => (
-                      <button
-                        type="button"
-                        key={opt.id}
-                        onClick={() => { setSelectedClaspType(opt.id); setHasSelectedClasp(true); }}
-                        className={`px-2 py-2.5 text-xs font-body border-2 transition-colors text-center rounded-sm ${
-                          selectedClaspType === opt.id && hasSelectedClasp
-                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                            : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
-                        }`}
-                      >
-                        <span className="block font-medium">{opt.label}</span>
-                        <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.price}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {hasSelectedClasp && (
-                    <div className="mt-3 bg-[oklch(0.97_0_0)] rounded-sm p-2">
-                      <img
-                        src={claspChoices.find((o) => o.id === selectedClaspType)!.img}
-                        alt={selectedClaspType}
-                        className="w-full max-h-56 object-contain rounded-sm"
-                      />
+                {hasClaspOption && (
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">扣件類型</p>
+                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2">點選看示意圖</p>
                     </div>
-                  )}
-                </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {claspChoices.map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.id}
+                          onClick={() => { setSelectedClaspType(opt.id); setHasSelectedClasp(true); }}
+                          className={`px-2 py-2.5 text-xs font-body border-2 transition-colors text-center rounded-sm ${
+                            selectedClaspType === opt.id && hasSelectedClasp
+                              ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                              : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                          }`}
+                        >
+                          <span className="block font-medium">{opt.label}</span>
+                          <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.price}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {hasSelectedClasp && (
+                      <div className="mt-3 bg-[oklch(0.97_0_0)] rounded-sm p-2">
+                        <img
+                          src={claspChoices.find((o) => o.id === selectedClaspType)!.img}
+                          alt={selectedClaspType}
+                          className="w-full max-h-56 object-contain rounded-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div>
                   <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
                   <div className="grid grid-cols-2 gap-2">
@@ -596,7 +606,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {!isCustomizableProduct && product.category !== "custom" && (
+            {!hasWristSizeOption && product.category !== "custom" && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
                 <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
                 <div className="grid grid-cols-2 gap-2">
