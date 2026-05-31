@@ -14,6 +14,12 @@ import {
   getCustomPriceDisplay,
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
+import {
+  applySaleRate,
+  getSaleRate,
+  getTieredBraceletBasePrice,
+  usesTieredBraceletPricing,
+} from "@/lib/pricing";
 import { IN_STOCK_FULFILLMENT_NOTE, PREORDER_FULFILLMENT_NOTE } from "@shared/fulfillment";
 
 const tarotReadingCategories = [
@@ -194,27 +200,26 @@ export default function ProductDetail() {
     );
   }
 
-  const usesTieredBraceletPricing =
-    product.id !== "d003-venus" && product.howToUse.some((line) => line.includes("手圍"));
-  const hasWristSizeOption = product.category !== "custom" && (product.isMonthlyLimited === true || usesTieredBraceletPricing);
-  const hasClaspOption = usesTieredBraceletPricing;
+  const hasTieredBraceletPricing = usesTieredBraceletPricing(product);
+  const hasWristSizeOption = product.category !== "custom" && (product.isMonthlyLimited === true || hasTieredBraceletPricing);
+  const hasClaspOption = hasTieredBraceletPricing;
   const visibleTags = product.tags;
   const galleryImages = getProductImages(product);
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
     ? selectedGalleryImage
     : galleryImages[0] ?? product.image;
   const wristSizeNumber = Number(selectedWristSize);
-  const isMoonClearHeart = product.id === "d005-moon-clear-heart";
-  const isMorningWhisper = product.id === "d004-morning-whisper";
-  const basePrice = usesTieredBraceletPricing
-    ? wristSizeNumber <= 13.5
-      ? isMorningWhisper ? 1700 : isMoonClearHeart ? 1400 : 1480
-      : wristSizeNumber <= 17
-        ? isMorningWhisper ? 1800 : isMoonClearHeart ? 1500 : 1580
-        : isMorningWhisper ? 1900 : isMoonClearHeart ? 1600 : 1680
+  const saleRate = getSaleRate(product);
+  const originalBasePrice = hasTieredBraceletPricing
+    ? getTieredBraceletBasePrice(product.id, wristSizeNumber)
+    : product.price;
+  const basePrice = hasTieredBraceletPricing
+    ? applySaleRate(originalBasePrice, saleRate)
     : product.price;
   const claspExtra = hasClaspOption && selectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
+  const originalCurrentPrice = originalBasePrice + claspExtra;
+  const hasCurrentPriceSale = hasTieredBraceletPricing && currentPrice < originalCurrentPrice;
   const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
@@ -386,7 +391,23 @@ export default function ProductDetail() {
 
             {/* Price */}
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
-              {product.priceRange ? (
+              {hasTieredBraceletPricing ? (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                    NT$ {currentPrice.toLocaleString()}
+                  </span>
+                  {hasCurrentPriceSale && (
+                    <>
+                      <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
+                        NT$ {originalCurrentPrice.toLocaleString()}
+                      </span>
+                      <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
+                        省 NT$ {(originalCurrentPrice - currentPrice).toLocaleString()}
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : product.priceRange ? (
                 <>
                   {isTarotDepositProduct ? (
                     <div className="space-y-5">
