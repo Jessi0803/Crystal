@@ -26,6 +26,8 @@ type FormState = {
   name: string;
   subtitle: string;
   categories: string[];
+  originalPrice: string;
+  discountRate: string;
   price: string;
   priceRange: string;
   image: string;
@@ -46,6 +48,8 @@ const DEFAULT_FORM: FormState = {
   name: "",
   subtitle: "",
   categories: ["healing"],
+  originalPrice: "",
+  discountRate: "",
   price: "",
   priceRange: "",
   image: "",
@@ -113,6 +117,20 @@ function formatPriceRange(value: string) {
   }
 
   return /^NT\$/i.test(normalized) ? normalized.replace(/^nt\$/i, "NT$") : normalized;
+}
+
+function calculateDiscountedPrice(originalPrice: string, discountRate: string) {
+  const original = Number(originalPrice);
+  const rate = Number(discountRate);
+  if (!Number.isFinite(original) || original < 0) return "";
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 10) return "";
+  return String(Math.round(original * (rate / 10)));
+}
+
+function formatDiscountRate(price?: number | null, originalPrice?: number | null) {
+  if (!price || !originalPrice || originalPrice <= 0 || price >= originalPrice) return "";
+  const rate = (price / originalPrice) * 10;
+  return Number.isInteger(rate) ? String(rate) : rate.toFixed(1).replace(/\.0$/, "");
 }
 
 function getCategoryLabel(category: string) {
@@ -287,7 +305,16 @@ function ProductRow({
           {product.priceRange ? (
             <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">{product.priceRange}</p>
           ) : (
-            <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">NT$ {product.price.toLocaleString()}</p>
+            <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">
+              {product.originalPrice && product.originalPrice > product.price ? (
+                <>
+                  <span className="line-through text-[oklch(0.62_0_0)] mr-1">NT$ {product.originalPrice.toLocaleString()}</span>
+                  <span>NT$ {product.price.toLocaleString()}</span>
+                </>
+              ) : (
+                <>NT$ {product.price.toLocaleString()}</>
+              )}
+            </p>
           )}
         </div>
 
@@ -378,6 +405,8 @@ function ProductModal({
           name: editing.name,
           subtitle: editing.subtitle ?? "",
           categories: editing.categories?.length ? editing.categories : [editing.category],
+          originalPrice: editing.originalPrice ? String(editing.originalPrice) : "",
+          discountRate: formatDiscountRate(editing.price, editing.originalPrice),
           price: String(editing.price),
           priceRange: editing.priceRange ?? "",
           image: editing.image,
@@ -485,9 +514,28 @@ function ProductModal({
     setGalleryImages([selected, ...images]);
   };
 
+  const handleOriginalPriceChange = (value: string) => {
+    setForm((p) => {
+      const price = calculateDiscountedPrice(value, p.discountRate);
+      return { ...p, originalPrice: value, price: price || p.price };
+    });
+  };
+
+  const handleDiscountRateChange = (value: string) => {
+    setForm((p) => {
+      const price = calculateDiscountedPrice(p.originalPrice, value);
+      return { ...p, discountRate: value, price: price || p.price };
+    });
+  };
+
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error("請填寫商品名稱"); return; }
     if (!form.price || isNaN(Number(form.price))) { toast.error("請填寫正確價格"); return; }
+    if (form.originalPrice && isNaN(Number(form.originalPrice))) { toast.error("請填寫正確原價"); return; }
+    if (form.discountRate && (isNaN(Number(form.discountRate)) || Number(form.discountRate) <= 0 || Number(form.discountRate) > 10)) {
+      toast.error("折數請填 0.1 到 10 之間，例如 8 代表 8 折");
+      return;
+    }
     if (selectedCategories.length === 0) { toast.error("請至少選擇一個分類"); return; }
 
     const galleryImages = form.images.map(normalizeImageUrl).filter(Boolean);
@@ -501,6 +549,7 @@ function ProductModal({
     }
 
     const formattedPriceRange = formatPriceRange(form.priceRange);
+    const originalPrice = form.originalPrice ? parseInt(form.originalPrice, 10) : null;
     const data = {
       name: form.name.trim(),
       subtitle: form.subtitle.trim(),
@@ -509,6 +558,7 @@ function ProductModal({
       categories: selectedCategories,
       categoryLabels,
       price: parseInt(form.price, 10),
+      originalPrice,
       priceRange: formattedPriceRange || undefined,
       image: imageUrl,
       images: galleryImages,
@@ -642,7 +692,7 @@ function ProductModal({
           </label>
 
           {/* Category + Price row */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <div>
               <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">分類 *</span>
               <div className="grid grid-cols-2 gap-2 border border-[oklch(0.86_0_0)] p-2">
@@ -664,17 +714,43 @@ function ProductModal({
                 ))}
               </div>
             </div>
-            <label className="block">
-              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">價格（NT$）*</span>
-              <input
-                type="number"
-                min={0}
-                value={form.price}
-                onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
-                placeholder="1200"
-                className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
-              />
-            </label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">原價（NT$）</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.originalPrice}
+                  onChange={(e) => handleOriginalPriceChange(e.target.value)}
+                  placeholder="1500"
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">幾折</span>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  value={form.discountRate}
+                  onChange={(e) => handleDiscountRateChange(e.target.value)}
+                  placeholder="8"
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">售價（NT$）*</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.price}
+                  onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
+                  placeholder="1200"
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                />
+              </label>
+            </div>
           </div>
 
           {/* Tags + Initial Stock row */}
