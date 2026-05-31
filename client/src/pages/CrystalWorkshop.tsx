@@ -151,7 +151,9 @@ export default function CrystalWorkshop() {
                     <div className="p-6 bg-white border border-[#E5DCD5] rounded-xl hover:shadow-md transition-shadow">
                       <BookOpen className="w-6 h-6 text-[#8E735B] mb-4" />
                       <h4 className="font-serif-zh text-sm mb-2">3件作品實戰</h4>
-                      <p className="text-xs text-gray-400">掌握 6 種核心製作方法</p>
+                      <p className="text-xs text-gray-400 leading-relaxed">
+                        掌握 6 種核心製作方法，包涵（彈力繩獨家不易鬆脫綁法、磁扣、龍蝦扣、U 型扣、項鍊、吊飾）
+                      </p>
                     </div>
                     <div className="p-6 bg-white border border-[#E5DCD5] rounded-xl hover:shadow-md transition-shadow">
                       <Briefcase className="w-6 h-6 text-[#8E735B] mb-4" />
@@ -163,7 +165,7 @@ export default function CrystalWorkshop() {
                 <div className="scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-300">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="aspect-square bg-[#3D3D3D] rounded-2xl overflow-hidden shadow-lg relative group">
-                      <img src="/images/workshop-products.jpg" className="w-full h-full object-cover object-center opacity-80 transition-transform duration-700 group-hover:scale-105" alt="手鍊吊飾項鍊作品展示" />
+                      <img src="/images/workshop-small-class.jpg" className="w-full h-full object-cover object-center opacity-80 transition-transform duration-700 group-hover:scale-105" alt="小班制教學體驗" />
                       <div className="absolute inset-x-0 bottom-0 px-5 py-4 bg-gradient-to-t from-black/45 to-transparent">
                         <p className="font-serif-en text-[0.65rem] tracking-[0.24em] text-white/90 uppercase">Bracelet · Charm · Necklace</p>
                       </div>
@@ -175,9 +177,9 @@ export default function CrystalWorkshop() {
                       </p>
                     </div>
                     <div className="col-span-2 aspect-[16/9] bg-[#3D3D3D] rounded-2xl overflow-hidden relative group">
-                      <img src="/images/workshop-small-class.jpg" className="w-full h-full object-cover object-center opacity-60 transition-transform duration-700 group-hover:scale-110" alt="小班制教學體驗" />
+                      <img src="/images/workshop-products.jpg" className="w-full h-full object-cover object-center opacity-60 transition-transform duration-700 group-hover:scale-110" alt="手鍊吊飾項鍊作品展示" />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-white font-serif-zh tracking-[0.5em] text-lg">小班制教學體驗</p>
+                        <p className="text-white font-serif-zh tracking-[0.5em] text-lg">3件商品實戰</p>
                       </div>
                     </div>
                   </div>
