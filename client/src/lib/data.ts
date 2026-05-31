@@ -14,6 +14,7 @@ export interface Product {
   priceRange?: string;
   depositRange?: string;
   image: string;
+  images?: string[];
   tags: string[];
   description: string;
   story: string;

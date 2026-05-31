@@ -88,6 +88,10 @@ function CustomPriceTile({
   );
 }
 
+function getProductImages(product: { image: string; images?: string[] }) {
+  return product.images?.length ? product.images : [product.image].filter(Boolean);
+}
+
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const utils = trpc.useUtils();
@@ -104,6 +108,7 @@ export default function ProductDetail() {
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
   const [selectedTarotReadingName, setSelectedTarotReadingName] = useState(tarotReadingCategories[0].items[0].name);
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState("");
   const wristSizes = ["13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
   const claspChoices = [
     { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
@@ -130,6 +135,7 @@ export default function ProductDetail() {
   useEffect(() => {
     setActiveTab((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
     setHasSelectedClasp(false);
+    setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
   }, [id, product?.id]);
 
   if (isLoading && !product) {
@@ -167,6 +173,10 @@ export default function ProductDetail() {
   const isCustomizableProduct =
     product.id !== "d003-venus" && product.howToUse.some((line) => line.includes("手圍"));
   const visibleTags = product.tags;
+  const galleryImages = getProductImages(product);
+  const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
+    ? selectedGalleryImage
+    : galleryImages[0] ?? product.image;
   const wristSizeNumber = Number(selectedWristSize);
   const isMoonClearHeart = product.id === "d005-moon-clear-heart";
   const isMorningWhisper = product.id === "d004-morning-whisper";
@@ -268,13 +278,42 @@ export default function ProductDetail() {
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
 
-          {/* Left: Image */}
-          <div className="bg-[oklch(0.97_0_0)] aspect-square overflow-hidden">
-            <img
-              src={product.image}
-              alt={product.name}
-              className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-6" : "object-cover"}`}
-            />
+          {/* Left: Gallery */}
+          <div className="space-y-3">
+            <div className="bg-[oklch(0.97_0_0)] aspect-square overflow-hidden">
+              <img
+                src={activeGalleryImage}
+                alt={product.name}
+                className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-6" : "object-cover"}`}
+              />
+            </div>
+            {galleryImages.length > 1 && (
+              <div className="grid grid-cols-5 gap-2 sm:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6">
+                {galleryImages.map((image, index) => {
+                  const isActive = image === activeGalleryImage;
+                  return (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => setSelectedGalleryImage(image)}
+                      aria-label={`查看商品圖片 ${index + 1}`}
+                      className={`aspect-square overflow-hidden border bg-[oklch(0.97_0_0)] transition-colors ${
+                        isActive
+                          ? "border-[oklch(0.16_0_0)]"
+                          : "border-[oklch(0.9_0_0)] hover:border-[oklch(0.55_0_0)]"
+                      }`}
+                    >
+                      <img
+                        src={image}
+                        alt={`${product.name} 圖片 ${index + 1}`}
+                        loading={index === 0 ? "eager" : "lazy"}
+                        className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-1.5" : "object-cover"}`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Right: Info */}

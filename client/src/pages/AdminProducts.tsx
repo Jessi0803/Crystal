@@ -29,6 +29,7 @@ type FormState = {
   price: string;
   priceRange: string;
   image: string;
+  images: string[];
   tags: string;
   benefits: string;    // 每行一項功效（非客製化）
   crystalType: string; // 每行一項內容，存檔時用 ｜ 串接
@@ -48,6 +49,7 @@ const DEFAULT_FORM: FormState = {
   price: "",
   priceRange: "",
   image: "",
+  images: [],
   tags: "",
   benefits: "",
   crystalType: "",
@@ -119,6 +121,10 @@ function getCategoryLabel(category: string) {
 
 function getProductCategoryLabels(product: DbProduct) {
   return product.categoryLabels?.length ? product.categoryLabels : [product.categoryLabel];
+}
+
+function getProductImages(product: Pick<DbProduct, "image" | "images">) {
+  return product.images?.length ? product.images : [product.image].filter(Boolean);
 }
 
 function compressImage(file: File): Promise<string> {
@@ -365,6 +371,7 @@ function ProductModal({
           price: String(editing.price),
           priceRange: editing.priceRange ?? "",
           image: editing.image,
+          images: getProductImages(editing),
           tags: ((editing.tags as string[]) ?? []).join(", "),
           benefits: ((editing.benefits as string[]) ?? []).join("\n"),
           crystalType: (editing.crystalType ?? "").split("｜").filter(Boolean).join("\n"),
@@ -378,7 +385,7 @@ function ProductModal({
         }
       : DEFAULT_FORM
   );
-  const [imagePreview, setImagePreview] = useState<string>(editing?.image ?? "");
+  const [imageUrlInput, setImageUrlInput] = useState("");
   const [compressing, setCompressing] = useState(false);
   const [showMoreFields, setShowMoreFields] = useState(false);
 
@@ -415,22 +422,53 @@ function ProductModal({
     onError: (err) => toast.error(err.message || "更新失敗"),
   });
 
+  const setGalleryImages = (images: string[]) => {
+    setForm((p) => ({ ...p, images, image: images[0] ?? "" }));
+  };
+
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("圖片請小於 10MB");
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    const oversized = files.find((file) => file.size > 10 * 1024 * 1024);
+    if (oversized) {
+      toast.error("每張圖片請小於 10MB");
+      e.target.value = "";
       return;
     }
     setCompressing(true);
     try {
-      const dataUrl = await compressImage(file);
-      setImagePreview(dataUrl);
-      setForm((p) => ({ ...p, image: dataUrl }));
+      const dataUrls = await Promise.all(files.map(compressImage));
+      setForm((p) => {
+        const images = [...p.images, ...dataUrls];
+        return { ...p, images, image: images[0] ?? "" };
+      });
     } catch {
       toast.error("圖片讀取失敗，請改用圖片網址");
     }
     setCompressing(false);
+    e.target.value = "";
+  };
+
+  const handleAddImageUrl = () => {
+    const url = imageUrlInput.trim();
+    if (!url) return;
+    setForm((p) => {
+      const images = [...p.images, url];
+      return { ...p, images, image: images[0] ?? "" };
+    });
+    setImageUrlInput("");
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const images = form.images.filter((_, i) => i !== index);
+    setGalleryImages(images);
+  };
+
+  const handleSetPrimaryImage = (index: number) => {
+    if (index === 0) return;
+    const images = [...form.images];
+    const [selected] = images.splice(index, 1);
+    setGalleryImages([selected, ...images]);
   };
 
   const handleSubmit = async () => {
@@ -438,8 +476,9 @@ function ProductModal({
     if (!form.price || isNaN(Number(form.price))) { toast.error("請填寫正確價格"); return; }
     if (selectedCategories.length === 0) { toast.error("請至少選擇一個分類"); return; }
 
-    const imageUrl = form.image;
-    if (!imageUrl) { toast.error("請上傳圖片或填入圖片網址"); return; }
+    const galleryImages = form.images.map((image) => image.trim()).filter(Boolean);
+    const imageUrl = galleryImages[0];
+    if (!imageUrl) { toast.error("請至少上傳或加入一張圖片"); return; }
     const scheduledPublishAt = parseScheduledPublishAt(form.scheduledPublishAt);
     if (form.scheduledPublishAt && !scheduledPublishAt) { toast.error("請填寫正確的預約上架時間"); return; }
     if (scheduledPublishAt && scheduledPublishAt.getTime() <= Date.now()) {
@@ -458,6 +497,7 @@ function ProductModal({
       price: parseInt(form.price, 10),
       priceRange: formattedPriceRange || undefined,
       image: imageUrl,
+      images: galleryImages,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       description: editing?.description ?? "",
       story: editing?.story ?? "",
@@ -498,41 +538,82 @@ function ProductModal({
 
         {/* Form */}
         <div className="px-6 py-5 space-y-4">
-          {/* Image */}
+          {/* Images */}
           <div>
-            <label className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">商品圖片</label>
-            <div className="flex gap-3 items-start">
-              <div
-                className="w-20 h-20 flex-shrink-0 border border-[oklch(0.88_0_0)] bg-[oklch(0.96_0_0)] flex items-center justify-center overflow-hidden cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {imagePreview ? (
-                  <img src={imagePreview} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon className="w-6 h-6 text-[oklch(0.7_0_0)]" />
-                )}
+            <label className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">商品相簿</label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {form.images.map((image, index) => (
+                  <div key={`${image}-${index}`} className="relative group border border-[oklch(0.88_0_0)] bg-[oklch(0.96_0_0)] aspect-square overflow-hidden">
+                    <img src={image} alt="" className="w-full h-full object-cover" />
+                    {index === 0 && (
+                      <span className="absolute left-1.5 top-1.5 bg-white/90 px-1.5 py-0.5 text-[10px] font-body text-[oklch(0.2_0_0)]">
+                        主圖
+                      </span>
+                    )}
+                    <div className="absolute inset-x-1.5 bottom-1.5 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetPrimaryImage(index)}
+                          className="flex-1 bg-white/95 px-1.5 py-1 text-[10px] font-body text-[oklch(0.25_0_0)] hover:bg-white"
+                        >
+                          設主圖
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(index)}
+                        aria-label="移除圖片"
+                        className="bg-white/95 p-1 text-red-600 hover:bg-white"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="aspect-square border border-dashed border-[oklch(0.78_0_0)] bg-[oklch(0.98_0_0)] flex flex-col items-center justify-center gap-1.5 text-xs font-body text-[oklch(0.45_0_0)] hover:border-[oklch(0.25_0_0)]"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                  加圖片
+                </button>
               </div>
-              <div className="flex-1 space-y-2">
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-2 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] w-full"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {compressing ? "處理中…" : "選擇圖片"}
+                  {compressing ? "處理中…" : "選擇圖片（可多選）"}
                 </button>
-                <input
-                  value={form.image}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, image: e.target.value }));
-                    setImagePreview(e.target.value);
-                  }}
-                  placeholder="或貼上圖片網址"
-                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body outline-none focus:border-[oklch(0.2_0_0)]"
-                />
+                <div className="flex gap-2">
+                  <input
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddImageUrl();
+                      }
+                    }}
+                    placeholder="或貼上圖片網址"
+                    className="min-w-0 flex-1 border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddImageUrl}
+                    className="shrink-0 border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
+                  >
+                    加入
+                  </button>
+                </div>
               </div>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
           </div>
 
           {/* Name */}

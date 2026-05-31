@@ -74,6 +74,7 @@ async function ensureProductsTable() {
       \`priceRange\` varchar(200) DEFAULT NULL,
       \`depositRange\` varchar(200) DEFAULT NULL,
       \`image\` mediumtext NOT NULL,
+      \`images\` json DEFAULT NULL,
       \`tags\` json DEFAULT NULL,
       \`description\` text DEFAULT NULL,
       \`story\` text DEFAULT NULL,
@@ -108,6 +109,9 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`categoryLabels\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`images\` json DEFAULT NULL`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
@@ -179,6 +183,7 @@ async function publishDueProducts() {
 
 function toFrontendProduct(p: DbProduct) {
   const { categories, categoryLabels } = normalizeProductCategories(p);
+  const images = p.images?.length ? p.images : [p.image].filter(Boolean);
   return {
     id: p.id,
     name: p.name,
@@ -192,6 +197,7 @@ function toFrontendProduct(p: DbProduct) {
     priceRange: p.priceRange ?? undefined,
     depositRange: p.depositRange ?? undefined,
     image: p.image,
+    images,
     tags: (p.tags as string[]) ?? [],
     description: p.description ?? "",
     story: p.story ?? "",
@@ -225,6 +231,7 @@ const ProductInputSchema = z.object({
   priceRange: z.string().optional(),
   depositRange: z.string().optional(),
   image: z.string().min(1),
+  images: z.array(z.string().min(1)).default([]),
   tags: z.array(z.string()).default([]),
   description: z.string().default(""),
   story: z.string().default(""),

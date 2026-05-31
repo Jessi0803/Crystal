@@ -274,6 +274,7 @@ export const dbProducts = mysqlTable("products", {
   priceRange: varchar("priceRange", { length: 200 }),
   depositRange: varchar("depositRange", { length: 200 }),
   image: text("image").notNull(),
+  images: json("images").$type<string[]>(),
   tags: json("tags").$type<string[]>(),
   description: text("description"),
   story: text("story"),
