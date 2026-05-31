@@ -198,8 +198,8 @@ export default function Products() {
                     )}
                   </div>
                   <div className="product-card-info">
-                    <div className="flex gap-1.5 mb-1.5">
-                      {product.tags.slice(0, 4).map((tag) => (
+                    <div className="tag-scroll mb-1.5">
+                      {product.tags.map((tag) => (
                         <span key={tag} className="tag">{tag}</span>
                       ))}
                     </div>

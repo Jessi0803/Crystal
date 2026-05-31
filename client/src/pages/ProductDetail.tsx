@@ -348,9 +348,13 @@ export default function ProductDetail() {
               <div className="flex items-center gap-2 mb-5 flex-wrap">
                 <span className="eyebrow">{product.categoryLabel}</span>
                 {visibleTags.length > 0 && <span className="text-[oklch(0.7_0_0)]">·</span>}
-                {visibleTags.slice(0, 4).map((tag) => (
-                  <span key={tag} className="tag">{tag}</span>
-                ))}
+                {visibleTags.length > 0 && (
+                  <div className="tag-scroll max-w-full sm:max-w-[28rem]">
+                    {visibleTags.map((tag) => (
+                      <span key={tag} className="tag">{tag}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
