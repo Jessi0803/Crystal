@@ -199,7 +199,7 @@ export default function Products() {
                   </div>
                   <div className="product-card-info">
                     <div className="flex gap-1.5 mb-1.5">
-                      {product.tags.slice(0, 2).map((tag) => (
+                      {product.tags.map((tag) => (
                         <span key={tag} className="tag">{tag}</span>
                       ))}
                     </div>

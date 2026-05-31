@@ -149,7 +149,7 @@ export default function Quiz() {
               </div>
               <div className="p-6">
                 <div className="flex gap-2 mb-3">
-                  {resultProduct.tags.slice(0, 2).map((tag) => (
+                  {resultProduct.tags.map((tag) => (
                     <span key={tag} className="tag">{tag}</span>
                   ))}
                 </div>
