@@ -29,6 +29,20 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1010);
   });
 
+  it("waives shipping for the payment-test email only", () => {
+    const fees = calcCheckoutFees({
+      items: [{ id: "d003-venus", price: 950, quantity: 1 }],
+      checkoutRegion: "domestic",
+      shippingMethod: "cvs_711",
+      paymentMethod: "credit",
+      buyerEmail: " Baby90522@gmail.com ",
+    });
+
+    expect(fees.shippingFee).toBe(0);
+    expect(fees.emailFreeShipping).toBe(true);
+    expect(fees.total).toBe(950);
+  });
+
   it("adds overseas shipping without PayPal fee for normal products", () => {
     const fees = calcCheckoutFees({
       items: [{ id: "d002-honey-realm", name: "蜜光之境手鍊", price: 1580, quantity: 1 }],

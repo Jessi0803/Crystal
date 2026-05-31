@@ -72,6 +72,7 @@ export default function Checkout() {
     shippingMethod,
     paymentMethod: checkoutRegion === "overseas" ? "paypal" : paymentMethod,
     overseasCountry: overseasCode,
+    buyerEmail: form.buyerEmail,
   });
   const shippingFee = feeSummary.shippingFee;
   const finalTotal = feeSummary.total;

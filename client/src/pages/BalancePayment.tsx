@@ -195,6 +195,7 @@ export default function BalancePayment() {
     shippingMethod,
     paymentMethod,
     overseasCountry: overseasCode,
+    buyerEmail: data.order.buyerEmail,
   });
   const payableAmount = feeSummary.total;
 

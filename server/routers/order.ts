@@ -245,6 +245,7 @@ export const orderRouter = router({
         shippingMethod,
         paymentMethod,
         overseasCountry,
+        buyerEmail,
       });
       const feeItems: typeof submittedItems = [];
       if (feeSummary.shippingFee > 0) {
@@ -838,6 +839,7 @@ export const orderRouter = router({
         shippingMethod,
         paymentMethod: input.paymentMethod,
         overseasCountry,
+        buyerEmail: balancePayment.order.buyerEmail,
       });
       const totalAmount = feeSummary.total;
 

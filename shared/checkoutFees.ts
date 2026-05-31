@@ -25,6 +25,8 @@ export const PAYMENT_FEE_RATES: Partial<Record<CheckoutPaymentMethod, number>> =
   paypal: 0,
 };
 
+export const FREE_SHIPPING_EMAILS = ["baby90522@gmail.com"];
+
 export type CheckoutFeeItem = {
   id: string;
   baseProductId?: string;
@@ -54,12 +56,17 @@ function calcBraceletQuantityForFreeShipping(items: CheckoutFeeItem[]) {
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
+export function isFreeShippingEmail(email?: string | null) {
+  return email ? FREE_SHIPPING_EMAILS.includes(email.trim().toLowerCase()) : false;
+}
+
 export function calcCheckoutFees(params: {
   items: CheckoutFeeItem[];
   checkoutRegion: CheckoutRegion;
   shippingMethod: DomesticShippingMethod;
   paymentMethod: CheckoutPaymentMethod;
   overseasCountry?: OverseasShipCountryCode | null;
+  buyerEmail?: string | null;
 }) {
   const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const chargeableSubtotal = params.items
@@ -67,9 +74,12 @@ export function calcCheckoutFees(params: {
     .reduce((sum, item) => sum + item.price * item.quantity, 0);
   const appliesFees = chargeableSubtotal > 0;
   const domesticFreeShipping = params.checkoutRegion === "domestic" && calcBraceletQuantityForFreeShipping(params.items) >= 2;
+  const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
 
   const shippingFee = !appliesFees
     ? 0
+    : emailFreeShipping
+      ? 0
     : domesticFreeShipping
       ? 0
     : params.checkoutRegion === "overseas"
@@ -89,5 +99,6 @@ export function calcCheckoutFees(params: {
     total,
     appliesFees,
     domesticFreeShipping,
+    emailFreeShipping,
   };
 }
