@@ -27,7 +27,7 @@ const CATEGORY_LOVE_IMG = "/images/categories/love.jpg";
 const CATEGORY_WEALTH_IMG = "/images/categories/wealth.jpg";
 const CATEGORY_PROTECT_IMG = "/images/categories/protect.jpg";
 const CATEGORY_HEALING_IMG = "/images/categories/healing.jpg";
-const HERO_BANNER2_IMG = "/images/categories/healing.jpg";
+const HERO_BANNER2_IMG = "/images/best-sellers.jpg";
 const customerReviewImages = Array.from(
   { length: 15 },
   (_, index) => `/reviews/review-${String(index + 1).padStart(2, "0")}.jpg`
