@@ -382,7 +382,7 @@ export default function OrderResult() {
               { label: "購買人", value: order.buyerName },
               { label: "Email", value: order.buyerEmail },
               { label: "手機", value: order.buyerPhone },
-              ...(order.isPreorder ? [{ label: "備註", value: "⏰ 預購商品" }] : []),
+              ...(order.isPreorder ? [{ label: "備註", value: "預購商品" }] : []),
               ...(order.paidAt
                 ? [{ label: "付款時間", value: new Date(order.paidAt).toLocaleString("zh-TW") }]
                 : []),
@@ -411,8 +411,10 @@ export default function OrderResult() {
                       <img src={item.productImage} alt={item.productName} className="w-10 h-10 object-cover" />
                     )}
                     <div>
-                      <p className="text-[oklch(0.1_0_0)]">{item.productName}</p>
-                      <p className="text-xs text-[oklch(0.5_0_0)]">x {item.quantity}{item.isPreorder ? " （預購）" : ""}</p>
+                      <p className="text-[oklch(0.1_0_0)]">
+                        {item.productName}{item.isPreorder ? "（預購）" : ""}
+                      </p>
+                      <p className="text-xs text-[oklch(0.5_0_0)]">x {item.quantity}</p>
                     </div>
                   </div>
                   <p className="font-medium">NT$ {item.subtotal.toLocaleString()}</p>

@@ -97,7 +97,7 @@ export default function Products() {
       toast.error("此每月限量商品已售完，無法預購");
       return;
     }
-    addToCart(product);
+    addToCart(product, { isPreorder: availability?.isPreorder === true });
     toast.success(`已加入購物袋：${product.name}`);
   };
 

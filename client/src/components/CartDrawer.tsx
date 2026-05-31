@@ -63,7 +63,7 @@ export default function CartDrawer() {
             </div>
           ) : (
             <div className="divide-y divide-[oklch(0.95_0_0)]">
-              {items.map(({ id, product, quantity, unitPrice, wristSize, claspType, fitPreference }) => (
+              {items.map(({ id, product, quantity, unitPrice, wristSize, claspType, fitPreference, isPreorder }) => (
                 <div key={id} className="flex gap-4 px-6 py-5">
                   {/* Image */}
                   <div className="w-20 h-24 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
@@ -77,7 +77,7 @@ export default function CartDrawer() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-body font-medium text-[oklch(0.1_0_0)] leading-snug mb-1">
-                      {product.name}
+                      {product.name}{isPreorder ? "（預購）" : ""}
                     </p>
                     <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-3">
                       {product.categoryLabel}

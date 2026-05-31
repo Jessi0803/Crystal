@@ -884,7 +884,9 @@ export default function Checkout() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.product.name}</p>
+                      <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">
+                        {item.product.name}{item.isPreorder ? "（預購）" : ""}
+                      </p>
                       <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">x {item.quantity}</p>
                       {(item.wristSize || item.claspType || item.fitPreference) && (
                         <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mt-0.5">
