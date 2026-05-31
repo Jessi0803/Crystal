@@ -427,6 +427,10 @@ function ProductModal({
     onSuccess: async () => {
       toast.success("商品已更新");
       await utils.product.adminList.invalidate();
+      await utils.product.list.invalidate();
+      if (editing?.id) {
+        await utils.product.getById.invalidate({ id: editing.id });
+      }
       onClose();
     },
     onError: (err) => toast.error(err.message || "更新失敗"),

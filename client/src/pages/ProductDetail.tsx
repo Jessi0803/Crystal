@@ -1,6 +1,6 @@
 // 日日好日 — Product Detail Page
 // Design: Vacanza-inspired — large image + clean product info
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { Plus, Minus, ShoppingBag } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
@@ -100,6 +100,20 @@ function normalizeImageUrl(url: string) {
 function getProductImages(product: { image: string; images?: string[] }) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
+}
+
+function MultilineText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, index) => (
+        <Fragment key={index}>
+          {line}
+          {index < lines.length - 1 && <br />}
+        </Fragment>
+      ))}
+    </>
+  );
 }
 
 export default function ProductDetail() {
@@ -690,8 +704,8 @@ export default function ProductDetail() {
               </div>
 
               {activeTab === "benefits" && (
-                <div className="whitespace-pre-wrap text-sm font-body font-light text-[oklch(0.35_0_0)] leading-[1.8]">
-                  {benefitText}
+                <div className="text-sm font-body font-light text-[oklch(0.35_0_0)] leading-[1.8]">
+                  <MultilineText text={benefitText} />
                 </div>
               )}
               {activeTab === "content" && (
