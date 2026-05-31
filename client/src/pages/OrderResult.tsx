@@ -412,7 +412,8 @@ export default function OrderResult() {
                     )}
                     <div>
                       <p className="text-[oklch(0.1_0_0)]">
-                        {item.productName}{item.isPreorder ? "（預購）" : ""}
+                        {item.productName}
+                        {item.isPreorder && <span className="text-[oklch(0.58_0_0)]">（預購）</span>}
                       </p>
                       <p className="text-xs text-[oklch(0.5_0_0)]">x {item.quantity}</p>
                     </div>

@@ -77,7 +77,8 @@ export default function CartDrawer() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-body font-medium text-[oklch(0.1_0_0)] leading-snug mb-1">
-                      {product.name}{isPreorder ? "（預購）" : ""}
+                      {product.name}
+                      {isPreorder && <span className="text-[oklch(0.58_0_0)] font-normal">（預購）</span>}
                     </p>
                     <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-3">
                       {product.categoryLabel}

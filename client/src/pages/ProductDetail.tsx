@@ -20,7 +20,7 @@ import {
   getTieredBraceletBasePrice,
   usesTieredBraceletPricing,
 } from "@/lib/pricing";
-import { IN_STOCK_FULFILLMENT_NOTE, PREORDER_FULFILLMENT_NOTE } from "@shared/fulfillment";
+import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
 
 const tarotReadingCategories = [
   {
@@ -243,11 +243,9 @@ export default function ProductDetail() {
     product.category !== "custom" &&
     availability?.isMonthlyLimited === true &&
     availability.available === false;
-  const fulfillmentNote = isPreorderItem
-    ? availability?.preorderNote || PREORDER_FULFILLMENT_NOTE
-    : isSoldOutItem
+  const fulfillmentNote = isSoldOutItem
       ? "本月限量商品已售完"
-    : IN_STOCK_FULFILLMENT_NOTE;
+      : IN_STOCK_FULFILLMENT_NOTE;
 
   const handleAddToCart = () => {
     if (isSoldOutItem) {
@@ -693,7 +691,7 @@ export default function ProductDetail() {
               </button>
             </div>}
 
-            {product.category !== "custom" && (
+            {product.category !== "custom" && !isPreorderItem && (
               <div className="mb-6 border border-[oklch(0.9_0_0)] bg-[oklch(0.985_0_0)] px-4 py-3">
                 <p className="text-[0.68rem] tracking-[0.14em] font-body text-[oklch(0.5_0_0)] mb-1">
                   出貨時間
