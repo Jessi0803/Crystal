@@ -254,6 +254,7 @@ export default function ProductDetail() {
   };
 
   const showHowToTab = product.category === "custom";
+  const benefitText = product.benefits.join("\n");
   const tabs = [
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
@@ -689,14 +690,9 @@ export default function ProductDetail() {
               </div>
 
               {activeTab === "benefits" && (
-                <ul className="space-y-2">
-                  {product.benefits.map((b, i) => (
-                    <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
-                      {b}
-                    </li>
-                  ))}
-                </ul>
+                <div className="whitespace-pre-wrap text-sm font-body font-light text-[oklch(0.35_0_0)] leading-[1.8]">
+                  {benefitText}
+                </div>
               )}
               {activeTab === "content" && (
                 <ul className="space-y-2">

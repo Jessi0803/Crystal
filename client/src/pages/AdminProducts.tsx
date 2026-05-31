@@ -31,7 +31,7 @@ type FormState = {
   image: string;
   images: string[];
   tags: string;
-  benefits: string;    // 每行一項功效（非客製化）
+  benefits: string;    // 功效說明，保留後台輸入的換行
   crystalType: string; // 每行一項內容，存檔時用 ｜ 串接
   howToUse: string;    // 每行一個步驟（客製化下單流程）
   disclaimer: string;  // 注意事項（客製化）
@@ -511,7 +511,7 @@ function ProductModal({
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       description: editing?.description ?? "",
       story: editing?.story ?? "",
-      benefits: form.benefits.split("\n").map((s) => s.trim()).filter(Boolean),
+      benefits: form.benefits.trim() ? [form.benefits] : [],
       suitableFor: [],
       howToUse: form.howToUse.split("\n").map((s) => s.trim()).filter(Boolean),
       disclaimer: form.disclaimer.trim(),
@@ -701,12 +701,12 @@ function ProductModal({
           {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}
           {primaryCategory !== "custom" ? (
             <label className="block">
-              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（每行一項）</span>
+              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（依輸入格式顯示）</span>
               <textarea
                 value={form.benefits}
                 onChange={(e) => setForm((p) => ({ ...p, benefits: e.target.value }))}
                 rows={4}
-                placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n帶來平靜、安定的能量"}
+                placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n\n帶來平靜、安定的能量"}
                 className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
               />
             </label>
