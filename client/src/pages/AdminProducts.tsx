@@ -302,19 +302,20 @@ function ProductRow({
               {formatAdminDateTime(product.scheduledPublishAt)} 上架
             </p>
           )}
-          {product.priceRange ? (
-            <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">{product.priceRange}</p>
-          ) : (
-            <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">
-              {product.originalPrice && product.originalPrice > product.price ? (
-                <>
-                  <span className="line-through text-[oklch(0.62_0_0)] mr-1">NT$ {product.originalPrice.toLocaleString()}</span>
-                  <span>NT$ {product.price.toLocaleString()}</span>
-                </>
-              ) : (
-                <>NT$ {product.price.toLocaleString()}</>
-              )}
-            </p>
+          <p className="text-xs text-[oklch(0.4_0_0)] font-body mt-0.5">
+            {product.originalPrice && product.originalPrice > product.price ? (
+              <>
+                <span className="line-through text-[oklch(0.62_0_0)] mr-1">NT$ {product.originalPrice.toLocaleString()}</span>
+                <span>NT$ {product.price.toLocaleString()}</span>
+              </>
+            ) : product.priceRange ? (
+              product.priceRange
+            ) : (
+              <>NT$ {product.price.toLocaleString()}</>
+            )}
+          </p>
+          {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
+            <p className="text-xs text-[oklch(0.55_0_0)] font-body mt-0.5">{product.priceRange}</p>
           )}
         </div>
 

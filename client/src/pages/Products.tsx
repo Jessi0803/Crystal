@@ -205,17 +205,22 @@ export default function Products() {
                     </div>
                     <p className="product-card-name">{product.name}</p>
                     <div className="flex flex-col gap-0.5 mt-1">
-                      {product.priceRange ? (
+                      {product.originalPrice && product.originalPrice > product.price ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
+                            NT$ {product.originalPrice.toLocaleString()}
+                          </p>
+                          <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                        </div>
+                      ) : product.priceRange ? (
                         <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
-                          {product.originalPrice && (
-                            <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
-                              NT$ {product.originalPrice.toLocaleString()}
-                            </p>
-                          )}
-                        </div>
+                        <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                      )}
+                      {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
+                        <p className="text-[0.7rem] font-body text-[oklch(0.55_0_0)]">
+                          {getCustomPriceDisplay(product.id, product.priceRange)}
+                        </p>
                       )}
                     </div>
                   </div>
