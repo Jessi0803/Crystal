@@ -182,6 +182,9 @@ export default function CrystalWorkshop() {
                           </p>
                         ))}
                       </div>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <p className="text-white font-serif-zh tracking-[0.5em] text-lg">3件商品實戰</p>
+                      </div>
                     </div>
                   </div>
                 </div>
