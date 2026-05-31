@@ -250,7 +250,7 @@ export default function Home() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-x-3 mt-9 pt-6 sm:flex sm:gap-8 sm:mt-12 sm:pt-8 border-t border-[oklch(0.93_0_0)]">
+          <div className="grid grid-cols-3 items-stretch gap-x-3 mt-9 pt-6 sm:flex sm:items-stretch sm:gap-8 sm:mt-12 sm:pt-8 border-t border-[oklch(0.93_0_0)]">
             {[
               { num: "10,000+", label: "滿意顧客" },
               { num: "4.9", label: "平均評分" },
@@ -272,17 +272,17 @@ export default function Home() {
                     key={s.label}
                     type="button"
                     onClick={() => setIsReviewsOpen(true)}
-                    className="group -m-2 min-h-[84px] rounded-md p-2 text-left transition-colors hover:bg-[oklch(0.985_0.008_75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.72_0.09_70)]"
+                    className="group -m-2 flex min-h-[84px] rounded-md p-2 text-left transition-colors hover:bg-[oklch(0.985_0.008_75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.72_0.09_70)]"
                     aria-label="查看顧客好評照片"
                   >
-                    <span className="block transition-transform duration-300 group-hover:-translate-y-0.5">
+                    <span className="block min-h-[68px] transition-transform duration-300 group-hover:-translate-y-0.5">
                       {content}
                     </span>
                   </button>
                 );
               }
 
-              return <div key={s.label}>{content}</div>;
+              return <div key={s.label} className="min-h-[84px]">{content}</div>;
             })}
           </div>
         </div>
