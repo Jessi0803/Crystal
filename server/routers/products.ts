@@ -183,7 +183,16 @@ async function publishDueProducts() {
 
 function toFrontendProduct(p: DbProduct) {
   const { categories, categoryLabels } = normalizeProductCategories(p);
-  const images = p.images?.length ? p.images : [p.image].filter(Boolean);
+  const normalizeImageUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed.includes("drive.google.com")) return trimmed;
+    const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+    const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+    const id = fileMatch?.[1] ?? idMatch?.[1];
+    return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
+  };
+  const images = (p.images?.length ? p.images : [p.image].filter(Boolean)).map(normalizeImageUrl);
+  const image = normalizeImageUrl(p.image);
   return {
     id: p.id,
     name: p.name,
@@ -196,7 +205,7 @@ function toFrontendProduct(p: DbProduct) {
     originalPrice: p.originalPrice ?? undefined,
     priceRange: p.priceRange ?? undefined,
     depositRange: p.depositRange ?? undefined,
-    image: p.image,
+    image,
     images,
     tags: (p.tags as string[]) ?? [],
     description: p.description ?? "",

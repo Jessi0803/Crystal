@@ -123,8 +123,18 @@ function getProductCategoryLabels(product: DbProduct) {
   return product.categoryLabels?.length ? product.categoryLabels : [product.categoryLabel];
 }
 
+function normalizeImageUrl(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed.includes("drive.google.com")) return trimmed;
+  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+  const id = fileMatch?.[1] ?? idMatch?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
+}
+
 function getProductImages(product: Pick<DbProduct, "image" | "images">) {
-  return product.images?.length ? product.images : [product.image].filter(Boolean);
+  const images = product.images?.length ? product.images : [product.image].filter(Boolean);
+  return images.map(normalizeImageUrl);
 }
 
 function compressImage(file: File): Promise<string> {
@@ -450,7 +460,7 @@ function ProductModal({
   };
 
   const handleAddImageUrl = () => {
-    const url = imageUrlInput.trim();
+    const url = normalizeImageUrl(imageUrlInput);
     if (!url) return;
     setForm((p) => {
       const images = [...p.images, url];
@@ -476,7 +486,7 @@ function ProductModal({
     if (!form.price || isNaN(Number(form.price))) { toast.error("請填寫正確價格"); return; }
     if (selectedCategories.length === 0) { toast.error("請至少選擇一個分類"); return; }
 
-    const galleryImages = form.images.map((image) => image.trim()).filter(Boolean);
+    const galleryImages = form.images.map(normalizeImageUrl).filter(Boolean);
     const imageUrl = galleryImages[0];
     if (!imageUrl) { toast.error("請至少上傳或加入一張圖片"); return; }
     const scheduledPublishAt = parseScheduledPublishAt(form.scheduledPublishAt);

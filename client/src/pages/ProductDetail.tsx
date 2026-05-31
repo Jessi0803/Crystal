@@ -88,8 +88,18 @@ function CustomPriceTile({
   );
 }
 
+function normalizeImageUrl(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed.includes("drive.google.com")) return trimmed;
+  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+  const id = fileMatch?.[1] ?? idMatch?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
+}
+
 function getProductImages(product: { image: string; images?: string[] }) {
-  return product.images?.length ? product.images : [product.image].filter(Boolean);
+  const images = product.images?.length ? product.images : [product.image].filter(Boolean);
+  return images.map(normalizeImageUrl);
 }
 
 export default function ProductDetail() {
