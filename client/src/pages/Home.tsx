@@ -5,6 +5,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { products as staticProducts } from "@/lib/data";
@@ -20,6 +27,10 @@ const CATEGORY_LOVE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376
 const CATEGORY_WEALTH_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-wealth-SRBHHLNZEuUcHwN4ofwAxa.webp";
 const CATEGORY_PROTECT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/category-protect-HSkaBEr6CpuJ465gjEc5jR.webp";
 const HERO_BANNER2_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663525376407/HsiMZrubGHyjhN4cohRHuH/hero-banner-2-ef9YyJoSCCnxBrg7VtEVxu.webp";
+const customerReviewImages = Array.from(
+  { length: 15 },
+  (_, index) => `/reviews/review-${String(index + 1).padStart(2, "0")}.jpg`
+);
 
 const categoryCards = [
   {
@@ -85,6 +96,7 @@ export default function Home() {
   const [heroSlide, setHeroSlide] = useState(0);
   const [isHeroPaused, setIsHeroPaused] = useState(false);
   const [isSliderPaused, setIsSliderPaused] = useState(false);
+  const [isReviewsOpen, setIsReviewsOpen] = useState(false);
   const [quote] = useState(() => dailyQuotes[new Date().getDay()]);
   useScrollReveal();
 
@@ -242,15 +254,35 @@ export default function Home() {
               { num: "10,000+", label: "滿意顧客" },
               { num: "4.9", label: "平均評分" },
               { num: "100%", label: "天然水晶", note: "無染色・無酸洗・無加工・有合作檢定廠商" },
-            ].map((s) => (
-              <div key={s.label}>
-                <div className="text-xl sm:text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
-                <div className="eyebrow mt-0.5">{s.label}</div>
-                {"note" in s && s.note && (
-                  <div className="text-[0.58rem] font-body text-[oklch(0.55_0_0)] mt-0.5 leading-relaxed">（{s.note}）</div>
-                )}
-              </div>
-            ))}
+            ].map((s) => {
+              const content = (
+                <>
+                  <div className="text-xl sm:text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
+                  <div className="eyebrow mt-0.5">{s.label}</div>
+                  {"note" in s && s.note && (
+                    <div className="text-[0.58rem] font-body text-[oklch(0.55_0_0)] mt-0.5 leading-relaxed">（{s.note}）</div>
+                  )}
+                </>
+              );
+
+              if (s.label === "滿意顧客") {
+                return (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => setIsReviewsOpen(true)}
+                    className="group -m-2 min-h-[84px] rounded-md p-2 text-left transition-colors hover:bg-[oklch(0.985_0.008_75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.72_0.09_70)]"
+                    aria-label="查看顧客好評照片"
+                  >
+                    <span className="block transition-transform duration-300 group-hover:-translate-y-0.5">
+                      {content}
+                    </span>
+                  </button>
+                );
+              }
+
+              return <div key={s.label}>{content}</div>;
+            })}
           </div>
         </div>
       </section>
@@ -431,6 +463,46 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <Dialog open={isReviewsOpen} onOpenChange={setIsReviewsOpen}>
+        <DialogContent
+          className="max-h-[86svh] max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-none border border-stone-200 bg-white p-0 shadow-2xl sm:max-w-[920px]"
+          style={{ backgroundColor: "#ffffff" }}
+        >
+          <DialogHeader
+            className="border-b border-stone-200 px-5 py-5 text-left sm:px-8"
+            style={{ backgroundColor: "#ffffff" }}
+          >
+            <p className="eyebrow mb-2">CUSTOMER REVIEWS</p>
+            <DialogTitle className="text-2xl font-medium leading-tight text-[oklch(0.1_0_0)] sm:text-3xl">
+              來自顧客的真實回饋
+            </DialogTitle>
+            <DialogDescription className="font-body text-sm font-light leading-relaxed text-[oklch(0.45_0_0)]">
+              謝謝每一位把能量故事分享給我們的人。
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className="max-h-[calc(86svh-142px)] overflow-y-auto bg-stone-50 px-4 py-5 sm:px-7 sm:py-7"
+            style={{ backgroundColor: "#fafaf9" }}
+          >
+            <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+              {customerReviewImages.map((src, index) => (
+                <figure
+                  key={src}
+                  className="mb-4 break-inside-avoid overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm"
+                >
+                  <img
+                    src={src}
+                    alt={`顧客好評截圖 ${index + 1}`}
+                    loading={index < 6 ? "eager" : "lazy"}
+                    className="h-auto w-full"
+                  />
+                </figure>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
