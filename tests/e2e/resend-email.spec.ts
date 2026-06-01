@@ -6,12 +6,14 @@ const externalEmailTest =
     ? test
     : test.skip;
 
+test.describe.configure({ mode: "serial" });
+
 async function findSentEmailId(resend: Resend, email: string, subject: string, excludedId?: string) {
   let sentEmailId: string | undefined;
   await expect
     .poll(
       async () => {
-        const { data, error } = await resend.emails.list({ limit: 20 });
+        const { data, error } = await resend.emails.list({ limit: 100 });
         if (error) {
           if (error.message.includes("Too many requests")) {
             return undefined;
@@ -26,7 +28,7 @@ async function findSentEmailId(resend: Resend, email: string, subject: string, e
         )?.id;
         return sentEmailId;
       },
-      { timeout: 30_000, intervals: [1_000, 2_000, 3_000] }
+      { timeout: 90_000, intervals: [1_000, 2_000, 3_000, 5_000] }
     )
     .toBeTruthy();
   return sentEmailId!;
@@ -47,7 +49,7 @@ async function getSentEmail(resend: Resend, emailId: string) {
         sentEmail = data;
         return true;
       },
-      { timeout: 30_000, intervals: [750, 1_000, 2_000] }
+      { timeout: 60_000, intervals: [750, 1_000, 2_000, 5_000] }
     )
     .toBe(true);
   return sentEmail!;
@@ -61,7 +63,7 @@ function extractAppLink(html: string | null | undefined, path: string) {
 
 externalEmailTest("registration sends a verification email through Resend test delivery", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Send the external Resend verification once per run.");
-  test.slow();
+  test.setTimeout(120_000);
 
   const apiKey = process.env.RESEND_API_KEY;
   expect(apiKey, "RESEND_API_KEY must be loaded only when RUN_RESEND_E2E=true").toBeTruthy();
@@ -95,7 +97,7 @@ externalEmailTest("registration sends a verification email through Resend test d
 
 externalEmailTest("forgot password sends a reset link through Resend test delivery", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Send the external Resend reset email once per run.");
-  test.slow();
+  test.setTimeout(180_000);
 
   const apiKey = process.env.RESEND_API_KEY;
   expect(apiKey, "RESEND_API_KEY must be loaded only when RUN_RESEND_E2E=true").toBeTruthy();
@@ -111,12 +113,17 @@ externalEmailTest("forgot password sends a reset link through Resend test delive
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/\/member/);
 
+  const resend = new Resend(apiKey);
+  const verificationEmailId = await findSentEmailId(resend, email, "請驗證您的 Email");
+  const verificationEmail = await getSentEmail(resend, verificationEmailId);
+  await page.goto(extractAppLink(verificationEmail?.html, "/verify-email\\?token="));
+  await expect(page.locator("body")).toContainText("Email 驗證成功");
+
   await page.goto("/forgot-password");
   await page.locator('input[type="email"]').fill(email);
   await page.getByRole("button", { name: "發送重設連結" }).click();
   await expect(page.locator("body")).toContainText("重設連結已發送");
 
-  const resend = new Resend(apiKey);
   const sentEmailId = await findSentEmailId(resend, email, "密碼重設連結");
   const sentEmail = await getSentEmail(resend, sentEmailId);
   expect(sentEmail?.to).toContain(email);
@@ -149,7 +156,7 @@ externalEmailTest("forgot password sends a reset link through Resend test delive
 
 externalEmailTest("member can resend and use a replacement verification email", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Send external Resend verification emails once per run.");
-  test.slow();
+  test.setTimeout(180_000);
 
   const apiKey = process.env.RESEND_API_KEY;
   expect(apiKey, "RESEND_API_KEY must be loaded only when RUN_RESEND_E2E=true").toBeTruthy();
