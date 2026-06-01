@@ -27,15 +27,16 @@ test.describe("navigation smoke", () => {
 
   test("home hero links to monthly, designed and custom product paths", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: /每月限量/ }).click();
+    const main = page.getByRole("main");
+    await main.getByRole("link", { name: /每月限量/ }).click();
     await expect(page).toHaveURL(/\/products\?category=monthly/);
 
     await page.goto("/");
-    await page.getByRole("button", { name: "固定設計款" }).click();
+    await main.getByRole("link", { name: "固定設計款" }).click();
     await expect(page).toHaveURL(/\/products$/);
 
     await page.goto("/");
-    await page.getByRole("button", { name: "客製款" }).click();
+    await main.getByRole("link", { name: "客製款" }).click();
     await expect(page).toHaveURL(/\/custom$/);
   });
 });

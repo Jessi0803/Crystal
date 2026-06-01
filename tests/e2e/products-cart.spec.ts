@@ -61,11 +61,11 @@ test("bracelet options and cart controls update line price and quantity", async 
   await expect(drawer).toContainText("手圍 13.5 cm");
   await expect(drawer).toContainText("磁扣");
   await expect(drawer).toContainText("微鬆");
-  await expect(drawer).toContainText("NT$ 1,680");
+  await expect(drawer).toContainText("NT$ 1,384");
 
   await drawer.getByRole("button", { name: "增加" }).click();
   await expect(drawer).toContainText("購物袋 (2)");
-  await expect(drawer).toContainText("NT$ 3,360");
+  await expect(drawer).toContainText("NT$ 2,768");
 
   await drawer.getByRole("button", { name: "移除" }).click();
   await expect(drawer).toContainText("你的購物袋是空的");
@@ -123,11 +123,11 @@ test("domestic shipping switches from home fee to convenience-store fee", async 
 
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
   await expect(page.locator("body")).toContainText("NT$ 100");
-  await expect(page.locator("body")).toContainText("NT$ 1,680");
+  await expect(page.locator("body")).toContainText("NT$ 1,364");
 
   await page.locator("button").filter({ hasText: "先付款再取貨" }).click();
   await expect(page.locator("body")).toContainText("NT$ 60");
-  await expect(page.locator("body")).toContainText("NT$ 1,640");
+  await expect(page.locator("body")).toContainText("NT$ 1,324");
 });
 
 test("two bracelets receive domestic free shipping in checkout summary", async ({ page }) => {
@@ -142,5 +142,5 @@ test("two bracelets receive domestic free shipping in checkout summary", async (
 
   await expect(page.locator("body")).toContainText("x 2");
   await expect(page.locator("body")).toContainText("免收");
-  await expect(page.locator("body")).toContainText("NT$ 3,160");
+  await expect(page.locator("body")).toContainText("NT$ 2,528");
 });

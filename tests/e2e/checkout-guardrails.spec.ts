@@ -57,10 +57,6 @@ async function postCreateAndPay(request: APIRequestContext, email: string, items
 
 async function fillCheckoutForAtm(page: Page, email: string) {
   await goToCheckoutWithSeededBracelet(page);
-  const closeCart = page.getByRole("button", { name: "關閉" });
-  if (await closeCart.isVisible().catch(() => false)) {
-    await closeCart.click({ force: true });
-  }
   await fillDomesticHomeCheckout(page, email);
   await page.getByRole("button", { name: /^轉帳/ }).click();
 }

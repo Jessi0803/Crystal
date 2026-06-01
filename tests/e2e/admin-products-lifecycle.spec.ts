@@ -14,6 +14,8 @@ async function openProductsAdmin(page: Page) {
 async function createProduct(page: Page, name: string) {
   await page.getByRole("button", { name: "新增商品" }).click();
   await page.locator('input[placeholder="或貼上圖片網址"]').fill("/images/d-design/d001.jpg");
+  await page.getByRole("button", { name: "加入" }).click();
+  await expect(page.locator('img[src="/images/d-design/d001.jpg"]')).toBeVisible();
   await page.locator('input[placeholder="例：紫水晶手鍊"]').fill(name);
   await page.locator('input[placeholder="1200"]').fill("888");
   await page.locator('input[placeholder="紫水晶, 愛情"]').fill("E2E, 後台流程");

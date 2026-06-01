@@ -4,6 +4,10 @@ import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { fillDomesticHomeCheckout, login } from "./helpers";
 
+test.beforeEach(({}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Inventory order database assertions only need one browser project.");
+});
+
 async function connectTestDb() {
   const env = dotenv.parse(readFileSync(".env.test.local"));
   const url = new URL(env.DATABASE_URL);
@@ -37,6 +41,8 @@ async function createUniqueStockProduct(page: Page, productName: string, stock: 
   await expect(page.locator("body")).toContainText("商品管理");
   await page.getByRole("button", { name: "新增商品" }).click();
   await page.locator('input[placeholder="或貼上圖片網址"]').fill("/images/d-design/d001.jpg");
+  await page.getByRole("button", { name: "加入" }).click();
+  await expect(page.locator('img[src="/images/d-design/d001.jpg"]')).toBeVisible();
   await page.locator('input[placeholder="例：紫水晶手鍊"]').fill(productName);
   await page.locator('input[placeholder="1200"]').fill("777");
   await page.locator('input[placeholder="紫水晶, 愛情"]').fill("E2E, 庫存");
@@ -99,9 +105,13 @@ test("ATM order deducts test stock and admin cancellation restores it", async ({
 test("ATM preorder order is displayed as preorder after it is stored", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-preorder");
   await expect(page.locator("body")).toContainText("預購");
+  await expect(page.locator("body")).not.toContainText("出貨時間");
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: /加入購物袋/ }).click();
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText("E2E 預購手鍊（預購）");
   await page.getByRole("button", { name: "前往結帳" }).click();
+  await expect(page.locator("body")).toContainText("E2E 預購手鍊（預購）");
   await fillDomesticHomeCheckout(page, `e2e-preorder-${Date.now()}@example.com`);
   await page.getByRole("button", { name: /^轉帳/ }).click();
   await page.getByRole("button", { name: "確認下單" }).click();
@@ -110,7 +120,7 @@ test("ATM preorder order is displayed as preorder after it is stored", async ({ 
   const orderNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";
   expect(orderNo).not.toBe("");
   await expect(page.locator("body")).toContainText("預購商品");
-  await expect(page.locator("body")).toContainText("（預購）");
+  await expect(page.locator("body")).toContainText(/E2E 預購手鍊.*（預購）/);
 
   await login(page, "e2e-admin@example.com");
   await expect(page).toHaveURL(/\/admin\/orders/);

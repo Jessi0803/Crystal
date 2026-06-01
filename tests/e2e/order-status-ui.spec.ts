@@ -5,9 +5,10 @@ function trpcSuccess(data: unknown) {
 }
 
 async function mockOrder(page: Page, paymentStatus: string, orderStatus: string) {
-  await page.unroute("**/api/trpc/order.getOrder**").catch(() => undefined);
-  await page.route("**/api/trpc/order.getOrder**", async (route) => {
+  await page.unroute(/\/api\/trpc\/order\.getOrder/).catch(() => undefined);
+  await page.route(/\/api\/trpc\/order\.getOrder/, async (route) => {
     await route.fulfill({
+      status: 200,
       contentType: "application/json",
       body: JSON.stringify(trpcSuccess({
         merchantTradeNo: `E2E-${orderStatus}`,
