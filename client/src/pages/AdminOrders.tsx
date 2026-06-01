@@ -195,7 +195,7 @@ function OrderRowCard({
                   key={item.id}
                   src={item.productImage}
                   alt={item.productName}
-                  className="h-16 w-16 border border-[oklch(0.9_0_0)] object-cover bg-white"
+                  className="h-20 w-20 border border-[oklch(0.9_0_0)] object-cover bg-white"
                   loading="lazy"
                 />
               ))}
@@ -261,7 +261,7 @@ function OrderRowCard({
                           <img
                             src={item.productImage}
                             alt={item.productName}
-                            className="h-24 w-24 border border-[oklch(0.9_0_0)] object-cover bg-white shrink-0"
+                            className="h-32 w-32 border border-[oklch(0.9_0_0)] object-cover bg-white shrink-0"
                             loading="lazy"
                           />
                         )}
