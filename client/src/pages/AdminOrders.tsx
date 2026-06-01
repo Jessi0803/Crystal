@@ -106,6 +106,11 @@ type OrderSummary = {
   createdAt: Date | string;
   itemCount: number;
   hasLogistics: boolean;
+  productThumbnails: {
+    id: number;
+    productName: string;
+    productImage: string;
+  }[];
 };
 
 function OrderRowCard({
@@ -183,6 +188,19 @@ function OrderRowCard({
             <span className="flex items-center gap-1"><Package className="w-3 h-3" />{order.itemCount} 件</span>
             <span>{getShippingLabel(order.shippingMethod ?? "")}</span>
           </div>
+          {order.productThumbnails.length > 0 && (
+            <div className="mt-3 flex items-center gap-2">
+              {order.productThumbnails.map((item) => (
+                <img
+                  key={item.id}
+                  src={item.productImage}
+                  alt={item.productName}
+                  className="h-11 w-11 border border-[oklch(0.9_0_0)] object-cover bg-white"
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <div className="text-base font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
@@ -234,14 +252,19 @@ function OrderRowCard({
                   <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">商品明細</p>
                   <div className="space-y-2">
                     {detail.items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3">
-                        {item.productImage && (
-                          <img src={item.productImage} alt={item.productName} className="w-10 h-10 object-cover shrink-0" />
-                        )}
+                      <div key={item.id} className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.productName}</p>
                           <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
                         </div>
+                        {item.productImage && (
+                          <img
+                            src={item.productImage}
+                            alt={item.productName}
+                            className="h-14 w-14 border border-[oklch(0.9_0_0)] object-cover bg-white shrink-0"
+                            loading="lazy"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>

@@ -9,6 +9,7 @@ import {
   orderItems,
   logisticsOrders,
   orderBalancePayments,
+  dbProducts,
   InsertOrder,
   InsertOrderItem,
   InsertOrderBalancePayment,
@@ -44,6 +45,11 @@ export type AdminOrderListItem = Pick<
 > & {
   itemCount: number;
   hasLogistics: boolean;
+  productThumbnails: {
+    id: number;
+    productName: string;
+    productImage: string;
+  }[];
 };
 
 export type AdminOrdersPage = {
@@ -434,14 +440,43 @@ export async function getAdminOrderSummaries(
     .from(logisticsOrders)
     .where(inArray(logisticsOrders.orderId, orderIds));
 
+  const thumbnailRows = await db
+    .select({
+      id: orderItems.id,
+      orderId: orderItems.orderId,
+      productName: orderItems.productName,
+      productImage: sql<string | null>`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`,
+    })
+    .from(orderItems)
+    .leftJoin(dbProducts, eq(orderItems.productId, dbProducts.id))
+    .where(inArray(orderItems.orderId, orderIds))
+    .orderBy(orderItems.id);
+
   const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
   const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
+  const thumbnailsByOrderId = new Map<
+    number,
+    { id: number; productName: string; productImage: string }[]
+  >();
+  for (const row of thumbnailRows) {
+    const image = row.productImage?.trim();
+    if (!image || image.startsWith("data:")) continue;
+    const current = thumbnailsByOrderId.get(row.orderId) ?? [];
+    if (current.length >= 3) continue;
+    current.push({
+      id: row.id,
+      productName: row.productName,
+      productImage: image,
+    });
+    thumbnailsByOrderId.set(row.orderId, current);
+  }
 
   return {
     items: orderRows.map((order) => ({
       ...order,
       itemCount: itemCountByOrderId.get(order.id) ?? 0,
       hasLogistics: logisticsOrderIds.has(order.id),
+      productThumbnails: thumbnailsByOrderId.get(order.id) ?? [],
     })),
     total,
     page,
