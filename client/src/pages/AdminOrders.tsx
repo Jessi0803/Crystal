@@ -250,10 +250,10 @@ function OrderRowCard({
 
                 <div>
                   <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">商品明細</p>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     {detail.items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
+                      <div key={item.id}>
+                        <div className="min-w-0">
                           <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.productName}</p>
                           <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
                         </div>
@@ -261,7 +261,7 @@ function OrderRowCard({
                           <img
                             src={item.productImage}
                             alt={item.productName}
-                            className="h-32 w-32 border border-[oklch(0.9_0_0)] object-cover bg-white shrink-0"
+                            className="mt-3 h-48 w-48 max-w-full border border-[oklch(0.9_0_0)] object-cover bg-white"
                             loading="lazy"
                           />
                         )}
