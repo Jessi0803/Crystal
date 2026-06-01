@@ -982,7 +982,17 @@ async function getAdminOrderDetail(orderId) {
   const [order] = await db.select().from(orders).where(eq2(orders.id, orderId)).limit(1);
   if (!order) return null;
   const [items, logistics, balancePayment] = await Promise.all([
-    db.select().from(orderItems).where(eq2(orderItems.orderId, order.id)),
+    db.select({
+      id: orderItems.id,
+      orderId: orderItems.orderId,
+      productId: orderItems.productId,
+      productName: orderItems.productName,
+      productImage: sql2`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`,
+      quantity: orderItems.quantity,
+      unitPrice: orderItems.unitPrice,
+      subtotal: orderItems.subtotal,
+      isPreorder: orderItems.isPreorder
+    }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(eq2(orderItems.orderId, order.id)),
     db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1),
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.orderId, order.id)).limit(1)
   ]);

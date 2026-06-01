@@ -497,7 +497,21 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
   if (!order) return null;
 
   const [items, logistics, balancePayment] = await Promise.all([
-    db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
+    db
+      .select({
+        id: orderItems.id,
+        orderId: orderItems.orderId,
+        productId: orderItems.productId,
+        productName: orderItems.productName,
+        productImage: sql<string | null>`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`,
+        quantity: orderItems.quantity,
+        unitPrice: orderItems.unitPrice,
+        subtotal: orderItems.subtotal,
+        isPreorder: orderItems.isPreorder,
+      })
+      .from(orderItems)
+      .leftJoin(dbProducts, eq(orderItems.productId, dbProducts.id))
+      .where(eq(orderItems.orderId, order.id)),
     db.select().from(logisticsOrders).where(eq(logisticsOrders.orderId, order.id)).limit(1),
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
   ]);
