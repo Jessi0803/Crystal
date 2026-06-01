@@ -291,6 +291,7 @@ var init_schema = __esm({
       priceRange: varchar("priceRange", { length: 200 }),
       depositRange: varchar("depositRange", { length: 200 }),
       image: text("image").notNull(),
+      images: json("images").$type(),
       tags: json("tags").$type(),
       description: text("description"),
       story: text("story"),
@@ -336,11 +337,12 @@ function isSecureRequest(req) {
   return protoList.some((proto) => proto.trim().toLowerCase() === "https");
 }
 function getSessionCookieOptions(req) {
+  const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req)
+    sameSite: secure ? "none" : "lax",
+    secure
   };
 }
 
@@ -509,6 +511,7 @@ var systemRouter = router({
     ecpayMerchantId: process.env.ECPAY_MERCHANT_ID || "(empty)",
     hasEcpayHashKey: !!process.env.ECPAY_HASH_KEY,
     ecpayHashKeyPrefix: process.env.ECPAY_HASH_KEY ? process.env.ECPAY_HASH_KEY.substring(0, 6) + "..." : "(empty)",
+    ecpaySandbox: process.env.ECPAY_SANDBOX === "true",
     // 綠界物流
     hasEcpayLogisticsMerchantId: !!process.env.ECPAY_LOGISTICS_MERCHANT_ID,
     ecpayLogisticsMerchantId: process.env.ECPAY_LOGISTICS_MERCHANT_ID || "(empty)",
@@ -536,14 +539,14 @@ import { TRPCError as TRPCError3 } from "@trpc/server";
 
 // server/ecpay.ts
 import crypto from "crypto";
-var isProduction = ENV.isProduction;
+var usePaymentSandbox = process.env.ECPAY_SANDBOX === "true";
+var paymentBaseURL = usePaymentSandbox ? "https://payment-stage.ecpay.com.tw" : "https://payment.ecpay.com.tw";
 var ECPAY_CONFIG = {
   MerchantID: ENV.ecpayMerchantId || "3002607",
   HashKey: ENV.ecpayHashKey || "pwFHCqoQZGmho4w6",
   HashIV: ENV.ecpayHashIV || "EkRm7iFT261dpevs",
-  // 永遠使用正式端點（憑證是正式帳號）
-  PaymentURL: "https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5",
-  QueryURL: "https://payment.ecpay.com.tw/Cashier/QueryTradeInfo/V5"
+  PaymentURL: `${paymentBaseURL}/Cashier/AioCheckOut/V5`,
+  QueryURL: `${paymentBaseURL}/Cashier/QueryTradeInfo/V5`
 };
 function ecpayUrlEncode(str) {
   return encodeURIComponent(str).replace(/%20/g, "+").replace(/%2D/gi, "-").replace(/%5F/gi, "_").replace(/%2E/gi, ".").replace(/%21/gi, "!").replace(/%2A/gi, "*").replace(/%28/gi, "(").replace(/%29/gi, ")");
@@ -553,11 +556,8 @@ function generateCheckMacValue(params) {
     (a, b) => a.toLowerCase().localeCompare(b.toLowerCase())
   );
   const raw = `HashKey=${ECPAY_CONFIG.HashKey}&` + sortedKeys.map((k) => `${k}=${params[k]}`).join("&") + `&HashIV=${ECPAY_CONFIG.HashIV}`;
-  console.log("[ECPay] Raw string for CheckMacValue:", raw);
   const encoded = ecpayUrlEncode(raw).toLowerCase();
-  console.log("[ECPay] Encoded string:", encoded);
   const hash2 = crypto.createHash("sha256").update(encoded).digest("hex").toUpperCase();
-  console.log("[ECPay] CheckMacValue:", hash2);
   return hash2;
 }
 function generateMerchantTradeNo() {
@@ -601,6 +601,7 @@ function normalizeOrderEmail(email) {
 import { eq, and, gt, sql } from "drizzle-orm";
 init_schema();
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 var ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
@@ -613,11 +614,41 @@ function shouldGrantAdminRole(openId, email) {
   if (!email) return false;
   return ADMIN_EMAIL_ALLOWLIST.has(normalizeOrderEmail(email));
 }
+var _pool = null;
+function shouldUseTls(databaseUrl) {
+  if (process.env.DATABASE_SSL === "true") return true;
+  try {
+    const url = new URL(databaseUrl);
+    return url.hostname.includes("tidbcloud.com");
+  } catch {
+    return false;
+  }
+}
+function createDb(databaseUrl) {
+  if (!shouldUseTls(databaseUrl)) {
+    return drizzle(databaseUrl);
+  }
+  const url = new URL(databaseUrl);
+  _pool = mysql.createPool({
+    host: url.hostname,
+    port: Number(url.port || 3306),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DATABASE_CONNECTION_LIMIT || 10),
+    ssl: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true
+    }
+  });
+  return drizzle(_pool);
+}
 var _db = null;
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = createDb(process.env.DATABASE_URL);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -797,6 +828,13 @@ async function attachItemsAndLogisticsForOrders(db, orderRows) {
     logistics: logisticsByOrder.get(order.id) ?? null
   }));
 }
+var MAX_PRODUCT_IMAGE_LEN = 6e4;
+function sanitizeProductImage(image) {
+  if (!image) return null;
+  if (image.startsWith("data:")) return null;
+  if (image.length > MAX_PRODUCT_IMAGE_LEN) return null;
+  return image;
+}
 async function createOrder(orderData, items) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -805,7 +843,11 @@ async function createOrder(orderData, items) {
   if (!created) throw new Error("Failed to create order");
   const itemsWithOrderId = items.map((item) => ({
     ...item,
-    orderId: created.id
+    orderId: created.id,
+    // productImage 欄位是 MySQL TEXT（上限約 64KB）。商品圖若是內嵌的
+    // base64 data URI（測試商品常見），長度動輒數百 KB，會讓 insert 直接失敗，
+    // 也會讓每筆訂單暴肥。這類圖片不存（存 null），只保留正常的網址圖。
+    productImage: sanitizeProductImage(item.productImage)
   }));
   await db.insert(orderItems).values(itemsWithOrderId);
   return created.id;
@@ -901,13 +943,33 @@ async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
     itemCount: sql2`CAST(COUNT(*) AS SIGNED)`
   }).from(orderItems).where(inArray(orderItems.orderId, orderIds)).groupBy(orderItems.orderId);
   const logisticsRows = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+  const thumbnailRows = await db.select({
+    id: orderItems.id,
+    orderId: orderItems.orderId,
+    productName: orderItems.productName,
+    productImage: sql2`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`
+  }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(inArray(orderItems.orderId, orderIds)).orderBy(orderItems.id);
   const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
   const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
+  const thumbnailsByOrderId = /* @__PURE__ */ new Map();
+  for (const row of thumbnailRows) {
+    const image = row.productImage?.trim();
+    if (!image || image.startsWith("data:")) continue;
+    const current = thumbnailsByOrderId.get(row.orderId) ?? [];
+    if (current.length >= 3) continue;
+    current.push({
+      id: row.id,
+      productName: row.productName,
+      productImage: image
+    });
+    thumbnailsByOrderId.set(row.orderId, current);
+  }
   return {
     items: orderRows.map((order) => ({
       ...order,
       itemCount: itemCountByOrderId.get(order.id) ?? 0,
-      hasLogistics: logisticsOrderIds.has(order.id)
+      hasLogistics: logisticsOrderIds.has(order.id),
+      productThumbnails: thumbnailsByOrderId.get(order.id) ?? []
     })),
     total,
     page,
@@ -1295,6 +1357,7 @@ async function restoreInventoryOnCancel(merchantTradeNo) {
       )
     );
   }
+  await db.update(orders).set({ inventoryDeducted: false }).where(eq3(orders.merchantTradeNo, merchantTradeNo));
 }
 async function getProductAvailability(productId) {
   const db = await getDb();
@@ -1877,6 +1940,7 @@ var OVERSEAS_SHIPPING_FEES = {
   GB: 644,
   AU: 552
 };
+var FREE_SHIPPING_EMAILS = ["baby90522@gmail.com"];
 function isCheckoutFeeExemptProduct(item) {
   const productId = item.baseProductId ?? item.id;
   return CUSTOM_PRODUCT_IDS.includes(productId) || productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
@@ -1888,12 +1952,16 @@ function isTestProduct(item) {
 function calcBraceletQuantityForFreeShipping(items) {
   return items.filter((item) => !isTestProduct(item) && item.name?.includes("\u624B\u934A") === true).reduce((sum, item) => sum + item.quantity, 0);
 }
+function isFreeShippingEmail(email) {
+  return email ? FREE_SHIPPING_EMAILS.includes(email.trim().toLowerCase()) : false;
+}
 function calcCheckoutFees(params) {
   const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const chargeableSubtotal = params.items.filter((item) => !isCheckoutFeeExemptProduct(item)).reduce((sum, item) => sum + item.price * item.quantity, 0);
   const appliesFees = chargeableSubtotal > 0;
   const domesticFreeShipping = params.checkoutRegion === "domestic" && calcBraceletQuantityForFreeShipping(params.items) >= 2;
-  const shippingFee = !appliesFees ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
+  const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
+  const shippingFee = !appliesFees ? 0 : emailFreeShipping ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
   const paymentFee = 0;
   const total = subtotal + shippingFee + paymentFee;
   return {
@@ -1903,7 +1971,8 @@ function calcCheckoutFees(params) {
     paymentFee,
     total,
     appliesFees,
-    domesticFreeShipping
+    domesticFreeShipping,
+    emailFreeShipping
   };
 }
 
@@ -2071,7 +2140,8 @@ var orderRouter = router({
       checkoutRegion: input.checkoutRegion,
       shippingMethod,
       paymentMethod,
-      overseasCountry
+      overseasCountry,
+      buyerEmail
     });
     const feeItems = [];
     if (feeSummary.shippingFee > 0) {
@@ -2263,13 +2333,21 @@ var orderRouter = router({
    */
   updateOrderStatus: adminProcedure.input(z2.object({
     orderId: z2.number(),
-    status: z2.enum(["pending_payment", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled"])
+    status: z2.enum(["pending_payment", "transfer_pending", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled"])
   })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq5(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
+    if (input.status === "transfer_pending") {
+      await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq5(orders.id, order.id));
+      return { success: true };
+    }
     await updateOrderStatus(order.merchantTradeNo, input.status);
+    if (input.status === "paid") {
+      await db.update(orders).set({ paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq5(orders.id, order.id));
+      await deductInventoryAfterPayment(order.merchantTradeNo);
+    }
     if (input.status === "cancelled") {
       await restoreInventoryOnCancel(order.merchantTradeNo);
     }
@@ -2537,7 +2615,8 @@ var orderRouter = router({
       checkoutRegion: input.checkoutRegion,
       shippingMethod,
       paymentMethod: input.paymentMethod,
-      overseasCountry
+      overseasCountry,
+      buyerEmail: balancePayment.order.buyerEmail
     });
     const totalAmount = feeSummary.total;
     await db.update(orderBalancePayments).set({
@@ -2638,9 +2717,9 @@ var knowledgeChunks = [
   {
     id: "faq-warranty",
     question: "\u624B\u934A\u6709\u4FDD\u56FA\u55CE\uFF1F",
-    answer: "\u6211\u50113\u500B\u6708\u5167\u6709\u514D\u8CBB1\u6B21\u7684\u4FDD\u56FA\uFF0C\u9805\u76EE\u6709\uFF1A\u63DB\u7DDA\u3001\u4E94\u91D1\u6C70\u63DB\u3001\u640D\u58DE\u7DAD\u4FEE\uFF1B\u5982\u9700\u6539\u5C3A\u5BF8\u3001\u6539\u8A2D\u8A08\u5C6C\u65BC\u91CD\u65B0\u8A2D\u8A08\uFF0C\u4E0D\u5305\u542B\u5728\u514D\u8CBB\u4FDD\u56FA\u7684\u7BC4\u570D\u5167\uFF0C\u5982\u6709\u9700\u8981\uFF0C\u9700\u914C\u6536200$\u91CD\u65B0\u8A2D\u8A08\u8CBB\u3002",
-    embedText: "\u624B\u934A\u6709\u4FDD\u56FA\u55CE \u4FDD\u56FA \u7DAD\u4FEE \u58DE\u6389 \u63DB\u7DDA \u4E94\u91D1 \u640D\u58DE \u514D\u8CBB \u5C3A\u5BF8 \u8A2D\u8A08\u8CBB",
-    keywords: ["\u4FDD\u56FA", "\u7DAD\u4FEE", "\u63DB\u7DDA", "\u4E94\u91D1", "\u640D\u58DE", "\u58DE\u6389", "\u514D\u8CBB", "\u5C3A\u5BF8", "\u8A2D\u8A08\u8CBB"],
+    answer: "\u6211\u50113\u500B\u6708\u5167\u6709\u514D\u8CBB1\u6B21\u7684\u4FDD\u56FA\uFF0C\u9805\u76EE\u6709\uFF1A\u63DB\u7DDA\u3001\u4E94\u91D1\u6C70\u63DB\u3001\u640D\u58DE\u7DAD\u4FEE\uFF1B\u6C34\u6676\u4E0D\u898B\u8981\u88DC\u5DEE\u984D\uFF1B\u5982\u9700\u6539\u5C3A\u5BF8\u3001\u6539\u8A2D\u8A08\u5C6C\u65BC\u91CD\u65B0\u8A2D\u8A08\uFF0C\u4E0D\u5305\u542B\u5728\u514D\u8CBB\u4FDD\u56FA\u7684\u7BC4\u570D\u5167\uFF0C\u5982\u6709\u9700\u8981\uFF0C\u9700\u914C\u6536200$\u91CD\u65B0\u8A2D\u8A08\u8CBB\u3002",
+    embedText: "\u624B\u934A\u6709\u4FDD\u56FA\u55CE \u4FDD\u56FA \u7DAD\u4FEE \u58DE\u6389 \u63DB\u7DDA \u4E94\u91D1 \u640D\u58DE \u514D\u8CBB \u5C3A\u5BF8 \u8A2D\u8A08\u8CBB \u6C34\u6676\u4E0D\u898B \u88DC\u5DEE\u984D",
+    keywords: ["\u4FDD\u56FA", "\u7DAD\u4FEE", "\u63DB\u7DDA", "\u4E94\u91D1", "\u640D\u58DE", "\u58DE\u6389", "\u514D\u8CBB", "\u5C3A\u5BF8", "\u8A2D\u8A08\u8CBB", "\u6C34\u6676\u4E0D\u898B", "\u88DC\u5DEE\u984D"],
     category: "\u5E38\u898B\u554F\u984C"
   },
   {
@@ -2845,8 +2924,8 @@ var knowledgeChunks = [
   {
     id: "faq-workshop-price",
     question: "\u6C34\u6676\u5275\u696D\u5168\u80FD\u73ED\u7684\u8CBB\u7528\u548C\u8AB2\u7A0B\u5167\u5BB9\u662F\u4EC0\u9EBC\uFF1F",
-    answer: "\u65E9\u9CE5\u512A\u60E0\u50F9 12,888 \u5143\uFF08\u5171 6 \u5C0F\u6642\uFF09\uFF0C\u5169\u4EBA\u540C\u884C\u518D\u6E1B 888 \u5143/\u4EBA\u3002\u5730\u9EDE\uFF1A\u6843\u5712\u5C0F\u6A9C\u6EAA\u5340\uFF08\u9810\u7D04\u5236\uFF09\u3002\u8AB2\u7A0B\u5206\u4E09\u6BB5\uFF1A\u2460\u7406\u8AD6/\u5275\u696D\u57FA\u790E\uFF082hr\uFF09\u2461\u624B\u4F5C 3 \u4EF6\u4F5C\u54C1\uFF083hr\uFF09\u2462\u6DE8\u5316\u4FDD\u990A\u8207\u9023\u7D50\uFF080.5hr\uFF09\u30026 \u7A2E\u6838\u5FC3\u88FD\u4F5C\u6280\u6CD5\u5305\u542B\u9F8D\u8766\u6263\u3001\u78C1\u6263\u3001U \u578B\u6263\u7B49\u9032\u968E\u6280\u6CD5\uFF0CIG \u5206\u4EAB\u53EF\u7372\u8D08\u54C1\u3002\u5831\u540D\u8ACB\u79C1\u8A0A LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh",
-    embedText: "\u6C34\u6676\u5275\u696D\u5168\u80FD\u73ED\u8CBB\u7528 \u5275\u696D\u73ED\u8CBB\u7528 \u8AB2\u7A0B\u5167\u5BB9 \u5927\u7DB1 12888 \u6843\u5712 \u5831\u540D",
+    answer: "\u65E9\u9CE5\u512A\u60E0\u50F9 12,888 \u5143\uFF08\u5171 6 \u5C0F\u6642\uFF09\uFF0C\u5169\u4EBA\u540C\u884C\u518D\u6E1B 888 \u5143/\u4EBA\u3002\u5730\u9EDE\uFF1A\u6843\u5712\u5C0F\u6A9C\u6EAA\u5340\uFF08\u9810\u7D04\u5236\uFF09\u3002\u8AB2\u7A0B\u5206\u4E09\u6BB5\uFF1A\u2460\u7406\u8AD6/\u5275\u696D\u57FA\u790E\uFF082hr\uFF09\u2461\u624B\u4F5C 3 \u4EF6\u4F5C\u54C1\uFF083hr\uFF09\u2462\u6DE8\u5316\u4FDD\u990A\u8207\u9023\u7D50\uFF080.5hr\uFF09\u30026 \u7A2E\u6838\u5FC3\u88FD\u4F5C\u6280\u6CD5\u5305\u542B\u5F48\u529B\u7E69\u7368\u5BB6\u4E0D\u6613\u9B06\u812B\u7D81\u6CD5\u3001\u78C1\u6263\u3001\u9F8D\u8766\u6263\u3001U \u578B\u6263\u3001\u9805\u934A\u3001\u540A\u98FE\uFF0CIG \u5206\u4EAB\u53EF\u7372\u8A31\u9858\u881F\u71ED\uFF0B\u6DE8\u5316\u6C34\u6676\u4E00\u5305\u3002\u5831\u540D\u8ACB\u79C1\u8A0A LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh",
+    embedText: "\u6C34\u6676\u5275\u696D\u5168\u80FD\u73ED\u8CBB\u7528 \u5275\u696D\u73ED\u8CBB\u7528 \u8AB2\u7A0B\u5167\u5BB9 \u5927\u7DB1 12888 \u6843\u5712 \u5831\u540D \u5F48\u529B\u7E69 \u78C1\u6263 \u9F8D\u8766\u6263 U\u578B\u6263 \u9805\u934A \u540A\u98FE",
     keywords: ["\u5275\u696D\u5168\u80FD\u73ED", "\u8CBB\u7528", "\u8AB2\u7A0B\u5167\u5BB9", "12888", "\u6843\u5712", "\u5831\u540D"],
     category: "\u8AB2\u7A0B"
   },
@@ -2917,11 +2996,11 @@ var knowledgeChunks = [
   {
     id: "rec-confidence",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u63D0\u5347\u81EA\u4FE1\u3001\u9B45\u529B\u6216\u5438\u5F15\u529B\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u7DAD\u7D0D\u65AF Venus\u300D\uFF08\u63D0\u5347\u81EA\u4FE1\u8207\u884C\u52D5\u529B\u3001\u62DB\u8CA1\u805A\u80FD\u3001\u7A69\u5B9A\u60C5\u7DD2\uFF0C\u8F15\u91CF\u65E5\u5E38\u6B3E\uFF0CNT$950\uFF09\u548C\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u589E\u5F37\u81EA\u4FE1\u3001\u5438\u5F15\u4EBA\u7DE3\u3001\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,580\uFF09\u3002\u5169\u6B3E\u90FD\u9069\u5408\u60F3\u5EFA\u7ACB\u81EA\u4FE1\u6C23\u5834\u7684\u4F60\uFF01",
+    answer: "\u63A8\u85A6\u300C\u7DAD\u7D0D\u65AF Venus\u300D\uFF08\u63D0\u5347\u81EA\u4FE1\u8207\u884C\u52D5\u529B\uFF0C\u8F15\u91CF\u65E5\u5E38\u6B3E\uFF0CNT$950\uFF09\u3001\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u589E\u5F37\u81EA\u4FE1\u3001\u5438\u5F15\u4EBA\u7DE3\u3001\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,580\uFF09\u548C\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u91CB\u653E\u58D3\u529B\u4E26\u63D0\u5347\u8868\u9054\u52C7\u6C23\uFF0CNT$1,480\u8D77\uFF09\u3002",
     embedText: "\u63D0\u5347\u81EA\u4FE1 \u81EA\u4FE1\u5FC3 \u9B45\u529B \u5438\u5F15\u529B \u6C23\u5834 \u884C\u52D5\u529B \u589E\u5F37\u81EA\u4FE1 \u5EFA\u7ACB\u81EA\u4FE1 \u60F3\u8B8A\u81EA\u4FE1 \u81EA\u6211\u63D0\u5347",
     keywords: ["\u81EA\u4FE1", "\u9B45\u529B", "\u5438\u5F15\u529B", "\u6C23\u5834", "\u884C\u52D5\u529B", "\u63D0\u5347\u81EA\u4FE1"],
     category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d003-venus", "d002-honey-realm"]
+    relatedProductIds: ["d003-venus", "d002-honey-realm", "d001-moon-secret"]
   },
   {
     id: "rec-wealth",
@@ -2944,20 +3023,20 @@ var knowledgeChunks = [
   {
     id: "rec-healing",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u7642\u7652\u3001\u91CB\u653E\u58D3\u529B\u6216\u5B89\u64AB\u60C5\u7DD2\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u6DE8\u5316\u8CA0\u80FD\u91CF\u3001\u91CB\u653E\u58D3\u529B\u7126\u616E\u3001\u589E\u5F37\u76F4\u89BA\u9748\u611F\uFF0CNT$1,480\uFF09\u548C\u300C\u6708\u6620\u6DE8\u5FC3\u300D\uFF08\u5B89\u64AB\u60C5\u7DD2\u3001\u6DE8\u5316\u653E\u5927\u6B63\u5411\u80FD\u91CF\u3001\u5E36\u4F86\u6EAB\u67D4\u5B89\u5168\u611F\uFF0CNT$1,500\uFF09\u3002",
+    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u6DE8\u5316\u8CA0\u80FD\u91CF\u3001\u91CB\u653E\u58D3\u529B\u7126\u616E\uFF0CNT$1,480\u8D77\uFF09\u3001\u300C\u6708\u6620\u6DE8\u5FC3\u300D\uFF08\u5B89\u64AB\u60C5\u7DD2\u4E26\u5E36\u4F86\u5B89\u5168\u611F\uFF0CNT$1,500\uFF09\u548C\u300C\u6668\u5149\u8F15\u8A9E\u300D\uFF08\u67D4\u5316\u60C5\u7DD2\u4E26\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,800\uFF09\u3002",
     embedText: "\u7642\u7652 \u58D3\u529B \u7126\u616E \u60C5\u7DD2 \u5B89\u64AB \u7D13\u58D3 \u653E\u9B06 \u4E0D\u5B89 \u91CB\u653E\u58D3\u529B \u60C5\u7DD2\u7A69\u5B9A \u5FC3\u60C5\u4E0D\u597D \u8CA0\u9762\u60C5\u7DD2",
     keywords: ["\u7642\u7652", "\u58D3\u529B", "\u7126\u616E", "\u60C5\u7DD2", "\u5B89\u64AB", "\u7D13\u58D3", "\u653E\u9B06", "\u5FC3\u60C5\u4E0D\u597D"],
     category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart"]
+    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"]
   },
   {
     id: "rec-protection",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u9632\u8B77\u8CA0\u80FD\u91CF\u3001\u4FDD\u8B77\u6C23\u5834\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u6DE8\u5316\u4E26\u9632\u8B77\u5916\u5728\u8CA0\u80FD\u91CF\u3001\u5E73\u8861\u8EAB\u5FC3\u9748\uFF0CNT$1,480\uFF09\u548C\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u5F37\u5316\u4FDD\u8B77\u529B\u8207\u7A69\u5B9A\u6C23\u5834\u3001\u653E\u5927\u500B\u4EBA\u80FD\u91CF\uFF0CNT$1,580\uFF09\u3002",
+    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u6DE8\u5316\u4E26\u9632\u8B77\u5916\u5728\u8CA0\u80FD\u91CF\uFF0CNT$1,480\u8D77\uFF09\u3001\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u5F37\u5316\u4FDD\u8B77\u529B\u8207\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,580\uFF09\u548C\u300C\u6668\u5149\u8F15\u8A9E\u300D\uFF08\u6DE8\u5316\u8CA0\u80FD\u91CF\u4E26\u7DAD\u6301\u67D4\u548C\u6C23\u5834\uFF0CNT$1,800\uFF09\u3002",
     embedText: "\u9632\u8B77 \u8CA0\u80FD\u91CF \u4FDD\u8B77 \u6C23\u5834 \u6DE8\u5316 \u7A69\u5B9A \u9632\u5C0F\u4EBA \u907F\u90AA \u4FDD\u8B77\u80FD\u91CF \u9A45\u90AA",
     keywords: ["\u9632\u8B77", "\u8CA0\u80FD\u91CF", "\u4FDD\u8B77", "\u6C23\u5834", "\u6DE8\u5316", "\u9632\u5C0F\u4EBA", "\u9A45\u90AA"],
     category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d001-moon-secret", "d002-honey-realm"]
+    relatedProductIds: ["d001-moon-secret", "d002-honey-realm", "d004-morning-whisper"]
   },
   {
     id: "rec-crystal-rose-quartz",
@@ -3072,7 +3151,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 500,
-    priceRange: "NT$1,200 ~ 1,800",
+    priceRange: "NT$1,500 \xB1 NT$300",
     image: "/images/custom3.jpg",
     tags: [],
     description: "\u7D14\u5BA2\u88FD\u6C34\u6676\u624B\u934A\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3097,7 +3176,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1399,
-    priceRange: "\u624B\u934A NT$1,200 ~ 1,800\uFF5C\u5854\u7F85\u4F9D\u50F9\u76EE\u8868 9 \u6298",
+    priceRange: "\u624B\u934A NT$1,500 \xB1 NT$300\uFF5C\u5854\u7F85\u4F9D\u50F9\u76EE\u8868 9 \u6298",
     image: "/images/custom-tarot2.jpg",
     tags: ["\u5854\u7F85"],
     description: "\u5854\u7F85 \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3122,7 +3201,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1e3,
-    priceRange: "\u624B\u934A NT$1,200 ~ 1,800\uFF5C\u8108\u8F2A\u6AA2\u6E2C NT$500",
+    priceRange: "\u624B\u934A NT$1,500 \xB1 NT$300\uFF5C\u8108\u8F2A\u6AA2\u6E2C NT$500",
     image: "/images/custom-chakra2.jpg",
     tags: ["\u8108\u8F2A"],
     description: "\u8108\u8F2A\u6AA2\u6E2C \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3147,7 +3226,7 @@ var products = [
     category: "custom",
     categoryLabel: "\u5BA2\u88FD\u5316",
     price: 1e3,
-    priceRange: "\u624B\u934A NT$1,200 ~ 1,800\uFF5C\u751F\u547D\u9748\u6578\u89E3\u6790 NT$500",
+    priceRange: "\u624B\u934A NT$1,500 \xB1 NT$300\uFF5C\u751F\u547D\u9748\u6578\u89E3\u6790 NT$500",
     image: "/images/custom-numerology3.jpg",
     tags: ["\u751F\u547D\u9748\u6578"],
     description: "\u751F\u547D\u9748\u6578 \xD7 \u6C34\u6676\u624B\u934A\u5BA2\u88FD\u5316\u670D\u52D9\u8A02\u91D1\u3002",
@@ -3188,7 +3267,7 @@ var products = [
     ],
     suitableFor: ["\u8FD1\u671F\u58D3\u529B\u8F03\u5927\u8005", "\u5E0C\u671B\u7A69\u5B9A\u60C5\u7DD2\u8207\u63D0\u5347\u9B45\u529B\u8005", "\u60F3\u589E\u5F37\u6E9D\u901A\u8868\u9054\u8207\u9748\u611F\u8005"],
     howToUse: [
-      "\u624B\u570D\uFF1A12\u300112.5\u300113\u300113.5\u300114\u300114.5\u300115\u300115.5\u300116\u300116.5\u300117\u300117.5\u300118\u300118.5\u300119",
+      "\u624B\u570D\uFF1A13\u300113.5\u300114\u300114.5\u300115\u300115.5\u300116\u300116.5\u300117\u300117.5\u300118\u300118.5\u300119",
       "\u624B\u570D\u5C0F\u65BC13.5\uFF0D1480$\uFF0C\u624B\u570D14-17\uFF0D1580$\uFF0C\u624B\u570D\u5927\u65BC18\uFF0D1680$",
       "\u6A19\u6E96\u70BA\u5F48\u529B\u7E69\u7248\u672C\uFF1B\u82E5\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\u9700\u52A0\u6536 200 \u5143"
     ],
@@ -3222,7 +3301,7 @@ var products = [
     ],
     suitableFor: ["\u5E0C\u671B\u540C\u6642\u63D0\u5347\u8CA1\u904B\u8207\u4EBA\u7DE3\u8005", "\u6B63\u5728\u885D\u523A\u5DE5\u4F5C\u76EE\u6A19\u8005", "\u9700\u8981\u7A69\u5B9A\u60C5\u7DD2\u8207\u9632\u8B77\u529B\u8005"],
     howToUse: [
-      "\u624B\u570D\u53EF\u9078 12-19 \u516C\u5206\uFF0C\u8ACB\u4F9D\u6DE8\u624B\u570D\u4E0B\u55AE",
+      "\u624B\u570D\u53EF\u9078 13-19 \u516C\u5206\uFF0C\u8ACB\u4F9D\u6DE8\u624B\u570D\u4E0B\u55AE",
       "\u6A19\u6E96\u70BA\u5F48\u529B\u7E69\u7248\u672C\uFF1B\u82E5\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\u9700\u52A0\u6536 200 \u5143"
     ],
     disclaimer: "\u672C\u5546\u54C1\u70BA\u5929\u7136\u7926\u77F3\u98FE\u54C1\uFF0C\u5177\u6709\u500B\u4EBA\u80FD\u91CF\u652F\u6301\u4F5C\u7528\uFF0C\u975E\u91AB\u7642\u7528\u54C1\uFF0C\u4E0D\u5177\u4EFB\u4F55\u91AB\u7642\u7642\u6548\u3002\u6548\u679C\u56E0\u500B\u4EBA\u80FD\u91CF\u72C0\u614B\u800C\u7570\u3002",
@@ -3283,7 +3362,7 @@ var products = [
     ],
     suitableFor: ["\u5E0C\u671B\u7A69\u5B9A\u95DC\u4FC2\u80FD\u91CF\u8005", "\u5BB9\u6613\u53D7\u5916\u754C\u60C5\u7DD2\u5F71\u97FF\u8005", "\u60F3\u63D0\u5347\u4EBA\u7DE3\u8207\u6EAB\u67D4\u9B45\u529B\u8005"],
     howToUse: [
-      "\u624B\u570D\u53EF\u9078 12-19 \u516C\u5206\uFF0C\u8ACB\u4F9D\u6DE8\u624B\u570D\u4E0B\u55AE",
+      "\u624B\u570D\u53EF\u9078 13-19 \u516C\u5206\uFF0C\u8ACB\u4F9D\u6DE8\u624B\u570D\u4E0B\u55AE",
       "\u6A19\u6E96\u70BA\u5F48\u529B\u7E69\u7248\u672C\uFF1B\u82E5\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\u9700\u52A0\u6536 200 \u5143"
     ],
     disclaimer: "\u672C\u5546\u54C1\u70BA\u5929\u7136\u7926\u77F3\u98FE\u54C1\uFF0C\u5177\u6709\u500B\u4EBA\u80FD\u91CF\u652F\u6301\u4F5C\u7528\uFF0C\u975E\u91AB\u7642\u7528\u54C1\uFF0C\u4E0D\u5177\u4EFB\u4F55\u91AB\u7642\u7642\u6548\u3002\u6548\u679C\u56E0\u500B\u4EBA\u80FD\u91CF\u72C0\u614B\u800C\u7570\u3002",
@@ -3315,7 +3394,7 @@ var products = [
     ],
     suitableFor: ["\u60F3\u7A69\u5B9A\u5167\u5728\u7BC0\u594F\u8005", "\u5E0C\u671B\u4FEE\u5FA9\u60C5\u7DD2\u8207\u95DC\u4FC2\u8005", "\u504F\u597D\u67D4\u548C\u6708\u5149\u7CFB\u8A2D\u8A08\u8005"],
     howToUse: [
-      "\u624B\u570D\u53EF\u9078 12-19 \u516C\u5206\uFF0C\u8ACB\u4F9D\u6DE8\u624B\u570D\u4E0B\u55AE",
+      "\u624B\u570D\u53EF\u9078 13-19 \u516C\u5206\uFF0C\u8ACB\u4F9D\u6DE8\u624B\u570D\u4E0B\u55AE",
       "\u6A19\u6E96\u70BA\u5F48\u529B\u7E69\u7248\u672C\uFF1B\u82E5\u6539\u9F8D\u8766\u6263\u6216\u78C1\u6263\u9700\u52A0\u6536 200 \u5143"
     ],
     disclaimer: "\u672C\u5546\u54C1\u70BA\u5929\u7136\u7926\u77F3\u98FE\u54C1\uFF0C\u5177\u6709\u500B\u4EBA\u80FD\u91CF\u652F\u6301\u4F5C\u7528\uFF0C\u975E\u91AB\u7642\u7528\u54C1\uFF0C\u4E0D\u5177\u4EFB\u4F55\u91AB\u7642\u7642\u6548\u3002\u6548\u679C\u56E0\u500B\u4EBA\u80FD\u91CF\u72C0\u614B\u800C\u7570\u3002",
@@ -3412,6 +3491,7 @@ var SYSTEM_PROMPT = `\u4F60\u662F\u300C\u691B\u02D9Crystal\u300D\u6C34\u6676\u5E
 - \u4F7F\u7528\u9069\u7576\u7684\u63DB\u884C\u8B93\u56DE\u7B54\u6613\u8B80
 - \u4E0D\u4F7F\u7528 markdown \u683C\u5F0F\uFF0C\u4E0D\u4F7F\u7528 **\u7C97\u9AD4**\u3001*\u659C\u9AD4*\u3001# \u6A19\u984C\u7B49\u7B26\u865F`;
 var PUBLIC_SITE = "https://goodaytarot.com";
+var CHATBOT_MAX_MESSAGE_LENGTH = 500;
 function clipKnowledgeAnswer(text2, maxChars = 240) {
   const t2 = text2.trim();
   if (t2.length <= maxChars) return t2;
@@ -3493,6 +3573,14 @@ async function embedQuery(text2) {
   const data = await res.json();
   return data.embedding.values;
 }
+function selectRelatedProductIds(relevantChunks, scoreMin = 0.55, maxProducts = 4) {
+  const matchingChunks = relevantChunks.filter(
+    (chunk) => chunk.category === "\u5546\u54C1\u63A8\u85A6" && (chunk.relatedProductIds?.length ?? 0) > 0 && chunk.score >= scoreMin
+  ).sort((a, b) => b.score - a.score).slice(0, 2);
+  return Array.from(
+    new Set(matchingChunks.flatMap((chunk) => chunk.relatedProductIds ?? []))
+  ).slice(0, maxProducts);
+}
 async function saveChatbotLog(params) {
   const db = await getDb();
   if (!db) return;
@@ -3515,13 +3603,13 @@ async function saveChatbotLog(params) {
 var chatbotRouter = router({
   chat: publicProcedure.input(
     z3.object({
-      message: z3.string().min(1).max(500),
+      message: z3.string().min(1).max(CHATBOT_MAX_MESSAGE_LENGTH),
       sessionId: z3.string().min(1).max(64).optional(),
       pagePath: z3.string().max(255).optional(),
       history: z3.array(
         z3.object({
           role: z3.enum(["user", "assistant"]),
-          content: z3.string()
+          content: z3.string().max(CHATBOT_MAX_MESSAGE_LENGTH * 2)
         })
       ).max(10).default([])
     })
@@ -3546,12 +3634,11 @@ var chatbotRouter = router({
     }
     const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
     const PRODUCT_SCORE_MIN = 0.55;
-    const productCandidates = relevantChunks.filter(
-      (c) => c.category === "\u5546\u54C1\u63A8\u85A6" && (c.relatedProductIds?.length ?? 0) > 0
+    const relatedProductIds = selectRelatedProductIds(
+      relevantChunks,
+      PRODUCT_SCORE_MIN
     );
-    const bestProductChunk = productCandidates.sort((a, b) => b.score - a.score)[0];
-    const isProductQuery = !!bestProductChunk && bestProductChunk.score >= PRODUCT_SCORE_MIN;
-    const relatedProducts = isProductQuery ? (bestProductChunk.relatedProductIds ?? []).map((id) => products.find((p) => p.id === id)).filter((p) => !!p) : [];
+    const relatedProducts = relatedProductIds.length > 0 ? relatedProductIds.map((id) => products.find((p) => p.id === id)).filter((p) => !!p) : [];
     let ragContext = "";
     if (relevantChunks.length > 0) {
       ragContext = "\n\n\u3010\u76F8\u95DC\u5E38\u898B\u554F\u984C\u3011\n" + relevantChunks.map((c) => `Q: ${c.question}
@@ -4424,6 +4511,7 @@ async function ensureProductsTable() {
       \`priceRange\` varchar(200) DEFAULT NULL,
       \`depositRange\` varchar(200) DEFAULT NULL,
       \`image\` mediumtext NOT NULL,
+      \`images\` json DEFAULT NULL,
       \`tags\` json DEFAULT NULL,
       \`description\` text DEFAULT NULL,
       \`story\` text DEFAULT NULL,
@@ -4461,6 +4549,10 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`categoryLabels\` json DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql5`ALTER TABLE \`products\` ADD COLUMN \`images\` json DEFAULT NULL`);
   } catch {
   }
   try {
@@ -4529,6 +4621,16 @@ async function publishDueProducts() {
 }
 function toFrontendProduct(p) {
   const { categories, categoryLabels } = normalizeProductCategories(p);
+  const normalizeImageUrl = (url) => {
+    const trimmed = url.trim();
+    if (!trimmed.includes("drive.google.com")) return trimmed;
+    const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+    const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+    const id = fileMatch?.[1] ?? idMatch?.[1];
+    return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
+  };
+  const images = (p.images?.length ? p.images : [p.image].filter(Boolean)).map(normalizeImageUrl);
+  const image = normalizeImageUrl(p.image);
   return {
     id: p.id,
     name: p.name,
@@ -4541,7 +4643,8 @@ function toFrontendProduct(p) {
     originalPrice: p.originalPrice ?? void 0,
     priceRange: p.priceRange ?? void 0,
     depositRange: p.depositRange ?? void 0,
-    image: p.image,
+    image,
+    images,
     tags: p.tags ?? [],
     description: p.description ?? "",
     story: p.story ?? "",
@@ -4569,10 +4672,11 @@ var ProductInputSchema = z6.object({
   categories: z6.array(z6.string()).default([]),
   categoryLabels: z6.array(z6.string()).default([]),
   price: z6.number().int().min(0),
-  originalPrice: z6.number().int().min(0).optional(),
-  priceRange: z6.string().optional(),
+  originalPrice: z6.number().int().min(0).nullable().optional(),
+  priceRange: z6.string().nullable().optional(),
   depositRange: z6.string().optional(),
   image: z6.string().min(1),
+  images: z6.array(z6.string().min(1)).default([]),
   tags: z6.array(z6.string()).default([]),
   description: z6.string().default(""),
   story: z6.string().default(""),
