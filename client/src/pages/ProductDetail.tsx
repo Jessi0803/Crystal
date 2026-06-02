@@ -21,6 +21,11 @@ import {
   usesTieredBraceletPricing,
 } from "@/lib/pricing";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const tarotReadingCategories = [
   {
@@ -141,14 +146,15 @@ export default function ProductDetail() {
   const [selectedGalleryImage, setSelectedGalleryImage] = useState("");
   const wristSizes = ["13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
   const claspChoices = [
-    { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200", img: "/lobster-clasp.jpg" },
-    { id: "magnetic" as const, label: "磁扣", price: "+NT$200", img: "/magnet-clasp.png" },
-    { id: "elastic" as const, label: "彈力繩", price: "免費", img: "/elastic-cord.jpg" },
+    { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200" },
+    { id: "magnetic" as const, label: "磁扣", price: "+NT$200" },
+    { id: "elastic" as const, label: "彈力繩", price: "免費" },
   ];
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
   const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
+  const [showClaspGuide, setShowClaspGuide] = useState(false);
   const [selectedFitPreference, setSelectedFitPreference] = useState<"just-right" | "loose">("just-right");
   const fitOptions = [
     { id: "just-right" as const, label: "剛好", desc: "會有水晶壓痕但不掐肉" },
@@ -167,6 +173,7 @@ export default function ProductDetail() {
     setActiveTab((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
     setHasSelectedClasp(false);
     setShowWristMeasureGuide(false);
+    setShowClaspGuide(false);
     setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
   }, [id, product?.id]);
 
@@ -590,7 +597,13 @@ export default function ProductDetail() {
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
                       <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">扣件類型</p>
-                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2">點選看示意圖</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowClaspGuide(true)}
+                        className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2 hover:text-[oklch(0.38_0.08_250)]"
+                      >
+                        點選看示意圖
+                      </button>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {claspChoices.map((opt) => (
@@ -609,15 +622,18 @@ export default function ProductDetail() {
                         </button>
                       ))}
                     </div>
-                    {hasSelectedClasp && (
-                      <div className="mt-3 bg-[oklch(0.97_0_0)] rounded-sm p-2">
-                        <img
-                          src={claspChoices.find((o) => o.id === selectedClaspType)!.img}
-                          alt={selectedClaspType}
-                          className="w-full max-h-56 object-contain rounded-sm"
-                        />
-                      </div>
-                    )}
+                    <Dialog open={showClaspGuide} onOpenChange={setShowClaspGuide}>
+                      <DialogContent className="w-[calc(100vw-2rem)] max-w-[900px] rounded-sm border-0 bg-white p-3 shadow-xl sm:max-w-[900px] sm:p-4">
+                        <DialogTitle className="sr-only">扣件類型示意圖</DialogTitle>
+                        <div className="flex max-h-[86vh] w-full items-center justify-center overflow-auto">
+                          <img
+                            src="/images/龍蝦扣磁扣.jpg"
+                            alt="扣件類型示意圖"
+                            className="max-h-[86vh] max-w-full rounded-sm object-contain"
+                          />
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
                 <div>
