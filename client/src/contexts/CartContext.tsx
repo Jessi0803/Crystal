@@ -76,7 +76,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existing) {
         return prev.map(item =>
           item.id === itemId
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + 1, isPreorder: options?.isPreorder ?? item.isPreorder }
             : item
         );
       }
