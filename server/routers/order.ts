@@ -53,10 +53,9 @@ import {
   capturePayPalOrder,
 } from "../_core/paypal";
 import {
-  notifyLineOrderPlaced,
-  notifyLineOrderShipped,
-  notifyLineSafely,
-} from "../lineMessage";
+  notifyCustomerOrderPlacedSafely,
+  notifyCustomerOrderShippedSafely,
+} from "../customerOrderNotification";
 import { isOverseasShipCountryCode, OVERSEAS_SHIP_COUNTRY_LABELS } from "@shared/overseasShipping";
 import {
   formatOverseasShippingAddress,
@@ -308,7 +307,7 @@ export const orderRouter = router({
           isPreorder: item.isPreorder ?? false,
         }))
       );
-      await notifyLineSafely("order_placed", () => notifyLineOrderPlaced(createdOrderId));
+      await notifyCustomerOrderPlacedSafely(createdOrderId);
 
       if (paymentMethod === "paypal") {
         const returnUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
@@ -503,7 +502,7 @@ export const orderRouter = router({
         await restoreInventoryOnCancel(order.merchantTradeNo);
       }
       if (input.status === "shipped") {
-        await notifyLineSafely("order_shipped_manual", () => notifyLineOrderShipped(order.id));
+        await notifyCustomerOrderShippedSafely(order.id);
       }
       return { success: true };
     }),
@@ -629,7 +628,7 @@ export const orderRouter = router({
 
           // 更新訂單狀態為已出貨
           await dbUpdateOrderStatus(order.merchantTradeNo, "shipped");
-          await notifyLineSafely("order_shipped_logistics", () => notifyLineOrderShipped(input.orderId));
+          await notifyCustomerOrderShippedSafely(input.orderId);
 
           return {
             success: true,

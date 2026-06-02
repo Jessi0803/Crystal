@@ -22,6 +22,7 @@ import {
   updateBalancePaymentStatus,
 } from "./orderDb";
 import { deductInventoryAfterPayment } from "./inventoryDb";
+import { notifyCustomerOrderShippedSafely } from "./customerOrderNotification";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -349,6 +350,7 @@ ${inputs}
 
         // 更新訂單狀態為已出貨
         await db.update(orders).set({ orderStatus: "shipped" }).where(eq(orders.id, orderId));
+        await notifyCustomerOrderShippedSafely(orderId);
       }
 
       res.json(result);
