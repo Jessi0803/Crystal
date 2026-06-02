@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knowledgeChunks, type ScoredChunk } from "./crystalKnowledge";
+import { knowledgeChunks, searchKnowledge, type ScoredChunk } from "./crystalKnowledge";
 import { selectRelatedProductIds } from "./routers/chatbot";
 
 function recommendationChunk(id: string) {
@@ -35,5 +35,38 @@ describe("chatbot product recommendations", () => {
     ] as ScoredChunk[];
 
     expect(selectRelatedProductIds(chunks)).toEqual([]);
+  });
+
+  it("has standalone knowledge for each limited design product", () => {
+    const productKnowledge = [
+      ["product-d001-moon-secret", "d001-moon-secret"],
+      ["product-d002-honey-realm", "d002-honey-realm"],
+      ["product-d003-venus", "d003-venus"],
+      ["product-d004-morning-whisper", "d004-morning-whisper"],
+      ["product-d005-moon-clear-heart", "d005-moon-clear-heart"],
+    ] as const;
+
+    for (const [chunkId, productId] of productKnowledge) {
+      expect(recommendationChunk(chunkId)).toMatchObject({
+        category: "商品推薦",
+        relatedProductIds: [productId],
+      });
+    }
+  });
+
+  it("finds limited design products for limited-edition questions", async () => {
+    const results = await searchKnowledge("限定款有哪些 每月限量手鍊", Array(768).fill(1), 5, 0.45);
+    const resultIds = results.map((chunk) => chunk.id);
+
+    expect(resultIds).toHaveLength(5);
+    expect(resultIds).toEqual(
+      expect.arrayContaining([
+        "product-d001-moon-secret",
+        "product-d002-honey-realm",
+        "product-d003-venus",
+        "product-d004-morning-whisper",
+        "product-d005-moon-clear-heart",
+      ])
+    );
   });
 });

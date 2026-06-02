@@ -254,11 +254,11 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "faq-see-design-first",
-    question: "可以看到成品圖再決定要不要購買嗎？",
+    question: "可以看到成品圖再決定要不要購買嗎？客製化什麼時候付尾款？",
     answer:
       "客製化流程為先付訂金，老闆設計完成品圖後給您確認，滿意再支付尾款。初版享有免費修改一次，範圍為更換不喜歡的配飾與調整水晶／配飾擺放順序；改手圍、新增條件（如銀管、珠框、色系、扣具等）屬重新設計需另收 200 元，第二次修改起每次亦加收 200 元。預約時請先透過官方 LINE 說明：https://line.me/R/ti/p/@011tymeh",
-    embedText: "先看成品圖 成品圖確認 先看設計 看圖再付款 設計確認",
-    keywords: ["成品圖", "先看設計", "設計確認", "看圖", "確認後付款"],
+    embedText: "先看成品圖 成品圖確認 先看設計 看圖再付款 設計確認 訂金 尾款 什麼時候付尾款 客製化尾款",
+    keywords: ["成品圖", "先看設計", "設計確認", "看圖", "確認後付款", "尾款", "付尾款", "訂金", "客製化尾款"],
     category: "客製化",
   },
   {
@@ -398,11 +398,10 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "rec-crystal-green-phantom-unavailable",
     question: "想要綠幽靈手鍊，有推薦嗎？",
     answer:
-      "目前現貨沒有綠幽靈手鍊。若是想找財運、事業、行動力方向，可改看「蜜光之境手鍊」（含銅髮晶、黃水晶、太陽石等，NT$1,580）作為替代參考；若想討論指定晶石或材料是否可用，可再透過 LINE 詢問店家。",
+      "目前現貨沒有綠幽靈手鍊。若是想找財運、事業、行動力方向，可以改看網站上的財運事業系列作為替代參考；若想討論指定晶石或材料是否可用，可再透過 LINE 詢問店家。",
     embedText: "綠幽靈 綠幽靈手鍊 綠幽靈推薦 有綠幽靈嗎 綠幽靈水晶 財運 事業 招財 替代款",
     keywords: ["綠幽靈", "綠幽靈手鍊", "綠幽靈水晶"],
-    category: "商品推薦",
-    relatedProductIds: ["d002-honey-realm"],
+    category: "常見問題",
   },
   {
     id: "rec-crystal-obsidian",
@@ -424,6 +423,61 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     keywords: ["白幽靈", "紅兔毛", "白兔毛", "兔毛", "粉碧璽"],
     category: "商品推薦",
     relatedProductIds: ["d004-morning-whisper", "d001-moon-secret"],
+  },
+  {
+    id: "product-d001-moon-secret",
+    question: "月下密語手鍊適合什麼需求？",
+    answer:
+      "「月下密語手鍊」是限定款手鍊，水晶包含白幽靈、藍月光、灰月光、藍針與珍珠。適合想淨化負能量、釋放壓力焦慮、穩定情緒、提升直覺靈感與表達勇氣的人，也兼具招人緣與防護感。價格 NT$1,480 起，商品連結：https://goodaytarot.com/products/d001-moon-secret",
+    embedText:
+      "月下密語 月下密語手鍊 d001 D001 限定款 每月限量 限量手鍊 淨化 負能量 壓力 焦慮 情緒穩定 療癒 防護 人緣 表達力 直覺 靈感 白幽靈 藍月光 灰月光 藍針 珍珠",
+    keywords: ["月下密語", "d001", "D001", "限定款", "每月限量", "限量手鍊", "淨化", "負能量", "壓力", "焦慮", "療癒", "防護", "白幽靈", "藍月光", "灰月光", "藍針"],
+    category: "商品推薦",
+    relatedProductIds: ["d001-moon-secret"],
+  },
+  {
+    id: "product-d002-honey-realm",
+    question: "蜜光之境手鍊適合什麼需求？",
+    answer:
+      "「蜜光之境手鍊」是限定款手鍊，水晶包含銅髮晶、黃水晶、草莓晶、白水晶、黑曜石、珍珠、葡萄石、太陽石與粉晶。適合想提升財運、行動力、好人緣、愛情桃花、保護力與穩定氣場的人。價格 NT$1,580，商品連結：https://goodaytarot.com/products/d002-honey-realm",
+    embedText:
+      "蜜光之境 蜜光之境手鍊 d002 D002 限定款 每月限量 限量手鍊 招財 財運 財富 事業 行動力 自信 人緣 愛情 桃花 防護 保護 氣場 療癒 銅髮晶 黃水晶 草莓晶 白水晶 黑曜石 葡萄石 太陽石 粉晶 珍珠",
+    keywords: ["蜜光之境", "d002", "D002", "限定款", "每月限量", "限量手鍊", "招財", "財運", "事業", "行動力", "自信", "人緣", "愛情", "桃花", "防護", "銅髮晶", "黃水晶", "草莓晶", "黑曜石", "太陽石", "粉晶"],
+    category: "商品推薦",
+    relatedProductIds: ["d002-honey-realm"],
+  },
+  {
+    id: "product-d003-venus",
+    question: "維納斯 Venus 適合什麼需求？",
+    answer:
+      "「維納斯 Venus」是限定款吊飾，水晶包含太陽石、鈦晶、藍月光、白水晶與珍珠。適合想提升自信、行動力、吸引力、財運聚能、直覺力與柔和魅力的人，日常配戴輕巧俐落。價格 NT$950，商品連結：https://goodaytarot.com/products/d003-venus",
+    embedText:
+      "維納斯 Venus d003 D003 限定款 每月限量 限定吊飾 吊飾 自信 魅力 吸引力 行動力 財運 招財 情緒穩定 直覺 氣質 太陽石 鈦晶 藍月光 白水晶 珍珠",
+    keywords: ["維納斯", "Venus", "d003", "D003", "限定款", "每月限量", "吊飾", "自信", "魅力", "吸引力", "行動力", "財運", "招財", "太陽石", "鈦晶", "藍月光", "白水晶"],
+    category: "商品推薦",
+    relatedProductIds: ["d003-venus"],
+  },
+  {
+    id: "product-d004-morning-whisper",
+    question: "晨光輕語手鍊適合什麼需求？",
+    answer:
+      "「晨光輕語手鍊」是限定款手鍊，水晶包含白幽靈、紅兔毛、藍月光、白兔毛、白水晶、粉碧璽、珍珠與白月光。適合想提升愛情人緣、穩定關係能量、柔化情緒、增加安全感、淨化負能量並維持防護氣場的人。價格 NT$1,800，商品連結：https://goodaytarot.com/products/d004-morning-whisper",
+    embedText:
+      "晨光輕語 晨光輕語手鍊 d004 D004 限定款 每月限量 限量手鍊 愛情 桃花 人緣 關係 情緒 安全感 溫柔魅力 淨化 負能量 防護 氣場 直覺 白幽靈 紅兔毛 白兔毛 粉碧璽 藍月光 白月光 白水晶 珍珠",
+    keywords: ["晨光輕語", "d004", "D004", "限定款", "每月限量", "限量手鍊", "愛情", "桃花", "人緣", "關係", "情緒", "安全感", "淨化", "防護", "白幽靈", "紅兔毛", "白兔毛", "粉碧璽", "藍月光", "白月光"],
+    category: "商品推薦",
+    relatedProductIds: ["d004-morning-whisper"],
+  },
+  {
+    id: "product-d005-moon-clear-heart",
+    question: "月映淨心手鍊適合什麼需求？",
+    answer:
+      "「月映淨心手鍊」是限定款手鍊，水晶包含粉晶、白月光、珍珠、白水晶與藍月光。適合想吸引愛情與好人緣、安撫情緒、修復關係能量、柔化心性、提升直覺並回到穩定安全感的人。價格 NT$1,500，商品連結：https://goodaytarot.com/products/d005-moon-clear-heart",
+    embedText:
+      "月映淨心 月映淨心手鍊 映淨心 d005 D005 限定款 每月限量 限量手鍊 愛情 桃花 人緣 關係修復 情緒 安撫 療癒 安全感 溫柔 淨化 正向能量 直覺 粉晶 白月光 藍月光 白水晶 珍珠",
+    keywords: ["月映淨心", "映淨心", "d005", "D005", "限定款", "每月限量", "限量手鍊", "愛情", "桃花", "人緣", "關係", "情緒", "安撫", "療癒", "安全感", "粉晶", "白月光", "藍月光", "白水晶"],
+    category: "商品推薦",
+    relatedProductIds: ["d005-moon-clear-heart"],
   },
 ];
 
@@ -459,7 +513,7 @@ function keywordBoostScore(chunk: KnowledgeChunk, hits: number): number {
   if (chunk.category === "商品推薦") {
     return Math.min(0.78, 0.73 + 0.02 * Math.min(hits - 1, 3));
   }
-  return Math.min(0.58, 0.48 + 0.04 * Math.min(hits, 3));
+  return Math.min(0.92, 0.6 + 0.12 * Math.min(hits, 3));
 }
 
 export type ScoredChunk = KnowledgeChunk & { score: number };

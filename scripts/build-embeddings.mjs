@@ -130,7 +130,7 @@ const knowledgeChunks = [
   },
   {
     id: "faq-see-design-first",
-    embedText: "先看成品圖 成品圖確認 先看設計 看圖再付款 設計確認",
+    embedText: "先看成品圖 成品圖確認 先看設計 看圖再付款 設計確認 訂金 尾款 什麼時候付尾款 客製化尾款",
   },
   {
     id: "faq-ready-stock",
@@ -203,6 +203,31 @@ const knowledgeChunks = [
     embedText:
       "白幽靈 白幽靈手鍊 紅兔毛 白兔毛 兔毛水晶 粉碧璽 想要白幽靈 有白幽靈的手鍊嗎 粉碧璽手鍊",
   },
+  {
+    id: "product-d001-moon-secret",
+    embedText:
+      "月下密語 月下密語手鍊 d001 D001 限定款 每月限量 限量手鍊 淨化 負能量 壓力 焦慮 情緒穩定 療癒 防護 人緣 表達力 直覺 靈感 白幽靈 藍月光 灰月光 藍針 珍珠",
+  },
+  {
+    id: "product-d002-honey-realm",
+    embedText:
+      "蜜光之境 蜜光之境手鍊 d002 D002 限定款 每月限量 限量手鍊 招財 財運 財富 事業 行動力 自信 人緣 愛情 桃花 防護 保護 氣場 療癒 銅髮晶 黃水晶 草莓晶 白水晶 黑曜石 葡萄石 太陽石 粉晶 珍珠",
+  },
+  {
+    id: "product-d003-venus",
+    embedText:
+      "維納斯 Venus d003 D003 限定款 每月限量 限定吊飾 吊飾 自信 魅力 吸引力 行動力 財運 招財 情緒穩定 直覺 氣質 太陽石 鈦晶 藍月光 白水晶 珍珠",
+  },
+  {
+    id: "product-d004-morning-whisper",
+    embedText:
+      "晨光輕語 晨光輕語手鍊 d004 D004 限定款 每月限量 限量手鍊 愛情 桃花 人緣 關係 情緒 安全感 溫柔魅力 淨化 負能量 防護 氣場 直覺 白幽靈 紅兔毛 白兔毛 粉碧璽 藍月光 白月光 白水晶 珍珠",
+  },
+  {
+    id: "product-d005-moon-clear-heart",
+    embedText:
+      "月映淨心 月映淨心手鍊 映淨心 d005 D005 限定款 每月限量 限量手鍊 愛情 桃花 人緣 關係修復 情緒 安撫 療癒 安全感 溫柔 淨化 正向能量 直覺 粉晶 白月光 藍月光 白水晶 珍珠",
+  },
 ];
 
 async function embed(text) {
@@ -252,7 +277,7 @@ async function main() {
     console.log("✓");
   }
 
-  writeFileSync(OUTPUT_PATH, JSON.stringify(results, null, 2));
+  writeFileSync(OUTPUT_PATH, JSON.stringify(results));
   console.log(`\n✅ 完成！輸出至 server/faqEmbeddings.json（共 ${results.length} 筆）`);
 }
 
