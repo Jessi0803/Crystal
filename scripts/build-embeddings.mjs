@@ -16,6 +16,13 @@ if (!GEMINI_API_KEY) {
 }
 
 const OUTPUT_PATH = join(__dirname, "../server/faqEmbeddings.json");
+const REEMBED_IDS = new Set([
+  "product-d001-moon-secret",
+  "product-d002-honey-realm",
+  "product-d003-venus",
+  "product-d004-morning-whisper",
+  "product-d005-moon-clear-heart",
+]);
 
 const knowledgeChunks = [
   {
@@ -206,27 +213,52 @@ const knowledgeChunks = [
   {
     id: "product-d001-moon-secret",
     embedText:
-      "月下密語 月下密語手鍊 d001 D001 限定款 每月限量 限量手鍊 淨化 負能量 壓力 焦慮 情緒穩定 療癒 防護 人緣 表達力 直覺 靈感 白幽靈 藍月光 灰月光 藍針 珍珠",
+      "月下密語 月下密語手鍊 d001 D001 淨化 負能量 壓力 焦慮 情緒穩定 療癒 防護 人緣 表達力 直覺 靈感 白幽靈 藍月光 灰月光 藍針 珍珠",
   },
   {
     id: "product-d002-honey-realm",
     embedText:
-      "蜜光之境 蜜光之境手鍊 d002 D002 限定款 每月限量 限量手鍊 招財 財運 財富 事業 行動力 自信 人緣 愛情 桃花 防護 保護 氣場 療癒 銅髮晶 黃水晶 草莓晶 白水晶 黑曜石 葡萄石 太陽石 粉晶 珍珠",
+      "蜜光之境 蜜光之境手鍊 d002 D002 招財 財運 財富 事業 行動力 自信 人緣 愛情 桃花 防護 保護 氣場 療癒 銅髮晶 黃水晶 草莓晶 白水晶 黑曜石 葡萄石 太陽石 粉晶 珍珠",
   },
   {
     id: "product-d003-venus",
     embedText:
-      "維納斯 Venus d003 D003 限定款 每月限量 限定吊飾 吊飾 自信 魅力 吸引力 行動力 財運 招財 情緒穩定 直覺 氣質 太陽石 鈦晶 藍月光 白水晶 珍珠",
+      "維納斯 Venus d003 D003 吊飾 自信 魅力 吸引力 行動力 財運 招財 情緒穩定 直覺 氣質 太陽石 鈦晶 藍月光 白水晶 珍珠",
   },
   {
     id: "product-d004-morning-whisper",
     embedText:
-      "晨光輕語 晨光輕語手鍊 d004 D004 限定款 每月限量 限量手鍊 愛情 桃花 人緣 關係 情緒 安全感 溫柔魅力 淨化 負能量 防護 氣場 直覺 白幽靈 紅兔毛 白兔毛 粉碧璽 藍月光 白月光 白水晶 珍珠",
+      "晨光輕語 晨光輕語手鍊 d004 D004 愛情 桃花 人緣 關係 情緒 安全感 溫柔魅力 淨化 負能量 防護 氣場 直覺 白幽靈 紅兔毛 白兔毛 粉碧璽 藍月光 白月光 白水晶 珍珠",
   },
   {
     id: "product-d005-moon-clear-heart",
     embedText:
-      "月映淨心 月映淨心手鍊 映淨心 d005 D005 限定款 每月限量 限量手鍊 愛情 桃花 人緣 關係修復 情緒 安撫 療癒 安全感 溫柔 淨化 正向能量 直覺 粉晶 白月光 藍月光 白水晶 珍珠",
+      "月映淨心 月映淨心手鍊 映淨心 d005 D005 愛情 桃花 人緣 關係修復 情緒 安撫 療癒 安全感 溫柔 淨化 正向能量 直覺 粉晶 白月光 藍月光 白水晶 珍珠",
+  },
+  {
+    id: "product-prod-1780212635593",
+    embedText:
+      "潛月之境 prod-1780212635593 限定款 每月限量 限量手鍊 灰月光 白月光 黑髮晶 黑曜石 淨化氣場 排除負能量 防護 保護力 穩定情緒 思緒 直覺 洞察力 安定感 療癒",
+  },
+  {
+    id: "product-prod-1780212866677",
+    embedText:
+      "御光而行 prod-1780212866677 限定款 每月限量 限量手鍊 銀曜石 黑碧璽 白水晶 白月光 黑曜石 白幽靈 驅邪 負能量 防護 保護結界 淨化氣場 自信 意志力 成長 清明 平靜",
+  },
+  {
+    id: "product-prod-1780212957392",
+    embedText:
+      "柔韌之光 prod-1780212957392 限定款 每月限量 限量手鍊 銅髮晶 粉晶 金髮晶 白幽靈 愛情 桃花 感情 貴人 招財 財運 行動力 自信 心輪 緣分 成長 蛻變",
+  },
+  {
+    id: "product-prod-1780213098870",
+    embedText:
+      "理光之境 prod-1780213098870 限定款 每月限量 限量手鍊 白瑪瑙 金髮晶 藍兔毛 珍珠 海藍寶 白水晶 穩定情緒 沉澱思緒 平靜 清明 溝通表達 專注 理性判斷 淨化氣場 招財",
+  },
+  {
+    id: "product-prod-1780213199030",
+    embedText:
+      "盛光流年 prod-1780213199030 限定款 每月限量 限量手鍊 金髮晶 白水晶 白瑪瑙 黃阿賽 招財 財運 機遇 貴人 正向緣分 行動力 自信 淨化氣場 正能量 豐盛",
   },
 ];
 
@@ -259,6 +291,7 @@ async function main() {
     console.log(`已有 ${existing.length} 筆 embedding`);
   }
 
+  existing = existing.filter((entry) => !REEMBED_IDS.has(entry.id));
   const existingIds = new Set(existing.map((e) => e.id));
   const newChunks = knowledgeChunks.filter((c) => !existingIds.has(c.id));
 

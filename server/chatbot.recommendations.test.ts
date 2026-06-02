@@ -61,12 +61,23 @@ describe("chatbot product recommendations", () => {
     expect(resultIds).toHaveLength(5);
     expect(resultIds).toEqual(
       expect.arrayContaining([
-        "product-d001-moon-secret",
-        "product-d002-honey-realm",
-        "product-d003-venus",
-        "product-d004-morning-whisper",
-        "product-d005-moon-clear-heart",
+        "product-prod-1780212635593",
+        "product-prod-1780212866677",
+        "product-prod-1780212957392",
+        "product-prod-1780213098870",
+        "product-prod-1780213199030",
       ])
     );
+  });
+
+  it("does not classify regular design products as limited editions", async () => {
+    const results = await searchKnowledge("限定款有哪些 每月限量手鍊", Array(768).fill(1), 10, 0.45);
+    const resultIds = results.map((chunk) => chunk.id);
+
+    expect(resultIds).not.toContain("product-d001-moon-secret");
+    expect(resultIds).not.toContain("product-d002-honey-realm");
+    expect(resultIds).not.toContain("product-d003-venus");
+    expect(resultIds).not.toContain("product-d004-morning-whisper");
+    expect(resultIds).not.toContain("product-d005-moon-clear-heart");
   });
 });
