@@ -148,6 +148,7 @@ export default function ProductDetail() {
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
+  const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
   const [selectedFitPreference, setSelectedFitPreference] = useState<"just-right" | "loose">("just-right");
   const fitOptions = [
     { id: "just-right" as const, label: "剛好", desc: "會有水晶壓痕但不掐肉" },
@@ -165,6 +166,7 @@ export default function ProductDetail() {
   useEffect(() => {
     setActiveTab((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
     setHasSelectedClasp(false);
+    setShowWristMeasureGuide(false);
     setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
   }, [id, product?.id]);
 
@@ -555,7 +557,16 @@ export default function ProductDetail() {
             {hasWristSizeOption && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
                 <div>
-                  <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">手圍尺寸</p>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">手圍尺寸</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowWristMeasureGuide((current) => !current)}
+                      className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2 hover:text-[oklch(0.38_0.08_250)]"
+                    >
+                      手圍怎麼測量？
+                    </button>
+                  </div>
                   <select
                     value={selectedWristSize}
                     onChange={(e) => setSelectedWristSize(e.target.value)}
@@ -567,6 +578,13 @@ export default function ProductDetail() {
                       </option>
                     ))}
                   </select>
+                  {showWristMeasureGuide && (
+                    <div className="mt-3 bg-[oklch(0.98_0_0)] border border-[oklch(0.92_0_0)] px-3 py-2.5">
+                      <p className="text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">
+                        拿軟尺平貼手圍繞一圈。如果沒有軟尺，也可以拿一段棉線或紙條繞手圍，拿筆做記號後，再用一般直尺量那段線的長度。
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {hasClaspOption && (
                   <div>
