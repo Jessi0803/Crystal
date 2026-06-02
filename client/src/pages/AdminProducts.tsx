@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Package, Plus, Search, Save, X, Upload, ImageIcon,
-  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2
+  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Users
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -1002,6 +1002,13 @@ export default function AdminProducts() {
               className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
             >
               AI 客服
+            </button>
+            <button
+              onClick={() => setLocation("/admin/members")}
+              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
+            >
+              <Users className="w-3.5 h-3.5" />
+              會員管理
             </button>
             <button
               onClick={openCreate}
