@@ -2,7 +2,7 @@ import { eq, and, gt, sql } from "drizzle-orm";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql, { type Pool } from "mysql2/promise";
-import { InsertUser, users } from "../drizzle/schema";
+import { chatbotLogs, InsertUser, orders, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 const ADMIN_EMAIL_ALLOWLIST = new Set(
@@ -161,8 +161,163 @@ export async function getUserByEmail(email: string) {
     .select()
     .from(users)
     .where(sql`LOWER(TRIM(${users.email})) = ${key}`)
+    .orderBy(sql`CASE WHEN ${users.openId} LIKE 'line:%' THEN 0 ELSE 1 END`, sql`${users.updatedAt} DESC`)
     .limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+async function mergeDuplicateMemberIntoPrimary(opts: {
+  primaryUserId: number;
+  duplicateUserId: number;
+  lineOpenId: string;
+  email: string;
+  name?: string | null;
+  lastSignedIn: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (opts.primaryUserId === opts.duplicateUserId) return;
+
+  const [primary] = await db.select().from(users).where(eq(users.id, opts.primaryUserId)).limit(1);
+  const [duplicate] = await db.select().from(users).where(eq(users.id, opts.duplicateUserId)).limit(1);
+  if (!primary || !duplicate) return;
+
+  await db.update(orders).set({ userId: opts.primaryUserId }).where(eq(orders.userId, opts.duplicateUserId));
+  await db
+    .update(chatbotLogs)
+    .set({ userId: opts.primaryUserId })
+    .where(eq(chatbotLogs.userId, opts.duplicateUserId));
+
+  const shouldKeepAdmin = primary.role === "admin" || duplicate.role === "admin" || shouldGrantAdminRole(opts.lineOpenId, opts.email);
+  await db
+    .update(users)
+    .set({
+      openId: opts.lineOpenId,
+      name: opts.name?.trim() || primary.name || duplicate.name,
+      email: opts.email,
+      passwordHash: primary.passwordHash ?? duplicate.passwordHash,
+      emailVerified: true,
+      verifyToken: null,
+      verifyTokenExpiresAt: null,
+      resetToken: primary.resetToken ?? duplicate.resetToken,
+      resetTokenExpiresAt: primary.resetTokenExpiresAt ?? duplicate.resetTokenExpiresAt,
+      loginMethod: "line",
+      role: shouldKeepAdmin ? "admin" : "user",
+      lastSignedIn: opts.lastSignedIn,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, opts.primaryUserId));
+
+  try {
+    await db.execute(sql`
+      UPDATE \`users\` primary_user
+      JOIN \`users\` duplicate_user ON duplicate_user.\`id\` = ${opts.duplicateUserId}
+      SET primary_user.\`vipTier\` = CASE
+            WHEN COALESCE(primary_user.\`vipTier\`, 'none') = 'none'
+            THEN COALESCE(duplicate_user.\`vipTier\`, 'none')
+            ELSE primary_user.\`vipTier\`
+          END,
+          primary_user.\`vipNote\` = COALESCE(primary_user.\`vipNote\`, duplicate_user.\`vipNote\`)
+      WHERE primary_user.\`id\` = ${opts.primaryUserId}
+    `);
+  } catch (error) {
+    if (!String(error).includes("Unknown column")) {
+      console.warn("[Database] Failed to merge member VIP fields:", error);
+    }
+  }
+
+  await db.delete(users).where(eq(users.id, opts.duplicateUserId));
+}
+
+export async function upsertLineUserAsPrimary(data: {
+  openId: string;
+  email?: string | null;
+  name?: string | null;
+  lastSignedIn?: Date;
+}) {
+  if (!data.openId.startsWith("line:")) {
+    throw new Error("LINE openId is required");
+  }
+
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert LINE user: database not available");
+    return;
+  }
+
+  const email = data.email ? normalizeOrderEmail(data.email) : null;
+  const lastSignedIn = data.lastSignedIn ?? new Date();
+  const name = data.name?.trim() || null;
+
+  const [lineUser] = await db.select().from(users).where(eq(users.openId, data.openId)).limit(1);
+  const [sameEmailUser] = email
+    ? await db
+        .select()
+        .from(users)
+        .where(sql`LOWER(TRIM(${users.email})) = ${email} AND ${users.openId} <> ${data.openId}`)
+        .limit(1)
+    : [];
+
+  if (lineUser && sameEmailUser) {
+    await mergeDuplicateMemberIntoPrimary({
+      primaryUserId: lineUser.id,
+      duplicateUserId: sameEmailUser.id,
+      lineOpenId: data.openId,
+      email: email!,
+      name,
+      lastSignedIn,
+    });
+    return;
+  }
+
+  if (lineUser) {
+    await db
+      .update(users)
+      .set({
+        name: name || lineUser.name,
+        email: email ?? lineUser.email,
+        loginMethod: "line",
+        emailVerified: true,
+        verifyToken: null,
+        verifyTokenExpiresAt: null,
+        role: shouldGrantAdminRole(data.openId, email ?? lineUser.email) || lineUser.role === "admin" ? "admin" : lineUser.role,
+        lastSignedIn,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, lineUser.id));
+    return;
+  }
+
+  if (sameEmailUser) {
+    await db
+      .update(users)
+      .set({
+        openId: data.openId,
+        name: name || sameEmailUser.name,
+        email,
+        loginMethod: "line",
+        emailVerified: true,
+        verifyToken: null,
+        verifyTokenExpiresAt: null,
+        role:
+          shouldGrantAdminRole(data.openId, email) || sameEmailUser.role === "admin"
+            ? "admin"
+            : sameEmailUser.role,
+        lastSignedIn,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, sameEmailUser.id));
+    return;
+  }
+
+  await upsertUser({
+    openId: data.openId,
+    name: name ?? undefined,
+    email: email ?? undefined,
+    loginMethod: "line",
+    lastSignedIn,
+    emailVerified: true,
+  });
 }
 
 export async function createEmailUser(data: {
