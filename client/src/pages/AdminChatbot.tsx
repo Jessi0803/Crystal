@@ -5,10 +5,11 @@
  */
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Bot, CalendarDays, MessageCircle, RefreshCw, Search, User, XCircle } from "lucide-react";
+import { ArrowLeft, Bot, CalendarDays, MessageCircle, RefreshCw, Search, Trash2, User, XCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { toast } from "sonner";
 
 const PAGE_SIZE = 20;
 
@@ -57,7 +58,9 @@ export default function AdminChatbot() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
 
+  const utils = trpc.useUtils();
   const offset = (page - 1) * PAGE_SIZE;
   const {
     data,
@@ -74,6 +77,9 @@ export default function AdminChatbot() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const visibleIds = useMemo(() => items.map((item) => item.id), [items]);
+  const selectedCount = selectedIds.size;
+  const selectedVisibleCount = visibleIds.filter((id) => selectedIds.has(id)).length;
   const groupedItems = useMemo(() => {
     const groups: Array<{
       key: string;
@@ -98,6 +104,16 @@ export default function AdminChatbot() {
     return groups;
   }, [items]);
 
+  const deleteLogs = trpc.chatbot.deleteLogs.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`已刪除 ${result.deletedCount} 筆 chatbot 紀錄`);
+      setSelectedIds(new Set());
+      setExpandedId(null);
+      await utils.chatbot.listLogs.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "刪除紀錄失敗"),
+  });
+
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
     return null;
@@ -121,8 +137,36 @@ export default function AdminChatbot() {
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
     setExpandedId(null);
+    setSelectedIds(new Set());
     setPage(1);
     setSearch(searchInput.trim());
+  };
+
+  const toggleSelected = (id: number) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectVisible = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const clearSelected = () => setSelectedIds(new Set());
+
+  const deleteSelected = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const confirmed = window.confirm(`確定要刪除選取的 ${ids.length} 筆 chatbot 紀錄嗎？此操作無法復原。`);
+    if (!confirmed) return;
+    deleteLogs.mutate({ ids });
   };
 
   return (
@@ -196,6 +240,7 @@ export default function AdminChatbot() {
                     setSearchInput("");
                     setPage(1);
                     setExpandedId(null);
+                    setSelectedIds(new Set());
                   }}
                   className="border border-[oklch(0.88_0_0)] bg-white px-4 py-3 text-sm font-body text-[oklch(0.45_0_0)] hover:text-[oklch(0.1_0_0)]"
                 >
@@ -209,6 +254,39 @@ export default function AdminChatbot() {
         <p className="text-[11px] font-body text-[oklch(0.5_0_0)] mb-4">
           目前顯示第 {currentPage} / {totalPages} 頁，共 {total.toLocaleString()} 筆。
         </p>
+
+        {items.length > 0 && (
+          <div className="mb-4 flex flex-col gap-3 border border-[oklch(0.9_0_0)] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={selectVisible}
+                disabled={selectedVisibleCount === visibleIds.length}
+                className="border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body text-[oklch(0.45_0_0)] disabled:opacity-40"
+              >
+                選取本頁
+              </button>
+              <button
+                type="button"
+                onClick={clearSelected}
+                disabled={selectedCount === 0}
+                className="border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body text-[oklch(0.45_0_0)] disabled:opacity-40"
+              >
+                取消選取
+              </button>
+              <span className="text-xs font-body text-[oklch(0.5_0_0)]">已選取 {selectedCount} 筆</span>
+            </div>
+            <button
+              type="button"
+              onClick={deleteSelected}
+              disabled={selectedCount === 0 || deleteLogs.isPending}
+              className="inline-flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-xs font-body text-white transition-colors hover:bg-red-700 disabled:opacity-40"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleteLogs.isPending ? "刪除中..." : "刪除選取"}
+            </button>
+          </div>
+        )}
 
         {isLoading || authLoading ? (
           <div className="bg-white border border-[oklch(0.93_0_0)] p-12 text-center">
@@ -245,15 +323,26 @@ export default function AdminChatbot() {
                 <div className="space-y-3">
                   {group.items.map((item) => {
                     const isExpanded = expandedId === item.id;
+                    const isSelected = selectedIds.has(item.id);
                     const products = normalizeJsonArray(item.relatedProducts);
                     const retrievedQuestions = normalizeJsonArray(item.retrievedQuestions);
                     return (
                       <div key={item.id} className="bg-white border border-[oklch(0.93_0_0)]">
-                        <button
-                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                          className="w-full text-left p-5 hover:bg-[oklch(0.985_0_0)] transition-colors"
-                        >
-                          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                        <div className="flex items-start gap-3 p-5 transition-colors hover:bg-[oklch(0.985_0_0)]">
+                          <label className="flex h-5 w-5 shrink-0 items-center justify-center pt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(item.id)}
+                              aria-label={`選取 chatbot 紀錄 ${item.id}`}
+                              className="h-4 w-4 accent-[oklch(0.18_0_0)]"
+                            />
+                          </label>
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                             <div className="lg:w-40 shrink-0">
                               <p className="text-xs font-body text-[oklch(0.5_0_0)]">{formatDate(item.createdAt)}</p>
                               <div className="flex items-center gap-1.5 mt-2 text-xs font-body text-[oklch(0.45_0_0)]">
@@ -273,7 +362,8 @@ export default function AdminChatbot() {
                               </p>
                             </div>
                           </div>
-                        </button>
+                          </button>
+                        </div>
 
                         {isExpanded && (
                           <div className="border-t border-[oklch(0.93_0_0)] p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -315,6 +405,7 @@ export default function AdminChatbot() {
             <button
               onClick={() => {
                 setExpandedId(null);
+                setSelectedIds(new Set());
                 setPage((p) => Math.max(1, p - 1));
               }}
               disabled={currentPage <= 1}
@@ -328,6 +419,7 @@ export default function AdminChatbot() {
             <button
               onClick={() => {
                 setExpandedId(null);
+                setSelectedIds(new Set());
                 setPage((p) => Math.min(totalPages, p + 1));
               }}
               disabled={currentPage >= totalPages}
