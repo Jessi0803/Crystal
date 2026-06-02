@@ -8,12 +8,19 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
   Crown,
   Mail,
+  MapPin,
+  Package,
+  Phone,
   RefreshCw,
   Save,
   Search,
   ShoppingBag,
+  Truck,
   UserRound,
   Users,
   XCircle,
@@ -74,6 +81,121 @@ function getVipLabel(value?: string | null) {
   return VIP_OPTIONS.find((option) => option.value === value)?.label ?? "一般會員";
 }
 
+function getPaymentMethodLabel(method?: string | null) {
+  if (method === "atm") return "銀行轉帳";
+  if (method === "paypal") return "PayPal";
+  return "信用卡";
+}
+
+function getShippingMethodLabel(method?: string | null) {
+  if (method === "cvs_711") return "7-11 店到店";
+  if (method === "cvs_family") return "全家店到店";
+  return "宅配";
+}
+
+function MemberOrderDetail({ orderId }: { orderId: number }) {
+  const { data: detail, isLoading } = trpc.order.getOrderDetail.useQuery(
+    { orderId },
+    { staleTime: 0 }
+  );
+
+  if (isLoading || !detail) {
+    return (
+      <div className="mt-4 border-t border-[oklch(0.93_0_0)] pt-4 text-center text-xs font-body text-[oklch(0.5_0_0)]">
+        載入訂單明細中...
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 border-t border-[oklch(0.93_0_0)] pt-4 space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <p className="text-[11px] tracking-widest font-body text-[oklch(0.5_0_0)] mb-2">購買人資訊</p>
+          <div className="space-y-1.5 text-xs font-body text-[oklch(0.45_0_0)]">
+            <p className="flex gap-2"><UserRound className="w-3.5 h-3.5 shrink-0" />{detail.buyerName}</p>
+            <p className="flex gap-2"><Mail className="w-3.5 h-3.5 shrink-0" />{detail.buyerEmail}</p>
+            <p className="flex gap-2"><Phone className="w-3.5 h-3.5 shrink-0" />{detail.buyerPhone}</p>
+            <p className="flex gap-2">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {detail.cvsStoreName
+                  ? `${getShippingMethodLabel(detail.shippingMethod)} - ${detail.cvsStoreName}`
+                  : detail.shippingAddress || getShippingMethodLabel(detail.shippingMethod)}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[11px] tracking-widest font-body text-[oklch(0.5_0_0)] mb-2">訂單資訊</p>
+          <div className="space-y-1.5 text-xs font-body text-[oklch(0.45_0_0)]">
+            <p>付款方式：{getPaymentMethodLabel(detail.paymentMethod)}</p>
+            <p>付款狀態：{PAYMENT_STATUS_LABEL[detail.paymentStatus] ?? detail.paymentStatus}</p>
+            <p>訂單狀態：{ORDER_STATUS_LABEL[detail.orderStatus] ?? detail.orderStatus}</p>
+            {detail.transferLastFive && <p>匯款末五碼：{detail.transferLastFive}</p>}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] tracking-widest font-body text-[oklch(0.5_0_0)] mb-2">商品明細</p>
+        <div className="space-y-2">
+          {detail.items.map((item) => (
+            <div key={item.id} className="flex items-center justify-between gap-3 bg-[oklch(0.985_0_0)] border border-[oklch(0.94_0_0)] p-2">
+              <div className="flex items-center gap-3 min-w-0">
+                {item.productImage && (
+                  <img
+                    src={item.productImage}
+                    alt={item.productName}
+                    className="h-12 w-12 object-cover border border-[oklch(0.9_0_0)] bg-white shrink-0"
+                    loading="lazy"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-body text-[oklch(0.12_0_0)] truncate">{item.productName}</p>
+                  <p className="text-[11px] font-body text-[oklch(0.5_0_0)]">x{item.quantity}</p>
+                </div>
+              </div>
+              <p className="text-xs font-medium text-[oklch(0.12_0_0)] shrink-0">{formatMoney(item.subtotal)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {detail.logistics && (
+        <div className="bg-indigo-50 border border-indigo-100 p-3 text-xs font-body text-indigo-700">
+          <p className="font-medium flex items-center gap-1.5 mb-1"><Truck className="w-3.5 h-3.5" />物流資訊</p>
+          <p>配送方式：{getShippingMethodLabel(detail.shippingMethod)}</p>
+          <p>物流狀態：{detail.logistics.logisticsStatus}</p>
+          <p>物流編號：{detail.logistics.allPayLogisticsId ?? detail.logistics.logisticsMerchantTradeNo}</p>
+          {detail.logistics.bookingNote && <p>托運單號：{detail.logistics.bookingNote}</p>}
+          {detail.logistics.cvsPaymentNo && <p>超商取件碼：{detail.logistics.cvsPaymentNo}</p>}
+        </div>
+      )}
+
+      {(detail as any).customerNote && (
+        <div className="bg-amber-50 border border-amber-100 p-3 text-xs font-body text-amber-800">
+          <p className="font-medium mb-2">客製化諮詢內容</p>
+          <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+            {(detail as any).customerNote}
+          </pre>
+        </div>
+      )}
+
+      {detail.isCustomOrder && detail.balancePayment && (
+        <div className="bg-rose-50 border border-rose-100 p-3 text-xs font-body text-rose-700">
+          <p className="font-medium flex items-center gap-1.5 mb-1"><CreditCard className="w-3.5 h-3.5" />尾款資訊</p>
+          <p>尾款編號：{detail.balancePayment.merchantTradeNo}</p>
+          <p>尾款金額：{formatMoney(detail.balancePayment.amount)}</p>
+          <p>尾款狀態：{detail.balancePayment.paymentStatus}</p>
+          {(detail.balancePayment as any).transferLastFive && <p>尾款匯款末五碼：{(detail.balancePayment as any).transferLastFive}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminMembers() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
@@ -81,6 +203,7 @@ export default function AdminMembers() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [vipTier, setVipTier] = useState<(typeof VIP_OPTIONS)[number]["value"]>("none");
   const [vipNote, setVipNote] = useState("");
 
@@ -135,6 +258,10 @@ export default function AdminMembers() {
   useEffect(() => {
     if (selectedUserId === null && items[0]) setSelectedUserId(items[0].id);
   }, [items, selectedUserId]);
+
+  useEffect(() => {
+    setExpandedOrderId(null);
+  }, [selectedUserId]);
 
   useEffect(() => {
     if (!selectedMember) return;
@@ -427,34 +554,48 @@ export default function AdminMembers() {
                 ) : (
                   detail?.orders.map((order) => (
                     <div key={order.id} className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-[oklch(0.12_0_0)]">#{order.merchantTradeNo}</p>
-                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1">
-                            {formatDate(order.createdAt)} · {order.itemCount} 件商品
-                          </p>
-                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1">
-                            {order.buyerName} · {order.buyerEmail} · {order.buyerPhone}
-                          </p>
-                        </div>
-                        <div className="md:text-right shrink-0">
-                          <p className="text-sm font-medium text-[oklch(0.12_0_0)]">{formatMoney(order.totalAmount)}</p>
-                          <div className="flex md:justify-end flex-wrap gap-1.5 mt-2">
-                            <span className="text-[11px] font-body border border-[oklch(0.86_0_0)] px-2 py-1 text-[oklch(0.42_0_0)]">
-                              {ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus}
-                            </span>
-                            <span className="text-[11px] font-body border border-[oklch(0.86_0_0)] px-2 py-1 text-[oklch(0.42_0_0)]">
-                              {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
-                            </span>
-                            {order.isPreorder && (
-                              <span className="text-[11px] font-body border border-blue-100 bg-blue-50 px-2 py-1 text-blue-700">預購</span>
-                            )}
-                            {order.isCustomOrder && (
-                              <span className="text-[11px] font-body border border-rose-100 bg-rose-50 px-2 py-1 text-rose-700">客製</span>
-                            )}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedOrderId((current) => current === order.id ? null : order.id)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-[oklch(0.12_0_0)]">#{order.merchantTradeNo}</p>
+                              {expandedOrderId === order.id ? (
+                                <ChevronUp className="w-4 h-4 text-[oklch(0.5_0_0)]" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-[oklch(0.5_0_0)]" />
+                              )}
+                            </div>
+                            <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1">
+                              {formatDate(order.createdAt)} · {order.itemCount} 件商品
+                            </p>
+                            <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1">
+                              {order.buyerName} · {order.buyerEmail} · {order.buyerPhone}
+                            </p>
+                          </div>
+                          <div className="md:text-right shrink-0">
+                            <p className="text-sm font-medium text-[oklch(0.12_0_0)]">{formatMoney(order.totalAmount)}</p>
+                            <div className="flex md:justify-end flex-wrap gap-1.5 mt-2">
+                              <span className="text-[11px] font-body border border-[oklch(0.86_0_0)] px-2 py-1 text-[oklch(0.42_0_0)]">
+                                {ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus}
+                              </span>
+                              <span className="text-[11px] font-body border border-[oklch(0.86_0_0)] px-2 py-1 text-[oklch(0.42_0_0)]">
+                                {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
+                              </span>
+                              {order.isPreorder && (
+                                <span className="text-[11px] font-body border border-blue-100 bg-blue-50 px-2 py-1 text-blue-700">預購</span>
+                              )}
+                              {order.isCustomOrder && (
+                                <span className="text-[11px] font-body border border-rose-100 bg-rose-50 px-2 py-1 text-rose-700">客製</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
+                      {expandedOrderId === order.id && <MemberOrderDetail orderId={order.id} />}
                     </div>
                   ))
                 )}
