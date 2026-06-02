@@ -35,7 +35,7 @@ function AdminInventoryRow({ product }: { product: Product }) {
   });
 
   const currentStock = inventory?.stock ?? DEFAULT_STOCK;
-  const currentAllowPreorder = inventory?.allowPreorder ?? false;
+  const currentAllowPreorder = inventory?.allowPreorder ?? product.isMonthlyLimited !== true;
   const editing = form !== null;
   const visibleStock = editing ? form.stock : String(currentStock);
 

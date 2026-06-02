@@ -179,7 +179,7 @@ function compressImage(file: File): Promise<string> {
 }
 
 // ── 庫存行內編輯（沿用 AdminInventory 的模式）──────────────────────────────
-function StockCell({ productId, productName }: { productId: string; productName: string }) {
+function StockCell({ productId, productName, isMonthlyLimited }: { productId: string; productName: string; isMonthlyLimited?: boolean }) {
   const utils = trpc.useUtils();
   const { data: inventory, isLoading } = trpc.inventory.getInventory.useQuery({ productId });
   const [editing, setEditing] = useState(false);
@@ -207,7 +207,7 @@ function StockCell({ productId, productName }: { productId: string; productName:
       toast.error("庫存請輸入 -1 或 0 以上的整數");
       return;
     }
-    saveMutation.mutate({ productId, productName, stock: n, allowPreorder: inventory?.allowPreorder ?? false });
+    saveMutation.mutate({ productId, productName, stock: n, allowPreorder: inventory?.allowPreorder ?? !isMonthlyLimited });
   };
 
   if (isLoading) return <span className="text-xs text-[oklch(0.6_0_0)] font-body">—</span>;
@@ -325,7 +325,7 @@ function ProductRow({
           ) : (
             <>
               <p className="text-[10px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">庫存</p>
-              <StockCell productId={product.id} productName={product.name} />
+              <StockCell productId={product.id} productName={product.name} isMonthlyLimited={product.isMonthlyLimited} />
             </>
           )}
         </div>
@@ -443,7 +443,7 @@ function ProductModal({
             productId: id,
             productName: form.name,
             stock,
-            allowPreorder: false,
+            allowPreorder: !form.isMonthlyLimited,
           });
         }
       }

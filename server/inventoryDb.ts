@@ -43,6 +43,12 @@ async function isMonthlyLimitedProduct(productId: string) {
   return product?.isMonthlyLimited === true;
 }
 
+export async function getDefaultAllowPreorder(productId: string) {
+  if (shouldSkipInventory(productId)) return false;
+  const monthlyLimited = await isMonthlyLimitedProduct(productId);
+  return !monthlyLimited;
+}
+
 // ─── 庫存查詢 ─────────────────────────────────────────────────────────────────
 
 export async function getProductInventory(productId: string) {

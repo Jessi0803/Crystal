@@ -10,6 +10,7 @@ import {
   releaseSessionLocks,
   upsertProductInventory,
   getProductInventory,
+  getDefaultAllowPreorder,
 } from "../inventoryDb";
 
 export const inventoryRouter = router({
@@ -89,16 +90,17 @@ export const inventoryRouter = router({
         productId: z.string(),
         productName: z.string(),
         stock: z.number().min(-1), // -1 = 無限庫存
-        allowPreorder: z.boolean().optional().default(false),
+        allowPreorder: z.boolean().optional(),
         preorderNote: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
+      const allowPreorder = input.allowPreorder ?? (await getDefaultAllowPreorder(input.productId));
       await upsertProductInventory({
         productId: input.productId,
         productName: input.productName,
         stock: input.stock,
-        allowPreorder: input.allowPreorder,
+        allowPreorder,
         preorderNote: input.preorderNote,
       });
       return { success: true };
