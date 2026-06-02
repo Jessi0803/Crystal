@@ -211,7 +211,7 @@ export default function ProductDetail() {
 
   const hasTieredBraceletPricing = usesTieredBraceletPricing(product);
   const hasWristSizeOption = product.category !== "custom" && (product.isMonthlyLimited === true || hasTieredBraceletPricing);
-  const hasClaspOption = hasTieredBraceletPricing;
+  const hasClaspOption = product.category !== "custom" && (product.isMonthlyLimited === true || hasTieredBraceletPricing);
   const visibleTags = product.tags;
   const galleryImages = getProductImages(product);
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
