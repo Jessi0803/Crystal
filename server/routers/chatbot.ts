@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, desc, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { searchKnowledge, type ScoredChunk } from "../crystalKnowledge";
 import { ENV } from "../_core/env";
 import { products } from "../../client/src/lib/data";
-import { chatbotLogs } from "../../drizzle/schema";
+import { chatbotLogs, dbProducts } from "../../drizzle/schema";
 
 const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，名叫「椛小助」。
 
@@ -148,7 +148,16 @@ type ChatbotRelatedProduct = {
   id: string;
   name: string;
   price: number;
+  image?: string;
   href: string;
+};
+
+type RelatedProductForChat = {
+  id: string;
+  name: string;
+  subtitle: string;
+  price: number;
+  image: string;
 };
 
 export function selectRelatedProductIds(
@@ -169,6 +178,68 @@ export function selectRelatedProductIds(
   return Array.from(
     new Set(matchingChunks.flatMap((chunk) => chunk.relatedProductIds ?? []))
   ).slice(0, maxProducts);
+}
+
+function normalizeProductImageUrl(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed.includes("drive.google.com")) return trimmed;
+  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+  const id = fileMatch?.[1] ?? idMatch?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
+}
+
+export async function loadRelatedProducts(productIds: string[]): Promise<RelatedProductForChat[]> {
+  if (productIds.length === 0) return [];
+
+  const byId = new Map<string, RelatedProductForChat>();
+  const db = await getDb();
+
+  if (db) {
+    try {
+      const rows = await db
+        .select({
+          id: dbProducts.id,
+          name: dbProducts.name,
+          subtitle: dbProducts.subtitle,
+          price: dbProducts.price,
+          image: dbProducts.image,
+        })
+        .from(dbProducts)
+        .where(and(
+          inArray(dbProducts.id, productIds),
+          eq(dbProducts.active, true),
+          sql`${dbProducts.category} != 'test'`
+        ));
+
+      for (const row of rows) {
+        byId.set(row.id, {
+          id: row.id,
+          name: row.name,
+          subtitle: row.subtitle ?? "",
+          price: row.price,
+          image: normalizeProductImageUrl(row.image),
+        });
+      }
+    } catch (error) {
+      console.warn("[chatbot] failed to load related products from DB:", error);
+    }
+  }
+
+  for (const id of productIds) {
+    if (byId.has(id)) continue;
+    const product = products.find((p) => p.id === id && p.category !== "test");
+    if (!product) continue;
+    byId.set(id, {
+      id: product.id,
+      name: product.name,
+      subtitle: product.subtitle,
+      price: product.price,
+      image: normalizeProductImageUrl(product.image),
+    });
+  }
+
+  return productIds.map((id) => byId.get(id)).filter((p): p is RelatedProductForChat => Boolean(p));
 }
 
 async function saveChatbotLog(params: {
@@ -244,25 +315,29 @@ export const chatbotRouter = router({
 
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
+      const hasUnavailableCrystalMatch = relevantChunks.some(
+        (chunk) => chunk.id.endsWith("-unavailable") && chunk.score >= 0.55
+      );
+      const chunksForAnswer = hasUnavailableCrystalMatch
+        ? relevantChunks.filter((chunk) => chunk.id.endsWith("-unavailable") || chunk.category !== "商品推薦")
+        : relevantChunks;
 
       // 3. 關聯商品：合併最高分的相關推薦，讓複合需求可看到更多但仍精準的選項。
       const PRODUCT_SCORE_MIN = 0.55;
-      const relatedProductIds = selectRelatedProductIds(
-        relevantChunks,
-        PRODUCT_SCORE_MIN
-      );
-      const relatedProducts = relatedProductIds.length > 0
-        ? relatedProductIds
-            .map((id) => products.find((p) => p.id === id))
-            .filter((p): p is (typeof products)[number] => !!p)
-        : [];
+      const relatedProductIds = hasUnavailableCrystalMatch
+        ? []
+        : selectRelatedProductIds(
+            relevantChunks,
+            PRODUCT_SCORE_MIN
+          );
+      const relatedProducts = await loadRelatedProducts(relatedProductIds);
 
       // 4. 組建 RAG 上下文
       let ragContext = "";
-      if (relevantChunks.length > 0) {
+      if (chunksForAnswer.length > 0) {
         ragContext =
           "\n\n【相關常見問題】\n" +
-          relevantChunks
+          chunksForAnswer
             .map((c) => `Q: ${c.question}\nA: ${clipKnowledgeAnswer(c.answer)}`)
             .join("\n\n");
       }
@@ -315,7 +390,7 @@ export const chatbotRouter = router({
         price: p.price,
         href: `/products/${p.id}`,
       }));
-      const retrievedQuestions = relevantChunks.map((c) => c.question);
+      const retrievedQuestions = chunksForAnswer.map((c) => c.question);
 
       await saveChatbotLog({
         ...baseLog,
@@ -360,7 +435,9 @@ export const chatbotRouter = router({
             sql`${chatbotLogs.customerQuestion} LIKE ${term}`,
             sql`${chatbotLogs.botReply} LIKE ${term}`,
             sql`${chatbotLogs.customerEmail} LIKE ${term}`,
-            sql`${chatbotLogs.customerName} LIKE ${term}`
+            sql`${chatbotLogs.customerName} LIKE ${term}`,
+            sql`CAST(${chatbotLogs.relatedProducts} AS CHAR) LIKE ${term}`,
+            sql`CAST(${chatbotLogs.retrievedQuestions} AS CHAR) LIKE ${term}`
           )
         );
       }
@@ -385,5 +462,22 @@ export const chatbotRouter = router({
         items,
         total: Number(countRows[0]?.count ?? 0),
       };
+    }),
+
+  deleteLogs: adminProcedure
+    .input(
+      z.object({
+        ids: z.array(z.number().int().positive()).min(1).max(100),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      const ids = Array.from(new Set(input.ids));
+      await db.delete(chatbotLogs).where(inArray(chatbotLogs.id, ids));
+      return { success: true, deletedCount: ids.length };
     }),
 });
