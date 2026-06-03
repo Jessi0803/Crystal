@@ -51,7 +51,7 @@ export async function fillPureCustomDepositForm(page: Page) {
   await page.locator("section").filter({ hasText: "珠框" }).getByRole("button", { name: "不要" }).last().click();
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.locator("section").filter({ hasText: "要加吊飾嗎" }).getByRole("button", { name: "不要" }).click();
-  await page.locator('input[placeholder="例如：@your_ig_handle"]').fill("@e2e_test");
+  await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_line_id");
   await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
   await expect(page).toHaveURL(/\/checkout/);
 }
@@ -89,7 +89,7 @@ export async function fillProfileCustomDepositForm(
   await page.locator("section").filter({ hasText: "珠框" }).getByRole("button", { name: "不要" }).last().click();
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: "不要吊飾" }).click();
-  await page.locator('input[placeholder="例如：@your_ig_handle"]').fill("@e2e_profile");
+  await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_profile_line");
   await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
 
   await expect(page).toHaveURL(/\/checkout/);
@@ -109,7 +109,7 @@ export async function fillTarotCustomDepositForm(page: Page) {
   await page.locator("section").filter({ hasText: "珠框" }).getByRole("button", { name: "不要" }).last().click();
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: "不要吊飾" }).click();
-  await page.locator('input[placeholder="例如：@your_ig_handle"]').fill("@e2e_tarot");
+  await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_tarot_line");
   await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
 
   await expect(page).toHaveURL(/\/checkout/);

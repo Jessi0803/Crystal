@@ -51,7 +51,7 @@ function buildNote(form: FormData): string {
     `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
     `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
     `其餘特殊需求：${form.specialRequests || "無"}`,
-    `Instagram 帳號：${form.igHandle || "（未提供）"}`,
+    `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
   ].join("\n");
 }
 
@@ -309,18 +309,19 @@ export default function CustomForm() {
             </a>
           </div>
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
-              Instagram 帳號
+            <label htmlFor="custom-contact-handle" className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              Instagram 帳號 / LINE ID
             </label>
             <input
+              id="custom-contact-handle"
               type="text"
               value={form.igHandle}
               onChange={(e) => setForm({ ...form, igHandle: e.target.value })}
-              placeholder="例如：@your_ig_handle"
+              placeholder="例如：@your_ig_handle 或 LINE ID"
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
             />
             <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
-              請填寫 IG 帳號，設計師也可透過 IG 私訊聯絡您
+              請填寫 IG 帳號；若沒有 IG，請填寫 LINE ID
             </p>
           </div>
         </div>
@@ -337,6 +338,7 @@ export default function CustomForm() {
     if (!form.silverTube || !form.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
     if (!form.claspType) { toast.error("請選擇扣具"); return false; }
     if (!form.pendantCharm) { toast.error("請選擇是否要加吊飾"); return false; }
+    if (!form.igHandle.trim()) { toast.error("請填寫 IG 帳號；若沒有 IG，請填寫 LINE ID"); return false; }
     return true;
   };
 
