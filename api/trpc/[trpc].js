@@ -2275,6 +2275,14 @@ async function notifyCustomerOrderShippedSafely(orderId) {
 }
 
 // server/storage.ts
+import fs from "node:fs/promises";
+import path from "node:path";
+var DEFAULT_UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
+function getLocalStorageConfig() {
+  const publicPath = (process.env.LOCAL_STORAGE_PUBLIC_PATH || "/uploads").replace(/\/+$/, "");
+  const uploadDir = process.env.LOCAL_STORAGE_DIR ? path.resolve(process.env.LOCAL_STORAGE_DIR) : DEFAULT_UPLOAD_DIR;
+  return { publicPath: publicPath || "/uploads", uploadDir };
+}
 function getStorageConfig() {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
@@ -2294,7 +2302,11 @@ function ensureTrailingSlash(value) {
   return value.endsWith("/") ? value : `${value}/`;
 }
 function normalizeKey(relKey) {
-  return relKey.replace(/^\/+/, "");
+  const normalized = path.posix.normalize(relKey.replace(/\\/g, "/").replace(/^\/+/, "")).replace(/^(\.\.(\/|$))+/, "");
+  if (!normalized || normalized === ".") {
+    throw new Error("Storage key is empty");
+  }
+  return normalized;
 }
 function toFormData(data, contentType, fileName) {
   const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
@@ -2306,12 +2318,14 @@ function buildAuthHeaders(apiKey) {
   return { Authorization: `Bearer ${apiKey}` };
 }
 async function storagePut(relKey, data, contentType = "application/octet-stream") {
+  const key = normalizeKey(relKey);
   if (process.env.E2E_STORAGE_STUB === "true") {
-    const key2 = normalizeKey(relKey);
-    return { key: key2, url: `https://e2e-storage.local/${encodeURIComponent(key2)}` };
+    return { key, url: `https://e2e-storage.local/${encodeURIComponent(key)}` };
+  }
+  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    return storagePutLocal(key, data);
   }
   const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
   const response = await fetch(uploadUrl, {
@@ -2327,6 +2341,20 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
   }
   const url = (await response.json()).url;
   return { key, url };
+}
+async function storagePutLocal(key, data) {
+  const { publicPath, uploadDir } = getLocalStorageConfig();
+  const filePath = path.resolve(uploadDir, key);
+  const relativePath = path.relative(uploadDir, filePath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error("Storage key escapes upload directory");
+  }
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, data);
+  return {
+    key,
+    url: `${publicPath}/${key.split("/").map(encodeURIComponent).join("/")}`
+  };
 }
 
 // shared/overseasShipping.ts
@@ -2443,9 +2471,9 @@ function validateOverseasAddress(p) {
     [city, "intlCity"],
     [state, "intlState"]
   ];
-  for (const [t2, path] of textFields) {
+  for (const [t2, path2] of textFields) {
     if (t2 && hasNonEnglishScript(t2)) {
-      issues.push({ path, message: "Please use English only (no Chinese or other scripts)." });
+      issues.push({ path: path2, message: "Please use English only (no Chinese or other scripts)." });
     }
   }
   if (postal && hasNonEnglishScript(postal)) {

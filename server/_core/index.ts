@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "node:path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
@@ -33,6 +34,10 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  const uploadDir = process.env.LOCAL_STORAGE_DIR
+    ? path.resolve(process.env.LOCAL_STORAGE_DIR)
+    : path.resolve(process.cwd(), "uploads");
+  app.use("/uploads", express.static(uploadDir));
   registerLineWebhookRoutes(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
