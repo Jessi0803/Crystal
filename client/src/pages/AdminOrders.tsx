@@ -23,6 +23,7 @@ import {
   Banknote,
   BarChart3,
   Users,
+  Trash2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -123,6 +124,7 @@ function OrderRowCard({
   confirmTransfer,
   createLogistics,
   updateOrderStatus,
+  deleteCancelledOrder,
   isLogisticsSandbox,
 }: {
   order: OrderSummary;
@@ -133,6 +135,7 @@ function OrderRowCard({
   confirmTransfer: ReturnType<typeof trpc.order.confirmTransfer.useMutation>;
   createLogistics: ReturnType<typeof trpc.order.createLogistics.useMutation>;
   updateOrderStatus: ReturnType<typeof trpc.order.updateOrderStatus.useMutation>;
+  deleteCancelledOrder: ReturnType<typeof trpc.order.deleteCancelledOrder.useMutation>;
   isLogisticsSandbox: boolean;
 }) {
   const utils = trpc.useUtils();
@@ -378,6 +381,22 @@ function OrderRowCard({
                     <option value="cancelled">取消訂單</option>
                   </select>
                 )}
+
+                {detail.orderStatus === "cancelled" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ok = window.confirm(`確定要刪除已取消訂單 ${detail.merchantTradeNo}？此操作無法復原。`);
+                      if (!ok) return;
+                      deleteCancelledOrder.mutate({ orderId: detail.id });
+                    }}
+                    disabled={deleteCancelledOrder.isPending}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-xs font-body hover:bg-red-700 transition-colors disabled:opacity-60"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {deleteCancelledOrder.isPending ? "刪除中..." : "刪除訂單"}
+                  </button>
+                )}
               </div>
 
               {detail.logistics && (
@@ -518,6 +537,16 @@ export default function AdminOrders() {
       refetchListAndStats();
     },
     onError: () => toast.error("更新失敗，請重試"),
+  });
+
+  const deleteCancelledOrder = trpc.order.deleteCancelledOrder.useMutation({
+    onSuccess: async () => {
+      toast.success("已刪除取消訂單");
+      setExpandedId(null);
+      await utils.order.getOrderDetail.invalidate();
+      refetchListAndStats();
+    },
+    onError: (err) => toast.error(err.message || "刪除失敗，請重試"),
   });
 
   // 未登入 → 導向登入
@@ -718,6 +747,7 @@ export default function AdminOrders() {
                   confirmTransfer={confirmTransfer}
                   createLogistics={createLogistics}
                   updateOrderStatus={updateOrderStatus}
+                  deleteCancelledOrder={deleteCancelledOrder}
                   isLogisticsSandbox={Boolean(envCheck?.ecpayLogisticsSandbox)}
                 />
               );

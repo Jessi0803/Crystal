@@ -45,7 +45,7 @@ import {
 } from "../ecpayLogistics";
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
-import { orders, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
+import { orders, orderItems, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
@@ -504,6 +504,34 @@ export const orderRouter = router({
       if (input.status === "shipped") {
         await notifyCustomerOrderShippedSafely(order.id);
       }
+      return { success: true };
+    }),
+
+  /**
+   * 刪除已取消訂單（管理後台）
+   */
+  deleteCancelledOrder: adminProcedure
+    .input(z.object({ orderId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [order] = await db
+        .select({ id: orders.id, orderStatus: orders.orderStatus })
+        .from(orders)
+        .where(eq(orders.id, input.orderId))
+        .limit(1);
+
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+      if (order.orderStatus !== "cancelled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "只能刪除已取消的訂單" });
+      }
+
+      await db.delete(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id));
+      await db.delete(logisticsOrders).where(eq(logisticsOrders.orderId, order.id));
+      await db.delete(orderItems).where(eq(orderItems.orderId, order.id));
+      await db.delete(orders).where(eq(orders.id, order.id));
+
       return { success: true };
     }),
 
