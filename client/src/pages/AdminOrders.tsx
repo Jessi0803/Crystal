@@ -277,25 +277,14 @@ function OrderRowCard({
                       <strong className="ml-1 tracking-wider">{detail.transferLastFive || "未填寫"}</strong>
                     </p>
                     {(detail as any).transferReceiptUrl ? (
-                      <div className="space-y-2">
-                        <a
-                          href={(detail as any).transferReceiptUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-blue-700 underline underline-offset-2"
-                        >
-                          <Banknote className="w-3.5 h-3.5" />
-                          開啟轉帳截圖
-                        </a>
-                        <a href={(detail as any).transferReceiptUrl} target="_blank" rel="noreferrer" className="block w-fit">
-                          <img
-                            src={(detail as any).transferReceiptUrl}
-                            alt="轉帳成功截圖"
-                            className="h-40 w-auto max-w-full border border-blue-200 bg-white object-contain"
-                            loading="lazy"
-                          />
-                        </a>
-                      </div>
+                      <a href={(detail as any).transferReceiptUrl} target="_blank" rel="noreferrer" className="block w-fit">
+                        <img
+                          src={(detail as any).transferReceiptUrl}
+                          alt="轉帳成功截圖"
+                          className="h-40 w-auto max-w-full border border-blue-200 bg-white object-contain"
+                          loading="lazy"
+                        />
+                      </a>
                     ) : (
                       <p className="text-blue-600">未找到轉帳截圖。若這是舊訂單，可能是在截圖欄位上線前建立。</p>
                     )}
