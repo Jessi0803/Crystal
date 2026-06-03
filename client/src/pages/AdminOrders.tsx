@@ -249,20 +249,6 @@ function OrderRowCard({
                         <span className="text-blue-700 font-medium tracking-wider">{detail.transferLastFive}</span>
                       </div>
                     )}
-                    {(detail as any).transferReceiptUrl && (
-                      <div className="flex items-start gap-2 text-sm font-body">
-                        <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0"><Banknote className="w-3.5 h-3.5" /></span>
-                        <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">截圖</span>
-                        <a
-                          href={(detail as any).transferReceiptUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-700 underline underline-offset-2"
-                        >
-                          查看轉帳截圖
-                        </a>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -288,6 +274,41 @@ function OrderRowCard({
                   </div>
                 </div>
               </div>
+
+              {detail.paymentMethod === "atm" && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-100 text-xs font-body text-blue-800">
+                  <p className="font-medium mb-3">轉帳資料</p>
+                  <div className="space-y-2">
+                    <p>
+                      匯款末五碼：
+                      <strong className="ml-1 tracking-wider">{detail.transferLastFive || "未填寫"}</strong>
+                    </p>
+                    {(detail as any).transferReceiptUrl ? (
+                      <div className="space-y-2">
+                        <a
+                          href={(detail as any).transferReceiptUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-blue-700 underline underline-offset-2"
+                        >
+                          <Banknote className="w-3.5 h-3.5" />
+                          開啟轉帳截圖
+                        </a>
+                        <a href={(detail as any).transferReceiptUrl} target="_blank" rel="noreferrer" className="block w-fit">
+                          <img
+                            src={(detail as any).transferReceiptUrl}
+                            alt="轉帳成功截圖"
+                            className="h-40 w-auto max-w-full border border-blue-200 bg-white object-contain"
+                            loading="lazy"
+                          />
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-blue-600">未找到轉帳截圖。若這是舊訂單，可能是在截圖欄位上線前建立。</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
                 {detail.paymentStatus === "transfer_pending" && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
