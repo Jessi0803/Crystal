@@ -965,6 +965,7 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
         cvsType: orders.cvsType,
         shippingAddress: orders.shippingAddress,
         transferLastFive: orders.transferLastFive,
+        transferReceiptUrl: orders.transferReceiptUrl,
         adminNote: orders.adminNote,
         ecpayNotifyData: orders.ecpayNotifyData,
         paidAt: orders.paidAt,

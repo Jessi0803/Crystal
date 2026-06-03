@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import { fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet } from "./helpers";
+import { fillDomesticHomeCheckout, fillTransferCheckoutFields, goToCheckoutWithSeededBracelet } from "./helpers";
 
 async function connectTestDb() {
   const env = dotenv.parse(readFileSync(".env.test.local"));
@@ -30,7 +30,10 @@ async function countOrdersForEmail(email: string) {
   }
 }
 
-function createAndPayPayload(email: string, items: unknown[]) {
+const receiptBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lZn+7QAAAABJRU5ErkJggg==";
+
+function createAndPayPayload(email: string, items: unknown[], includeReceipt = true) {
   return {
     "0": {
       json: {
@@ -42,6 +45,14 @@ function createAndPayPayload(email: string, items: unknown[]) {
         shippingMethod: "home",
         shippingAddress: "台北市中正區測試路 1 號",
         receiverZipCode: "100",
+        transferLastFive: "54321",
+        ...(includeReceipt
+          ? {
+              transferReceiptImageBase64: receiptBase64,
+              transferReceiptImageContentType: "image/png",
+              transferReceiptImageFilename: "transfer-receipt.png",
+            }
+          : {}),
         items,
         origin: "http://localhost:3100",
       },
@@ -49,9 +60,9 @@ function createAndPayPayload(email: string, items: unknown[]) {
   };
 }
 
-async function postCreateAndPay(request: APIRequestContext, email: string, items: unknown[]) {
+async function postCreateAndPay(request: APIRequestContext, email: string, items: unknown[], includeReceipt = true) {
   return request.post("/api/trpc/order.createAndPay?batch=1", {
-    data: createAndPayPayload(email, items),
+    data: createAndPayPayload(email, items, includeReceipt),
   });
 }
 
@@ -59,6 +70,7 @@ async function fillCheckoutForAtm(page: Page, email: string) {
   await goToCheckoutWithSeededBracelet(page);
   await fillDomesticHomeCheckout(page, email);
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
 }
 
 test("overseas checkout shows shipping fees and validates address before PayPal submission", async ({ page }) => {
@@ -105,6 +117,7 @@ test("server rejects an ATM checkout request tampered to contain a sold-out mont
   await goToCheckoutWithSeededBracelet(page);
   await fillDomesticHomeCheckout(page, `e2e-soldout-guard-${Date.now()}@example.com`);
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
 
   await expect(page.locator("body")).toContainText("已售完，無法預購");
@@ -140,6 +153,25 @@ test("server rejects direct sold-out monthly checkout API calls without creating
   expect(response.status()).toBe(400);
   const text = await response.text();
   expect(text).toContain("已售完");
+  await expect.poll(() => countOrdersForEmail(email)).toBe(before);
+});
+
+test("server rejects direct ATM checkout API calls without a transfer receipt", async ({ request }) => {
+  const email = `e2e-missing-receipt-${Date.now()}@example.com`;
+  const before = await countOrdersForEmail(email);
+
+  const response = await postCreateAndPay(request, email, [{
+    id: "e2e-bracelet-in-stock",
+    baseProductId: "e2e-bracelet-in-stock",
+    name: "E2E 現貨手鍊",
+    price: 1280,
+    quantity: 1,
+    image: "/images/d-design/d001.jpg",
+  }], false);
+
+  expect(response.status()).toBe(400);
+  const text = await response.text();
+  expect(text).toContain("請上傳轉帳成功截圖");
   await expect.poll(() => countOrdersForEmail(email)).toBe(before);
 });
 

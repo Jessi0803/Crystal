@@ -249,6 +249,20 @@ function OrderRowCard({
                         <span className="text-blue-700 font-medium tracking-wider">{detail.transferLastFive}</span>
                       </div>
                     )}
+                    {(detail as any).transferReceiptUrl && (
+                      <div className="flex items-start gap-2 text-sm font-body">
+                        <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0"><Banknote className="w-3.5 h-3.5" /></span>
+                        <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">截圖</span>
+                        <a
+                          href={(detail as any).transferReceiptUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-700 underline underline-offset-2"
+                        >
+                          查看轉帳截圖
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -56,6 +56,7 @@ import {
   notifyCustomerOrderPlacedSafely,
   notifyCustomerOrderShippedSafely,
 } from "../customerOrderNotification";
+import { storagePut } from "../storage";
 import { isOverseasShipCountryCode, OVERSEAS_SHIP_COUNTRY_LABELS } from "@shared/overseasShipping";
 import {
   formatOverseasShippingAddress,
@@ -66,6 +67,15 @@ import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
+const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function getReceiptExtension(contentType: string, filename?: string) {
+  const ext = filename?.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (ext && ["jpg", "jpeg", "png", "webp"].includes(ext)) return ext === "jpeg" ? "jpg" : ext;
+  if (contentType === "image/png") return "png";
+  if (contentType === "image/webp") return "webp";
+  return "jpg";
+}
 
 function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: string }) {
   const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
@@ -120,6 +130,9 @@ export const orderRouter = router({
           intlState: z.string().optional(),
           intlPostalCode: z.string().optional(),
           transferLastFive: z.string().optional(),
+          transferReceiptImageBase64: z.string().max(8_000_000).optional(),
+          transferReceiptImageContentType: z.string().optional(),
+          transferReceiptImageFilename: z.string().optional(),
           items: z.array(CartItemSchema).min(1),
           origin: z.string(),
           sessionToken: z.string().optional(),
@@ -139,6 +152,21 @@ export const orderRouter = router({
               message: "請輸入銀行帳號末五碼",
               path: ["transferLastFive"],
             });
+          }
+          if (data.checkoutRegion === "domestic" && data.paymentMethod === "atm") {
+            if (!data.transferReceiptImageBase64 || !data.transferReceiptImageContentType) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請上傳轉帳成功截圖",
+                path: ["transferReceiptImageBase64"],
+              });
+            } else if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(data.transferReceiptImageContentType)) {
+              ctx.addIssue({
+                code: "custom",
+                message: "轉帳截圖請上傳 JPG、PNG 或 WebP 圖片",
+                path: ["transferReceiptImageContentType"],
+              });
+            }
           }
 
           if (isCustomDepositCheckout) return;
@@ -274,6 +302,21 @@ export const orderRouter = router({
       }
       const orderItems = submittedItems.concat(feeItems);
       const totalAmount = feeSummary.total;
+      let transferReceiptUrl: string | undefined;
+      if (paymentMethod === "atm") {
+        const receiptBase64 = input.transferReceiptImageBase64;
+        const receiptContentType = input.transferReceiptImageContentType;
+        if (!receiptBase64 || !receiptContentType || !TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "請上傳轉帳成功截圖" });
+        }
+        const receiptBuffer = Buffer.from(receiptBase64, "base64");
+        if (receiptBuffer.length === 0 || receiptBuffer.length > 6 * 1024 * 1024) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "轉帳截圖大小需小於 6MB" });
+        }
+        const ext = getReceiptExtension(receiptContentType, input.transferReceiptImageFilename);
+        const uploaded = await storagePut(`transfer-receipts/${merchantTradeNo}-${Date.now()}.${ext}`, receiptBuffer, receiptContentType);
+        transferReceiptUrl = uploaded.url;
+      }
 
       const itemName = orderItems
         .map((i) => `${i.name} x${i.quantity}`)
@@ -298,6 +341,7 @@ export const orderRouter = router({
         shippingAddress,
         receiverZipCode,
         transferLastFive: paymentMethod === "atm" ? input.transferLastFive : undefined,
+        transferReceiptUrl,
         customerNote: input.customerNote ?? null,
       };
       if (ctx.user?.id != null) {

@@ -351,6 +351,8 @@ var orders = mysqlTable("orders", {
   receiverZipCode: varchar("receiverZipCode", { length: 10 }),
   // 銀行轉帳末五碼（客人填入）
   transferLastFive: varchar("transferLastFive", { length: 5 }),
+  // 銀行轉帳成功截圖 URL（客人上傳）
+  transferReceiptUrl: text("transferReceiptUrl"),
   // 顧客諮詢備註（客製化報名表單填寫內容）
   customerNote: text("customerNote"),
   // 老闆備註
@@ -655,6 +657,10 @@ async function ensureOrdersColumns() {
   if (!db) return;
   try {
     await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
+  } catch {
+  }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`transferReceiptUrl\` text NULL`);
   } catch {
   }
   ordersColumnsEnsured = true;

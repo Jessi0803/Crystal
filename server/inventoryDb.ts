@@ -22,6 +22,9 @@ export async function ensureOrdersColumns() {
   try {
     await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch { /* column already exists */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`transferReceiptUrl\` text NULL`);
+  } catch { /* column already exists */ }
   ordersColumnsEnsured = true;
 }
 

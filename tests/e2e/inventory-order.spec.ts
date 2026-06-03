@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import { fillDomesticHomeCheckout, login } from "./helpers";
+import { fillDomesticHomeCheckout, fillTransferCheckoutFields, login } from "./helpers";
 
 test.beforeEach(({}, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Inventory order database assertions only need one browser project.");
@@ -62,6 +62,7 @@ async function addProductAndCreateAtmOrder(page: Page, productName: string, emai
   await page.getByRole("button", { name: "前往結帳" }).click();
   await fillDomesticHomeCheckout(page, email);
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
   await expect(page).toHaveURL(/\/order\//);
 
@@ -114,6 +115,7 @@ test("ATM preorder order is displayed as preorder after it is stored", async ({ 
   await expect(page.locator("body")).toContainText("E2E 預購手鍊（預購）");
   await fillDomesticHomeCheckout(page, `e2e-preorder-${Date.now()}@example.com`);
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
 
   await expect(page).toHaveURL(/\/order\//);

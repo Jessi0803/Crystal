@@ -32,10 +32,28 @@ export async function fillDomesticHomeCheckout(page: Page, email: string) {
   await page.locator('input[placeholder^="路名"]').fill("測試路 1 號");
 }
 
+export async function uploadTransferReceipt(page: Page) {
+  await page.locator('input[type="file"][accept="image/*"]').setInputFiles({
+    name: "transfer-receipt.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lZn+7QAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  });
+  await expect(page.locator("body")).toContainText("已選擇截圖");
+}
+
+export async function fillTransferCheckoutFields(page: Page, lastFive = "54321") {
+  await page.getByPlaceholder("請輸入 5 位數字").fill(lastFive);
+  await uploadTransferReceipt(page);
+}
+
 export async function createAtmHomeDeliveryOrder(page: Page, email: string) {
   await goToCheckoutWithSeededBracelet(page);
   await fillDomesticHomeCheckout(page, email);
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
   await expect(page).toHaveURL(/\/order\//);
   return page.url().split("/order/")[1]?.split("?")[0] ?? "";
@@ -66,6 +84,7 @@ export async function submitAtmCustomDepositCheckout(page: Page, email: string) 
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="tel"]').fill("0912345678");
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
   await expect(page).toHaveURL(/\/order\//);
   return page.url().split("/order/")[1]?.split("?")[0] ?? "";

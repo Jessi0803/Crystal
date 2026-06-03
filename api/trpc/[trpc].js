@@ -157,6 +157,8 @@ var init_schema = __esm({
       receiverZipCode: varchar("receiverZipCode", { length: 10 }),
       // 銀行轉帳末五碼（客人填入）
       transferLastFive: varchar("transferLastFive", { length: 5 }),
+      // 銀行轉帳成功截圖 URL（客人上傳）
+      transferReceiptUrl: text("transferReceiptUrl"),
       // 顧客諮詢備註（客製化報名表單填寫內容）
       customerNote: text("customerNote"),
       // 老闆備註
@@ -1321,6 +1323,7 @@ async function getOrdersForMember(opts) {
       cvsType: orders.cvsType,
       shippingAddress: orders.shippingAddress,
       transferLastFive: orders.transferLastFive,
+      transferReceiptUrl: orders.transferReceiptUrl,
       adminNote: orders.adminNote,
       ecpayNotifyData: orders.ecpayNotifyData,
       paidAt: orders.paidAt,
@@ -1348,6 +1351,10 @@ async function ensureOrdersColumns() {
   if (!db) return;
   try {
     await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`inventoryDeducted\` BOOLEAN NOT NULL DEFAULT FALSE`);
+  } catch {
+  }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`transferReceiptUrl\` text NULL`);
   } catch {
   }
   ordersColumnsEnsured = true;
@@ -2267,6 +2274,61 @@ async function notifyCustomerOrderShippedSafely(orderId) {
   }
 }
 
+// server/storage.ts
+function getStorageConfig() {
+  const baseUrl = ENV.forgeApiUrl;
+  const apiKey = ENV.forgeApiKey;
+  if (!baseUrl || !apiKey) {
+    throw new Error(
+      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
+    );
+  }
+  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
+}
+function buildUploadUrl(baseUrl, relKey) {
+  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
+  url.searchParams.set("path", normalizeKey(relKey));
+  return url;
+}
+function ensureTrailingSlash(value) {
+  return value.endsWith("/") ? value : `${value}/`;
+}
+function normalizeKey(relKey) {
+  return relKey.replace(/^\/+/, "");
+}
+function toFormData(data, contentType, fileName) {
+  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
+  const form = new FormData();
+  form.append("file", blob, fileName || "file");
+  return form;
+}
+function buildAuthHeaders(apiKey) {
+  return { Authorization: `Bearer ${apiKey}` };
+}
+async function storagePut(relKey, data, contentType = "application/octet-stream") {
+  if (process.env.E2E_STORAGE_STUB === "true") {
+    const key2 = normalizeKey(relKey);
+    return { key: key2, url: `https://e2e-storage.local/${encodeURIComponent(key2)}` };
+  }
+  const { baseUrl, apiKey } = getStorageConfig();
+  const key = normalizeKey(relKey);
+  const uploadUrl = buildUploadUrl(baseUrl, key);
+  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: buildAuthHeaders(apiKey),
+    body: formData
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+    );
+  }
+  const url = (await response.json()).url;
+  return { key, url };
+}
+
 // shared/overseasShipping.ts
 var OVERSEAS_SHIP_COUNTRY_CODES = ["MY", "HK", "SG", "US", "GB", "AU"];
 var OVERSEAS_SHIP_COUNTRY_LABELS = {
@@ -2506,6 +2568,14 @@ var STORE_BANK_INFO = {
 };
 
 // server/routers/order.ts
+var TRANSFER_RECEIPT_CONTENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
+function getReceiptExtension(contentType, filename) {
+  const ext = filename?.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (ext && ["jpg", "jpeg", "png", "webp"].includes(ext)) return ext === "jpeg" ? "jpg" : ext;
+  if (contentType === "image/png") return "png";
+  if (contentType === "image/webp") return "webp";
+  return "jpg";
+}
 function siteBaseUrl(req) {
   const fixed = process.env.SITE_URL?.trim().replace(/\/$/, "");
   if (fixed) return fixed;
@@ -2552,6 +2622,9 @@ var orderRouter = router({
       intlState: z2.string().optional(),
       intlPostalCode: z2.string().optional(),
       transferLastFive: z2.string().optional(),
+      transferReceiptImageBase64: z2.string().max(8e6).optional(),
+      transferReceiptImageContentType: z2.string().optional(),
+      transferReceiptImageFilename: z2.string().optional(),
       items: z2.array(CartItemSchema).min(1),
       origin: z2.string(),
       sessionToken: z2.string().optional(),
@@ -2567,6 +2640,21 @@ var orderRouter = router({
           message: "\u8ACB\u8F38\u5165\u9280\u884C\u5E33\u865F\u672B\u4E94\u78BC",
           path: ["transferLastFive"]
         });
+      }
+      if (data.checkoutRegion === "domestic" && data.paymentMethod === "atm") {
+        if (!data.transferReceiptImageBase64 || !data.transferReceiptImageContentType) {
+          ctx.addIssue({
+            code: "custom",
+            message: "\u8ACB\u4E0A\u50B3\u8F49\u5E33\u6210\u529F\u622A\u5716",
+            path: ["transferReceiptImageBase64"]
+          });
+        } else if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(data.transferReceiptImageContentType)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "\u8F49\u5E33\u622A\u5716\u8ACB\u4E0A\u50B3 JPG\u3001PNG \u6216 WebP \u5716\u7247",
+            path: ["transferReceiptImageContentType"]
+          });
+        }
       }
       if (isCustomDepositCheckout) return;
       if (data.checkoutRegion === "domestic") {
@@ -2686,6 +2774,21 @@ var orderRouter = router({
     }
     const orderItems2 = submittedItems.concat(feeItems);
     const totalAmount = feeSummary.total;
+    let transferReceiptUrl;
+    if (paymentMethod === "atm") {
+      const receiptBase64 = input.transferReceiptImageBase64;
+      const receiptContentType = input.transferReceiptImageContentType;
+      if (!receiptBase64 || !receiptContentType || !TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u4E0A\u50B3\u8F49\u5E33\u6210\u529F\u622A\u5716" });
+      }
+      const receiptBuffer = Buffer.from(receiptBase64, "base64");
+      if (receiptBuffer.length === 0 || receiptBuffer.length > 6 * 1024 * 1024) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u5927\u5C0F\u9700\u5C0F\u65BC 6MB" });
+      }
+      const ext = getReceiptExtension(receiptContentType, input.transferReceiptImageFilename);
+      const uploaded = await storagePut(`transfer-receipts/${merchantTradeNo}-${Date.now()}.${ext}`, receiptBuffer, receiptContentType);
+      transferReceiptUrl = uploaded.url;
+    }
     const itemName = orderItems2.map((i) => `${i.name} x${i.quantity}`).join("#");
     const orderRow = {
       merchantTradeNo,
@@ -2706,6 +2809,7 @@ var orderRouter = router({
       shippingAddress,
       receiverZipCode,
       transferLastFive: paymentMethod === "atm" ? input.transferLastFive : void 0,
+      transferReceiptUrl,
       customerNote: input.customerNote ?? null
     };
     if (ctx.user?.id != null) {
@@ -4959,59 +5063,6 @@ import { z as z6 } from "zod";
 import { eq as eq8, and as and5, sql as sql5 } from "drizzle-orm";
 import { TRPCError as TRPCError6 } from "@trpc/server";
 init_schema();
-
-// server/storage.ts
-function getStorageConfig() {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
-  if (!baseUrl || !apiKey) {
-    throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
-  }
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
-}
-function buildUploadUrl(baseUrl, relKey) {
-  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
-  url.searchParams.set("path", normalizeKey(relKey));
-  return url;
-}
-function ensureTrailingSlash(value) {
-  return value.endsWith("/") ? value : `${value}/`;
-}
-function normalizeKey(relKey) {
-  return relKey.replace(/^\/+/, "");
-}
-function toFormData(data, contentType, fileName) {
-  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
-  const form = new FormData();
-  form.append("file", blob, fileName || "file");
-  return form;
-}
-function buildAuthHeaders(apiKey) {
-  return { Authorization: `Bearer ${apiKey}` };
-}
-async function storagePut(relKey, data, contentType = "application/octet-stream") {
-  const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData
-  });
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
-  }
-  const url = (await response.json()).url;
-  return { key, url };
-}
-
-// server/routers/products.ts
 var tableEnsured = false;
 var CATEGORY_LABELS = {
   love: "\u611B\u60C5\u6843\u82B1",

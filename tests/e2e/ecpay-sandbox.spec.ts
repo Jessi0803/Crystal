@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet, login } from "./helpers";
+import { fillDomesticHomeCheckout, fillTransferCheckoutFields, goToCheckoutWithSeededBracelet, login } from "./helpers";
 
 const sandboxTest = process.env.RUN_ECPAY_SANDBOX === "true" ? test : test.skip;
 
@@ -52,6 +52,7 @@ sandboxTest("admin creates a convenience-store logistics order through the ECPay
   });
   await expect(page.locator("body")).toContainText("E2E 測試門市");
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
   await expect(page).toHaveURL(/\/order\//);
   const merchantTradeNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";
@@ -77,6 +78,7 @@ sandboxTest("admin creates a home-delivery logistics order through the ECPay san
   await page.locator('input[placeholder^="鄉鎮市區"]').fill("中正區");
   await page.locator('input[placeholder^="路名"]').fill("忠孝西路一段49號");
   await page.getByRole("button", { name: /^轉帳/ }).click();
+  await fillTransferCheckoutFields(page);
   await page.getByRole("button", { name: "確認下單" }).click();
   await expect(page).toHaveURL(/\/order\//);
   const merchantTradeNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";

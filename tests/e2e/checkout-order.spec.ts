@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createAtmHomeDeliveryOrder, fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet, login } from "./helpers";
+import {
+  createAtmHomeDeliveryOrder,
+  fillDomesticHomeCheckout,
+  goToCheckoutWithSeededBracelet,
+  login,
+  uploadTransferReceipt,
+} from "./helpers";
 
 async function openAdminOrder(page: Page, merchantTradeNo: string) {
   await page.goto("/admin/orders");
@@ -47,11 +53,29 @@ test("ATM home-delivery checkout creates an order and accepts transfer last five
   await expect(page.locator("body")).toContainText("等待轉帳確認");
   await expect(page.locator("body")).toContainText("轉帳資訊");
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
-
-  await page.locator('input[placeholder="12345"]').fill("54321");
-  await page.getByRole("button", { name: "確認送出" }).click();
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
   await expect(page.locator("body")).toContainText("54321");
+});
+
+test("ATM checkout requires last five and transfer receipt before submit", async ({ page }) => {
+  await goToCheckoutWithSeededBracelet(page);
+  await fillDomesticHomeCheckout(page, `e2e-atm-receipt-required-${Date.now()}@example.com`);
+  await page.getByRole("button", { name: /^轉帳/ }).click();
+
+  const submitButton = page.getByRole("button", { name: "確認下單" });
+  await expect(page.locator("body")).toContainText("銀行帳號末五碼");
+  await expect(page.locator("body")).toContainText("轉帳成功截圖");
+  await expect(submitButton).toBeDisabled();
+
+  await page.getByPlaceholder("請輸入 5 位數字").fill("12345");
+  await expect(submitButton).toBeDisabled();
+
+  await page.getByPlaceholder("請輸入 5 位數字").fill("");
+  await uploadTransferReceipt(page);
+  await expect(submitButton).toBeDisabled();
+
+  await page.getByPlaceholder("請輸入 5 位數字").fill("12345");
+  await expect(submitButton).toBeEnabled();
 });
 
 test("logged-in member sees a newly created ATM order in member center", async ({ page }) => {

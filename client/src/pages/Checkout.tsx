@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, CreditCard, Store, ShieldCheck, Lock, Banknote, MapPin, Home, Globe } from "lucide-react";
+import { ArrowLeft, CreditCard, Store, ShieldCheck, Lock, Banknote, MapPin, Home, Globe, ImageUp, X } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -31,6 +31,38 @@ type CheckoutRegion = "domestic" | "overseas";
 // 同分頁跳轉去綠界選店前，把結帳表單暫存起來，回來時還原（手機 / LINE 內建
 // 瀏覽器不支援 popup + window.close，必須用整頁跳轉，所以要自己保住表單）。
 const CHECKOUT_FORM_KEY = "checkout_form_state";
+
+function compressTransferReceipt(file: File): Promise<{ dataBase64: string; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height * MAX) / width);
+          width = MAX;
+        } else {
+          width = Math.round((width * MAX) / height);
+          height = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      resolve({ dataBase64: dataUrl.split(",")[1] ?? "", contentType: "image/jpeg" });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("截圖讀取失敗，請重新選擇圖片"));
+    };
+    img.src = url;
+  });
+}
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
@@ -59,6 +91,12 @@ export default function Checkout() {
     intlPostalCode: "",
     transferLastFive: "",
   });
+  const [transferReceipt, setTransferReceipt] = useState<{
+    dataBase64: string;
+    contentType: string;
+    filename: string;
+    previewUrl: string;
+  } | null>(null);
   // 計算總件數與費用
   const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
   const feeSummary = calcCheckoutFees({
@@ -100,6 +138,7 @@ export default function Checkout() {
 
   // 套用綠界回傳的門市資訊
   const cvsWindowRef = useRef<Window | null>(null);
+  const transferReceiptInputRef = useRef<HTMLInputElement>(null);
   const applyStore = useRef((payload: { storeId?: string; storeName?: string; cvsType?: string }) => {
     if (!payload?.storeId && !payload?.storeName) return;
     setCvsStore({
@@ -187,6 +226,9 @@ export default function Checkout() {
     if (checkoutRegion === "domestic" && paymentMethod === "atm" && !/^\d{5}$/.test(form.transferLastFive.trim())) {
       errs.transferLastFive = "請輸入銀行帳號末五碼";
     }
+    if (checkoutRegion === "domestic" && paymentMethod === "atm" && !transferReceipt) {
+      errs.transferReceipt = "請上傳轉帳成功截圖";
+    }
 
     if (isCustomDepositCheckout) {
       if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
@@ -248,6 +290,12 @@ export default function Checkout() {
         intlPostalCode: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
         transferLastFive:
           checkoutRegion === "domestic" && paymentMethod === "atm" ? form.transferLastFive.trim() : undefined,
+        transferReceiptImageBase64:
+          checkoutRegion === "domestic" && paymentMethod === "atm" ? transferReceipt?.dataBase64 : undefined,
+        transferReceiptImageContentType:
+          checkoutRegion === "domestic" && paymentMethod === "atm" ? transferReceipt?.contentType : undefined,
+        transferReceiptImageFilename:
+          checkoutRegion === "domestic" && paymentMethod === "atm" ? transferReceipt?.filename : undefined,
         items: items.map((i) => ({
           id: i.id,
           baseProductId: i.product.id,
@@ -301,6 +349,43 @@ export default function Checkout() {
     }
   };
 
+  const handleTransferReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("請上傳圖片格式的轉帳成功截圖");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("截圖請小於 10MB");
+      e.target.value = "";
+      return;
+    }
+    try {
+      const compressed = await compressTransferReceipt(file);
+      setTransferReceipt({
+        ...compressed,
+        filename: file.name,
+        previewUrl: URL.createObjectURL(file),
+      });
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.transferReceipt;
+        return next;
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "截圖讀取失敗，請重新選擇圖片");
+      e.target.value = "";
+    }
+  };
+
+  const clearTransferReceipt = () => {
+    if (transferReceipt?.previewUrl) URL.revokeObjectURL(transferReceipt.previewUrl);
+    setTransferReceipt(null);
+    if (transferReceiptInputRef.current) transferReceiptInputRef.current.value = "";
+  };
+
   // 綠界超商選店：用「同分頁整頁跳轉」而非彈出視窗，桌機/手機/LINE 內建瀏覽器都能用。
   // 跳轉前先把表單暫存，回來時（cvs-map-reply 會 302 導回 /checkout?cvsStoreId=...）還原。
   const handleSelectCvsStore = () => {
@@ -333,6 +418,12 @@ export default function Checkout() {
       setCvsStore(null);
     }
   };
+
+  const submitDisabled =
+    createAndPay.isPending ||
+    (checkoutRegion === "domestic" &&
+      paymentMethod === "atm" &&
+      (!/^\d{5}$/.test(form.transferLastFive.trim()) || !transferReceipt));
 
   return (
     <div className="min-h-screen bg-white">
@@ -850,6 +941,47 @@ export default function Checkout() {
                   <p className="text-xs font-body text-blue-700 mt-2">
                     請先完成轉帳，再填入轉出帳號末五碼後送出訂單。
                   </p>
+                  <div className="mt-4">
+                    <p className="text-xs tracking-[0.16em] font-body text-blue-800 mb-2">轉帳成功截圖</p>
+                    {transferReceipt ? (
+                      <div className="flex items-center gap-3 border border-blue-200 bg-white p-3">
+                        <img
+                          src={transferReceipt.previewUrl}
+                          alt="轉帳成功截圖預覽"
+                          className="w-20 h-20 object-cover border border-blue-100"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-body text-blue-900 truncate">{transferReceipt.filename}</p>
+                          <p className="text-xs font-body text-blue-700 mt-1">已選擇截圖</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={clearTransferReceipt}
+                          className="p-2 text-blue-700 hover:text-blue-900"
+                          aria-label="移除轉帳截圖"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => transferReceiptInputRef.current?.click()}
+                        className="w-full border border-dashed border-blue-300 bg-white px-4 py-4 text-sm font-body text-blue-800 flex items-center justify-center gap-2 hover:border-blue-500 transition-colors"
+                      >
+                        <ImageUp className="w-4 h-4" />
+                        上傳轉帳成功截圖
+                      </button>
+                    )}
+                    <input
+                      ref={transferReceiptInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleTransferReceiptChange}
+                    />
+                    {errors.transferReceipt && <p className="text-xs text-red-400 mt-1">{errors.transferReceipt}</p>}
+                  </div>
                 </div>
               )}
             </section>
@@ -865,7 +997,7 @@ export default function Checkout() {
             {/* 提交按鈕 */}
             <button
               type="submit"
-              disabled={createAndPay.isPending}
+              disabled={submitDisabled}
               className="w-full btn-primary py-4 text-sm tracking-[0.2em] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {createAndPay.isPending ? (

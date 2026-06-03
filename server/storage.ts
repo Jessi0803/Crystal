@@ -72,6 +72,10 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
+  if (process.env.E2E_STORAGE_STUB === "true") {
+    const key = normalizeKey(relKey);
+    return { key, url: `https://e2e-storage.local/${encodeURIComponent(key)}` };
+  }
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
