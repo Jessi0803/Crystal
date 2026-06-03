@@ -219,7 +219,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
 // drizzle/schema.ts
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext } from "drizzle-orm/mysql-core";
 var users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -351,8 +351,8 @@ var orders = mysqlTable("orders", {
   receiverZipCode: varchar("receiverZipCode", { length: 10 }),
   // 銀行轉帳末五碼（客人填入）
   transferLastFive: varchar("transferLastFive", { length: 5 }),
-  // 銀行轉帳成功截圖 URL（客人上傳）
-  transferReceiptUrl: text("transferReceiptUrl"),
+  // 銀行轉帳成功截圖 URL 或 data URL（客人上傳）
+  transferReceiptUrl: longtext("transferReceiptUrl"),
   // 顧客諮詢備註（客製化報名表單填寫內容）
   customerNote: text("customerNote"),
   // 老闆備註
@@ -661,6 +661,10 @@ async function ensureOrdersColumns() {
   }
   try {
     await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`transferReceiptUrl\` text NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` MODIFY COLUMN \`transferReceiptUrl\` longtext NULL`);
   } catch {
   }
   ordersColumnsEnsured = true;

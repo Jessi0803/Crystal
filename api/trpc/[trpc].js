@@ -21,7 +21,7 @@ __export(schema_exports, {
   productInventory: () => productInventory,
   users: () => users
 });
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext } from "drizzle-orm/mysql-core";
 var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs, dbProducts;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
@@ -157,8 +157,8 @@ var init_schema = __esm({
       receiverZipCode: varchar("receiverZipCode", { length: 10 }),
       // 銀行轉帳末五碼（客人填入）
       transferLastFive: varchar("transferLastFive", { length: 5 }),
-      // 銀行轉帳成功截圖 URL（客人上傳）
-      transferReceiptUrl: text("transferReceiptUrl"),
+      // 銀行轉帳成功截圖 URL 或 data URL（客人上傳）
+      transferReceiptUrl: longtext("transferReceiptUrl"),
       // 顧客諮詢備註（客製化報名表單填寫內容）
       customerNote: text("customerNote"),
       // 老闆備註
@@ -1357,6 +1357,10 @@ async function ensureOrdersColumns() {
     await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`transferReceiptUrl\` text NULL`);
   } catch {
   }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` MODIFY COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+  }
   ordersColumnsEnsured = true;
 }
 var NO_EXPIRY_LOCK_DATE = /* @__PURE__ */ new Date("2038-01-01T00:00:00.000Z");
@@ -2317,13 +2321,23 @@ function toFormData(data, contentType, fileName) {
 function buildAuthHeaders(apiKey) {
   return { Authorization: `Bearer ${apiKey}` };
 }
+function isServerlessRuntime() {
+  return process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+function toDataUrl(data, contentType) {
+  const base64 = typeof data === "string" ? Buffer.from(data).toString("base64") : Buffer.from(data).toString("base64");
+  return `data:${contentType};base64,${base64}`;
+}
 async function storagePut(relKey, data, contentType = "application/octet-stream") {
   const key = normalizeKey(relKey);
   if (process.env.E2E_STORAGE_STUB === "true") {
     return { key, url: `https://e2e-storage.local/${encodeURIComponent(key)}` };
   }
   if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-    return storagePutLocal(key, data);
+    if (isServerlessRuntime()) {
+      return { key, url: toDataUrl(data, contentType) };
+    }
+    return storagePutLocal(key, data, contentType);
   }
   const { baseUrl, apiKey } = getStorageConfig();
   const uploadUrl = buildUploadUrl(baseUrl, key);
@@ -2342,15 +2356,23 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
   const url = (await response.json()).url;
   return { key, url };
 }
-async function storagePutLocal(key, data) {
+async function storagePutLocal(key, data, contentType) {
   const { publicPath, uploadDir } = getLocalStorageConfig();
   const filePath = path.resolve(uploadDir, key);
   const relativePath = path.relative(uploadDir, filePath);
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     throw new Error("Storage key escapes upload directory");
   }
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, data);
+  try {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, data);
+  } catch (error) {
+    const code = error?.code;
+    if (code === "ENOENT" || code === "EROFS" || code === "EACCES" || code === "EPERM") {
+      return { key, url: toDataUrl(data, contentType) };
+    }
+    throw error;
+  }
   return {
     key,
     url: `${publicPath}/${key.split("/").map(encodeURIComponent).join("/")}`

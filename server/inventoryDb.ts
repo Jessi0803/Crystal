@@ -25,6 +25,9 @@ export async function ensureOrdersColumns() {
   try {
     await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`transferReceiptUrl\` text NULL`);
   } catch { /* column already exists */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`orders\` MODIFY COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch { /* column type already compatible */ }
   ordersColumnsEnsured = true;
 }
 

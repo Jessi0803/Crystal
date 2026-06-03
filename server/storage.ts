@@ -87,6 +87,18 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
+function isServerlessRuntime() {
+  return process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
+function toDataUrl(data: Buffer | Uint8Array | string, contentType: string): string {
+  const base64 =
+    typeof data === "string"
+      ? Buffer.from(data).toString("base64")
+      : Buffer.from(data).toString("base64");
+  return `data:${contentType};base64,${base64}`;
+}
+
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
@@ -97,7 +109,10 @@ export async function storagePut(
     return { key, url: `https://e2e-storage.local/${encodeURIComponent(key)}` };
   }
   if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-    return storagePutLocal(key, data);
+    if (isServerlessRuntime()) {
+      return { key, url: toDataUrl(data, contentType) };
+    }
+    return storagePutLocal(key, data, contentType);
   }
   const { baseUrl, apiKey } = getStorageConfig();
   const uploadUrl = buildUploadUrl(baseUrl, key);
@@ -120,7 +135,8 @@ export async function storagePut(
 
 async function storagePutLocal(
   key: string,
-  data: Buffer | Uint8Array | string
+  data: Buffer | Uint8Array | string,
+  contentType: string
 ): Promise<{ key: string; url: string }> {
   const { publicPath, uploadDir } = getLocalStorageConfig();
   const filePath = path.resolve(uploadDir, key);
@@ -129,8 +145,16 @@ async function storagePutLocal(
     throw new Error("Storage key escapes upload directory");
   }
 
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, data);
+  try {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, data);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException)?.code;
+    if (code === "ENOENT" || code === "EROFS" || code === "EACCES" || code === "EPERM") {
+      return { key, url: toDataUrl(data, contentType) };
+    }
+    throw error;
+  }
 
   return {
     key,
