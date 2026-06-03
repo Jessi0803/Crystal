@@ -242,35 +242,6 @@ function OrderRowCard({
                         <span className="text-[oklch(0.1_0_0)] break-all">{row.value}</span>
                       </div>
                     ))}
-                    {detail.transferLastFive && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
-                      <div className="flex items-start gap-2 text-sm font-body">
-                        <span className="text-[oklch(0.6_0_0)] mt-0.5 shrink-0"><Banknote className="w-3.5 h-3.5" /></span>
-                        <span className="text-[oklch(0.5_0_0)] shrink-0 w-10">末五碼</span>
-                        <div className="min-w-0">
-                          <span className="text-blue-700 font-medium tracking-wider">{detail.transferLastFive}</span>
-                          {(detail as any).transferReceiptUrl && (
-                            <div className="mt-3 space-y-2">
-                              <a
-                                href={(detail as any).transferReceiptUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1.5 text-xs text-blue-700 underline underline-offset-2"
-                              >
-                                開啟轉帳截圖
-                              </a>
-                              <a href={(detail as any).transferReceiptUrl} target="_blank" rel="noreferrer" className="block w-fit">
-                                <img
-                                  src={(detail as any).transferReceiptUrl}
-                                  alt="轉帳成功截圖"
-                                  className="h-40 w-auto max-w-full border border-blue-200 bg-white object-contain"
-                                  loading="lazy"
-                                />
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
 
