@@ -119,6 +119,7 @@ export const orderRouter = router({
           intlCity: z.string().optional(),
           intlState: z.string().optional(),
           intlPostalCode: z.string().optional(),
+          transferLastFive: z.string().optional(),
           items: z.array(CartItemSchema).min(1),
           origin: z.string(),
           sessionToken: z.string().optional(),
@@ -131,6 +132,14 @@ export const orderRouter = router({
               return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
             })
             .every(isCustomCheckoutItem);
+
+          if (data.checkoutRegion === "domestic" && data.paymentMethod === "atm" && !/^\d{5}$/.test(data.transferLastFive ?? "")) {
+            ctx.addIssue({
+              code: "custom",
+              message: "請輸入銀行帳號末五碼",
+              path: ["transferLastFive"],
+            });
+          }
 
           if (isCustomDepositCheckout) return;
 
@@ -288,6 +297,7 @@ export const orderRouter = router({
         cvsType,
         shippingAddress,
         receiverZipCode,
+        transferLastFive: paymentMethod === "atm" ? input.transferLastFive : undefined,
         customerNote: input.customerNote ?? null,
       };
       if (ctx.user?.id != null) {

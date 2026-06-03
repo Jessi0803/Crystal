@@ -28,14 +28,14 @@ var ENV = {
 };
 
 // server/ecpay.ts
-var isProduction = ENV.isProduction;
+var usePaymentSandbox = process.env.ECPAY_SANDBOX === "true";
+var paymentBaseURL = usePaymentSandbox ? "https://payment-stage.ecpay.com.tw" : "https://payment.ecpay.com.tw";
 var ECPAY_CONFIG = {
   MerchantID: ENV.ecpayMerchantId || "3002607",
   HashKey: ENV.ecpayHashKey || "pwFHCqoQZGmho4w6",
   HashIV: ENV.ecpayHashIV || "EkRm7iFT261dpevs",
-  // 永遠使用正式端點（憑證是正式帳號）
-  PaymentURL: "https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5",
-  QueryURL: "https://payment.ecpay.com.tw/Cashier/QueryTradeInfo/V5"
+  PaymentURL: `${paymentBaseURL}/Cashier/AioCheckOut/V5`,
+  QueryURL: `${paymentBaseURL}/Cashier/QueryTradeInfo/V5`
 };
 function ecpayUrlEncode(str) {
   return encodeURIComponent(str).replace(/%20/g, "+").replace(/%2D/gi, "-").replace(/%5F/gi, "_").replace(/%2E/gi, ".").replace(/%21/gi, "!").replace(/%2A/gi, "*").replace(/%28/gi, "(").replace(/%29/gi, ")");
@@ -45,18 +45,14 @@ function generateCheckMacValue(params) {
     (a, b) => a.toLowerCase().localeCompare(b.toLowerCase())
   );
   const raw = `HashKey=${ECPAY_CONFIG.HashKey}&` + sortedKeys.map((k) => `${k}=${params[k]}`).join("&") + `&HashIV=${ECPAY_CONFIG.HashIV}`;
-  console.log("[ECPay] Raw string for CheckMacValue:", raw);
   const encoded = ecpayUrlEncode(raw).toLowerCase();
-  console.log("[ECPay] Encoded string:", encoded);
   const hash = crypto.createHash("sha256").update(encoded).digest("hex").toUpperCase();
-  console.log("[ECPay] CheckMacValue:", hash);
   return hash;
 }
 function verifyCheckMacValue(params) {
   const { CheckMacValue, ...rest } = params;
   if (!CheckMacValue) return false;
   const expected = generateCheckMacValue(rest);
-  console.log("[ECPay Verify] Expected:", expected, "Got:", CheckMacValue);
   return expected === CheckMacValue;
 }
 
@@ -220,6 +216,7 @@ function normalizeOrderEmail(email) {
 // server/db.ts
 import { eq, and, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 
 // drizzle/schema.ts
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index } from "drizzle-orm/mysql-core";
@@ -488,6 +485,7 @@ var dbProducts = mysqlTable("products", {
   priceRange: varchar("priceRange", { length: 200 }),
   depositRange: varchar("depositRange", { length: 200 }),
   image: text("image").notNull(),
+  images: json("images").$type(),
   tags: json("tags").$type(),
   description: text("description"),
   story: text("story"),
@@ -514,11 +512,41 @@ var ADMIN_EMAIL_ALLOWLIST = new Set(
     ...process.env.ADMIN_EMAILS?.split(",") ?? []
   ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
 );
+var _pool = null;
+function shouldUseTls(databaseUrl) {
+  if (process.env.DATABASE_SSL === "true") return true;
+  try {
+    const url = new URL(databaseUrl);
+    return url.hostname.includes("tidbcloud.com");
+  } catch {
+    return false;
+  }
+}
+function createDb(databaseUrl) {
+  if (!shouldUseTls(databaseUrl)) {
+    return drizzle(databaseUrl);
+  }
+  const url = new URL(databaseUrl);
+  _pool = mysql.createPool({
+    host: url.hostname,
+    port: Number(url.port || 3306),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DATABASE_CONNECTION_LIMIT || 10),
+    ssl: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true
+    }
+  });
+  return drizzle(_pool);
+}
 var _db = null;
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = createDb(process.env.DATABASE_URL);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -564,6 +592,16 @@ async function getOrderByMerchantTradeNo(merchantTradeNo) {
   if (!db) throw new Error("Database not available");
   const [order] = await db.select().from(orders).where(eq2(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   return order ?? null;
+}
+async function getOrderWithItems(merchantTradeNo) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [order] = await db.select().from(orders).where(eq2(orders.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!order) return null;
+  const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
+  const [logistics] = await db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1);
+  const [balancePayment] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.orderId, order.id)).limit(1);
+  return { ...order, items, logistics: logistics ?? null, balancePayment: hydrateBalancePayment(balancePayment) };
 }
 async function updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData) {
   const db = await getDb();
@@ -644,8 +682,236 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
   await db.update(orders).set({ inventoryDeducted: true }).where(eq3(orders.merchantTradeNo, merchantTradeNo));
 }
 
-// server/ecpayRoutes.ts
+// server/customerOrderNotification.ts
+import { eq as eq5 } from "drizzle-orm";
+
+// server/email.ts
+import { Resend } from "resend";
+var FROM_ADDRESS = "service@goodaytarot.com";
+var BRAND_NAME = "\u691B \xB7 Crystal";
+var ADMIN_ORDER_NOTIFICATION_EMAIL = process.env.ADMIN_ORDER_NOTIFICATION_EMAIL ?? "goodaytarot@gmail.com";
+function getResend() {
+  if (!ENV.resendApiKey) throw new Error("RESEND_API_KEY \u672A\u8A2D\u5B9A");
+  return new Resend(ENV.resendApiKey);
+}
+var SHIPPING_LABEL = {
+  cvs_711: "7-11 \u8D85\u5546\u53D6\u8CA8",
+  cvs_family: "\u5168\u5BB6\u8D85\u5546\u53D6\u8CA8",
+  home: "\u5B85\u914D\u5230\u5E9C"
+};
+var PAYMENT_LABEL = {
+  credit: "\u4FE1\u7528\u5361 / Apple Pay",
+  credit_card: "\u4FE1\u7528\u5361 / Apple Pay",
+  atm: "\u8F49\u5E33",
+  bank_transfer: "\u8F49\u5E33",
+  paypal: "PayPal"
+};
+function escapeHtml(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+async function sendOrderShippedEmail(payload) {
+  const resend = getResend();
+  const {
+    to,
+    buyerName,
+    merchantTradeNo,
+    totalAmount,
+    shippingMethod,
+    paymentMethod,
+    cvsStoreName,
+    receiverAddress,
+    items
+  } = payload;
+  const itemRows = items.map(
+    (item) => `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;">${escapeHtml(item.productName)}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#666;text-align:center;">\xD7 ${item.quantity}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;text-align:right;">NT$ ${item.subtotal.toLocaleString()}</td>
+      </tr>`
+  ).join("");
+  const deliveryInfo = shippingMethod === "home" ? `<p style="margin:4px 0;font-size:13px;color:#555;">\u914D\u9001\u5730\u5740\uFF1A${escapeHtml(receiverAddress ?? "\u2014")}</p>` : `<p style="margin:4px 0;font-size:13px;color:#555;">\u53D6\u8CA8\u9580\u5E02\uFF1A${escapeHtml(cvsStoreName ?? "\u2014")}</p>`;
+  const html = `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f9f7f4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e8e4df;">
+        <tr>
+          <td style="padding:32px 40px 24px;border-bottom:1px solid #f0ece7;text-align:center;">
+            <p style="margin:0;font-size:11px;letter-spacing:0.2em;color:#999;text-transform:uppercase;">Crystal Energy</p>
+            <h1 style="margin:8px 0 0;font-size:22px;font-weight:300;color:#1a1a1a;letter-spacing:0.08em;">${BRAND_NAME}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="margin:0 0 4px;font-size:13px;color:#555;">\u89AA\u611B\u7684 ${escapeHtml(buyerName)}\uFF0C</p>
+            <h2 style="margin:0 0 16px;font-size:18px;font-weight:500;color:#1a1a1a;">\u60A8\u7684\u8A02\u55AE\u5DF2\u51FA\u8CA8</h2>
+            <p style="margin:0 0 24px;font-size:13px;color:#666;line-height:1.8;">
+              \u60A8\u7684\u6C34\u6676\u5546\u54C1\u5DF2\u5B8C\u6210\u51FA\u8CA8\u5B89\u6392\uFF0C\u8ACB\u7559\u610F\u914D\u9001\u901A\u77E5\u8207\u53D6\u8CA8\u8A0A\u606F\u3002
+            </p>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:16px 20px;margin-bottom:24px;">
+              <tr><td style="font-size:11px;letter-spacing:0.1em;color:#999;padding-bottom:10px;">\u8A02\u55AE\u8CC7\u8A0A</td></tr>
+              <tr><td style="font-size:13px;color:#555;padding:2px 0;">\u8A02\u55AE\u7DE8\u865F\uFF1A<strong style="color:#1a1a1a;">${escapeHtml(merchantTradeNo)}</strong></td></tr>
+              <tr><td style="font-size:13px;color:#555;padding:2px 0;">\u4ED8\u6B3E\u65B9\u5F0F\uFF1A${escapeHtml(PAYMENT_LABEL[paymentMethod] ?? paymentMethod)}</td></tr>
+              <tr><td style="font-size:13px;color:#555;padding:2px 0;">\u914D\u9001\u65B9\u5F0F\uFF1A${escapeHtml(SHIPPING_LABEL[shippingMethod] ?? shippingMethod)}</td></tr>
+              <tr><td style="font-size:13px;color:#555;padding:2px 0;">${deliveryInfo}</td></tr>
+            </table>
+
+            <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.1em;color:#999;">\u5546\u54C1\u660E\u7D30</p>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${itemRows}
+              <tr>
+                <td colspan="2" style="padding:14px 0 0;font-size:13px;font-weight:600;color:#1a1a1a;">\u8A02\u55AE\u7E3D\u8A08</td>
+                <td style="padding:14px 0 0;font-size:15px;font-weight:600;color:#1a1a1a;text-align:right;">NT$ ${totalAmount.toLocaleString()}</td>
+              </tr>
+            </table>
+
+            <p style="margin:24px 0 0;font-size:12px;color:#999;line-height:1.8;">
+              \u82E5\u914D\u9001\u8CC7\u8A0A\u6709\u4EFB\u4F55\u554F\u984C\uFF0C\u6B61\u8FCE\u900F\u904E\u5B98\u7DB2\u6216 LINE \u806F\u7E6B\u6211\u5011\u3002
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #f0ece7;text-align:center;">
+            <p style="margin:0;font-size:10px;color:#bbb;letter-spacing:0.1em;">
+              \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} ${BRAND_NAME} \xB7 \u5929\u7136\u6C34\u6676\u80FD\u91CF\u98FE\u54C1
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  return resend.emails.send({
+    from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
+    to,
+    subject: `\u3010${BRAND_NAME}\u3011\u60A8\u7684\u8A02\u55AE\u5DF2\u51FA\u8CA8 #${merchantTradeNo}`,
+    html
+  });
+}
+
+// server/lineMessage.ts
 import { eq as eq4 } from "drizzle-orm";
+function getLineAccessToken() {
+  return process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() || process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN?.trim();
+}
+function getSiteUrl() {
+  return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
+}
+function extractLineUserId(openId) {
+  if (!openId?.startsWith("line:")) return null;
+  return openId.slice("line:".length);
+}
+async function pushLineTextMessage(to, text2) {
+  const token = getLineAccessToken();
+  if (!token) {
+    console.warn("[LINE Message] LINE_CHANNEL_ACCESS_TOKEN is not configured");
+    return { sent: false, reason: "missing_token" };
+  }
+  const res = await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      to,
+      messages: [{ type: "text", text: text2 }]
+    })
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[LINE Message] push failed", { status: res.status, body });
+    return { sent: false, reason: "line_api_error" };
+  }
+  return { sent: true };
+}
+async function getLineUserIdForOrder(orderId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [order] = await db.select({ userId: orders.userId }).from(orders).where(eq4(orders.id, orderId)).limit(1);
+  if (!order?.userId) return null;
+  const [user] = await db.select({ openId: users.openId }).from(users).where(eq4(users.id, order.userId)).limit(1);
+  return extractLineUserId(user?.openId);
+}
+async function notifyLineOrderShipped(orderId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const lineUserId = await getLineUserIdForOrder(orderId);
+  if (!lineUserId) return { sent: false, reason: "missing_line_user" };
+  const [order] = await db.select().from(orders).where(eq4(orders.id, orderId)).limit(1);
+  if (!order) return { sent: false, reason: "missing_order" };
+  const [logistics] = await db.select().from(logisticsOrders).where(eq4(logisticsOrders.orderId, orderId)).limit(1);
+  const shippingLabel = order.shippingMethod === "home" ? "\u9ED1\u8C93\u5B85\u6025\u4FBF" : order.shippingMethod === "cvs_711" ? "7-11 \u5E97\u5230\u5E97" : "\u5168\u5BB6\u5E97\u5230\u5E97";
+  const trackingNo = logistics?.bookingNote || logistics?.allPayLogisticsId || logistics?.logisticsMerchantTradeNo;
+  const text2 = [
+    `${order.buyerName} \u60A8\u597D\uFF0C\u60A8\u7684\u8A02\u55AE\u5DF2\u51FA\u8CA8\u3002`,
+    "",
+    `\u8A02\u55AE\u7DE8\u865F\uFF1A${order.merchantTradeNo}`,
+    `\u914D\u9001\u65B9\u5F0F\uFF1A${shippingLabel}`,
+    trackingNo ? `\u7269\u6D41\u7DE8\u865F\uFF1A${trackingNo}` : "",
+    "",
+    `\u67E5\u770B\u8A02\u55AE\uFF1A${getSiteUrl()}/order/${encodeURIComponent(order.merchantTradeNo)}`
+  ].filter(Boolean).join("\n");
+  return pushLineTextMessage(lineUserId, text2);
+}
+
+// server/customerOrderNotification.ts
+async function getMerchantTradeNoByOrderId(orderId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq5(orders.id, orderId)).limit(1);
+  return order?.merchantTradeNo ?? null;
+}
+async function getOrderEmailPayload(orderId) {
+  const merchantTradeNo = await getMerchantTradeNoByOrderId(orderId);
+  if (!merchantTradeNo) return null;
+  const order = await getOrderWithItems(merchantTradeNo);
+  if (!order) return null;
+  return {
+    to: order.buyerEmail,
+    buyerName: order.buyerName,
+    merchantTradeNo: order.merchantTradeNo,
+    totalAmount: order.totalAmount,
+    shippingMethod: order.shippingMethod,
+    paymentMethod: order.paymentMethod,
+    cvsStoreName: order.cvsStoreName,
+    receiverAddress: order.shippingAddress,
+    items: order.items.map((item) => ({
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: item.subtotal
+    }))
+  };
+}
+async function notifyCustomerOrderShippedSafely(orderId) {
+  try {
+    const lineResult = await notifyLineOrderShipped(orderId);
+    if (lineResult.sent) return;
+    if (lineResult.reason === "missing_order") return;
+    const emailPayload = await getOrderEmailPayload(orderId);
+    if (!emailPayload) return;
+    await sendOrderShippedEmail(emailPayload);
+  } catch (error) {
+    console.error("[CustomerOrderNotification] order shipped failed:", error);
+  }
+}
+
+// server/ecpayRoutes.ts
+import { eq as eq6 } from "drizzle-orm";
+function safeReturnPath(p) {
+  if (typeof p !== "string") return "/checkout";
+  const path = p.split(/[?#]/)[0];
+  if (!path.startsWith("/") || path.startsWith("//")) return "/checkout";
+  if (path.includes(":")) return "/checkout";
+  return path;
+}
 function registerECPayRoutes(app2) {
   app2.post("/api/ecpay/notify", async (req, res) => {
     try {
@@ -726,8 +992,9 @@ function registerECPayRoutes(app2) {
     const forwardedProto1 = req.headers["x-forwarded-proto"];
     const protocol1 = forwardedProto1 ? forwardedProto1.split(",")[0].trim() : req.protocol;
     const origin = `${protocol1}://${req.get("host")}`;
-    const serverReplyURL = `${origin}/api/ecpay/cvs-map-reply`;
-    const clientReplyURL = clientReturn || `${origin}/checkout`;
+    const returnPath = safeReturnPath(clientReturn);
+    const serverReplyURL = `${origin}/api/ecpay/cvs-map-reply?to=${encodeURIComponent(returnPath)}`;
+    const clientReplyURL = `${origin}${returnPath}`;
     const params = buildCVSMapParams({
       logisticsMerchantTradeNo: tradeNo,
       logisticsSubType: normalizedSubType,
@@ -754,64 +1021,13 @@ ${inputs}
       const storeId = data.CVSStoreID || "";
       const storeName = data.CVSStoreName || "";
       const cvsType = data.LogisticsSubType || "";
-      const storeIdJson = JSON.stringify(storeId);
-      const storeNameJson = JSON.stringify(storeName);
-      const cvsTypeJson = JSON.stringify(cvsType);
-      const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>\u9078\u5E97\u5B8C\u6210</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #fafafa; }
-  .card { background: white; border-radius: 12px; padding: 32px 24px; max-width: 320px; margin: 0 auto; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-  .icon { font-size: 48px; margin-bottom: 16px; }
-  h2 { font-size: 18px; color: #1a1a1a; margin: 0 0 8px; }
-  p { font-size: 14px; color: #666; margin: 0 0 24px; }
-  .store-name { font-size: 16px; font-weight: 600; color: #1a1a1a; background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 24px; }
-  button { background: #1a1a1a; color: white; border: none; padding: 14px 32px; border-radius: 8px; font-size: 15px; cursor: pointer; width: 100%; }
-  button:active { opacity: 0.8; }
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="icon">\u2705</div>
-  <h2>\u9078\u5E97\u5B8C\u6210</h2>
-  <div class="store-name">${storeName}</div>
-  <p>\u9580\u5E02\u8CC7\u8A0A\u5DF2\u50B3\u56DE\u7D50\u5E33\u9801\u9762</p>
-  <button onclick="closeWindow()">\u95DC\u9589\u6B64\u8996\u7A97</button>
-</div>
-<script>
-  function sendMessage() {
-    try {
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'CVS_STORE_SELECTED',
-          storeId: ${storeIdJson},
-          storeName: ${storeNameJson},
-          cvsType: ${cvsTypeJson}
-        }, '*');
-      }
-    } catch(e) { console.error(e); }
-  }
-  function closeWindow() {
-    sendMessage();
-    try { window.close(); } catch(e) {}
-    // \u5099\u7528\uFF1A\u5982\u679C close \u88AB\u963B\u64CB\uFF0C\u5617\u8A66\u5C0E\u56DE\u7D50\u5E33\u9801
-    setTimeout(function() {
-      if (!window.closed) {
-        try { window.location.href = window.opener ? 'about:blank' : '/checkout'; } catch(e) {}
-      }
-    }, 300);
-  }
-  // \u81EA\u52D5\u767C\u9001 postMessage \u4E26\u5617\u8A66\u95DC\u9589
-  sendMessage();
-  setTimeout(function() {
-    try { window.close(); } catch(e) {}
-  }, 800);
-</script>
-</body>
-</html>`;
-      res.send(html);
+      const returnPath = safeReturnPath(req.query.to);
+      const qs = new URLSearchParams({
+        cvsStoreId: storeId,
+        cvsStoreName: storeName,
+        cvsType
+      }).toString();
+      res.redirect(302, `${returnPath}?${qs}`);
     } catch (err) {
       console.error("[ECPay CVS Map Reply] Error:", err);
       res.status(500).send("Error");
@@ -838,10 +1054,10 @@ ${inputs}
       if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
         const db = await getDb();
         if (db) {
-          const [logistics] = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq4(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1);
+          const [logistics] = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq6(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1);
           if (logistics) {
             const orderStatus = newStatus === "arrived" ? "arrived" : newStatus === "picked_up" ? "picked_up" : "not_picked";
-            await db.update(orders).set({ orderStatus }).where(eq4(orders.id, logistics.orderId));
+            await db.update(orders).set({ orderStatus }).where(eq6(orders.id, logistics.orderId));
           }
         }
       }
@@ -860,12 +1076,12 @@ ${inputs}
         res.status(500).json({ error: "DB unavailable" });
         return;
       }
-      const [order] = await db.select().from(orders).where(eq4(orders.id, orderId)).limit(1);
+      const [order] = await db.select().from(orders).where(eq6(orders.id, orderId)).limit(1);
       if (!order) {
         res.status(404).json({ error: "Order not found" });
         return;
       }
-      const [logistics] = await db.select().from(logisticsOrders).where(eq4(logisticsOrders.orderId, orderId)).limit(1);
+      const [logistics] = await db.select().from(logisticsOrders).where(eq6(logisticsOrders.orderId, orderId)).limit(1);
       if (!logistics) {
         res.status(404).json({ error: "Logistics order not found" });
         return;
@@ -913,8 +1129,9 @@ ${inputs}
           bookingNote: result.bookingNote,
           logisticsStatus: "in_transit",
           ecpayLogisticsData: result.raw
-        }).where(eq4(logisticsOrders.orderId, orderId));
-        await db.update(orders).set({ orderStatus: "shipped" }).where(eq4(orders.id, orderId));
+        }).where(eq6(logisticsOrders.orderId, orderId));
+        await db.update(orders).set({ orderStatus: "shipped" }).where(eq6(orders.id, orderId));
+        await notifyCustomerOrderShippedSafely(orderId);
       }
       res.json(result);
     } catch (err) {

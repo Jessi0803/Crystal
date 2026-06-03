@@ -3,7 +3,7 @@
  * 路由：/order/:merchantTradeNo
  * 顯示訂單狀態：待付款 / 轉帳待確認 / 已付款 / 付款失敗
  */
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -27,8 +27,6 @@ export default function OrderResult() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
   const search = useSearch();
-  const [transferCode, setTransferCode] = useState("");
-  const [codeSubmitted, setCodeSubmitted] = useState(false);
   const paypalCaptureStarted = useRef(false);
 
   const { data: order, isLoading, isError, refetch } = trpc.order.getOrder.useQuery(
@@ -38,15 +36,6 @@ export default function OrderResult() {
       refetchInterval: 5000,
     }
   );
-
-  const submitTransferCode = trpc.order.submitTransferCode.useMutation({
-    onSuccess: () => {
-      setCodeSubmitted(true);
-      toast.success("已送出匯款末五碼，老闆確認後將更新訂單狀態");
-      refetch();
-    },
-    onError: (err) => toast.error(err.message || "送出失敗，請重試"),
-  });
 
   const capturePayPal = trpc.order.capturePayPal.useMutation({
     onSuccess: (data) => {
@@ -81,14 +70,6 @@ export default function OrderResult() {
     capturePayPal.mutate({ merchantTradeNo, paypalOrderId: token });
   }, [search, merchantTradeNo, capturePayPal.mutate]);
 
-  const handleSubmitCode = () => {
-    if (transferCode.length !== 5 || !/^\d+$/.test(transferCode)) {
-      toast.error("請輸入正確的 5 位數字");
-      return;
-    }
-    submitTransferCode.mutate({ merchantTradeNo: merchantTradeNo ?? "", lastFive: transferCode });
-  };
-
   const getStatusConfig = () => {
     if (!order) return null;
 
@@ -105,7 +86,7 @@ export default function OrderResult() {
       return {
         icon: <Banknote className="w-12 h-12 text-blue-400" />,
         title: "等待轉帳確認",
-        desc: "請完成匯款，並在下方填入匯款末五碼，設計師確認後將為您處理出貨。",
+        desc: "我們已收到您的匯款末五碼，設計師確認收款後將為您處理出貨。",
         color: "text-blue-600",
         bg: "bg-blue-50",
       };
@@ -318,34 +299,15 @@ export default function OrderResult() {
                   </div>
                 </div>
 
-                {/* 填入末五碼 */}
-                {!codeSubmitted && !order.transferLastFive ? (
-                  <div>
-                    <p className="text-xs font-body text-blue-700 mb-2">轉帳完成後，請填入匯款末五碼：</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={5}
-                        value={transferCode}
-                        onChange={(e) => setTransferCode(e.target.value.replace(/\D/g, ""))}
-                        placeholder="12345"
-                        className="flex-1 border border-blue-300 bg-white px-3 py-2 text-sm font-body text-center tracking-widest focus:outline-none focus:border-blue-500"
-                      />
-                      <button
-                        onClick={handleSubmitCode}
-                        disabled={submitTransferCode.isPending}
-                        className="btn-primary text-sm px-4 py-2"
-                      >
-                        {submitTransferCode.isPending ? "送出中..." : "確認送出"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
-                    ✅ 已收到您的匯款末五碼：<strong>{order.transferLastFive}</strong>，老闆確認後將更新訂單狀態。
-                  </div>
-                )}
+                <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
+                  {order.transferLastFive ? (
+                    <>
+                      已收到您的匯款末五碼：<strong>{order.transferLastFive}</strong>，老闆確認後將更新訂單狀態。
+                    </>
+                  ) : (
+                    "此訂單正在等待轉帳確認，若需要補充匯款資訊請聯繫客服。"
+                  )}
+                </div>
               </div>
             </div>
           </div>

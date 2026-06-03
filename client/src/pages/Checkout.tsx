@@ -57,6 +57,7 @@ export default function Checkout() {
     intlCity: "",
     intlState: "",
     intlPostalCode: "",
+    transferLastFive: "",
   });
   // 計算總件數與費用
   const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
@@ -183,6 +184,9 @@ export default function Checkout() {
     if (!form.buyerName.trim()) errs.buyerName = "請輸入姓名";
     if (!form.buyerEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.buyerEmail))
       errs.buyerEmail = "請輸入有效的 Email";
+    if (checkoutRegion === "domestic" && paymentMethod === "atm" && !/^\d{5}$/.test(form.transferLastFive.trim())) {
+      errs.transferLastFive = "請輸入銀行帳號末五碼";
+    }
 
     if (isCustomDepositCheckout) {
       if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
@@ -242,6 +246,8 @@ export default function Checkout() {
         intlCity: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlCity : undefined,
         intlState: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlState : undefined,
         intlPostalCode: !isCustomDepositCheckout && checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
+        transferLastFive:
+          checkoutRegion === "domestic" && paymentMethod === "atm" ? form.transferLastFive.trim() : undefined,
         items: items.map((i) => ({
           id: i.id,
           baseProductId: i.product.id,
@@ -811,7 +817,7 @@ export default function Checkout() {
                   <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
                   <div>
                     <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">轉帳</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">匯款後填入末五碼</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">下單前填入末五碼</p>
                     <p className="text-xs font-body text-[oklch(0.5_0_0)]">老闆確認後出貨</p>
                   </div>
                   <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
@@ -821,6 +827,31 @@ export default function Checkout() {
                   </div>
                 </button>
               </div>
+              {paymentMethod === "atm" && (
+                <div className="mt-4 border border-blue-200 bg-blue-50 p-4">
+                  <label className="block text-xs tracking-[0.16em] font-body text-blue-800 mb-2">
+                    銀行帳號末五碼
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
+                    value={form.transferLastFive}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        transferLastFive: e.target.value.replace(/\D/g, "").slice(0, 5),
+                      }))
+                    }
+                    placeholder="請輸入 5 位數字"
+                    className={inputClass("transferLastFive")}
+                  />
+                  {errors.transferLastFive && <p className="text-xs text-red-400 mt-1">{errors.transferLastFive}</p>}
+                  <p className="text-xs font-body text-blue-700 mt-2">
+                    請先完成轉帳，再填入轉出帳號末五碼後送出訂單。
+                  </p>
+                </div>
+              )}
             </section>
             )}
 
