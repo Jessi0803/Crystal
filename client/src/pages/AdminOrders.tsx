@@ -275,7 +275,7 @@ function OrderRowCard({
                 </div>
               </div>
 
-              {detail.paymentMethod === "atm" && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
+              {((detail as any).transferReceiptUrl || detail.transferLastFive || detail.paymentMethod === "atm") && (
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-100 text-xs font-body text-blue-800">
                   <p className="font-medium mb-3">轉帳資料</p>
                   <div className="space-y-2">
