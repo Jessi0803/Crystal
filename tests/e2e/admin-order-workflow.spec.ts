@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { login } from "./helpers";
 
-async function createDirectAtmOrder(prefix: string) {
+async function createDirectAtmOrder(
+  prefix: string,
+  options: { transferReceiptUrl?: string } = {},
+) {
   const env = dotenv.parse(readFileSync(".env.test.local"));
   const url = new URL(env.DATABASE_URL);
   const connection = await mysql.createConnection({
@@ -32,6 +35,12 @@ async function createDirectAtmOrder(prefix: string) {
       [orderNo]
     );
     const orderId = rows[0]?.id;
+    if (options.transferReceiptUrl) {
+      await connection.execute(
+        "UPDATE orders SET transferReceiptUrl = ?, transferLastFive = ? WHERE id = ?",
+        [options.transferReceiptUrl, "54321", orderId]
+      );
+    }
     await connection.execute(
       `INSERT INTO orderItems (orderId, productId, productName, quantity, unitPrice, subtotal, isPreorder)
        VALUES (?, 'e2e-bracelet-in-stock', 'E2E 現貨手鍊', 1, 1780, 1780, false)`,
@@ -116,4 +125,30 @@ test("admin can mark a delivery test order as shipped and then not picked up", a
   await updateStatus(page, orderNo, "已付款", "processing", "備貨中");
   await updateStatus(page, orderNo, "備貨中", "shipped", "已出貨");
   await updateStatus(page, orderNo, "已出貨", "not_picked", "未取貨");
+});
+
+test("admin order detail shows the uploaded transfer receipt exactly once", async ({ page }) => {
+  const receiptDataUrl =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lZn+7QAAAABJRU5ErkJggg==";
+  const orderNo = await createDirectAtmOrder("E2ERCP", { transferReceiptUrl: receiptDataUrl });
+
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+
+  await page.goto("/admin/orders");
+  await page.getByRole("button", { name: "轉帳待確認" }).click();
+  await expect(page.locator("body")).toContainText(orderNo);
+  await page.locator("button").filter({ hasText: orderNo }).click();
+
+  // 等明細載入並顯示「轉帳資料」區塊
+  await expect(page.locator("body")).toContainText("轉帳資料");
+
+  // 收據縮圖只出現一次（鎖住去重，避免回歸成兩張），且來源正確
+  const receipt = page.locator('img[alt="轉帳成功截圖"]');
+  await expect(receipt).toHaveCount(1);
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toHaveAttribute("src", receiptDataUrl);
+
+  // 縮圖本身可點開看大圖，不再有多餘的「開啟轉帳截圖」文字連結
+  await expect(page.getByText("開啟轉帳截圖")).toHaveCount(0);
 });
