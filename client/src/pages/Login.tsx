@@ -13,6 +13,7 @@ function getSafeReturnTo() {
 export default function Login() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const returnTo = getSafeReturnTo();
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -67,7 +68,7 @@ export default function Login() {
           </h1>
           <p className="text-xs text-[oklch(0.55_0_0)] font-body mb-8">
             還沒有帳號？{" "}
-            <Link href="/register">
+            <Link href={returnTo ? `/register?returnTo=${encodeURIComponent(returnTo)}` : "/register"}>
               <span className="text-[oklch(0.55_0.08_60)] underline cursor-pointer hover:text-[oklch(0.45_0.08_60)]">
                 立即註冊
               </span>

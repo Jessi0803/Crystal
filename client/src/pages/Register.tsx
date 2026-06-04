@@ -3,9 +3,17 @@ import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
+function getSafeReturnTo() {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get("returnTo");
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
 export default function Register() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const returnTo = getSafeReturnTo();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -17,7 +25,7 @@ export default function Register() {
       } else {
         toast.warning("註冊成功，但驗證信暫時無法寄出，請稍後到會員中心重新發送");
       }
-      navigate("/member");
+      navigate(returnTo ?? "/member");
     },
     onError: (err) => {
       toast.error(err.message || "註冊失敗，請稍後再試");
@@ -72,7 +80,7 @@ export default function Register() {
           </h1>
           <p className="text-xs text-[oklch(0.55_0_0)] font-body mb-8">
             已有帳號？{" "}
-            <Link href="/login">
+            <Link href={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login"}>
               <span className="text-[oklch(0.55_0.08_60)] underline cursor-pointer hover:text-[oklch(0.45_0.08_60)]">
                 直接登入
               </span>
