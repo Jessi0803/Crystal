@@ -262,6 +262,29 @@ export const chatbotLogs = mysqlTable("chatbotLogs", {
 export type ChatbotLog = typeof chatbotLogs.$inferSelect;
 export type InsertChatbotLog = typeof chatbotLogs.$inferInsert;
 
+// ─── Chatbot 動態知識庫 ───────────────────────────────────────────────────────
+export const chatbotKnowledge = mysqlTable("chatbotKnowledge", {
+  id: varchar("id", { length: 128 }).primaryKey(),
+  sourceType: varchar("sourceType", { length: 32 }).notNull(),
+  sourceId: varchar("sourceId", { length: 64 }).notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  embedText: text("embedText").notNull(),
+  keywords: json("keywords").$type<string[]>(),
+  category: varchar("category", { length: 64 }).notNull(),
+  relatedProductIds: json("relatedProductIds").$type<string[]>(),
+  vector: json("vector").$type<number[]>(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("chatbot_knowledge_source_idx").on(table.sourceType, table.sourceId),
+  index("chatbot_knowledge_active_idx").on(table.active),
+]);
+
+export type ChatbotKnowledge = typeof chatbotKnowledge.$inferSelect;
+export type InsertChatbotKnowledge = typeof chatbotKnowledge.$inferInsert;
+
 // ─── 商品表 ───────────────────────────────────────────────────────────────────
 export const dbProducts = mysqlTable("products", {
   id: varchar("id", { length: 64 }).primaryKey(),

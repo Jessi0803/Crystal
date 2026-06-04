@@ -5,8 +5,17 @@ import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { dbProducts, productInventory, type DbProduct } from "../../drizzle/schema";
 import { storagePut } from "../storage";
+import { removeProductKnowledge, syncProductKnowledge, syncProductKnowledgeById } from "../crystalKnowledge";
 
 let tableEnsured = false;
+
+async function trySyncChatbotKnowledge(action: () => Promise<void>) {
+  try {
+    await action();
+  } catch (error) {
+    console.warn("[products] failed to sync chatbot product knowledge:", error);
+  }
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   love: "愛情桃花",
@@ -309,6 +318,7 @@ export const productRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const id = `prod-${Date.now()}`;
       await db.insert(dbProducts).values({ id, ...input });
+      await trySyncChatbotKnowledge(() => syncProductKnowledge({ id, ...input }));
       return { id };
     }),
 
@@ -321,6 +331,7 @@ export const productRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const { id, ...data } = input;
       await db.update(dbProducts).set(data).where(eq(dbProducts.id, id));
+      await trySyncChatbotKnowledge(() => syncProductKnowledgeById(id));
       return { success: true };
     }),
 
@@ -332,6 +343,7 @@ export const productRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq(dbProducts.id, input.id));
+      await trySyncChatbotKnowledge(() => syncProductKnowledgeById(input.id));
       return { success: true };
     }),
 
@@ -343,6 +355,7 @@ export const productRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       await db.delete(dbProducts).where(eq(dbProducts.id, input.id));
       await db.delete(productInventory).where(eq(productInventory.productId, input.id));
+      await trySyncChatbotKnowledge(() => removeProductKnowledge(input.id));
       return { success: true };
     }),
 

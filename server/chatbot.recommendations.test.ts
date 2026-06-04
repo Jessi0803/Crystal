@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knowledgeChunks, searchKnowledge, type ScoredChunk } from "./crystalKnowledge";
+import { buildProductKnowledgeChunk, knowledgeChunks, searchKnowledge, type ScoredChunk } from "./crystalKnowledge";
 import { selectRelatedProductIds } from "./routers/chatbot";
 
 function recommendationChunk(id: string) {
@@ -79,5 +79,43 @@ describe("chatbot product recommendations", () => {
     expect(resultIds).not.toContain("product-d003-venus");
     expect(resultIds).not.toContain("product-d004-morning-whisper");
     expect(resultIds).not.toContain("product-d005-moon-clear-heart");
+  });
+
+  it("builds searchable recommendation knowledge from an admin product", () => {
+    const chunk = buildProductKnowledgeChunk({
+      id: "prod-dynamic-protection",
+      name: "御光而行",
+      subtitle: "每月限量防護手鍊",
+      category: "protect",
+      categoryLabel: "能量防護",
+      categories: ["protect", "healing"],
+      categoryLabels: ["能量防護", "療癒系列"],
+      price: 1422,
+      priceRange: null,
+      tags: ["限定款", "防護"],
+      description: "",
+      story: "",
+      benefits: [
+        "強力驅除負能量與外界干擾",
+        "建立深層保護結界",
+        "淨化氣場與空間",
+        "提升自信與意志力",
+      ],
+      suitableFor: [],
+      crystalType: "銀曜石・黑碧璽・白水晶・白月光・黑曜石・白幽靈",
+      active: true,
+      isMonthlyLimited: true,
+    });
+
+    expect(chunk).toMatchObject({
+      id: "product-prod-dynamic-protection",
+      category: "商品推薦",
+      relatedProductIds: ["prod-dynamic-protection"],
+    });
+    expect(chunk.keywords).toEqual(
+      expect.arrayContaining(["銀曜石", "黑碧璽", "黑曜石", "強力驅除負能量與外界干擾", "提升自信與意志力"])
+    );
+    expect(chunk.embedText).toContain("建立深層保護結界");
+    expect(chunk.answer).toContain("https://goodaytarot.com/products/prod-dynamic-protection");
   });
 });
