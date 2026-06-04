@@ -209,4 +209,33 @@ export const adminMembersRouter = router({
 
       return { success: true };
     }),
+
+  deleteMember: adminProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "不能刪除目前登入的管理員帳號" });
+      }
+
+      const db = await ensureMemberVipColumns();
+      const [member] = await db
+        .select({
+          id: users.id,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+
+      if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "找不到會員" });
+      if (member.role === "admin") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "不能從會員管理刪除管理員帳號" });
+      }
+
+      await db.execute(sql`UPDATE \`orders\` SET \`userId\` = NULL WHERE \`userId\` = ${input.userId}`);
+      await db.execute(sql`UPDATE \`chatbotLogs\` SET \`userId\` = NULL WHERE \`userId\` = ${input.userId}`);
+      await db.execute(sql`DELETE FROM \`users\` WHERE \`id\` = ${input.userId}`);
+
+      return { success: true, deletedUserId: input.userId };
+    }),
 });

@@ -161,4 +161,51 @@ describe("adminMembers router", () => {
     expect(result).toEqual({ success: true });
     expect(db.execute).toHaveBeenCalledTimes(3);
   });
+
+  it("deletes a regular member and clears user links from related records", async () => {
+    const db = createMockDb([
+      [
+        {
+          id: 7,
+          role: "user",
+        },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+    const result = await caller.deleteMember({ userId: 7 });
+
+    expect(result).toEqual({ success: true, deletedUserId: 7 });
+    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(db.execute).toHaveBeenCalledTimes(5);
+  });
+
+  it("does not allow admins to delete themselves", async () => {
+    const caller = createCaller({ id: 1, role: "admin" });
+
+    await expect(caller.deleteMember({ userId: 1 })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    expect(getDbMock).not.toHaveBeenCalled();
+  });
+
+  it("does not allow deleting another admin account from member management", async () => {
+    const db = createMockDb([
+      [
+        {
+          id: 2,
+          role: "admin",
+        },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+
+    await expect(caller.deleteMember({ userId: 2 })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    expect(db.execute).toHaveBeenCalledTimes(2);
+  });
 });

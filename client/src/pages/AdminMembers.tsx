@@ -20,6 +20,7 @@ import {
   Save,
   Search,
   ShoppingBag,
+  Trash2,
   Truck,
   UserRound,
   Users,
@@ -237,6 +238,18 @@ export default function AdminMembers() {
     onError: (err) => toast.error(err.message || "更新 VIP 設定失敗"),
   });
 
+  const deleteMember = trpc.adminMembers.deleteMember.useMutation({
+    onSuccess: async (result) => {
+      toast.success("會員已刪除，資料庫已同步");
+      if (selectedUserId === result.deletedUserId) {
+        setSelectedUserId(null);
+      }
+      await utils.adminMembers.list.invalidate();
+      await utils.adminMembers.detail.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "刪除會員失敗"),
+  });
+
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -304,6 +317,14 @@ export default function AdminMembers() {
       vipTier,
       vipNote: vipNote.trim() || null,
     });
+  };
+
+  const handleDeleteMember = () => {
+    if (!selectedMember) return;
+    const label = selectedMember.name || selectedMember.email || `#${selectedMember.id}`;
+    const confirmed = window.confirm(`確定要刪除會員「${label}」嗎？訂單紀錄會保留，但此會員帳號會從資料庫刪除。`);
+    if (!confirmed) return;
+    deleteMember.mutate({ userId: selectedMember.id });
   };
 
   return (
@@ -492,10 +513,21 @@ export default function AdminMembers() {
                         </div>
                       </div>
                     </div>
-                    <span className="inline-flex self-start items-center gap-1.5 text-xs font-body border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1.5">
-                      <Crown className="w-3.5 h-3.5" />
-                      {getVipLabel(selectedMember.vipTier)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex self-start items-center gap-1.5 text-xs font-body border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1.5">
+                        <Crown className="w-3.5 h-3.5" />
+                        {getVipLabel(selectedMember.vipTier)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleDeleteMember}
+                        disabled={deleteMember.isPending}
+                        className="inline-flex items-center justify-center gap-1.5 border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-body text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deleteMember.isPending ? "刪除中" : "刪除會員"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="border-t border-[oklch(0.93_0_0)] pt-5 grid gap-4 md:grid-cols-[160px_1fr_auto] md:items-end">
