@@ -2,7 +2,7 @@
 // Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { ShoppingBag, User, Menu, X, ChevronDown } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -245,6 +245,7 @@ export default function Navbar() {
               {/* Icons */}
               <div className="flex items-center gap-3">
 
+                <AdminDashboardButton />
                 <MemberIconButton />
                 <button
                   onClick={() => setIsOpen(true)}
@@ -391,6 +392,24 @@ export default function Navbar() {
 }
 
 /** 桌面版會員 icon：已登入 → 連到會員中心，未登入 → 連到登入頁 */
+function AdminDashboardButton() {
+  const { data: user } = trpc.auth.me.useQuery();
+  const [, navigate] = useLocation();
+
+  if (user?.role !== "admin") return null;
+
+  return (
+    <button
+      onClick={() => navigate("/admin/orders")}
+      className="relative p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors hidden sm:block"
+      aria-label="前往後台"
+      title="後台"
+    >
+      <LayoutDashboard className="w-4 h-4" strokeWidth={1.5} />
+    </button>
+  );
+}
+
 function MemberIconButton() {
   const { data: user } = trpc.auth.me.useQuery();
   const [, navigate] = useLocation();
@@ -425,6 +444,13 @@ function MobileMemberLinks() {
   if (user) {
     return (
       <>
+        {user.role === "admin" && (
+          <Link href="/admin/orders">
+            <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+              後台
+            </span>
+          </Link>
+        )}
         <Link href="/member">
           <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
             會員中心（{user.name ?? user.email}）
