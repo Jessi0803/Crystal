@@ -148,7 +148,7 @@ export default function CartDrawer() {
                 購買 2 條手鍊享國內免運，目前還差 1 條
               </p>
             )}
-            <Link href="/checkout">
+            <Link href="/checkout/start">
               <button
                 onClick={() => setIsOpen(false)}
                 className="btn-primary w-full justify-center"

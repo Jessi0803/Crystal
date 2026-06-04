@@ -15,10 +15,23 @@ export async function addSeededBraceletToCart(page: Page) {
   await expect(page.locator("body")).toContainText("龍蝦扣");
 }
 
+// 結帳選擇頁（/checkout/start）：未登入顯示「以訪客身分結帳」；已登入會自動轉到 /checkout
+export async function proceedThroughCheckoutGate(page: Page) {
+  const guestButton = page.getByRole("button", { name: "以訪客身分結帳" });
+  await Promise.race([
+    guestButton.waitFor({ state: "visible" }),
+    page.waitForURL(/\/checkout(\?|$)/),
+  ]).catch(() => {});
+  if (await guestButton.isVisible().catch(() => false)) {
+    await guestButton.click();
+  }
+  await expect(page).toHaveURL(/\/checkout(\?|$)/);
+}
+
 export async function goToCheckoutWithSeededBracelet(page: Page) {
   await addSeededBraceletToCart(page);
   await page.getByRole("button", { name: "前往結帳" }).click();
-  await expect(page).toHaveURL(/\/checkout/);
+  await proceedThroughCheckoutGate(page);
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
 }
 

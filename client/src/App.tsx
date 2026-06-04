@@ -22,6 +22,7 @@ import Contact from "./pages/Contact";
 import About from "./pages/About";
 import CrystalWorkshop from "./pages/CrystalWorkshop";
 import Checkout from "./pages/Checkout";
+import CheckoutStart from "./pages/CheckoutStart";
 import OrderResult from "./pages/OrderResult";
 import BalancePayment from "./pages/BalancePayment";
 import AdminOrders from "./pages/AdminOrders";
@@ -121,6 +122,7 @@ function Router() {
       <Route path="/crystal-workshop" component={CrystalWorkshop} />
       <Route path="/contact" component={Contact} />
       <Route path="/about" component={About} />
+      <Route path="/checkout/start" component={CheckoutStart} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/order/:merchantTradeNo" component={OrderResult} />
       <Route path="/balance/:merchantTradeNo" component={BalancePayment} />
