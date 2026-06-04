@@ -34,6 +34,10 @@ const knowledgeChunks = [
     embedText: "手鍊怎麼照顧 保養 注意事項 拉扯 洗澡 消磁 淨化 日常 戴著",
   },
   {
+    id: "faq-metal-material",
+    embedText: "金屬是什麼材質 金屬材質 銀飾 金飾 鍍銀 保色處理 純銀 不容易變色 過敏 14K包金 碰水 褪色",
+  },
+  {
     id: "faq-cleanse",
     embedText: "手鍊怎麼淨化 淨化方法 水晶碎石 水晶洞 鼠尾草 月光 音叉 消磁",
   },

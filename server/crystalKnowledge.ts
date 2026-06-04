@@ -28,6 +28,15 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     category: "常見問題",
   },
   {
+    id: "faq-metal-material",
+    question: "金屬是什麼材質呢？",
+    answer:
+      "銀飾：保色處理的鍍銀，如果沒有碰水的話，比純銀還不容易變色，目前也沒有客人反應說有過敏問題～\n\n金飾：14K包金\n\n如果想要碰水怕褪色的話，建議可以選擇金飾～",
+    embedText: "金屬是什麼材質 金屬材質 銀飾 金飾 鍍銀 保色處理 純銀 不容易變色 過敏 14K包金 碰水 褪色",
+    keywords: ["金屬", "材質", "銀飾", "金飾", "鍍銀", "保色", "純銀", "變色", "過敏", "14K", "包金", "碰水", "褪色"],
+    category: "常見問題",
+  },
+  {
     id: "faq-cleanse",
     question: "手鍊怎麼淨化？",
     answer:

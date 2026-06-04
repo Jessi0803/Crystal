@@ -126,6 +126,9 @@ function OrderRowCard({
   updateOrderStatus,
   deleteCancelledOrder,
   isLogisticsSandbox,
+  isSelectable,
+  isSelected,
+  onSelectChange,
 }: {
   order: OrderSummary;
   isExpanded: boolean;
@@ -137,6 +140,9 @@ function OrderRowCard({
   updateOrderStatus: ReturnType<typeof trpc.order.updateOrderStatus.useMutation>;
   deleteCancelledOrder: ReturnType<typeof trpc.order.deleteCancelledOrder.useMutation>;
   isLogisticsSandbox: boolean;
+  isSelectable: boolean;
+  isSelected: boolean;
+  onSelectChange: (checked: boolean) => void;
 }) {
   const utils = trpc.useUtils();
   const { data: detail, isLoading: detailLoading } = trpc.order.getOrderDetail.useQuery(
@@ -174,48 +180,61 @@ function OrderRowCard({
 
   return (
     <div className="bg-white border border-[oklch(0.93_0_0)] overflow-hidden">
-      <button
-        className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-[oklch(0.98_0_0)] transition-colors"
-        onClick={onToggle}
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <span className="text-xs font-mono text-[oklch(0.4_0_0)] tracking-wide">{order.merchantTradeNo}</span>
-            <StatusBadge status={displayStatus} />
-            {order.isPreorder && (
-              <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">預購</span>
+      <div className="flex items-stretch">
+        {isSelectable && (
+          <label className="flex w-12 shrink-0 cursor-pointer items-center justify-center border-r border-[oklch(0.93_0_0)] bg-[oklch(0.99_0_0)]">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(event) => onSelectChange(event.target.checked)}
+              className="h-4 w-4 accent-red-600"
+              aria-label={`選取訂單 ${order.merchantTradeNo}`}
+            />
+          </label>
+        )}
+        <button
+          className="flex-1 text-left px-5 py-4 flex items-center gap-4 hover:bg-[oklch(0.98_0_0)] transition-colors"
+          onClick={onToggle}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
+              <span className="text-xs font-mono text-[oklch(0.4_0_0)] tracking-wide">{order.merchantTradeNo}</span>
+              <StatusBadge status={displayStatus} />
+              {order.isPreorder && (
+                <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">預購</span>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-xs font-body text-[oklch(0.5_0_0)] flex-wrap">
+              <span className="flex items-center gap-1"><User className="w-3 h-3" />{order.buyerName}</span>
+              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(order.createdAt).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+              <span className="flex items-center gap-1"><Package className="w-3 h-3" />{order.itemCount} 件</span>
+              <span>{getShippingLabel(order.shippingMethod ?? "")}</span>
+            </div>
+            {order.productThumbnails.length > 0 && (
+              <div className="mt-3 flex items-center gap-2">
+                {order.productThumbnails.map((item) => (
+                  <img
+                    key={item.id}
+                    src={item.productImage}
+                    alt={item.productName}
+                    className="h-20 w-20 border border-[oklch(0.9_0_0)] object-cover bg-white"
+                    loading="lazy"
+                  />
+                ))}
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-4 text-xs font-body text-[oklch(0.5_0_0)] flex-wrap">
-            <span className="flex items-center gap-1"><User className="w-3 h-3" />{order.buyerName}</span>
-            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(order.createdAt).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-            <span className="flex items-center gap-1"><Package className="w-3 h-3" />{order.itemCount} 件</span>
-            <span>{getShippingLabel(order.shippingMethod ?? "")}</span>
-          </div>
-          {order.productThumbnails.length > 0 && (
-            <div className="mt-3 flex items-center gap-2">
-              {order.productThumbnails.map((item) => (
-                <img
-                  key={item.id}
-                  src={item.productImage}
-                  alt={item.productName}
-                  className="h-20 w-20 border border-[oklch(0.9_0_0)] object-cover bg-white"
-                  loading="lazy"
-                />
-              ))}
+          <div className="text-right shrink-0">
+            <div className="text-base font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+              NT$ {order.totalAmount.toLocaleString()}
             </div>
-          )}
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-base font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-            NT$ {order.totalAmount.toLocaleString()}
+            <div className="text-xs font-body text-[oklch(0.6_0_0)]">{getPaymentLabel(order.paymentMethod)}</div>
           </div>
-          <div className="text-xs font-body text-[oklch(0.6_0_0)]">{getPaymentLabel(order.paymentMethod)}</div>
-        </div>
-        <div className="shrink-0 text-[oklch(0.6_0_0)]">
-          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </div>
-      </button>
+          <div className="shrink-0 text-[oklch(0.6_0_0)]">
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+      </div>
 
       {isExpanded && (
         <div className="border-t border-[oklch(0.93_0_0)] px-5 py-5 bg-[oklch(0.985_0_0)]">
@@ -499,6 +518,7 @@ export default function AdminOrders() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [selectedCancelledOrderIds, setSelectedCancelledOrderIds] = useState<number[]>([]);
 
   const { data: dashStats, isLoading: dashStatsLoading, isFetching: dashStatsFetching, refetch: refetchDashStats } =
     trpc.order.getStats.useQuery(undefined, {
@@ -521,6 +541,7 @@ export default function AdminOrders() {
   useEffect(() => {
     setPage(1);
     setExpandedId(null);
+    setSelectedCancelledOrderIds([]);
   }, [statusFilter, pageSize]);
 
   const utils = trpc.useUtils();
@@ -566,6 +587,17 @@ export default function AdminOrders() {
     onError: (err) => toast.error(err.message || "刪除失敗，請重試"),
   });
 
+  const deleteCancelledOrders = trpc.order.deleteCancelledOrders.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`已刪除 ${result.deletedCount} 筆取消訂單`);
+      setSelectedCancelledOrderIds([]);
+      setExpandedId(null);
+      await utils.order.getOrderDetail.invalidate();
+      refetchListAndStats();
+    },
+    onError: (err) => toast.error(err.message || "批次刪除失敗，請重試"),
+  });
+
   // 未登入 → 導向登入
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
@@ -589,6 +621,13 @@ export default function AdminOrders() {
   }
 
   const allOrders = orders?.items ?? [];
+  const selectableCancelledOrderIds =
+    statusFilter === "cancelled" ? allOrders.filter((order) => order.orderStatus === "cancelled").map((order) => order.id) : [];
+  const selectedCancelledOrderIdSet = new Set(selectedCancelledOrderIds);
+  const selectedCount = selectedCancelledOrderIds.length;
+  const allPageCancelledSelected =
+    selectableCancelledOrderIds.length > 0 &&
+    selectableCancelledOrderIds.every((orderId) => selectedCancelledOrderIdSet.has(orderId));
   const totalOrders = orders?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -613,6 +652,28 @@ export default function AdminOrders() {
     if (method === "cvs_family") return "全家超商";
     if (method === "home") return "宅配";
     return method;
+  };
+
+  const toggleCancelledOrderSelection = (orderId: number, checked: boolean) => {
+    setSelectedCancelledOrderIds((current) => {
+      if (checked) return current.includes(orderId) ? current : [...current, orderId];
+      return current.filter((id) => id !== orderId);
+    });
+  };
+
+  const selectAllCancelledOrdersOnPage = () => {
+    setSelectedCancelledOrderIds((current) => Array.from(new Set([...current, ...selectableCancelledOrderIds])));
+  };
+
+  const clearCancelledOrderSelection = () => {
+    setSelectedCancelledOrderIds([]);
+  };
+
+  const bulkDeleteCancelledOrders = () => {
+    if (selectedCancelledOrderIds.length === 0) return;
+    const confirmed = window.confirm(`確定要刪除選取的 ${selectedCancelledOrderIds.length} 筆已取消訂單嗎？此操作無法復原。`);
+    if (!confirmed) return;
+    deleteCancelledOrders.mutate({ orderIds: selectedCancelledOrderIds });
   };
 
   const getPageNumbers = () => {
@@ -733,6 +794,48 @@ export default function AdminOrders() {
           目前顯示第 {currentPage} / {totalPages} 頁，共 {totalOrders} 筆；本頁 {startItem}-{endItem} 筆。
         </p>
 
+        {statusFilter === "cancelled" && allOrders.length > 0 && (
+          <div className="mb-4 flex flex-col gap-3 border border-red-100 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-body text-red-800">
+              <label className="inline-flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allPageCancelledSelected}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      selectAllCancelledOrdersOnPage();
+                    } else {
+                      clearCancelledOrderSelection();
+                    }
+                  }}
+                  className="h-4 w-4 accent-red-600"
+                />
+                選取本頁已取消訂單
+              </label>
+              <span>已選 {selectedCount} 筆</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={clearCancelledOrderSelection}
+                disabled={selectedCount === 0 || deleteCancelledOrders.isPending}
+                className="border border-red-200 bg-white px-3 py-2 text-xs font-body text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                清除選取
+              </button>
+              <button
+                type="button"
+                onClick={bulkDeleteCancelledOrders}
+                disabled={selectedCount === 0 || deleteCancelledOrders.isPending}
+                className="inline-flex items-center gap-1.5 bg-red-600 px-3 py-2 text-xs font-body text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deleteCancelledOrders.isPending ? "刪除中..." : "刪除選取訂單"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Orders List */}
         {isLoading || authLoading ? (
           <div className="bg-white border border-[oklch(0.93_0_0)] p-12 text-center">
@@ -766,6 +869,9 @@ export default function AdminOrders() {
                   updateOrderStatus={updateOrderStatus}
                   deleteCancelledOrder={deleteCancelledOrder}
                   isLogisticsSandbox={Boolean(envCheck?.ecpayLogisticsSandbox)}
+                  isSelectable={statusFilter === "cancelled" && order.orderStatus === "cancelled"}
+                  isSelected={selectedCancelledOrderIdSet.has(order.id)}
+                  onSelectChange={(checked) => toggleCancelledOrderSelection(order.id, checked)}
                 />
               );
             })}

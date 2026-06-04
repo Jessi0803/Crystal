@@ -46,7 +46,7 @@ import {
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
 import { orders, orderItems, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
   verifyPayPalOrderBelongsToMerchant,
@@ -68,6 +68,15 @@ import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>, orderIds: number[]) {
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(orderBalancePayments).where(inArray(orderBalancePayments.orderId, orderIds));
+  await db.delete(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+  await db.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
+  await db.delete(orders).where(inArray(orders.id, orderIds));
+}
 
 function getReceiptExtension(contentType: string, filename?: string) {
   const ext = filename?.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -581,12 +590,49 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "只能刪除已取消的訂單" });
       }
 
-      await db.delete(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id));
-      await db.delete(logisticsOrders).where(eq(logisticsOrders.orderId, order.id));
-      await db.delete(orderItems).where(eq(orderItems.orderId, order.id));
-      await db.delete(orders).where(eq(orders.id, order.id));
+      await deleteCancelledOrderRecords(db, [order.id]);
 
       return { success: true };
+    }),
+
+  /**
+   * 批次刪除已取消訂單（管理後台）
+   */
+  deleteCancelledOrders: adminProcedure
+    .input(
+      z.object({
+        orderIds: z.array(z.number().int().positive()).min(1).max(100),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const orderIds = Array.from(new Set(input.orderIds));
+      const rows = await db
+        .select({
+          id: orders.id,
+          orderStatus: orders.orderStatus,
+          merchantTradeNo: orders.merchantTradeNo,
+        })
+        .from(orders)
+        .where(inArray(orders.id, orderIds));
+
+      if (rows.length !== orderIds.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "部分訂單不存在，請重新整理後再試" });
+      }
+
+      const notCancelled = rows.filter((order) => order.orderStatus !== "cancelled");
+      if (notCancelled.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `只能刪除已取消的訂單：${notCancelled.map((order) => order.merchantTradeNo).join(", ")}`,
+        });
+      }
+
+      await deleteCancelledOrderRecords(db, orderIds);
+
+      return { success: true, deletedCount: orderIds.length };
     }),
 
   createBalancePaymentLink: adminProcedure
