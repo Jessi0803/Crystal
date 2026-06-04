@@ -63,7 +63,7 @@ export default function CheckoutStart() {
                 </button>
               </Link>
               <p className="text-[11px] text-[oklch(0.55_0_0)] font-body text-center mt-1.5">
-                登入後訂單會存進會員中心
+                會不定時有專屬優惠
               </p>
             </div>
 
@@ -74,9 +74,6 @@ export default function CheckoutStart() {
                   以訪客身分結帳
                 </button>
               </Link>
-              <p className="text-[11px] text-[oklch(0.55_0_0)] font-body text-center mt-1.5">
-                不用註冊，填資料直接下單
-              </p>
             </div>
           </div>
 
