@@ -382,7 +382,7 @@ export default function Navbar() {
         <div className="marquee-track">
           {Array(8).fill(null).map((_, i) => (
             <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
-              任選兩條手鍊免運 · 6/1–6/10 全面九折 ·&nbsp;
+              任選兩件商品免運 · 6/1–6/10 全面九折 ·&nbsp;
             </span>
           ))}
         </div>

@@ -533,7 +533,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-shipping-methods",
     question: "有哪些配送方式？",
-    answer: "台灣地區（含離島）提供黑貓宅急便（$100）及 7-11 店到店（$60），單次購買兩條以上免運。海外可寄送至馬來西亞、香港、新加坡、美國、英國、澳洲。詳見：https://goodaytarot.com/shopping-guide",
+    answer: "台灣地區（含離島）提供黑貓宅急便（$100）及 7-11 店到店（$60），單次購買兩件商品以上免運。海外可寄送至馬來西亞、香港、新加坡、美國、英國、澳洲。詳見：https://goodaytarot.com/shopping-guide",
     embedText: "配送方式 運送 黑貓 7-11 店到店 宅配 免運 寄送",
     keywords: ["配送方式", "運送", "黑貓", "7-11", "店到店", "宅配", "免運"],
     category: "常見問題",
@@ -541,7 +541,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-shipping-fee",
     question: "運費是多少？",
-    answer: "黑貓宅急便 $100、7-11 店到店 $60，單次購買兩條以上免運。",
+    answer: "黑貓宅急便 $100、7-11 店到店 $60，單次購買兩件商品以上免運。",
     embedText: "運費多少 運費 宅配費 免運 運費計算",
     keywords: ["運費", "多少", "宅配費", "免運"],
     category: "常見問題",

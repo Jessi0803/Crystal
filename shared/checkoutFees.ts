@@ -52,7 +52,7 @@ function isTestProduct(item: { id: string; baseProductId?: string; name?: string
 
 function calcFreeShippingQuantity(items: CheckoutFeeItem[]) {
   return items
-    .filter((item) => !isTestProduct(item) && !isCheckoutFeeExemptProduct(item))
+    .filter((item) => !isTestProduct(item))
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 

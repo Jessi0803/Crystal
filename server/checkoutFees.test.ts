@@ -103,7 +103,7 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1545);
   });
 
-  it("does not count custom deposit products toward two-item domestic free shipping", () => {
+  it("counts custom deposit products toward two-item domestic free shipping", () => {
     const fees = calcCheckoutFees({
       items: [
         { id: "d003-venus", name: "維納斯 Venus", price: 950, quantity: 1 },
@@ -114,9 +114,9 @@ describe("checkout fee calculation", () => {
       paymentMethod: "credit",
     });
 
-    expect(fees.shippingFee).toBe(100);
-    expect(fees.domesticFreeShipping).toBe(false);
-    expect(fees.total).toBe(1550);
+    expect(fees.shippingFee).toBe(0);
+    expect(fees.domesticFreeShipping).toBe(true);
+    expect(fees.total).toBe(1450);
   });
 
   it("does not add shipping or handling fees for test and custom products", () => {

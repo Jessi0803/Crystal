@@ -7,10 +7,10 @@ import { toast } from "sonner"; // still used for remove toast
 
 export default function CartDrawer() {
   const { items, isOpen, setIsOpen, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
-  const braceletQuantity = items
-    .filter(({ product }) => !product.id.startsWith("test-") && !product.name.includes("測試用") && product.name.includes("手鍊"))
+  const freeShippingEligibleQuantity = items
+    .filter(({ product }) => !product.id.startsWith("test-") && !product.name.includes("測試用"))
     .reduce((sum, item) => sum + item.quantity, 0);
-  const showFreeShippingHint = braceletQuantity === 1;
+  const showFreeShippingHint = freeShippingEligibleQuantity === 1;
 
   return (
     <>
@@ -145,7 +145,7 @@ export default function CartDrawer() {
             </div>
             {showFreeShippingHint && (
               <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] bg-[oklch(0.97_0.01_70)] border border-[oklch(0.9_0.02_70)] px-3 py-2 mb-5 tracking-wide">
-                購買 2 條手鍊享國內免運，目前還差 1 條
+                購買 2 件商品享國內免運，目前還差 1 件
               </p>
             )}
             <Link href="/checkout/start">
