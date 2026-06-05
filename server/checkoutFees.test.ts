@@ -57,11 +57,11 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(2351);
   });
 
-  it("waives domestic shipping when ordering two non-test bracelets", () => {
+  it("waives domestic shipping when ordering two normal products", () => {
     const fees = calcCheckoutFees({
       items: [
         { id: "d001-moon-secret", name: "月下密語手鍊", price: 1480, quantity: 1 },
-        { id: "d002-honey-realm", name: "蜜光之境手鍊", price: 1580, quantity: 1 },
+        { id: "d003-venus", name: "維納斯 Venus", price: 950, quantity: 1 },
       ],
       checkoutRegion: "domestic",
       shippingMethod: "home",
@@ -71,10 +71,23 @@ describe("checkout fee calculation", () => {
     expect(fees.shippingFee).toBe(0);
     expect(fees.domesticFreeShipping).toBe(true);
     expect(fees.paymentFee).toBe(0);
-    expect(fees.total).toBe(3060);
+    expect(fees.total).toBe(2430);
   });
 
-  it("does not count test products toward two-bracelet domestic free shipping", () => {
+  it("waives domestic shipping when one normal product quantity reaches two", () => {
+    const fees = calcCheckoutFees({
+      items: [{ id: "d003-venus", name: "維納斯 Venus", price: 950, quantity: 2 }],
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+    });
+
+    expect(fees.shippingFee).toBe(0);
+    expect(fees.domesticFreeShipping).toBe(true);
+    expect(fees.total).toBe(1900);
+  });
+
+  it("does not count test products toward two-item domestic free shipping", () => {
     const fees = calcCheckoutFees({
       items: [
         { id: "d001-moon-secret", name: "月下密語手鍊", price: 1480, quantity: 1 },
@@ -88,6 +101,22 @@ describe("checkout fee calculation", () => {
     expect(fees.shippingFee).toBe(60);
     expect(fees.domesticFreeShipping).toBe(false);
     expect(fees.total).toBe(1545);
+  });
+
+  it("does not count custom deposit products toward two-item domestic free shipping", () => {
+    const fees = calcCheckoutFees({
+      items: [
+        { id: "d003-venus", name: "維納斯 Venus", price: 950, quantity: 1 },
+        { id: CUSTOM_PRODUCT_ID, name: "客製化商品", price: 500, quantity: 1 },
+      ],
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+    });
+
+    expect(fees.shippingFee).toBe(100);
+    expect(fees.domesticFreeShipping).toBe(false);
+    expect(fees.total).toBe(1550);
   });
 
   it("does not add shipping or handling fees for test and custom products", () => {

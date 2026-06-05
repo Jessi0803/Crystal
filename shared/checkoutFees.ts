@@ -50,9 +50,9 @@ function isTestProduct(item: { id: string; baseProductId?: string; name?: string
   return productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("測試用") === true;
 }
 
-function calcBraceletQuantityForFreeShipping(items: CheckoutFeeItem[]) {
+function calcFreeShippingQuantity(items: CheckoutFeeItem[]) {
   return items
-    .filter((item) => !isTestProduct(item) && item.name?.includes("手鍊") === true)
+    .filter((item) => !isTestProduct(item) && !isCheckoutFeeExemptProduct(item))
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
@@ -73,7 +73,7 @@ export function calcCheckoutFees(params: {
     .filter((item) => !isCheckoutFeeExemptProduct(item))
     .reduce((sum, item) => sum + item.price * item.quantity, 0);
   const appliesFees = chargeableSubtotal > 0;
-  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcBraceletQuantityForFreeShipping(params.items) >= 2;
+  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
   const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
 
   const shippingFee = !appliesFees
