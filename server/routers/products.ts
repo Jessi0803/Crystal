@@ -96,6 +96,7 @@ async function ensureProductsTable() {
       \`featured\` boolean NOT NULL DEFAULT false,
       \`active\` boolean NOT NULL DEFAULT true,
       \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
+      \`claspOptions\` json DEFAULT NULL,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -121,6 +122,9 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`images\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`claspOptions\` json DEFAULT NULL`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
@@ -226,6 +230,7 @@ function toFrontendProduct(p: DbProduct) {
     inStock: p.active,
     featured: p.featured,
     isMonthlyLimited: p.isMonthlyLimited,
+    claspOptions: p.claspOptions ?? undefined,
     scheduledPublishAt: p.scheduledPublishAt ?? undefined,
     crystalType: p.crystalType ?? "",
     color: p.color ?? "",
@@ -262,6 +267,7 @@ const ProductInputSchema = z.object({
   featured: z.boolean().default(false),
   active: z.boolean().default(true),
   isMonthlyLimited: z.boolean().default(false),
+  claspOptions: z.array(z.enum(["elastic", "lobster", "magnetic"])).default([]),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z.number().int().default(0),
 });

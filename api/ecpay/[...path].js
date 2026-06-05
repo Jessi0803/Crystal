@@ -474,6 +474,24 @@ var chatbotLogs = mysqlTable("chatbotLogs", {
   index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
   index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt)
 ]);
+var chatbotKnowledge = mysqlTable("chatbotKnowledge", {
+  id: varchar("id", { length: 128 }).primaryKey(),
+  sourceType: varchar("sourceType", { length: 32 }).notNull(),
+  sourceId: varchar("sourceId", { length: 64 }).notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  embedText: text("embedText").notNull(),
+  keywords: json("keywords").$type(),
+  category: varchar("category", { length: 64 }).notNull(),
+  relatedProductIds: json("relatedProductIds").$type(),
+  vector: json("vector").$type(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+}, (table) => [
+  index("chatbot_knowledge_source_idx").on(table.sourceType, table.sourceId),
+  index("chatbot_knowledge_active_idx").on(table.active)
+]);
 var dbProducts = mysqlTable("products", {
   id: varchar("id", { length: 64 }).primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
@@ -500,6 +518,7 @@ var dbProducts = mysqlTable("products", {
   featured: boolean("featured").notNull().default(false),
   active: boolean("active").notNull().default(true),
   isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
+  claspOptions: json("claspOptions").$type(),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

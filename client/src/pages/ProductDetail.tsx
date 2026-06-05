@@ -73,10 +73,16 @@ const tarotReadingCategories = [
   },
 ];
 
-const braceletCategories = new Set(["love", "wealth", "protect", "healing"]);
+const DEFAULT_CLASP_OPTIONS = ["elastic", "lobster", "magnetic"] as const;
+const wristSizeCategories = new Set(["love", "wealth", "protect", "healing"]);
+const ALL_CLASP_CHOICES = [
+  { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200" },
+  { id: "magnetic" as const, label: "磁扣", price: "+NT$200" },
+  { id: "elastic" as const, label: "彈力繩", price: "免費" },
+];
 
-function isBraceletProduct(product: { category: string }) {
-  return braceletCategories.has(product.category);
+function hasProductWristSize(product: { category: string }) {
+  return wristSizeCategories.has(product.category);
 }
 
 function CustomPriceTile({
@@ -151,11 +157,6 @@ export default function ProductDetail() {
   const [selectedTarotReadingName, setSelectedTarotReadingName] = useState(tarotReadingCategories[0].items[0].name);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState("");
   const wristSizes = ["13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
-  const claspChoices = [
-    { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200" },
-    { id: "magnetic" as const, label: "磁扣", price: "+NT$200" },
-    { id: "elastic" as const, label: "彈力繩", price: "免費" },
-  ];
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
@@ -216,8 +217,13 @@ export default function ProductDetail() {
   }
 
   const hasTieredBraceletPricing = usesTieredBraceletPricing(product);
-  const hasWristSizeOption = product.category !== "custom" && isBraceletProduct(product);
-  const hasClaspOption = hasWristSizeOption;
+  const productClaspOptions = product.claspOptions ?? [...DEFAULT_CLASP_OPTIONS];
+  const claspChoices = ALL_CLASP_CHOICES.filter((choice) => productClaspOptions.includes(choice.id));
+  const hasWristSizeOption = product.category !== "custom" && hasProductWristSize(product);
+  const hasClaspOption = product.category !== "custom" && claspChoices.length > 0;
+  const effectiveSelectedClaspType = claspChoices.some((choice) => choice.id === selectedClaspType)
+    ? selectedClaspType
+    : claspChoices[0]?.id ?? "elastic";
   const visibleTags = product.tags;
   const galleryImages = getProductImages(product);
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
@@ -231,7 +237,7 @@ export default function ProductDetail() {
   const basePrice = hasTieredBraceletPricing
     ? applySaleRate(originalBasePrice, saleRate)
     : product.price;
-  const claspExtra = hasClaspOption && selectedClaspType !== "elastic" ? 200 : 0;
+  const claspExtra = hasClaspOption && effectiveSelectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
   const originalCurrentPrice = originalBasePrice + claspExtra;
   const hasCurrentPriceSale = hasTieredBraceletPricing && currentPrice < originalCurrentPrice;
@@ -274,11 +280,16 @@ export default function ProductDetail() {
           ? {
               unitPrice: currentPrice,
               wristSize: selectedWristSize,
-              claspType: hasClaspOption ? selectedClaspType : undefined,
+              claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: selectedFitPreference,
               isPreorder: isPreorderItem,
             }
-          : { fitPreference: selectedFitPreference, isPreorder: isPreorderItem }
+          : {
+              unitPrice: currentPrice,
+              claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
+              fitPreference: selectedFitPreference,
+              isPreorder: isPreorderItem,
+            }
       );
     }
     toast.success(`已加入購物袋：${product.name} × ${qty}`);
@@ -567,38 +578,40 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {hasWristSizeOption && (
+            {product.category !== "custom" && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
-                <div>
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">手圍尺寸</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowWristMeasureGuide((current) => !current)}
-                      className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2 hover:text-[oklch(0.38_0.08_250)]"
-                    >
-                      手圍怎麼測量？
-                    </button>
-                  </div>
-                  <select
-                    value={selectedWristSize}
-                    onChange={(e) => setSelectedWristSize(e.target.value)}
-                    className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
-                  >
-                    {wristSizes.map((size) => (
-                      <option key={size} value={size}>
-                        {size} cm
-                      </option>
-                    ))}
-                  </select>
-                  {showWristMeasureGuide && (
-                    <div className="mt-3 bg-[oklch(0.98_0_0)] border border-[oklch(0.92_0_0)] px-3 py-2.5">
-                      <p className="text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">
-                        拿軟尺平貼手圍繞一圈。如果沒有軟尺，也可以拿一段棉線或紙條繞手圍，拿筆做記號後，再用一般直尺量那段線的長度。
-                      </p>
+                {hasWristSizeOption && (
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">手圍尺寸</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowWristMeasureGuide((current) => !current)}
+                        className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2 hover:text-[oklch(0.38_0.08_250)]"
+                      >
+                        手圍怎麼測量？
+                      </button>
                     </div>
-                  )}
-                </div>
+                    <select
+                      value={selectedWristSize}
+                      onChange={(e) => setSelectedWristSize(e.target.value)}
+                      className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                    >
+                      {wristSizes.map((size) => (
+                        <option key={size} value={size}>
+                          {size} cm
+                        </option>
+                      ))}
+                    </select>
+                    {showWristMeasureGuide && (
+                      <div className="mt-3 bg-[oklch(0.98_0_0)] border border-[oklch(0.92_0_0)] px-3 py-2.5">
+                        <p className="text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">
+                          拿軟尺平貼手圍繞一圈。如果沒有軟尺，也可以拿一段棉線或紙條繞手圍，拿筆做記號後，再用一般直尺量那段線的長度。
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {hasClaspOption && (
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
@@ -661,29 +674,6 @@ export default function ProductDetail() {
                       </button>
                     ))}
                   </div>
-                </div>
-              </div>
-            )}
-
-            {!hasWristSizeOption && product.category !== "custom" && (
-              <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
-                <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {fitOptions.map((opt) => (
-                    <button
-                      type="button"
-                      key={opt.id}
-                      onClick={() => setSelectedFitPreference(opt.id)}
-                      className={`px-3 py-2.5 text-xs font-body border transition-colors text-left ${
-                        selectedFitPreference === opt.id
-                          ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                          : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
-                      }`}
-                    >
-                      <span className="block font-medium">{opt.label}</span>
-                      <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.desc}</span>
-                    </button>
-                  ))}
                 </div>
               </div>
             )}

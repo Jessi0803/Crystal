@@ -22,6 +22,14 @@ const CATEGORY_OPTIONS = [
   { id: "other", label: "其他" },
 ];
 
+const CLASP_OPTIONS = [
+  { id: "elastic" as const, label: "彈力繩", note: "免費" },
+  { id: "lobster" as const, label: "龍蝦扣", note: "+200" },
+  { id: "magnetic" as const, label: "磁扣", note: "+200" },
+];
+
+const DEFAULT_CLASP_OPTIONS = CLASP_OPTIONS.map((option) => option.id);
+
 type FormState = {
   name: string;
   subtitle: string;
@@ -40,6 +48,7 @@ type FormState = {
   featured: boolean;
   active: boolean;
   isMonthlyLimited: boolean;
+  claspOptions: ("elastic" | "lobster" | "magnetic")[];
   scheduledPublishAt: string;
   initialStock: string;
 };
@@ -62,6 +71,7 @@ const DEFAULT_FORM: FormState = {
   featured: false,
   active: true,
   isMonthlyLimited: false,
+  claspOptions: [...DEFAULT_CLASP_OPTIONS],
   scheduledPublishAt: "",
   initialStock: "5",
 };
@@ -420,6 +430,7 @@ function ProductModal({
           featured: editing.featured,
           active: editing.active,
           isMonthlyLimited: editing.isMonthlyLimited,
+          claspOptions: editing.claspOptions ?? [...DEFAULT_CLASP_OPTIONS],
           scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
           initialStock: "5",
         }
@@ -432,6 +443,14 @@ function ProductModal({
   const selectedCategories = form.categories;
   const primaryCategory = selectedCategories[0] ?? "";
   const categoryLabels = selectedCategories.map(getCategoryLabel);
+  const toggleClaspOption = (id: FormState["claspOptions"][number]) => {
+    setForm((current) => ({
+      ...current,
+      claspOptions: current.claspOptions.includes(id)
+        ? current.claspOptions.filter((option) => option !== id)
+        : [...current.claspOptions, id],
+    }));
+  };
 
   const setInventory = trpc.inventory.setInventory.useMutation();
   const createProduct = trpc.product.create.useMutation({
@@ -574,6 +593,7 @@ function ProductModal({
       color: editing?.color ?? "",
       featured: form.featured,
       isMonthlyLimited: form.isMonthlyLimited,
+      claspOptions: form.claspOptions,
       active: scheduledPublishAt ? false : form.active,
       scheduledPublishAt,
       sortOrder: editing?.sortOrder ?? 0,
@@ -827,6 +847,26 @@ function ProductModal({
               className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
             />
           </label>
+
+          <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">
+            <legend className="px-1 text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">扣具選項</legend>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {CLASP_OPTIONS.map((option) => (
+                <label key={option.id} className="flex items-center gap-2 cursor-pointer border border-[oklch(0.9_0_0)] px-2.5 py-2">
+                  <input
+                    type="checkbox"
+                    checked={form.claspOptions.includes(option.id)}
+                    onChange={() => toggleClaspOption(option.id)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-xs font-body text-[oklch(0.35_0_0)]">
+                    {option.label}
+                    <span className="ml-1 text-[oklch(0.58_0_0)]">{option.note}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           {/* More fields toggle */}
           <button

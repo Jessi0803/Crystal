@@ -95,6 +95,25 @@ test("monthly limited bracelet products keep wrist size and clasp through checko
   await expect(page.locator("body")).toContainText("微鬆");
 });
 
+test("non-bracelet category products also keep clasp through checkout", async ({ page }) => {
+  await page.goto("/products/d003-venus");
+
+  await expect(page.getByRole("heading", { name: "維納斯 Venus" })).toBeVisible();
+  await page.getByRole("button", { name: /磁扣/ }).click();
+  await page.getByRole("button", { name: /加入購物袋/ }).click();
+
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText("維納斯 Venus");
+  await expect(drawer).toContainText("磁扣");
+  await expect(drawer).toContainText("NT$ 1,150");
+
+  await drawer.getByRole("button", { name: "前往結帳" }).click();
+  await proceedThroughCheckoutGate(page);
+  await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("維納斯 Venus");
+  await expect(page.locator("body")).toContainText("磁扣");
+});
+
 test("adjustable bracelets offer only 13 to 19 cm and retain a boundary size in checkout", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-in-stock");
 

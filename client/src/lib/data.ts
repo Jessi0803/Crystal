@@ -25,6 +25,7 @@ export interface Product {
   inStock: boolean;
   featured: boolean;
   isMonthlyLimited?: boolean;
+  claspOptions?: ("elastic" | "lobster" | "magnetic")[];
   crystalType: string;
   color: string;
 }
