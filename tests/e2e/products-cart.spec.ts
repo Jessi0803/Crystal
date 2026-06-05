@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { proceedThroughCheckoutGate } from "./helpers";
 
 test("known product detail renders while latest database product query is pending", async ({ page }) => {
   await page.route("**/api/trpc/product.getById**", async route => {
@@ -28,7 +29,7 @@ test("product detail can add seeded product to cart and continue to checkout", a
   await expect(page.locator("body")).toContainText("龍蝦扣");
 
   await page.getByRole("button", { name: "前往結帳" }).click();
-  await expect(page).toHaveURL(/\/checkout/);
+  await proceedThroughCheckoutGate(page);
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
 });
@@ -71,26 +72,26 @@ test("bracelet options and cart controls update line price and quantity", async 
   await expect(drawer).toContainText("你的購物袋是空的");
 });
 
-test("monthly limited products keep wrist size through checkout without clasp options", async ({ page }) => {
+test("monthly limited bracelet products keep wrist size and clasp through checkout", async ({ page }) => {
   await page.goto("/products/e2e-monthly-in-stock");
 
   await page.getByRole("combobox").selectOption("16.5");
-  await expect(page.locator("body")).not.toContainText("扣件類型");
-  await expect(page.getByRole("button", { name: /龍蝦扣/ })).toHaveCount(0);
+  await page.getByRole("button", { name: /磁扣/ }).click();
   await page.getByRole("button", { name: /微鬆/ }).click();
   await page.getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("手圍 16.5 cm");
-  await expect(drawer).not.toContainText("龍蝦扣");
+  await expect(drawer).toContainText("磁扣");
   await expect(drawer).toContainText("微鬆");
-  await expect(drawer).toContainText("NT$ 980");
+  await expect(drawer).toContainText("NT$ 1,180");
 
   await drawer.getByRole("button", { name: "前往結帳" }).click();
+  await proceedThroughCheckoutGate(page);
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
   await expect(page.locator("body")).toContainText("E2E 月限現貨商品");
   await expect(page.locator("body")).toContainText("手圍 16.5 cm");
-  await expect(page.locator("body")).not.toContainText("龍蝦扣");
+  await expect(page.locator("body")).toContainText("磁扣");
   await expect(page.locator("body")).toContainText("微鬆");
 });
 
@@ -111,6 +112,7 @@ test("adjustable bracelets offer only 13 to 19 cm and retain a boundary size in 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("手圍 19 cm");
   await drawer.getByRole("button", { name: "前往結帳" }).click();
+  await proceedThroughCheckoutGate(page);
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
   await expect(page.locator("body")).toContainText("手圍 19 cm");
 });
@@ -120,6 +122,7 @@ test("domestic shipping switches from home fee to convenience-store fee", async 
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: /加入購物袋/ }).click();
   await page.getByRole("button", { name: "前往結帳" }).click();
+  await proceedThroughCheckoutGate(page);
 
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
   await expect(page.locator("body")).toContainText("NT$ 100");
@@ -139,8 +142,9 @@ test("two bracelets receive domestic free shipping in checkout summary", async (
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("購物袋 (2)");
   await page.getByRole("button", { name: "前往結帳" }).click();
+  await proceedThroughCheckoutGate(page);
 
-  await expect(page.locator("body")).toContainText("x 2");
+  await expect(page.locator("body")).toContainText("× 2");
   await expect(page.locator("body")).toContainText("免收");
   await expect(page.locator("body")).toContainText("NT$ 2,528");
 });

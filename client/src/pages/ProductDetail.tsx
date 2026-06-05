@@ -73,6 +73,12 @@ const tarotReadingCategories = [
   },
 ];
 
+const braceletCategories = new Set(["love", "wealth", "protect", "healing"]);
+
+function isBraceletProduct(product: { category: string }) {
+  return braceletCategories.has(product.category);
+}
+
 function CustomPriceTile({
   label,
   value,
@@ -210,8 +216,8 @@ export default function ProductDetail() {
   }
 
   const hasTieredBraceletPricing = usesTieredBraceletPricing(product);
-  const hasWristSizeOption = product.category !== "custom" && (product.isMonthlyLimited === true || hasTieredBraceletPricing);
-  const hasClaspOption = product.category !== "custom" && (product.isMonthlyLimited === true || hasTieredBraceletPricing);
+  const hasWristSizeOption = product.category !== "custom" && isBraceletProduct(product);
+  const hasClaspOption = hasWristSizeOption;
   const visibleTags = product.tags;
   const galleryImages = getProductImages(product);
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
