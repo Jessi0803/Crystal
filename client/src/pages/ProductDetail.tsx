@@ -624,7 +624,7 @@ export default function ProductDetail() {
                         點選看示意圖
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className={`grid gap-2 ${claspChoices.length === 1 ? "grid-cols-1" : claspChoices.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
                       {claspChoices.map((opt) => (
                         <button
                           type="button"
