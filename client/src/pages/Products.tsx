@@ -6,7 +6,6 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
-import { getTieredBraceletDisplay, usesTieredBraceletPricing } from "@/lib/pricing";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -173,10 +172,6 @@ export default function Products() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
             {filtered.map((product) => {
-              const tieredDisplay = usesTieredBraceletPricing(product)
-                ? getTieredBraceletDisplay(product)
-                : null;
-
               return (
               <Link key={product.id} href={`/products/${product.id}`}>
                 <div className="product-card group">
@@ -211,18 +206,7 @@ export default function Products() {
                     </div>
                     <p className="product-card-name">{product.name}</p>
                     <div className="flex flex-col gap-0.5 mt-1">
-                      {tieredDisplay ? (
-                        tieredDisplay.hasSale ? (
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
-                              {tieredDisplay.originalRange}
-                            </p>
-                            <p className="product-card-price">{tieredDisplay.saleRange}</p>
-                          </div>
-                        ) : (
-                          <p className="product-card-price">{tieredDisplay.saleRange}</p>
-                        )
-                      ) : product.originalPrice && product.originalPrice > product.price ? (
+                      {product.originalPrice && product.originalPrice > product.price ? (
                         <div className="flex items-center gap-2">
                           <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
                             NT$ {product.originalPrice.toLocaleString()}
@@ -234,7 +218,7 @@ export default function Products() {
                       ) : (
                         <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
                       )}
-                      {!tieredDisplay && product.originalPrice && product.originalPrice > product.price && product.priceRange && (
+                      {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
                         <p className="text-[0.7rem] font-body text-[oklch(0.55_0_0)]">
                           {getCustomPriceDisplay(product.id, product.priceRange)}
                         </p>
