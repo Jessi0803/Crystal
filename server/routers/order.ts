@@ -764,6 +764,8 @@ export const orderRouter = router({
             logisticsId: logisticsMerchantTradeNo,
             allPayLogisticsId: ecpayResult.allPayLogisticsId,
             cvsPaymentNo: (ecpayResult as any).cvsPaymentNo || null,
+            cvsValidationNo: (ecpayResult as any).cvsValidationNo || null,
+            bookingNote: (ecpayResult as any).bookingNote || null,
           };
         } else {
           // 綠界回傳失敗，刪除這筆記錄讓按鈕可以重新出現

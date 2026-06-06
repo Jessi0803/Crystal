@@ -561,9 +561,18 @@ export default function AdminOrders() {
   });
 
   const createLogistics = trpc.order.createLogistics.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data, variables) => {
       const mode = data.sandbox ? "沙盒物流" : "正式物流";
-      toast.success(`${mode}訂單建立成功！${data.logisticsId ? `物流編號：${data.logisticsId}` : ""}`);
+      const logisticsLines = [
+        `${mode}訂單建立成功`,
+        data.allPayLogisticsId ? `綠界物流編號：${data.allPayLogisticsId}` : null,
+        data.cvsPaymentNo ? `超商取件碼：${data.cvsPaymentNo}` : null,
+        data.cvsValidationNo ? `驗證碼：${data.cvsValidationNo}` : null,
+        data.bookingNote ? `托運單號：${data.bookingNote}` : null,
+        !data.allPayLogisticsId && data.logisticsId ? `系統物流編號：${data.logisticsId}` : null,
+      ].filter(Boolean);
+      toast.success(logisticsLines.join("\n"));
+      await utils.order.getOrderDetail.invalidate({ orderId: variables.orderId });
       refetchListAndStats();
     },
     onError: (err) => toast.error(`建立物流失敗：${err.message}`),
