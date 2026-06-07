@@ -1,6 +1,6 @@
 // 日日好日 — Navbar
 // Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
-import { useState, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
@@ -74,8 +74,21 @@ function ShoppingGuideDropdown() {
   );
 }
 
+function useProductListPrefetch() {
+  const utils = trpc.useUtils();
+  const startedRef = useRef(false);
+
+  return useCallback(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void utils.product.list.prefetch(undefined, { staleTime: 60_000 }).catch(() => {
+      startedRef.current = false;
+    });
+  }, [utils]);
+}
+
 // 商品分類下拉選單
-function CategoryDropdown() {
+function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void }) {
   const [open, setOpen] = useState(false);
   const [effectOpen, setEffectOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -91,9 +104,12 @@ function CategoryDropdown() {
   }, []);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" onMouseEnter={onProductsIntent} onFocus={onProductsIntent}>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          onProductsIntent?.();
+          setOpen((v) => !v);
+        }}
         className={`h-4 inline-flex items-center gap-1 text-[0.7rem] leading-none tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
           open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
         }`}
@@ -114,6 +130,7 @@ function CategoryDropdown() {
           <div className="border-b border-[oklch(0.95_0_0)] px-5 py-3">
             <Link href="/products">
               <div
+                onMouseEnter={onProductsIntent}
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-between cursor-pointer group"
               >
@@ -188,6 +205,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { totalItems, setIsOpen } = useCart();
   const [location] = useLocation();
+  const prefetchProducts = useProductListPrefetch();
   const { data: siteSettings } = trpc.siteSettings.public.useQuery(undefined, {
     refetchInterval: 15_000,
     refetchOnMount: "always",
@@ -203,6 +221,11 @@ export default function Navbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(prefetchProducts, 900);
+    return () => window.clearTimeout(timer);
+  }, [prefetchProducts]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -229,12 +252,12 @@ export default function Navbar() {
 
               {/* Left nav: 每月限量、商品分類、購物說明 */}
               <nav className="hidden lg:flex items-center gap-6">
-                <Link href="/products?category=monthly">
+                <Link href="/products?category=monthly" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
                     每月限量
                   </span>
                 </Link>
-                <CategoryDropdown />
+                <CategoryDropdown onProductsIntent={prefetchProducts} />
                 <Link href="/crystal-workshop">
                   <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
                     水晶創業班
@@ -284,7 +307,7 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
             <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
-              <Link href="/products?category=monthly">
+              <Link href="/products?category=monthly" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
                 <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   每月限量
                 </span>
@@ -293,7 +316,10 @@ export default function Navbar() {
               {/* 商品分類展開 */}
               <div>
                 <button
-                  onClick={() => setMobileCatOpen((v) => !v)}
+                  onClick={() => {
+                    prefetchProducts();
+                    setMobileCatOpen((v) => !v);
+                  }}
                   className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
                 >
                   <span>商品分類</span>
@@ -301,7 +327,7 @@ export default function Navbar() {
                 </button>
                 {mobileCatOpen && (
                   <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
-                    <Link href="/products">
+                    <Link href="/products" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
                       <div className="flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
                         <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">查看全部商品</span>
                         <span className="text-xs text-[oklch(0.6_0_0)]">→</span>
