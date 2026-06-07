@@ -188,6 +188,9 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { totalItems, setIsOpen } = useCart();
   const [location] = useLocation();
+  const { data: siteSettings } = trpc.siteSettings.public.useQuery();
+  const announcementText = siteSettings?.announcementText?.trim() || "任選兩件商品免運 · 6/1–6/10 全面九折 ·";
+  const showAnnouncement = siteSettings?.announcementEnabled !== false && announcementText.length > 0;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -378,15 +381,17 @@ export default function Navbar() {
       </header>
 
       {/* ── 跑馬燈公告 ── */}
-      <div className="bg-[oklch(0.985_0_0)] border-b border-[oklch(0.95_0_0)] py-2 overflow-hidden">
-        <div className="marquee-track">
-          {Array(8).fill(null).map((_, i) => (
-            <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
-              任選兩件商品免運 · 6/1–6/10 全面九折 ·&nbsp;
-            </span>
-          ))}
+      {showAnnouncement && (
+        <div className="bg-[oklch(0.985_0_0)] border-b border-[oklch(0.95_0_0)] py-2 overflow-hidden">
+          <div className="marquee-track">
+            {Array(8).fill(null).map((_, i) => (
+              <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
+                {announcementText}&nbsp;
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

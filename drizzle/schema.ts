@@ -285,6 +285,17 @@ export const chatbotKnowledge = mysqlTable("chatbotKnowledge", {
 export type ChatbotKnowledge = typeof chatbotKnowledge.$inferSelect;
 export type InsertChatbotKnowledge = typeof chatbotKnowledge.$inferInsert;
 
+// ─── 網站設定表 ───────────────────────────────────────────────────────────────
+export const siteSettings = mysqlTable("siteSettings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
+export type InsertSiteSetting = typeof siteSettings.$inferInsert;
+
 // ─── 商品表 ───────────────────────────────────────────────────────────────────
 export const dbProducts = mysqlTable("products", {
   id: varchar("id", { length: 64 }).primaryKey(),

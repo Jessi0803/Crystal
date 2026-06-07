@@ -708,7 +708,7 @@ export default function AdminOrders() {
     <div className="min-h-screen bg-[oklch(0.97_0_0)]">
       {/* Header */}
       <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <button
               onClick={() => setLocation("/")}
@@ -720,7 +720,7 @@ export default function AdminOrders() {
               訂單管理後台
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               onClick={() => setLocation("/admin/chatbot")}
               className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
@@ -746,6 +746,12 @@ export default function AdminOrders() {
             >
               <Users className="w-3.5 h-3.5" />
               會員管理
+            </button>
+            <button
+              onClick={() => setLocation("/admin/settings")}
+              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+            >
+              網站設定
             </button>
             <button
               onClick={() => refetchListAndStats()}

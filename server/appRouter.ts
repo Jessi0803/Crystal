@@ -8,6 +8,7 @@ import { inventoryRouter } from "./routers/inventory";
 import { memberRouter } from "./routers/member";
 import { productRouter } from "./routers/products";
 import { adminMembersRouter } from "./routers/adminMembers";
+import { siteSettingsRouter } from "./routers/siteSettings";
 
 export const appRouter = router({
   system: systemRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   member: memberRouter,
   product: productRouter,
   adminMembers: adminMembersRouter,
+  siteSettings: siteSettingsRouter,
 });
 
 export type AppRouter = typeof appRouter;
