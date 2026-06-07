@@ -81,7 +81,10 @@ function useProductListPrefetch() {
   return useCallback(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    void utils.product.list.prefetch(undefined, { staleTime: 60_000 }).catch(() => {
+    void Promise.all([
+      utils.product.list.prefetch(undefined, { staleTime: 60_000 }),
+      utils.order.getProductSalesTotals.prefetch(undefined, { staleTime: 60_000 }),
+    ]).catch(() => {
       startedRef.current = false;
     });
   }, [utils]);
