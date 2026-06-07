@@ -720,43 +720,43 @@ export default function AdminOrders() {
               訂單管理後台
             </h1>
           </div>
-          <div className="flex items-center flex-wrap gap-2">
+          <div className="-mx-4 flex w-[calc(100%+2rem)] items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:w-auto sm:flex-wrap sm:justify-end sm:overflow-visible sm:px-0 sm:pb-0">
             <button
               onClick={() => setLocation("/admin/chatbot")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+              className="flex h-10 shrink-0 items-center gap-2 whitespace-nowrap border border-[oklch(0.88_0_0)] px-3 text-xs font-body text-[oklch(0.5_0_0)] transition-colors hover:text-[oklch(0.1_0_0)]"
             >
               AI 客服
             </button>
             <button
               onClick={() => setLocation("/admin/inventory")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+              className="flex h-10 shrink-0 items-center gap-2 whitespace-nowrap border border-[oklch(0.88_0_0)] px-3 text-xs font-body text-[oklch(0.5_0_0)] transition-colors hover:text-[oklch(0.1_0_0)]"
             >
               庫存管理
             </button>
             <button
               onClick={() => setLocation("/admin/revenue")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+              className="flex h-10 shrink-0 items-center gap-2 whitespace-nowrap border border-[oklch(0.88_0_0)] px-3 text-xs font-body text-[oklch(0.5_0_0)] transition-colors hover:text-[oklch(0.1_0_0)]"
             >
               <BarChart3 className="w-3.5 h-3.5" />
               營收報表
             </button>
             <button
               onClick={() => setLocation("/admin/members")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+              className="flex h-10 shrink-0 items-center gap-2 whitespace-nowrap border border-[oklch(0.88_0_0)] px-3 text-xs font-body text-[oklch(0.5_0_0)] transition-colors hover:text-[oklch(0.1_0_0)]"
             >
               <Users className="w-3.5 h-3.5" />
               會員管理
             </button>
             <button
               onClick={() => setLocation("/admin/settings")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+              className="flex h-10 shrink-0 items-center gap-2 whitespace-nowrap border border-[oklch(0.88_0_0)] px-3 text-xs font-body text-[oklch(0.5_0_0)] transition-colors hover:text-[oklch(0.1_0_0)]"
             >
               網站設定
             </button>
             <button
               onClick={() => refetchListAndStats()}
               disabled={isFetching || dashStatsFetching}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
+              className="flex h-10 shrink-0 items-center gap-2 whitespace-nowrap border border-[oklch(0.88_0_0)] px-3 text-xs font-body text-[oklch(0.5_0_0)] transition-colors hover:text-[oklch(0.1_0_0)] disabled:opacity-50"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${isFetching || dashStatsFetching ? "animate-spin" : ""}`}
