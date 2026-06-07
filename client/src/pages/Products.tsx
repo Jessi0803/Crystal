@@ -44,13 +44,14 @@ export default function Products() {
   const [showFilter, setShowFilter] = useState(false);
   const { addToCart } = useCart();
   const { data: productSalesTotals = [] } = trpc.order.getProductSalesTotals.useQuery();
-  const { data: dbProducts } = trpc.product.list.useQuery();
+  const { data: dbProducts, isLoading: productsLoading } = trpc.product.list.useQuery();
   const salesQtyByProductId = new Map(
     productSalesTotals.map((item) => [item.productId, item.totalQty])
   );
 
   const products = useMemo(() => {
-    if (!dbProducts || dbProducts.length === 0) {
+    if (!dbProducts) return [];
+    if (dbProducts.length === 0) {
       return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
     }
     const dbIds = new Set(dbProducts.map((p) => p.id));
@@ -150,12 +151,22 @@ export default function Products() {
         {/* Results Count */}
         <div className="py-4 border-b border-[oklch(0.95_0_0)]">
           <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] tracking-wide">
-            共 {filtered.length} 件商品
+            {productsLoading ? "商品載入中…" : `共 ${filtered.length} 件商品`}
           </p>
         </div>
 
         {/* Product Grid */}
-        {filtered.length === 0 ? (
+        {productsLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] bg-[oklch(0.94_0_0)]" />
+                <div className="mt-4 h-3 w-2/3 bg-[oklch(0.94_0_0)]" />
+                <div className="mt-2 h-3 w-1/2 bg-[oklch(0.94_0_0)]" />
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="py-20 text-center">
             <p className="text-2xl font-light text-[oklch(0.7_0_0)] mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
               {activeCategory === "energy-perfume" ? "商品即將推出" : "暫無商品"}
