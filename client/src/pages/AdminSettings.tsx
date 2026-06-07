@@ -18,7 +18,9 @@ export default function AdminSettings() {
   const utils = trpc.useUtils();
   const { data: settings, isLoading } = trpc.siteSettings.admin.useQuery();
   const updateSettings = trpc.siteSettings.update.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (updatedSettings) => {
+      utils.siteSettings.admin.setData(undefined, updatedSettings);
+      utils.siteSettings.public.setData(undefined, updatedSettings);
       toast.success("網站設定已更新");
       await Promise.all([
         utils.siteSettings.admin.invalidate(),

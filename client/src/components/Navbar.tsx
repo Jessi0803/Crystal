@@ -188,8 +188,14 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { totalItems, setIsOpen } = useCart();
   const [location] = useLocation();
-  const { data: siteSettings } = trpc.siteSettings.public.useQuery();
-  const announcementText = siteSettings?.announcementText?.trim() || "任選兩件商品免運 · 6/1–6/10 全面九折 ·";
+  const { data: siteSettings } = trpc.siteSettings.public.useQuery(undefined, {
+    refetchInterval: 15_000,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+  const announcementText = siteSettings?.announcementText.trim() ?? "任選兩件商品免運 · 6/1–6/10 全面九折 ·";
   const showAnnouncement = siteSettings?.announcementEnabled !== false && announcementText.length > 0;
 
   useEffect(() => {
