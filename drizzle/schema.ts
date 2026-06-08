@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -324,6 +324,8 @@ export const dbProducts = mysqlTable("products", {
   active: boolean("active").notNull().default(true),
   isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
   claspOptions: json("claspOptions").$type<("elastic" | "lobster" | "magnetic")[]>(),
+  wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
+  wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

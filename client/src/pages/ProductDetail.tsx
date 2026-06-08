@@ -1,6 +1,6 @@
 // 日日好日 — Product Detail Page
 // Design: Vacanza-inspired — large image + clean product info
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Plus, Minus, ShoppingBag } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
@@ -74,6 +74,8 @@ const tarotReadingCategories = [
 ];
 
 const DEFAULT_CLASP_OPTIONS = ["elastic", "lobster", "magnetic"] as const;
+const DEFAULT_WRIST_SIZE_MIN = 13;
+const DEFAULT_WRIST_SIZE_MAX = 19;
 const wristSizeCategories = new Set(["love", "wealth", "protect", "healing"]);
 const ALL_CLASP_CHOICES = [
   { id: "lobster" as const, label: "龍蝦扣", price: "+NT$200" },
@@ -83,6 +85,24 @@ const ALL_CLASP_CHOICES = [
 
 function hasProductWristSize(product: { category: string }) {
   return wristSizeCategories.has(product.category);
+}
+
+function formatWristSize(size: number) {
+  return Number.isInteger(size) ? String(size) : size.toFixed(1);
+}
+
+function buildWristSizes(min?: number, max?: number) {
+  const safeMin = Number.isFinite(min) ? Number(min) : DEFAULT_WRIST_SIZE_MIN;
+  const safeMax = Number.isFinite(max) ? Number(max) : DEFAULT_WRIST_SIZE_MAX;
+  const start = Math.ceil(safeMin * 2) / 2;
+  const end = Math.floor(safeMax * 2) / 2;
+  if (start > end) return [formatWristSize(DEFAULT_WRIST_SIZE_MIN)];
+
+  const sizes: string[] = [];
+  for (let size = start; size <= end; size += 0.5) {
+    sizes.push(formatWristSize(size));
+  }
+  return sizes;
 }
 
 function CustomPriceTile({
@@ -156,7 +176,10 @@ export default function ProductDetail() {
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
   const [selectedTarotReadingName, setSelectedTarotReadingName] = useState(tarotReadingCategories[0].items[0].name);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState("");
-  const wristSizes = ["13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"];
+  const wristSizes = useMemo(
+    () => buildWristSizes(product?.wristSizeMin, product?.wristSizeMax),
+    [product?.wristSizeMin, product?.wristSizeMax]
+  );
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
@@ -183,6 +206,11 @@ export default function ProductDetail() {
     setShowClaspGuide(false);
     setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
   }, [id, product?.id]);
+  useEffect(() => {
+    if (!wristSizes.includes(selectedWristSize)) {
+      setSelectedWristSize(wristSizes.includes("14") ? "14" : wristSizes[0]);
+    }
+  }, [wristSizes, selectedWristSize]);
 
   if (isLoading && !product) {
     return (

@@ -26,6 +26,8 @@ export interface Product {
   featured: boolean;
   isMonthlyLimited?: boolean;
   claspOptions?: ("elastic" | "lobster" | "magnetic")[];
+  wristSizeMin?: number;
+  wristSizeMax?: number;
   crystalType: string;
   color: string;
 }

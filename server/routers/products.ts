@@ -97,6 +97,8 @@ async function ensureProductsTable() {
       \`active\` boolean NOT NULL DEFAULT true,
       \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
       \`claspOptions\` json DEFAULT NULL,
+      \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
+      \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -125,6 +127,12 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`claspOptions\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
@@ -231,6 +239,8 @@ function toFrontendProduct(p: DbProduct) {
     featured: p.featured,
     isMonthlyLimited: p.isMonthlyLimited,
     claspOptions: p.claspOptions ?? undefined,
+    wristSizeMin: p.wristSizeMin ?? 13,
+    wristSizeMax: p.wristSizeMax ?? 19,
     scheduledPublishAt: p.scheduledPublishAt ?? undefined,
     crystalType: p.crystalType ?? "",
     color: p.color ?? "",
@@ -241,6 +251,10 @@ const scheduledPublishAtSchema = z.preprocess(
   (value) => value === "" || value === undefined ? null : value,
   z.coerce.date().nullable()
 );
+
+const wristSizeSchema = z.number().min(0).max(99).refine((value) => Number.isInteger(value * 2), {
+  message: "手圍尺寸需以 0.5 cm 為單位",
+});
 
 const ProductInputSchema = z.object({
   name: z.string().min(1),
@@ -268,8 +282,13 @@ const ProductInputSchema = z.object({
   active: z.boolean().default(true),
   isMonthlyLimited: z.boolean().default(false),
   claspOptions: z.array(z.enum(["elastic", "lobster", "magnetic"])).default([]),
+  wristSizeMin: wristSizeSchema.default(13),
+  wristSizeMax: wristSizeSchema.default(19),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z.number().int().default(0),
+}).refine((value) => value.wristSizeMin <= value.wristSizeMax, {
+  message: "手圍最小值不可大於最大值",
+  path: ["wristSizeMax"],
 });
 
 export const productRouter = router({
@@ -329,7 +348,7 @@ export const productRouter = router({
     }),
 
   update: adminProcedure
-    .input(ProductInputSchema.extend({ id: z.string() }))
+    .input(ProductInputSchema.safeExtend({ id: z.string() }))
     .mutation(async ({ input }) => {
       await ensureProductsTable();
       await publishDueProducts();
@@ -380,7 +399,7 @@ export const productRouter = router({
     }),
 
   seed: adminProcedure
-    .input(z.array(ProductInputSchema.extend({ id: z.string() })))
+    .input(z.array(ProductInputSchema.safeExtend({ id: z.string() })))
     .mutation(async ({ input }) => {
       await ensureProductsTable();
       const db = await getDb();

@@ -29,6 +29,8 @@ const CLASP_OPTIONS = [
 ];
 
 const DEFAULT_CLASP_OPTIONS = CLASP_OPTIONS.map((option) => option.id);
+const DEFAULT_WRIST_SIZE_MIN = "13";
+const DEFAULT_WRIST_SIZE_MAX = "19";
 
 type FormState = {
   name: string;
@@ -49,6 +51,8 @@ type FormState = {
   active: boolean;
   isMonthlyLimited: boolean;
   claspOptions: ("elastic" | "lobster" | "magnetic")[];
+  wristSizeMin: string;
+  wristSizeMax: string;
   scheduledPublishAt: string;
   initialStock: string;
 };
@@ -72,6 +76,8 @@ const DEFAULT_FORM: FormState = {
   active: true,
   isMonthlyLimited: false,
   claspOptions: [...DEFAULT_CLASP_OPTIONS],
+  wristSizeMin: DEFAULT_WRIST_SIZE_MIN,
+  wristSizeMax: DEFAULT_WRIST_SIZE_MAX,
   scheduledPublishAt: "",
   initialStock: "5",
 };
@@ -105,6 +111,15 @@ function parseScheduledPublishAt(value: string) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseWristSize(value: string) {
+  const wristSize = Number(value);
+  return Number.isFinite(wristSize) ? wristSize : NaN;
+}
+
+function isValidWristSize(value: number) {
+  return Number.isFinite(value) && value >= 0 && value <= 99 && Number.isInteger(value * 2);
 }
 
 function formatPriceRange(value: string) {
@@ -431,6 +446,8 @@ function ProductModal({
           active: editing.active,
           isMonthlyLimited: editing.isMonthlyLimited,
           claspOptions: editing.claspOptions ?? [...DEFAULT_CLASP_OPTIONS],
+          wristSizeMin: String(editing.wristSizeMin ?? DEFAULT_WRIST_SIZE_MIN),
+          wristSizeMax: String(editing.wristSizeMax ?? DEFAULT_WRIST_SIZE_MAX),
           scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
           initialStock: "5",
         }
@@ -567,6 +584,16 @@ function ProductModal({
       toast.error("預約上架時間需晚於現在");
       return;
     }
+    const wristSizeMin = parseWristSize(form.wristSizeMin);
+    const wristSizeMax = parseWristSize(form.wristSizeMax);
+    if (!isValidWristSize(wristSizeMin) || !isValidWristSize(wristSizeMax)) {
+      toast.error("手圍範圍請填 0.5 cm 為單位的數字");
+      return;
+    }
+    if (wristSizeMin > wristSizeMax) {
+      toast.error("手圍最小值不可大於最大值");
+      return;
+    }
 
     const formattedPriceRange = formatPriceRange(form.priceRange);
     const originalPrice = form.originalPrice ? parseInt(form.originalPrice, 10) : null;
@@ -594,6 +621,8 @@ function ProductModal({
       featured: form.featured,
       isMonthlyLimited: form.isMonthlyLimited,
       claspOptions: form.claspOptions,
+      wristSizeMin,
+      wristSizeMax,
       active: scheduledPublishAt ? false : form.active,
       scheduledPublishAt,
       sortOrder: editing?.sortOrder ?? 0,
@@ -865,6 +894,34 @@ function ProductModal({
                   </span>
                 </label>
               ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">
+            <legend className="px-1 text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">手圍範圍</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">最小手圍（cm）</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.wristSizeMin}
+                  onChange={(e) => setForm((p) => ({ ...p, wristSizeMin: e.target.value }))}
+                  placeholder="13"
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">最大手圍（cm）</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.wristSizeMax}
+                  onChange={(e) => setForm((p) => ({ ...p, wristSizeMax: e.target.value }))}
+                  placeholder="19"
+                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                />
+              </label>
             </div>
           </fieldset>
 
