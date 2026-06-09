@@ -363,9 +363,15 @@ function OrderRowCard({
                       <div className="flex flex-col gap-1 px-4 py-2 bg-green-50 border border-green-300 text-xs font-body">
                         <div className="flex items-center gap-1.5 text-green-700">
                           <Truck className="w-3.5 h-3.5" />
-                          <span className="font-semibold">超商取件碼</span>
+                          <span className="font-semibold">
+                            {detail.logistics.logisticsSubType === "UNIMARTC2C" ? "7-11 交貨便代碼" : "超商寄貨編號"}
+                          </span>
                         </div>
-                        <span className="font-mono text-lg font-bold text-green-800 tracking-widest">{detail.logistics.cvsPaymentNo}</span>
+                        <span className="font-mono text-lg font-bold text-green-800 tracking-widest">
+                          {detail.logistics.logisticsSubType === "UNIMARTC2C" && detail.logistics.cvsValidationNo
+                            ? `${detail.logistics.cvsPaymentNo}${detail.logistics.cvsValidationNo}`
+                            : detail.logistics.cvsPaymentNo}
+                        </span>
                         {detail.logistics.cvsValidationNo && (
                           <span className="text-green-600">驗證碼：{detail.logistics.cvsValidationNo}</span>
                         )}
@@ -440,7 +446,14 @@ function OrderRowCard({
                   <p className="font-medium mb-1">物流資訊</p>
                   <p>物流商：{detail.logistics.logisticsSubType}</p>
                   {detail.logistics.bookingNote && <p>托運單號：{detail.logistics.bookingNote}</p>}
-                  {detail.logistics.cvsPaymentNo && <p>超商取件碼：{detail.logistics.cvsPaymentNo}</p>}
+                  {detail.logistics.cvsPaymentNo && (
+                    <p>
+                      {detail.logistics.logisticsSubType === "UNIMARTC2C" ? "7-11 交貨便代碼" : "超商寄貨編號"}：
+                      {detail.logistics.logisticsSubType === "UNIMARTC2C" && detail.logistics.cvsValidationNo
+                        ? `${detail.logistics.cvsPaymentNo}${detail.logistics.cvsValidationNo}`
+                        : detail.logistics.cvsPaymentNo}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -563,11 +576,17 @@ export default function AdminOrders() {
   const createLogistics = trpc.order.createLogistics.useMutation({
     onSuccess: async (data, variables) => {
       const mode = data.sandbox ? "沙盒物流" : "正式物流";
+      const cvsShipmentCode =
+        data.logisticsSubType === "UNIMARTC2C" && data.cvsPaymentNo && data.cvsValidationNo
+          ? `${data.cvsPaymentNo}${data.cvsValidationNo}`
+          : data.cvsPaymentNo;
       const logisticsLines = [
         `${mode}訂單建立成功`,
         data.allPayLogisticsId ? `綠界物流編號：${data.allPayLogisticsId}` : null,
-        data.cvsPaymentNo ? `超商取件碼：${data.cvsPaymentNo}` : null,
-        data.cvsValidationNo ? `驗證碼：${data.cvsValidationNo}` : null,
+        cvsShipmentCode
+          ? `${data.logisticsSubType === "UNIMARTC2C" ? "7-11 交貨便代碼" : "超商寄貨編號"}：${cvsShipmentCode}`
+          : null,
+        data.cvsValidationNo && data.logisticsSubType !== "UNIMARTC2C" ? `驗證碼：${data.cvsValidationNo}` : null,
         data.bookingNote ? `托運單號：${data.bookingNote}` : null,
         !data.allPayLogisticsId && data.logisticsId ? `系統物流編號：${data.logisticsId}` : null,
       ].filter(Boolean);

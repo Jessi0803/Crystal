@@ -762,6 +762,7 @@ export const orderRouter = router({
             success: true,
             sandbox: useLogisticsSandbox,
             logisticsId: logisticsMerchantTradeNo,
+            logisticsSubType,
             allPayLogisticsId: ecpayResult.allPayLogisticsId,
             cvsPaymentNo: (ecpayResult as any).cvsPaymentNo || null,
             cvsValidationNo: (ecpayResult as any).cvsValidationNo || null,
