@@ -42,11 +42,15 @@ test("empty checkout shows empty cart state", async ({ page }) => {
 });
 
 test("seeded inventory states are visible", async ({ page }) => {
+  await page.goto("/products?category=monthly");
+  await expect(page.locator('a[href="/products/e2e-monthly-sold-out"] .sold-out-card')).toHaveText("已售完");
+
   await page.goto("/products/e2e-bracelet-preorder");
   await expect(page.locator("body")).toContainText(/預購|7-14 天/);
   await expect(page.getByRole("button", { name: /加入購物袋/ })).toBeEnabled();
 
   await page.goto("/products/e2e-monthly-sold-out");
+  await expect(page.locator(".sold-out-card")).toHaveText("已售完");
   await expect(page.locator("body")).toContainText("本月限量商品已售完");
   await expect(page.getByRole("button", { name: "售完" })).toBeDisabled();
 });
