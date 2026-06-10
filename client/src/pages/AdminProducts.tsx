@@ -51,6 +51,7 @@ type FormState = {
   active: boolean;
   isMonthlyLimited: boolean;
   claspOptions: ("elastic" | "lobster" | "magnetic")[];
+  showFitPreference: boolean;
   wristSizeMin: string;
   wristSizeMax: string;
   scheduledPublishAt: string;
@@ -76,6 +77,7 @@ const DEFAULT_FORM: FormState = {
   active: true,
   isMonthlyLimited: false,
   claspOptions: [...DEFAULT_CLASP_OPTIONS],
+  showFitPreference: true,
   wristSizeMin: DEFAULT_WRIST_SIZE_MIN,
   wristSizeMax: DEFAULT_WRIST_SIZE_MAX,
   scheduledPublishAt: "",
@@ -446,6 +448,7 @@ function ProductModal({
           active: editing.active,
           isMonthlyLimited: editing.isMonthlyLimited,
           claspOptions: editing.claspOptions ?? [...DEFAULT_CLASP_OPTIONS],
+          showFitPreference: editing.showFitPreference ?? true,
           wristSizeMin: String(editing.wristSizeMin ?? DEFAULT_WRIST_SIZE_MIN),
           wristSizeMax: String(editing.wristSizeMax ?? DEFAULT_WRIST_SIZE_MAX),
           scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
@@ -621,6 +624,7 @@ function ProductModal({
       featured: form.featured,
       isMonthlyLimited: form.isMonthlyLimited,
       claspOptions: form.claspOptions,
+      showFitPreference: form.showFitPreference,
       wristSizeMin,
       wristSizeMax,
       active: scheduledPublishAt ? false : form.active,
@@ -923,6 +927,24 @@ function ProductModal({
                 />
               </label>
             </div>
+          </fieldset>
+
+          <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">
+            <legend className="px-1 text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">鬆緊度調整</legend>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.showFitPreference}
+                onChange={(e) => setForm((p) => ({ ...p, showFitPreference: e.target.checked }))}
+                className="mt-0.5 w-4 h-4"
+              />
+              <span className="text-xs font-body leading-relaxed text-[oklch(0.35_0_0)]">
+                前台顯示「剛好 / 微鬆」選項
+                <span className="block text-[0.65rem] text-[oklch(0.58_0_0)]">
+                  關閉後，顧客下單此商品時不會選擇或儲存鬆緊度。
+                </span>
+              </span>
+            </label>
           </fieldset>
 
           {/* More fields toggle */}

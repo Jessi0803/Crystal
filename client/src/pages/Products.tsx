@@ -183,25 +183,23 @@ export default function Products() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
             {filtered.map((product) => {
+              const availability = availabilityByProductId.get(product.id);
+              const soldOut = availability?.isMonthlyLimited === true && availability.available === false;
               return (
               <Link key={product.id} href={`/products/${product.id}`}>
                 <div className="product-card group">
                   <div className="product-card-image">
                     <img src={product.image} alt={product.name} loading="lazy" />
+                    {soldOut && <span className="sold-out-card">已售完</span>}
                     {/* Hover Add to Cart */}
-                    {(() => {
-                      const availability = availabilityByProductId.get(product.id);
-                      const soldOut = availability?.isMonthlyLimited === true && availability.available === false;
-                      return (
-                    <button
-                      onClick={(e) => handleAddToCart(product, e)}
-                      disabled={soldOut}
-                      className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    >
-                      {soldOut ? "售完" : "加入購物袋"}
-                    </button>
-                      );
-                    })()}
+                    {!soldOut && (
+                      <button
+                        onClick={(e) => handleAddToCart(product, e)}
+                        className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        加入購物袋
+                      </button>
+                    )}
                     {/* Sale Badge */}
                     {product.originalPrice && (
                       <span className="absolute top-3 left-3 bg-white text-[0.6rem] tracking-[0.08em] font-body px-2 py-1">

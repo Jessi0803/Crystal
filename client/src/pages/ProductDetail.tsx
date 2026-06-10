@@ -249,6 +249,7 @@ export default function ProductDetail() {
   const claspChoices = ALL_CLASP_CHOICES.filter((choice) => productClaspOptions.includes(choice.id));
   const hasWristSizeOption = product.category !== "custom" && hasProductWristSize(product);
   const hasClaspOption = product.category !== "custom" && claspChoices.length > 0;
+  const hasFitPreferenceOption = product.category !== "custom" && product.showFitPreference !== false;
   const effectiveSelectedClaspType = claspChoices.some((choice) => choice.id === selectedClaspType)
     ? selectedClaspType
     : claspChoices[0]?.id ?? "elastic";
@@ -309,13 +310,13 @@ export default function ProductDetail() {
               unitPrice: currentPrice,
               wristSize: selectedWristSize,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
-              fitPreference: selectedFitPreference,
+              fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
             }
           : {
               unitPrice: currentPrice,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
-              fitPreference: selectedFitPreference,
+              fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
             }
       );
@@ -370,12 +371,13 @@ export default function ProductDetail() {
 
           {/* Left: Gallery */}
           <div className="space-y-3">
-            <div className="bg-[oklch(0.97_0_0)] aspect-square overflow-hidden">
+            <div className="relative bg-[oklch(0.97_0_0)] aspect-square overflow-hidden">
               <img
                 src={activeGalleryImage}
                 alt={product.name}
                 className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-6" : "object-cover"}`}
               />
+              {isSoldOutItem && <span className="sold-out-card">已售完</span>}
             </div>
             {galleryImages.length > 1 && (
               <div className="grid grid-cols-5 gap-2 sm:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6">
@@ -683,26 +685,28 @@ export default function ProductDetail() {
                     </Dialog>
                   </div>
                 )}
-                <div>
-                  <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {fitOptions.map((opt) => (
-                      <button
-                        type="button"
-                        key={opt.id}
-                        onClick={() => setSelectedFitPreference(opt.id)}
-                        className={`px-3 py-2.5 text-xs font-body border transition-colors text-left ${
-                          selectedFitPreference === opt.id
-                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                            : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
-                        }`}
-                      >
-                        <span className="block font-medium">{opt.label}</span>
-                        <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.desc}</span>
-                      </button>
-                    ))}
+                {hasFitPreferenceOption && (
+                  <div>
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {fitOptions.map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.id}
+                          onClick={() => setSelectedFitPreference(opt.id)}
+                          className={`px-3 py-2.5 text-xs font-body border transition-colors text-left ${
+                            selectedFitPreference === opt.id
+                              ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                              : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                          }`}
+                        >
+                          <span className="block font-medium">{opt.label}</span>
+                          <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 

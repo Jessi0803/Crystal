@@ -97,6 +97,7 @@ async function ensureProductsTable() {
       \`active\` boolean NOT NULL DEFAULT true,
       \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
       \`claspOptions\` json DEFAULT NULL,
+      \`showFitPreference\` boolean NOT NULL DEFAULT true,
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
       \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
@@ -127,6 +128,9 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`claspOptions\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`showFitPreference\` boolean NOT NULL DEFAULT true`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0`);
@@ -239,6 +243,7 @@ function toFrontendProduct(p: DbProduct) {
     featured: p.featured,
     isMonthlyLimited: p.isMonthlyLimited,
     claspOptions: p.claspOptions ?? undefined,
+    showFitPreference: p.showFitPreference,
     wristSizeMin: p.wristSizeMin ?? 13,
     wristSizeMax: p.wristSizeMax ?? 19,
     scheduledPublishAt: p.scheduledPublishAt ?? undefined,
@@ -282,6 +287,7 @@ const ProductInputSchema = z.object({
   active: z.boolean().default(true),
   isMonthlyLimited: z.boolean().default(false),
   claspOptions: z.array(z.enum(["elastic", "lobster", "magnetic"])).default([]),
+  showFitPreference: z.boolean().default(true),
   wristSizeMin: wristSizeSchema.default(13),
   wristSizeMax: wristSizeSchema.default(19),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),

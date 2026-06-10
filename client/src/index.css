@@ -302,6 +302,27 @@
     transform: scale(1.05);
   }
 
+  .sold-out-card {
+    position: absolute;
+    left: 50%;
+    bottom: 0.875rem;
+    transform: translateX(-50%);
+    z-index: 2;
+    min-width: 5.5rem;
+    border: 1px solid oklch(1 0 0 / 0.72);
+    background: oklch(0.12 0 0 / 0.82);
+    color: oklch(1 0 0);
+    padding: 0.45rem 0.9rem;
+    text-align: center;
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.68rem;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    line-height: 1;
+    pointer-events: none;
+    box-shadow: 0 10px 24px rgb(0 0 0 / 0.14);
+  }
+
   .product-card-info {
     padding: 0.875rem 0 0;
   }

@@ -324,6 +324,7 @@ export const dbProducts = mysqlTable("products", {
   active: boolean("active").notNull().default(true),
   isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
   claspOptions: json("claspOptions").$type<("elastic" | "lobster" | "magnetic")[]>(),
+  showFitPreference: boolean("showFitPreference").notNull().default(true),
   wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
   wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
