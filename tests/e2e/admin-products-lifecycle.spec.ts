@@ -99,6 +99,46 @@ test("admin can edit, unpublish, republish and remove a test product", async ({ 
   await expectProductHiddenOnStorefront(page, editedName, productHref);
 });
 
+test("admin can hide fit preference controls per product", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const name = `E2E 鬆緊度開關 ${testInfo.project.name} ${Date.now()}`;
+
+  await openProductsAdmin(page);
+  await createProduct(page, name);
+
+  const productHref = await expectProductVisibleOnStorefront(page, name);
+  await expect(page.getByText("鬆緊度", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /剛好/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /微鬆/ })).toBeVisible();
+
+  await findProduct(page, name);
+  await page.getByRole("button", { name: "編輯" }).last().click();
+  await page
+    .locator("fieldset")
+    .filter({ hasText: "鬆緊度調整" })
+    .locator('input[type="checkbox"]')
+    .setChecked(false);
+  await page.getByRole("button", { name: "儲存變更" }).click();
+  await expect(page.locator("body")).toContainText("商品已更新");
+
+  await page.goto(productHref);
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByText("鬆緊度", { exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: /剛好/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /微鬆/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText(name);
+  await expect(drawer).not.toContainText("剛好");
+  await expect(drawer).not.toContainText("微鬆");
+  await drawer.getByRole("button", { name: "移除" }).click();
+  await expect(drawer).toContainText("你的購物袋是空的");
+
+  await removeProduct(page, name);
+  await expectProductHiddenOnStorefront(page, name, productHref);
+});
+
 test("admin can schedule a test product and keep it hidden before release", async ({ page }) => {
   test.setTimeout(60_000);
   const name = `E2E 預約商品 ${Date.now()}`;
