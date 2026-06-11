@@ -160,6 +160,18 @@ type RelatedProductForChat = {
   image: string;
 };
 
+const LEGACY_STATIC_PRODUCT_IDS = new Set([
+  "d001-moon-secret",
+  "d002-honey-realm",
+  "d003-venus",
+  "d004-morning-whisper",
+  "d005-moon-clear-heart",
+]);
+
+function uniqueProductIdsFromChunks(chunks: ScoredChunk[]): string[] {
+  return Array.from(new Set(chunks.flatMap((chunk) => chunk.relatedProductIds ?? [])));
+}
+
 export function selectRelatedProductIds(
   relevantChunks: ScoredChunk[],
   scoreMin = 0.55,
@@ -176,12 +188,18 @@ export function selectRelatedProductIds(
 
   const standaloneProductChunks = matchingChunks.filter((chunk) => chunk.id.startsWith("product-"));
   const fallbackRecommendationChunks = matchingChunks.filter((chunk) => !chunk.id.startsWith("product-"));
-  const chunksToUse =
-    standaloneProductChunks.length >= 2
-      ? standaloneProductChunks
-      : [...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)];
+  const standaloneProductIds = uniqueProductIdsFromChunks(standaloneProductChunks);
+  if (standaloneProductIds.length >= 2) {
+    const newerProductIds = standaloneProductIds.filter((id) => !LEGACY_STATIC_PRODUCT_IDS.has(id));
+    const legacyProductIds = standaloneProductIds.filter((id) => LEGACY_STATIC_PRODUCT_IDS.has(id));
+    const idsToUse = newerProductIds.length >= 2
+      ? [...newerProductIds, ...legacyProductIds]
+      : standaloneProductIds;
+    return idsToUse.slice(0, maxProducts);
+  }
 
-  return Array.from(new Set(chunksToUse.flatMap((chunk) => chunk.relatedProductIds ?? []))).slice(0, maxProducts);
+  return uniqueProductIdsFromChunks([...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)])
+    .slice(0, maxProducts);
 }
 
 function normalizeProductImageUrl(url: string) {
