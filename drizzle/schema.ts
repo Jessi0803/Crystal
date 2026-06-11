@@ -186,6 +186,7 @@ export const orderBalancePayments = mysqlTable("orderBalancePayments", {
     "cancelled",
   ]).default("pending").notNull(),
   transferLastFive: varchar("transferLastFive", { length: 5 }),
+  transferReceiptUrl: longtext("transferReceiptUrl"),
   tradeNo: varchar("tradeNo", { length: 64 }),
   ecpayNotifyData: json("ecpayNotifyData"),
   paidAt: timestamp("paidAt"),

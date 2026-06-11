@@ -67,6 +67,7 @@ const balancePaymentLegacySelect = {
   paymentMethod: orderBalancePayments.paymentMethod,
   paymentStatus: orderBalancePayments.paymentStatus,
   transferLastFive: orderBalancePayments.transferLastFive,
+  transferReceiptUrl: orderBalancePayments.transferReceiptUrl,
   tradeNo: orderBalancePayments.tradeNo,
   ecpayNotifyData: orderBalancePayments.ecpayNotifyData,
   paidAt: orderBalancePayments.paidAt,
@@ -827,7 +828,8 @@ export async function updateBalancePaymentStatus(
 
 export async function updateBalancePaymentTransferCode(
   merchantTradeNo: string,
-  lastFive: string
+  lastFive: string,
+  transferReceiptUrl?: string
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -840,7 +842,7 @@ export async function updateBalancePaymentTransferCode(
 
   await db
     .update(orderBalancePayments)
-    .set({ transferLastFive: lastFive, paymentStatus: "transfer_pending" })
+    .set({ transferLastFive: lastFive, transferReceiptUrl, paymentStatus: "transfer_pending" })
     .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo));
 
   if (balance) {

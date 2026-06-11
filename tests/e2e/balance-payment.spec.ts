@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createAtmCustomDepositOrder, login } from "./helpers";
+import { createAtmCustomDepositOrder, login, uploadTransferReceipt } from "./helpers";
 
 test("custom deposit order can receive a balance payment link and submit ATM balance transfer code", async ({ page }) => {
   test.setTimeout(90_000);
@@ -50,6 +50,7 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
 
   await expect(page.locator("body")).toContainText("轉帳資訊");
   await page.locator('input[placeholder="12345"]').fill("67890");
+  await uploadTransferReceipt(page);
   await page.getByRole("button", { name: "確認送出" }).click();
 
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");

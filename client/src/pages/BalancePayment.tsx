@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useLocation } from "wouter";
-import { CheckCircle, CreditCard, Banknote, XCircle, Home, Store, MapPin, Globe } from "lucide-react";
+import { CheckCircle, CreditCard, Banknote, XCircle, Home, Store, MapPin, Globe, ImageUp, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,38 @@ type CheckoutRegion = "domestic" | "overseas";
 // 不支援 popup + window.close，必須整頁跳轉）。
 const BALANCE_FORM_KEY = "balance_form_state";
 
+function compressTransferReceipt(file: File): Promise<{ dataBase64: string; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height * MAX) / width);
+          width = MAX;
+        } else {
+          width = Math.round((width * MAX) / height);
+          height = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      resolve({ dataBase64: dataUrl.split(",")[1] ?? "", contentType: "image/jpeg" });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("截圖讀取失敗，請重新選擇圖片"));
+    };
+    img.src = url;
+  });
+}
+
 export default function BalancePayment() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
@@ -47,8 +79,15 @@ export default function BalancePayment() {
   const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [transferCode, setTransferCode] = useState("");
+  const [transferReceipt, setTransferReceipt] = useState<{
+    dataBase64: string;
+    contentType: string;
+    filename: string;
+    previewUrl: string;
+  } | null>(null);
   const [codeSubmitted, setCodeSubmitted] = useState(false);
   const cvsWindowRef = useRef<Window | null>(null);
+  const transferReceiptInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading, refetch } = trpc.order.getBalancePayment.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
@@ -156,8 +195,63 @@ export default function BalancePayment() {
       toast.error("請輸入正確的 5 位數字");
       return;
     }
-    submitCode.mutate({ merchantTradeNo: merchantTradeNo ?? "", lastFive: transferCode });
+    if (!transferReceipt) {
+      toast.error("請上傳轉帳成功截圖");
+      setErrors((prev) => ({ ...prev, transferReceipt: "請上傳轉帳成功截圖" }));
+      return;
+    }
+    submitCode.mutate({
+      merchantTradeNo: merchantTradeNo ?? "",
+      lastFive: transferCode,
+      transferReceiptImageBase64: transferReceipt.dataBase64,
+      transferReceiptImageContentType: transferReceipt.contentType,
+      transferReceiptImageFilename: transferReceipt.filename,
+    });
   };
+
+  const handleTransferReceiptChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("請上傳圖片格式的轉帳成功截圖");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("截圖請小於 10MB");
+      e.target.value = "";
+      return;
+    }
+    try {
+      const compressed = await compressTransferReceipt(file);
+      setTransferReceipt((previous) => {
+        if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl);
+        return {
+          ...compressed,
+          filename: file.name,
+          previewUrl: URL.createObjectURL(file),
+        };
+      });
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.transferReceipt;
+        return next;
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "截圖讀取失敗，請重新選擇圖片");
+      e.target.value = "";
+    }
+  };
+
+  const clearTransferReceipt = () => {
+    if (transferReceipt?.previewUrl) URL.revokeObjectURL(transferReceipt.previewUrl);
+    setTransferReceipt(null);
+    if (transferReceiptInputRef.current) transferReceiptInputRef.current.value = "";
+  };
+
+  useEffect(() => () => {
+    if (transferReceipt?.previewUrl) URL.revokeObjectURL(transferReceipt.previewUrl);
+  }, [transferReceipt?.previewUrl]);
 
   if (isLoading) {
     return (
@@ -679,6 +773,47 @@ export default function BalancePayment() {
                         >
                           {submitCode.isPending ? "送出中..." : "確認送出"}
                         </button>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-xs tracking-[0.16em] font-body text-blue-800 mb-2">轉帳成功截圖</p>
+                        {transferReceipt ? (
+                          <div className="flex items-center gap-3 border border-blue-200 bg-white p-3">
+                            <img
+                              src={transferReceipt.previewUrl}
+                              alt="轉帳成功截圖預覽"
+                              className="w-20 h-20 object-cover border border-blue-100"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-body text-blue-900 truncate">{transferReceipt.filename}</p>
+                              <p className="text-xs font-body text-blue-700 mt-1">已選擇截圖</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={clearTransferReceipt}
+                              className="p-2 text-blue-700 hover:text-blue-900"
+                              aria-label="移除轉帳截圖"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => transferReceiptInputRef.current?.click()}
+                            className="w-full border border-dashed border-blue-300 bg-white px-4 py-4 text-sm font-body text-blue-800 flex items-center justify-center gap-2 hover:border-blue-500 transition-colors"
+                          >
+                            <ImageUp className="w-4 h-4" />
+                            上傳轉帳成功截圖
+                          </button>
+                        )}
+                        <input
+                          ref={transferReceiptInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleTransferReceiptChange}
+                        />
+                        {errors.transferReceipt && <p className="text-xs text-red-400 mt-1">{errors.transferReceipt}</p>}
                       </div>
                     </div>
                   ) : (

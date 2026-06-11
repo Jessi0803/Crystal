@@ -481,6 +481,21 @@ function OrderRowCard({
                   {(detail.balancePayment as any).transferLastFive && (
                     <p>匯款末五碼：<strong>{(detail.balancePayment as any).transferLastFive}</strong></p>
                   )}
+                  {(detail.balancePayment as any).transferReceiptUrl && (
+                    <a
+                      href={(detail.balancePayment as any).transferReceiptUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block w-fit"
+                    >
+                      <img
+                        src={(detail.balancePayment as any).transferReceiptUrl}
+                        alt="尾款轉帳成功截圖"
+                        className="h-36 w-auto max-w-full border border-rose-200 bg-white object-contain"
+                        loading="lazy"
+                      />
+                    </a>
+                  )}
                   <div className="flex flex-wrap gap-2 mt-2">
                     {(detail.balancePayment.paymentStatus as string) !== "transfer_pending" && detail.balancePayment.paymentStatus !== "paid" && (
                     <button

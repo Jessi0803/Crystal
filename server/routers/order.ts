@@ -372,9 +372,11 @@ export const orderRouter = router({
       );
       await notifyCustomerOrderPlacedSafely(createdOrderId);
 
+      const origin = siteBaseUrl(ctx.req);
+
       if (paymentMethod === "paypal") {
-        const returnUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
-        const cancelUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
+        const returnUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
+        const cancelUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
         try {
           const { approvalUrl } = await createPayPalCheckoutOrder({
             merchantTradeNo,
@@ -411,9 +413,9 @@ export const orderRouter = router({
         };
       }
 
-      const returnURL = `${input.origin}/api/ecpay/notify`;
-      const orderResultURL = `${input.origin}/api/ecpay/order-result`;
-      const clientBackURL = `${input.origin}/products`;
+      const returnURL = `${origin}/api/ecpay/notify`;
+      const orderResultURL = `${origin}/api/ecpay/order-result`;
+      const clientBackURL = `${origin}/products`;
 
       const paymentParams = buildCreditPaymentParams({
         merchantTradeNo,
@@ -700,10 +702,7 @@ export const orderRouter = router({
 
       // 取得 serverReplyURL（用於綠界回調）
       // 使用正式網域，確保綠界可以回調
-      const host = process.env.NODE_ENV === "production"
-        ? "https://www.goodaytarot.com"
-        : `http://localhost:${process.env.PORT || 3000}`;
-      const serverReplyURL = `${host}/api/ecpay/logistics-notify`;
+      const serverReplyURL = `${siteBaseUrl(ctx.req)}/api/ecpay/logistics-notify`;
 
       let ecpayResult;
       try {
@@ -916,7 +915,7 @@ export const orderRouter = router({
           }
         })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
       if (!balancePayment) {
         throw new TRPCError({ code: "NOT_FOUND", message: "找不到尾款資料" });
@@ -1005,14 +1004,15 @@ export const orderRouter = router({
         };
       }
 
+      const origin = siteBaseUrl(ctx.req);
       const paymentParams = buildCreditPaymentParams({
         merchantTradeNo: balancePayment.merchantTradeNo,
         tradeDesc: "椛Crystal客製化尾款",
         itemName: `客製化商品尾款#${balancePayment.order.merchantTradeNo}`,
         totalAmount,
-        returnURL: `${input.origin}/api/ecpay/notify`,
-        orderResultURL: `${input.origin}/api/ecpay/balance-result`,
-        clientBackURL: `${input.origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
+        returnURL: `${origin}/api/ecpay/notify`,
+        orderResultURL: `${origin}/api/ecpay/balance-result`,
+        clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
       });
 
       return {
@@ -1029,9 +1029,26 @@ export const orderRouter = router({
     .input(z.object({
       merchantTradeNo: z.string().min(1),
       lastFive: z.string().length(5).regex(/^\d+$/),
+      transferReceiptImageBase64: z.string().max(8_000_000),
+      transferReceiptImageContentType: z.string(),
+      transferReceiptImageFilename: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive);
+      const receiptContentType = input.transferReceiptImageContentType;
+      if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "轉帳截圖請上傳 JPG、PNG 或 WebP 圖片" });
+      }
+      const receiptBuffer = Buffer.from(input.transferReceiptImageBase64, "base64");
+      if (receiptBuffer.length === 0 || receiptBuffer.length > 6 * 1024 * 1024) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "轉帳截圖大小需小於 6MB" });
+      }
+      const ext = getReceiptExtension(receiptContentType, input.transferReceiptImageFilename);
+      const uploaded = await storagePut(
+        `balance-transfer-receipts/${input.merchantTradeNo}-${Date.now()}.${ext}`,
+        receiptBuffer,
+        receiptContentType
+      );
+      await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive, uploaded.url);
       return { success: true };
     }),
 
