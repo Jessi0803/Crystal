@@ -17,6 +17,8 @@ function createQueryResult<T>(rows: T[]) {
     offset: vi.fn(() => builder),
     then: (resolve: (value: T[]) => unknown, reject?: (reason: unknown) => unknown) =>
       Promise.resolve(rows).then(resolve, reject),
+    catch: (reject: (reason: unknown) => unknown) => Promise.resolve(rows).catch(reject),
+    finally: (handler: () => unknown) => Promise.resolve(rows).finally(handler),
   };
   return builder;
 }
@@ -24,6 +26,7 @@ function createQueryResult<T>(rows: T[]) {
 function createMockDb(selectResults: unknown[][]) {
   const queue = [...selectResults];
   return {
+    execute: vi.fn().mockResolvedValue(undefined),
     select: vi.fn(() => {
       const rows = queue.shift();
       if (!rows) throw new Error("Unexpected select call");

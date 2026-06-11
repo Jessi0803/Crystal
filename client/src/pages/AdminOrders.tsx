@@ -145,7 +145,7 @@ function OrderRowCard({
   onSelectChange: (checked: boolean) => void;
 }) {
   const utils = trpc.useUtils();
-  const { data: detail, isLoading: detailLoading } = trpc.order.getOrderDetail.useQuery(
+  const { data: detail, isLoading: detailLoading, isError: detailError, error: detailQueryError } = trpc.order.getOrderDetail.useQuery(
     { orderId: order.id },
     {
       enabled: isExpanded,
@@ -238,10 +238,14 @@ function OrderRowCard({
 
       {isExpanded && (
         <div className="border-t border-[oklch(0.93_0_0)] px-5 py-5 bg-[oklch(0.985_0_0)]">
-          {detailLoading || !detail ? (
+          {detailLoading ? (
             <div className="py-8 text-center">
               <div className="w-6 h-6 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
               <p className="text-sm font-body text-[oklch(0.5_0_0)]">載入訂單明細中...</p>
+            </div>
+          ) : detailError || !detail ? (
+            <div className="border border-red-100 bg-red-50 px-4 py-3 text-sm font-body text-red-800">
+              訂單明細載入失敗：{detailQueryError?.message ?? "請重新整理後再試"}
             </div>
           ) : (
             <>

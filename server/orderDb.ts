@@ -87,6 +87,17 @@ function hydrateBalancePayment(row: BalancePaymentLegacyRow | undefined): Balanc
   };
 }
 
+let balancePaymentColumnsEnsured = false;
+async function ensureBalancePaymentColumns(db: DbInstance) {
+  if (balancePaymentColumnsEnsured) return;
+  try {
+    await db.execute(sql`ALTER TABLE \`orderBalancePayments\` ADD COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+    /* column already exists */
+  }
+  balancePaymentColumnsEnsured = true;
+}
+
 /** 批次載入商品明細與物流，避免 N+1 查詢（管理後台 list、會員訂單） */
 async function attachItemsAndLogisticsForOrders(
   db: DbInstance,
@@ -173,6 +184,7 @@ export async function getOrderByMerchantTradeNo(merchantTradeNo: string) {
 export async function getOrderWithItems(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [order] = await db
     .select()
@@ -488,6 +500,7 @@ export async function getAdminOrderSummaries(
 export async function getAdminOrderDetail(orderId: number): Promise<OrderWithItemsAndLogistics | null> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [order] = await db
     .select()
@@ -695,6 +708,7 @@ export async function createOrReplaceBalancePayment(opts: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [order] = await db.select().from(orders).where(eq(orders.id, opts.orderId)).limit(1);
   if (!order) throw new Error("Order not found");
@@ -762,6 +776,7 @@ export async function createOrReplaceBalancePayment(opts: {
 export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [row] = await db
     .select(balancePaymentLegacySelect)
@@ -774,6 +789,7 @@ export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string
 export async function getBalancePaymentDetail(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [row] = await db
     .select(balancePaymentLegacySelect)
@@ -801,6 +817,7 @@ export async function updateBalancePaymentStatus(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [balance] = await db
     .select(balancePaymentLegacySelect)
@@ -833,6 +850,7 @@ export async function updateBalancePaymentTransferCode(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [balance] = await db
     .select({ orderId: orderBalancePayments.orderId })
@@ -856,6 +874,7 @@ export async function updateBalancePaymentTransferCode(
 export async function confirmBalanceTransfer(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
 
   const [balance] = await db
     .select(balancePaymentLegacySelect)
