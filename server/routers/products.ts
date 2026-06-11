@@ -399,7 +399,7 @@ export const productRouter = router({
         .select()
         .from(dbProducts)
         .where(inArray(dbProducts.id, input.productIds));
-      const products = rows.filter((product) => product.category !== "custom" && product.category !== "test");
+      const products = rows.filter((product) => product.category !== "test");
 
       for (const product of products) {
         const basePrice =
@@ -435,7 +435,7 @@ export const productRouter = router({
         .select()
         .from(dbProducts)
         .where(inArray(dbProducts.id, input.productIds));
-      const products = rows.filter((product) => product.category !== "custom" && product.category !== "test" && product.originalPrice);
+      const products = rows.filter((product) => product.category !== "test" && product.originalPrice);
 
       for (const product of products) {
         const originalPrice = product.originalPrice;

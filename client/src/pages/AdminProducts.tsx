@@ -1074,7 +1074,7 @@ export default function AdminProducts() {
   }, [dbProductList, query]);
 
   const selectableFilteredIds = useMemo(
-    () => filtered.filter((product) => product.category !== "custom" && product.category !== "test").map((product) => product.id),
+    () => filtered.filter((product) => product.category !== "test").map((product) => product.id),
     [filtered]
   );
   const selectedVisibleCount = selectedProductIds.filter((id) => selectableFilteredIds.includes(id)).length;
@@ -1116,7 +1116,7 @@ export default function AdminProducts() {
       toast.error("折數請填 0.1 到 10 之間，例如 9 代表 9 折");
       return;
     }
-    const confirmed = window.confirm(`確定要將 ${productIds.length} 件商品套用 ${bulkDiscountRate} 折嗎？客製化訂金商品不會被套用。`);
+    const confirmed = window.confirm(`確定要將 ${productIds.length} 件商品套用 ${bulkDiscountRate} 折嗎？`);
     if (!confirmed) return;
     bulkApplyDiscount.mutate({ productIds, discountRate });
   };
@@ -1255,7 +1255,7 @@ export default function AdminProducts() {
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">批次折扣</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
                   {selectionMode
-                    ? `已選 ${selectedProductIds.length} 件；目前列表可選 ${selectableFilteredIds.length} 件，客製化訂金商品會自動排除。`
+                    ? `已選 ${selectedProductIds.length} 件；目前列表可選 ${selectableFilteredIds.length} 件。`
                     : "先進入選取模式，再勾選要套用折扣的商品。"}
                 </p>
               </div>
@@ -1361,7 +1361,7 @@ export default function AdminProducts() {
                       product={product}
                       selected={selectedProductIds.includes(product.id)}
                       selectionMode={selectionMode}
-                      selectable={product.category !== "custom"}
+                      selectable={product.category !== "test"}
                       onSelectChange={setProductSelected}
                       onEdit={openEdit}
                     />
@@ -1383,7 +1383,7 @@ export default function AdminProducts() {
                       product={product}
                       selected={selectedProductIds.includes(product.id)}
                       selectionMode={selectionMode}
-                      selectable={product.category !== "custom"}
+                      selectable={product.category !== "test"}
                       onSelectChange={setProductSelected}
                       onEdit={openEdit}
                     />
@@ -1405,7 +1405,7 @@ export default function AdminProducts() {
                       product={product}
                       selected={selectedProductIds.includes(product.id)}
                       selectionMode={selectionMode}
-                      selectable={product.category !== "custom"}
+                      selectable={product.category !== "test"}
                       onSelectChange={setProductSelected}
                       onEdit={openEdit}
                     />
