@@ -23,6 +23,7 @@ import {
 } from "@shared/overseasShipping";
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -908,7 +909,7 @@ export default function Checkout() {
                   <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
                   <div>
                     <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">轉帳</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">下單前填入末五碼</p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">完成轉帳後上傳截圖</p>
                     <p className="text-xs font-body text-[oklch(0.5_0_0)]">老闆確認後出貨</p>
                   </div>
                   <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
@@ -920,6 +921,34 @@ export default function Checkout() {
               </div>
               {paymentMethod === "atm" && (
                 <div className="mt-4 border border-blue-200 bg-blue-50 p-4">
+                  <div className="mb-5 border border-blue-200 bg-white p-4">
+                    <p className="text-xs tracking-[0.16em] font-body text-blue-800 mb-3">轉帳資訊</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between gap-4 text-sm font-body">
+                        <span className="shrink-0 text-blue-700">銀行</span>
+                        <span className="font-medium text-blue-900 text-right">{STORE_BANK_INFO.bankName}</span>
+                      </div>
+                      {STORE_BANK_INFO.accountName && (
+                        <div className="flex justify-between gap-4 text-sm font-body">
+                          <span className="shrink-0 text-blue-700">戶名</span>
+                          <span className="font-medium text-blue-900 text-right">{STORE_BANK_INFO.accountName}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-4 text-sm font-body">
+                        <span className="shrink-0 text-blue-700">帳號</span>
+                        <span className="font-medium text-blue-900 tracking-wider text-right break-all">
+                          {STORE_BANK_INFO.accountNumber}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-4 text-sm font-body border-t border-blue-100 pt-2 mt-2">
+                        <span className="shrink-0 text-blue-700">轉帳金額</span>
+                        <span className="font-bold text-blue-900 text-right">NT$ {finalTotal.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs font-body text-blue-700 mt-3">
+                      請依上方金額完成轉帳，再填入轉出帳號末五碼並上傳成功截圖。
+                    </p>
+                  </div>
                   <label className="block text-xs tracking-[0.16em] font-body text-blue-800 mb-2">
                     銀行帳號末五碼
                   </label>
@@ -939,7 +968,7 @@ export default function Checkout() {
                   />
                   {errors.transferLastFive && <p className="text-xs text-red-400 mt-1">{errors.transferLastFive}</p>}
                   <p className="text-xs font-body text-blue-700 mt-2">
-                    請先完成轉帳，再填入轉出帳號末五碼後送出訂單。
+                    這是您轉出帳號的末五碼，用來協助核對款項。
                   </p>
                   <div className="mt-4">
                     <p className="text-xs tracking-[0.16em] font-body text-blue-800 mb-2">轉帳成功截圖</p>
