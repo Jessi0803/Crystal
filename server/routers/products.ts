@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -297,6 +297,15 @@ const ProductInputSchema = z.object({
   path: ["wristSizeMax"],
 });
 
+const BulkDiscountInputSchema = z.object({
+  productIds: z.array(z.string().min(1)).min(1),
+  discountRate: z.number().min(0.1).max(10),
+});
+
+const BulkClearDiscountInputSchema = z.object({
+  productIds: z.array(z.string().min(1)).min(1),
+});
+
 export const productRouter = router({
   list: publicProcedure.query(async () => {
     await ensureProductsTable();
@@ -376,6 +385,75 @@ export const productRouter = router({
       await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq(dbProducts.id, input.id));
       await trySyncChatbotKnowledge(() => syncProductKnowledgeById(input.id));
       return { success: true };
+    }),
+
+  bulkApplyDiscount: adminProcedure
+    .input(BulkDiscountInputSchema)
+    .mutation(async ({ input }) => {
+      await ensureProductsTable();
+      await publishDueProducts();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
+
+      const rows = await db
+        .select()
+        .from(dbProducts)
+        .where(inArray(dbProducts.id, input.productIds));
+      const products = rows.filter((product) => product.category !== "test");
+
+      for (const product of products) {
+        const basePrice =
+          product.originalPrice && product.originalPrice > product.price
+            ? product.originalPrice
+            : product.price;
+        const discountedPrice = Math.round(basePrice * (input.discountRate / 10));
+        await db
+          .update(dbProducts)
+          .set({
+            originalPrice: basePrice,
+            price: discountedPrice,
+          })
+          .where(eq(dbProducts.id, product.id));
+      }
+
+      await trySyncChatbotKnowledge(async () => {
+        await Promise.all(products.map((product) => syncProductKnowledgeById(product.id)));
+      });
+
+      return { count: products.length };
+    }),
+
+  bulkClearDiscount: adminProcedure
+    .input(BulkClearDiscountInputSchema)
+    .mutation(async ({ input }) => {
+      await ensureProductsTable();
+      await publishDueProducts();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
+
+      const rows = await db
+        .select()
+        .from(dbProducts)
+        .where(inArray(dbProducts.id, input.productIds));
+      const products = rows.filter((product) => product.category !== "test" && product.originalPrice);
+
+      for (const product of products) {
+        const originalPrice = product.originalPrice;
+        if (!originalPrice) continue;
+        await db
+          .update(dbProducts)
+          .set({
+            price: originalPrice,
+            originalPrice: sql`NULL`,
+          })
+          .where(eq(dbProducts.id, product.id));
+      }
+
+      await trySyncChatbotKnowledge(async () => {
+        await Promise.all(products.map((product) => syncProductKnowledgeById(product.id)));
+      });
+
+      return { count: products.length };
     }),
 
   remove: adminProcedure

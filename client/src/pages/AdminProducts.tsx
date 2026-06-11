@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Package, Plus, Search, Save, X, Upload, ImageIcon,
-  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Users
+  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Users, Percent
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -37,7 +37,6 @@ type FormState = {
   subtitle: string;
   categories: string[];
   originalPrice: string;
-  discountRate: string;
   price: string;
   priceRange: string;
   image: string;
@@ -63,7 +62,6 @@ const DEFAULT_FORM: FormState = {
   subtitle: "",
   categories: ["healing"],
   originalPrice: "",
-  discountRate: "",
   price: "",
   priceRange: "",
   image: "",
@@ -144,20 +142,6 @@ function formatPriceRange(value: string) {
   }
 
   return /^NT\$/i.test(normalized) ? normalized.replace(/^nt\$/i, "NT$") : normalized;
-}
-
-function calculateDiscountedPrice(originalPrice: string, discountRate: string) {
-  const original = Number(originalPrice);
-  const rate = Number(discountRate);
-  if (!Number.isFinite(original) || original < 0) return "";
-  if (!Number.isFinite(rate) || rate <= 0 || rate > 10) return "";
-  return String(Math.round(original * (rate / 10)));
-}
-
-function formatDiscountRate(price?: number | null, originalPrice?: number | null) {
-  if (!price || !originalPrice || originalPrice <= 0 || price >= originalPrice) return "";
-  const rate = (price / originalPrice) * 10;
-  return Number.isInteger(rate) ? String(rate) : rate.toFixed(1).replace(/\.0$/, "");
 }
 
 function getCategoryLabel(category: string) {
@@ -283,9 +267,17 @@ function StockCell({ productId, productName, isMonthlyLimited }: { productId: st
 // ── 商品列表行 ──────────────────────────────────────────────────────────────
 function ProductRow({
   product,
+  selected,
+  selectionMode,
+  selectable,
+  onSelectChange,
   onEdit,
 }: {
   product: DbProduct;
+  selected: boolean;
+  selectionMode: boolean;
+  selectable: boolean;
+  onSelectChange: (id: string, selected: boolean) => void;
   onEdit: (p: DbProduct) => void;
 }) {
   const utils = trpc.useUtils();
@@ -313,7 +305,21 @@ function ProductRow({
 
   return (
     <div className="bg-white border border-[oklch(0.9_0_0)] px-4 py-3">
-      <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-3 items-start lg:grid-cols-[56px_minmax(0,1fr)_80px_70px_80px_176px] lg:items-center">
+      <div className={`grid gap-3 items-start lg:items-center ${
+        selectionMode
+          ? "grid-cols-[20px_56px_minmax(0,1fr)] lg:grid-cols-[20px_56px_minmax(0,1fr)_80px_70px_80px_176px]"
+          : "grid-cols-[56px_minmax(0,1fr)] lg:grid-cols-[56px_minmax(0,1fr)_80px_70px_80px_176px]"
+      }`}>
+        {selectionMode && (
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={!selectable}
+            onChange={(e) => onSelectChange(product.id, e.target.checked)}
+            aria-label={`選取 ${product.name}`}
+            className="mt-5 h-4 w-4 disabled:opacity-30"
+          />
+        )}
         <img
           src={product.image}
           alt={product.name}
@@ -346,7 +352,7 @@ function ProductRow({
           )}
         </div>
 
-        <div className="col-start-2 text-left lg:col-auto lg:text-center">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} text-left lg:col-auto lg:text-center`}>
           {product.category === "custom" ? (
             <span className="text-xs font-body text-[oklch(0.6_0_0)]">—</span>
           ) : (
@@ -357,7 +363,7 @@ function ProductRow({
           )}
         </div>
 
-        <div className="col-start-2 text-left lg:col-auto lg:text-center">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} text-left lg:col-auto lg:text-center`}>
           <span className={`inline-block text-[10px] tracking-widest px-2 py-0.5 font-body ${
             isScheduled
               ? "bg-amber-50 text-amber-700 border border-amber-200"
@@ -369,7 +375,7 @@ function ProductRow({
           </span>
         </div>
 
-        <div className="col-start-2 text-left lg:col-auto lg:text-center">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} text-left lg:col-auto lg:text-center`}>
           <div className="flex flex-wrap items-center gap-1 lg:flex-col">
             {product.featured && (
               <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-amber-50 text-amber-700 border border-amber-200">
@@ -384,7 +390,7 @@ function ProductRow({
           </div>
         </div>
 
-        <div className="col-start-2 flex flex-wrap items-center justify-start gap-2 lg:col-auto lg:justify-end">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} flex flex-wrap items-center justify-start gap-2 lg:col-auto lg:justify-end`}>
           <button
             onClick={() => onEdit(product)}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
@@ -434,7 +440,6 @@ function ProductModal({
           subtitle: editing.subtitle ?? "",
           categories: editing.categories?.length ? editing.categories : [editing.category],
           originalPrice: editing.originalPrice ? String(editing.originalPrice) : "",
-          discountRate: formatDiscountRate(editing.price, editing.originalPrice),
           price: String(editing.price),
           priceRange: editing.priceRange ?? "",
           image: editing.image,
@@ -554,28 +559,10 @@ function ProductModal({
     setGalleryImages([selected, ...images]);
   };
 
-  const handleOriginalPriceChange = (value: string) => {
-    setForm((p) => {
-      const price = calculateDiscountedPrice(value, p.discountRate);
-      return { ...p, originalPrice: value, price: price || p.price };
-    });
-  };
-
-  const handleDiscountRateChange = (value: string) => {
-    setForm((p) => {
-      const price = calculateDiscountedPrice(p.originalPrice, value);
-      return { ...p, discountRate: value, price: price || p.price };
-    });
-  };
-
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error("請填寫商品名稱"); return; }
     if (!form.price || isNaN(Number(form.price))) { toast.error("請填寫正確價格"); return; }
     if (form.originalPrice && isNaN(Number(form.originalPrice))) { toast.error("請填寫正確原價"); return; }
-    if (form.discountRate && (isNaN(Number(form.discountRate)) || Number(form.discountRate) <= 0 || Number(form.discountRate) > 10)) {
-      toast.error("折數請填 0.1 到 10 之間，例如 8 代表 8 折");
-      return;
-    }
     if (selectedCategories.length === 0) { toast.error("請至少選擇一個分類"); return; }
 
     const galleryImages = form.images.map(normalizeImageUrl).filter(Boolean);
@@ -768,28 +755,15 @@ function ProductModal({
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">原價（NT$）</span>
                 <input
                   type="number"
                   min={0}
                   value={form.originalPrice}
-                  onChange={(e) => handleOriginalPriceChange(e.target.value)}
+                  onChange={(e) => setForm((p) => ({ ...p, originalPrice: e.target.value }))}
                   placeholder="1500"
-                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
-                />
-              </label>
-              <label className="block">
-                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">幾折</span>
-                <input
-                  type="number"
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  value={form.discountRate}
-                  onChange={(e) => handleDiscountRateChange(e.target.value)}
-                  placeholder="8"
                   className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                 />
               </label>
@@ -1045,6 +1019,9 @@ export default function AdminProducts() {
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<DbProduct | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [bulkDiscountRate, setBulkDiscountRate] = useState("9");
 
   const utils = trpc.useUtils();
   const { data: dbProductList = [], isLoading } = trpc.product.adminList.useQuery();
@@ -1055,6 +1032,28 @@ export default function AdminProducts() {
       await utils.product.adminList.invalidate();
     },
     onError: (err) => toast.error(err.message || "匯入失敗"),
+  });
+  const bulkApplyDiscount = trpc.product.bulkApplyDiscount.useMutation({
+    onSuccess: async ({ count }) => {
+      toast.success(`已套用折扣到 ${count} 件商品`);
+      setSelectedProductIds([]);
+      await Promise.all([
+        utils.product.adminList.invalidate(),
+        utils.product.list.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "套用折扣失敗"),
+  });
+  const bulkClearDiscount = trpc.product.bulkClearDiscount.useMutation({
+    onSuccess: async ({ count }) => {
+      toast.success(`已清除 ${count} 件商品折扣`);
+      setSelectedProductIds([]);
+      await Promise.all([
+        utils.product.adminList.invalidate(),
+        utils.product.list.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "清除折扣失敗"),
   });
 
   const handleSeed = () => {
@@ -1074,9 +1073,63 @@ export default function AdminProducts() {
     );
   }, [dbProductList, query]);
 
+  const selectableFilteredIds = useMemo(
+    () => filtered.filter((product) => product.category !== "test").map((product) => product.id),
+    [filtered]
+  );
+  const selectedVisibleCount = selectedProductIds.filter((id) => selectableFilteredIds.includes(id)).length;
+  const allVisibleSelected = selectableFilteredIds.length > 0 && selectedVisibleCount === selectableFilteredIds.length;
+  const bulkPending = bulkApplyDiscount.isPending || bulkClearDiscount.isPending;
+
   const openCreate = () => { setEditingProduct(null); setModalOpen(true); };
   const openEdit = (p: DbProduct) => { setEditingProduct(p); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditingProduct(null); };
+  const startSelection = () => {
+    setSelectionMode(true);
+  };
+  const cancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedProductIds([]);
+  };
+  const setProductSelected = (id: string, selected: boolean) => {
+    setSelectedProductIds((current) => {
+      if (selected) return current.includes(id) ? current : [...current, id];
+      return current.filter((productId) => productId !== id);
+    });
+  };
+  const toggleSelectVisible = () => {
+    setSelectedProductIds((current) => {
+      if (allVisibleSelected) {
+        return current.filter((id) => !selectableFilteredIds.includes(id));
+      }
+      return Array.from(new Set([...current, ...selectableFilteredIds]));
+    });
+  };
+  const applyBulkDiscount = () => {
+    const productIds = selectedProductIds;
+    if (productIds.length === 0) {
+      toast.error("請先勾選商品");
+      return;
+    }
+    const discountRate = Number(bulkDiscountRate);
+    if (!Number.isFinite(discountRate) || discountRate <= 0 || discountRate > 10) {
+      toast.error("折數請填 0.1 到 10 之間，例如 9 代表 9 折");
+      return;
+    }
+    const confirmed = window.confirm(`確定要將 ${productIds.length} 件商品套用 ${bulkDiscountRate} 折嗎？`);
+    if (!confirmed) return;
+    bulkApplyDiscount.mutate({ productIds, discountRate });
+  };
+  const clearBulkDiscount = () => {
+    const productIds = selectedProductIds;
+    if (productIds.length === 0) {
+      toast.error("請先勾選商品");
+      return;
+    }
+    const confirmed = window.confirm(`確定要清除 ${productIds.length} 件商品的折扣嗎？`);
+    if (!confirmed) return;
+    bulkClearDiscount.mutate({ productIds });
+  };
 
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
@@ -1191,6 +1244,86 @@ export default function AdminProducts() {
           </div>
         </div>
 
+        {/* Bulk discount */}
+        <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center bg-[oklch(0.94_0_0)]">
+                <Percent className="w-5 h-5 text-[oklch(0.25_0_0)]" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[oklch(0.12_0_0)]">批次折扣</p>
+                <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
+                  {selectionMode
+                    ? `已選 ${selectedProductIds.length} 件；目前列表可選 ${selectableFilteredIds.length} 件。`
+                    : "先進入選取模式，再勾選要套用折扣的商品。"}
+                </p>
+              </div>
+            </div>
+
+            {selectionMode ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto_auto] lg:justify-end">
+                <button
+                  type="button"
+                  onClick={toggleSelectVisible}
+                  disabled={selectableFilteredIds.length === 0 || bulkPending}
+                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                >
+                  {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
+                </button>
+                <label className="flex items-center border border-[oklch(0.86_0_0)] bg-white focus-within:border-[oklch(0.2_0_0)]">
+                  <span className="pl-3 text-xs font-body text-[oklch(0.45_0_0)]">折扣</span>
+                  <input
+                    type="number"
+                    min={0.1}
+                    max={10}
+                    step={0.1}
+                    value={bulkDiscountRate}
+                    disabled={bulkPending}
+                    onChange={(e) => setBulkDiscountRate(e.target.value)}
+                    className="min-w-0 flex-1 border-0 px-2 py-2 text-sm font-body outline-none disabled:bg-[oklch(0.96_0_0)]"
+                    placeholder="9"
+                  />
+                  <span className="pr-3 text-xs font-body text-[oklch(0.45_0_0)]">折</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={applyBulkDiscount}
+                  disabled={selectedProductIds.length === 0 || bulkPending}
+                  className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+                >
+                  套用折扣
+                </button>
+                <button
+                  type="button"
+                  onClick={clearBulkDiscount}
+                  disabled={selectedProductIds.length === 0 || bulkPending}
+                  className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  清除折扣
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelSelection}
+                  disabled={bulkPending}
+                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                >
+                  完成選取
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={startSelection}
+                disabled={selectableFilteredIds.length === 0 || bulkPending}
+                className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+              >
+                開始選取商品
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Product list */}
         {isLoading ? (
           <div className="space-y-3">
@@ -1223,7 +1356,15 @@ export default function AdminProducts() {
                 </p>
                 <div className="space-y-2">
                   {activeProducts.map((product) => (
-                    <ProductRow key={product.id} product={product} onEdit={openEdit} />
+                    <ProductRow
+                      key={product.id}
+                      product={product}
+                      selected={selectedProductIds.includes(product.id)}
+                      selectionMode={selectionMode}
+                      selectable={product.category !== "test"}
+                      onSelectChange={setProductSelected}
+                      onEdit={openEdit}
+                    />
                   ))}
                 </div>
               </div>
@@ -1237,7 +1378,15 @@ export default function AdminProducts() {
                 </p>
                 <div className="space-y-2">
                   {scheduledProducts.map((product) => (
-                    <ProductRow key={product.id} product={product} onEdit={openEdit} />
+                    <ProductRow
+                      key={product.id}
+                      product={product}
+                      selected={selectedProductIds.includes(product.id)}
+                      selectionMode={selectionMode}
+                      selectable={product.category !== "test"}
+                      onSelectChange={setProductSelected}
+                      onEdit={openEdit}
+                    />
                   ))}
                 </div>
               </div>
@@ -1251,7 +1400,15 @@ export default function AdminProducts() {
                 </p>
                 <div className="space-y-2 opacity-60">
                   {inactiveProducts.map((product) => (
-                    <ProductRow key={product.id} product={product} onEdit={openEdit} />
+                    <ProductRow
+                      key={product.id}
+                      product={product}
+                      selected={selectedProductIds.includes(product.id)}
+                      selectionMode={selectionMode}
+                      selectable={product.category !== "test"}
+                      onSelectChange={setProductSelected}
+                      onEdit={openEdit}
+                    />
                   ))}
                 </div>
               </div>

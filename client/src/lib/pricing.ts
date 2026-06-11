@@ -49,6 +49,14 @@ export function getSaleRate(product: ProductPricingFields) {
   return product.price / product.originalPrice;
 }
 
+export function getDiscountLabel(product: ProductPricingFields) {
+  const saleRate = getSaleRate(product);
+  if (saleRate === null) return null;
+  const discount = saleRate * 10;
+  const label = Number.isInteger(discount) ? String(discount) : discount.toFixed(1).replace(/\.0$/, "");
+  return `${label} 折`;
+}
+
 export function applySaleRate(price: number, saleRate: number | null) {
   return saleRate ? Math.round(price * saleRate) : price;
 }
@@ -72,4 +80,3 @@ export function getTieredBraceletDisplay(product: ProductPricingFields) {
     saleRange,
   };
 }
-
