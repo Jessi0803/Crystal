@@ -268,12 +268,14 @@ function StockCell({ productId, productName, isMonthlyLimited }: { productId: st
 function ProductRow({
   product,
   selected,
+  selectionMode,
   selectable,
   onSelectChange,
   onEdit,
 }: {
   product: DbProduct;
   selected: boolean;
+  selectionMode: boolean;
   selectable: boolean;
   onSelectChange: (id: string, selected: boolean) => void;
   onEdit: (p: DbProduct) => void;
@@ -303,15 +305,21 @@ function ProductRow({
 
   return (
     <div className="bg-white border border-[oklch(0.9_0_0)] px-4 py-3">
-      <div className="grid grid-cols-[20px_56px_minmax(0,1fr)] gap-3 items-start lg:grid-cols-[20px_56px_minmax(0,1fr)_80px_70px_80px_176px] lg:items-center">
-        <input
-          type="checkbox"
-          checked={selected}
-          disabled={!selectable}
-          onChange={(e) => onSelectChange(product.id, e.target.checked)}
-          aria-label={`選取 ${product.name}`}
-          className="mt-5 h-4 w-4 disabled:opacity-30"
-        />
+      <div className={`grid gap-3 items-start lg:items-center ${
+        selectionMode
+          ? "grid-cols-[20px_56px_minmax(0,1fr)] lg:grid-cols-[20px_56px_minmax(0,1fr)_80px_70px_80px_176px]"
+          : "grid-cols-[56px_minmax(0,1fr)] lg:grid-cols-[56px_minmax(0,1fr)_80px_70px_80px_176px]"
+      }`}>
+        {selectionMode && (
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={!selectable}
+            onChange={(e) => onSelectChange(product.id, e.target.checked)}
+            aria-label={`選取 ${product.name}`}
+            className="mt-5 h-4 w-4 disabled:opacity-30"
+          />
+        )}
         <img
           src={product.image}
           alt={product.name}
@@ -344,7 +352,7 @@ function ProductRow({
           )}
         </div>
 
-        <div className="col-start-3 text-left lg:col-auto lg:text-center">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} text-left lg:col-auto lg:text-center`}>
           {product.category === "custom" ? (
             <span className="text-xs font-body text-[oklch(0.6_0_0)]">—</span>
           ) : (
@@ -355,7 +363,7 @@ function ProductRow({
           )}
         </div>
 
-        <div className="col-start-3 text-left lg:col-auto lg:text-center">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} text-left lg:col-auto lg:text-center`}>
           <span className={`inline-block text-[10px] tracking-widest px-2 py-0.5 font-body ${
             isScheduled
               ? "bg-amber-50 text-amber-700 border border-amber-200"
@@ -367,7 +375,7 @@ function ProductRow({
           </span>
         </div>
 
-        <div className="col-start-3 text-left lg:col-auto lg:text-center">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} text-left lg:col-auto lg:text-center`}>
           <div className="flex flex-wrap items-center gap-1 lg:flex-col">
             {product.featured && (
               <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-amber-50 text-amber-700 border border-amber-200">
@@ -382,7 +390,7 @@ function ProductRow({
           </div>
         </div>
 
-        <div className="col-start-3 flex flex-wrap items-center justify-start gap-2 lg:col-auto lg:justify-end">
+        <div className={`${selectionMode ? "col-start-3" : "col-start-2"} flex flex-wrap items-center justify-start gap-2 lg:col-auto lg:justify-end`}>
           <button
             onClick={() => onEdit(product)}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
@@ -1011,6 +1019,7 @@ export default function AdminProducts() {
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<DbProduct | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [bulkDiscountRate, setBulkDiscountRate] = useState("9");
 
@@ -1075,6 +1084,13 @@ export default function AdminProducts() {
   const openCreate = () => { setEditingProduct(null); setModalOpen(true); };
   const openEdit = (p: DbProduct) => { setEditingProduct(p); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditingProduct(null); };
+  const startSelection = () => {
+    setSelectionMode(true);
+  };
+  const cancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedProductIds([]);
+  };
   const setProductSelected = (id: string, selected: boolean) => {
     setSelectedProductIds((current) => {
       if (selected) return current.includes(id) ? current : [...current, id];
@@ -1238,52 +1254,73 @@ export default function AdminProducts() {
               <div>
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">批次折扣</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  已勾選 {selectedProductIds.length} 件；目前列表可套用 {selectableFilteredIds.length} 件，客製化訂金商品會自動排除。
+                  {selectionMode
+                    ? `已選 ${selectedProductIds.length} 件；目前列表可選 ${selectableFilteredIds.length} 件，客製化訂金商品會自動排除。`
+                    : "先進入選取模式，再勾選要套用折扣的商品。"}
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto] lg:justify-end">
-              <button
-                type="button"
-                onClick={toggleSelectVisible}
-                disabled={selectableFilteredIds.length === 0 || bulkPending}
-                className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
-              >
-                {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
-              </button>
-              <label className="flex items-center border border-[oklch(0.86_0_0)] bg-white focus-within:border-[oklch(0.2_0_0)]">
-                <span className="pl-3 text-xs font-body text-[oklch(0.45_0_0)]">折扣</span>
-                <input
-                  type="number"
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  value={bulkDiscountRate}
+            {selectionMode ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto_auto] lg:justify-end">
+                <button
+                  type="button"
+                  onClick={toggleSelectVisible}
+                  disabled={selectableFilteredIds.length === 0 || bulkPending}
+                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                >
+                  {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
+                </button>
+                <label className="flex items-center border border-[oklch(0.86_0_0)] bg-white focus-within:border-[oklch(0.2_0_0)]">
+                  <span className="pl-3 text-xs font-body text-[oklch(0.45_0_0)]">折扣</span>
+                  <input
+                    type="number"
+                    min={0.1}
+                    max={10}
+                    step={0.1}
+                    value={bulkDiscountRate}
+                    disabled={bulkPending}
+                    onChange={(e) => setBulkDiscountRate(e.target.value)}
+                    className="min-w-0 flex-1 border-0 px-2 py-2 text-sm font-body outline-none disabled:bg-[oklch(0.96_0_0)]"
+                    placeholder="9"
+                  />
+                  <span className="pr-3 text-xs font-body text-[oklch(0.45_0_0)]">折</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={applyBulkDiscount}
+                  disabled={selectedProductIds.length === 0 || bulkPending}
+                  className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+                >
+                  套用折扣
+                </button>
+                <button
+                  type="button"
+                  onClick={clearBulkDiscount}
+                  disabled={selectedProductIds.length === 0 || bulkPending}
+                  className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  清除折扣
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelSelection}
                   disabled={bulkPending}
-                  onChange={(e) => setBulkDiscountRate(e.target.value)}
-                  className="min-w-0 flex-1 border-0 px-2 py-2 text-sm font-body outline-none disabled:bg-[oklch(0.96_0_0)]"
-                  placeholder="9"
-                />
-                <span className="pr-3 text-xs font-body text-[oklch(0.45_0_0)]">折</span>
-              </label>
+                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                >
+                  完成選取
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={applyBulkDiscount}
-                disabled={selectedProductIds.length === 0 || bulkPending}
+                onClick={startSelection}
+                disabled={selectableFilteredIds.length === 0 || bulkPending}
                 className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
               >
-                套用折扣
+                開始選取商品
               </button>
-              <button
-                type="button"
-                onClick={clearBulkDiscount}
-                disabled={selectedProductIds.length === 0 || bulkPending}
-                className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-              >
-                清除折扣
-              </button>
-            </div>
+            )}
           </div>
         </div>
 
@@ -1323,6 +1360,7 @@ export default function AdminProducts() {
                       key={product.id}
                       product={product}
                       selected={selectedProductIds.includes(product.id)}
+                      selectionMode={selectionMode}
                       selectable={product.category !== "custom"}
                       onSelectChange={setProductSelected}
                       onEdit={openEdit}
@@ -1344,6 +1382,7 @@ export default function AdminProducts() {
                       key={product.id}
                       product={product}
                       selected={selectedProductIds.includes(product.id)}
+                      selectionMode={selectionMode}
                       selectable={product.category !== "custom"}
                       onSelectChange={setProductSelected}
                       onEdit={openEdit}
@@ -1365,6 +1404,7 @@ export default function AdminProducts() {
                       key={product.id}
                       product={product}
                       selected={selectedProductIds.includes(product.id)}
+                      selectionMode={selectionMode}
                       selectable={product.category !== "custom"}
                       onSelectChange={setProductSelected}
                       onEdit={openEdit}
