@@ -825,6 +825,32 @@ function keywordBoostScore(chunk: KnowledgeChunk, hits: number): number {
 
 export type ScoredChunk = KnowledgeChunk & { score: number };
 
+function productIdsFromChunk(chunk: KnowledgeChunk): string[] {
+  if (chunk.relatedProductIds?.length) return chunk.relatedProductIds;
+  return chunk.id.startsWith("product-") ? [chunk.id.slice("product-".length)] : [];
+}
+
+function isProductRecommendationChunk(chunk: KnowledgeChunk): boolean {
+  return chunk.category === "商品推薦" && chunk.id.startsWith("product-");
+}
+
+export function selectStaticKnowledgeForSearch(
+  staticChunks: KnowledgeChunk[],
+  dynamicChunks: KnowledgeChunk[]
+): KnowledgeChunk[] {
+  const dynamicProductIds = new Set(
+    dynamicChunks
+      .filter(isProductRecommendationChunk)
+      .flatMap(productIdsFromChunk)
+  );
+  if (dynamicProductIds.size === 0) return staticChunks;
+
+  return staticChunks.filter((chunk) => {
+    if (!isProductRecommendationChunk(chunk)) return true;
+    return productIdsFromChunk(chunk).every((id) => !dynamicProductIds.has(id));
+  });
+}
+
 export async function searchKnowledge(
   query: string,
   queryVector: number[],
@@ -843,7 +869,8 @@ export async function searchKnowledge(
     return { ...chunk, score };
   };
 
-  const staticScored = knowledgeChunks.map((chunk) => scoreChunk(chunk, vectorById.get(chunk.id)));
+  const searchableStaticChunks = selectStaticKnowledgeForSearch(knowledgeChunks, dynamicChunks);
+  const staticScored = searchableStaticChunks.map((chunk) => scoreChunk(chunk, vectorById.get(chunk.id)));
   const dynamicScored = dynamicChunks.map((chunk) => scoreChunk(chunk, chunk.vector));
 
   return [...staticScored, ...dynamicScored]
