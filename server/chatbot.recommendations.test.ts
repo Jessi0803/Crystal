@@ -83,6 +83,22 @@ describe("chatbot product recommendations", () => {
     ]);
   });
 
+  it("moves legacy static products behind newer product matches when enough newer options match", () => {
+    const chunks = [
+      { ...recommendationChunk("product-d001-moon-secret"), score: 0.8 },
+      { ...recommendationChunk("product-d005-moon-clear-heart"), score: 0.78 },
+      { ...recommendationChunk("product-prod-1780213098870"), score: 0.7 },
+      { ...recommendationChunk("product-prod-1780212635593"), score: 0.68 },
+    ] as ScoredChunk[];
+
+    expect(selectRelatedProductIds(chunks)).toEqual([
+      "prod-1780213098870",
+      "prod-1780212635593",
+      "d001-moon-secret",
+      "d005-moon-clear-heart",
+    ]);
+  });
+
   it("does not recommend products from weak matches", () => {
     const chunks = [
       {
