@@ -9,16 +9,37 @@ function recommendationChunk(id: string) {
 }
 
 describe("chatbot product recommendations", () => {
-  it("offers three relevant products for broad confidence, healing and protection needs", () => {
-    expect(recommendationChunk("rec-confidence").relatedProductIds).toHaveLength(3);
-    expect(recommendationChunk("rec-healing").relatedProductIds).toHaveLength(3);
-    expect(recommendationChunk("rec-protection").relatedProductIds).toHaveLength(3);
+  it("uses broad need knowledge as guidance instead of hard-coded product bundles", () => {
+    expect(recommendationChunk("rec-confidence")).toMatchObject({ category: "選購需求" });
+    expect(recommendationChunk("rec-healing")).toMatchObject({ category: "選購需求" });
+    expect(recommendationChunk("rec-protection")).toMatchObject({ category: "選購需求" });
+    expect(recommendationChunk("rec-confidence").relatedProductIds).toBeUndefined();
+    expect(recommendationChunk("rec-healing").relatedProductIds).toBeUndefined();
+    expect(recommendationChunk("rec-protection").relatedProductIds).toBeUndefined();
   });
 
   it("merges two relevant recommendation matches without duplicate or excessive cards", () => {
     const chunks = [
-      { ...recommendationChunk("rec-confidence"), score: 0.76 },
-      { ...recommendationChunk("rec-healing"), score: 0.72 },
+      {
+        id: "manual-confidence",
+        question: "confidence",
+        answer: "",
+        embedText: "",
+        keywords: [],
+        category: "商品推薦",
+        relatedProductIds: ["d003-venus", "d002-honey-realm", "d001-moon-secret"],
+        score: 0.76,
+      },
+      {
+        id: "manual-healing",
+        question: "healing",
+        answer: "",
+        embedText: "",
+        keywords: [],
+        category: "商品推薦",
+        relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"],
+        score: 0.72,
+      },
     ] as ScoredChunk[];
 
     expect(selectRelatedProductIds(chunks)).toEqual([
@@ -26,12 +47,54 @@ describe("chatbot product recommendations", () => {
       "d002-honey-realm",
       "d001-moon-secret",
       "d005-moon-clear-heart",
+      "d004-morning-whisper",
+    ]);
+  });
+
+  it("prefers standalone product matches over broad fixed recommendation groups", () => {
+    const chunks = [
+      {
+        id: "manual-healing",
+        question: "healing",
+        answer: "",
+        embedText: "",
+        keywords: [],
+        category: "商品推薦",
+        relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"],
+        score: 0.8,
+      },
+      { ...recommendationChunk("product-prod-1780212635593"), score: 0.68 },
+      { ...recommendationChunk("product-prod-1780213098870"), score: 0.66 },
+      {
+        id: "manual-confidence",
+        question: "confidence",
+        answer: "",
+        embedText: "",
+        keywords: [],
+        category: "商品推薦",
+        relatedProductIds: ["d003-venus", "d002-honey-realm", "d001-moon-secret"],
+        score: 0.64,
+      },
+    ] as ScoredChunk[];
+
+    expect(selectRelatedProductIds(chunks)).toEqual([
+      "prod-1780212635593",
+      "prod-1780213098870",
     ]);
   });
 
   it("does not recommend products from weak matches", () => {
     const chunks = [
-      { ...recommendationChunk("rec-confidence"), score: 0.54 },
+      {
+        id: "manual-confidence",
+        question: "confidence",
+        answer: "",
+        embedText: "",
+        keywords: [],
+        category: "商品推薦",
+        relatedProductIds: ["d003-venus"],
+        score: 0.54,
+      },
     ] as ScoredChunk[];
 
     expect(selectRelatedProductIds(chunks)).toEqual([]);

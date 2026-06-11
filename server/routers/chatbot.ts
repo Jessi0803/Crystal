@@ -163,7 +163,7 @@ type RelatedProductForChat = {
 export function selectRelatedProductIds(
   relevantChunks: ScoredChunk[],
   scoreMin = 0.55,
-  maxProducts = 4
+  maxProducts = 6
 ): string[] {
   const matchingChunks = relevantChunks
     .filter(
@@ -172,12 +172,16 @@ export function selectRelatedProductIds(
         (chunk.relatedProductIds?.length ?? 0) > 0 &&
         chunk.score >= scoreMin
     )
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2);
+    .sort((a, b) => b.score - a.score);
 
-  return Array.from(
-    new Set(matchingChunks.flatMap((chunk) => chunk.relatedProductIds ?? []))
-  ).slice(0, maxProducts);
+  const standaloneProductChunks = matchingChunks.filter((chunk) => chunk.id.startsWith("product-"));
+  const fallbackRecommendationChunks = matchingChunks.filter((chunk) => !chunk.id.startsWith("product-"));
+  const chunksToUse =
+    standaloneProductChunks.length >= 2
+      ? standaloneProductChunks
+      : [...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)];
+
+  return Array.from(new Set(chunksToUse.flatMap((chunk) => chunk.relatedProductIds ?? []))).slice(0, maxProducts);
 }
 
 function normalizeProductImageUrl(url: string) {
@@ -314,7 +318,7 @@ export const chatbotRouter = router({
       }
 
       // 2. RAG 檢索
-      const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
+      const relevantChunks = await searchKnowledge(queryText, queryVector, 10, 0.45);
       const hasUnavailableCrystalMatch = relevantChunks.some(
         (chunk) => chunk.id.endsWith("-unavailable") && chunk.score >= 0.55
       );

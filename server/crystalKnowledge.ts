@@ -567,93 +567,84 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "rec-confidence",
     question: "哪款手鍊適合提升自信、魅力或吸引力？",
     answer:
-      "推薦「維納斯 Venus」（提升自信與行動力，輕量日常款，NT$950）、「蜜光之境」（增強自信、吸引人緣、穩定氣場，NT$1,580）和「月下密語」（釋放壓力並提升表達勇氣，NT$1,480起）。",
+      "提升自信、魅力或吸引力時，請優先從現貨商品知識中挑選功效包含自信、魅力、吸引力、氣場、行動力或表達力的款式。",
     embedText: "提升自信 自信心 魅力 吸引力 氣場 行動力 增強自信 建立自信 想變自信 自我提升",
     keywords: ["自信", "魅力", "吸引力", "氣場", "行動力", "提升自信"],
-    category: "商品推薦",
-    relatedProductIds: ["d003-venus", "d002-honey-realm", "d001-moon-secret"],
+    category: "選購需求",
   },
   {
     id: "rec-wealth",
     question: "哪款手鍊適合招財、提升財運或事業運？",
     answer:
-      "推薦「蜜光之境」（招財聚能、提升行動力、財富人緣一次到位，NT$1,580）和「維納斯 Venus」（招財放大正向能量、提升自信行動力，NT$950）。",
+      "招財、財運或事業需求，請優先從現貨商品知識中挑選功效包含招財、財運、事業、貴人、行動力、目標或自信的款式。",
     embedText: "招財 財運 財富 錢財 事業 工作 升遷 行動力 提升財運 招財手鍊 賺錢",
     keywords: ["招財", "財運", "財富", "事業", "工作", "升遷", "賺錢"],
-    category: "商品推薦",
-    relatedProductIds: ["d002-honey-realm", "d003-venus"],
+    category: "選購需求",
   },
   {
     id: "rec-love",
     question: "哪款手鍊適合提升愛情、桃花或人緣？",
     answer:
-      "推薦「晨光輕語」（提升愛情人緣、柔化情緒增加安全感，NT$1,800）、「月映淨心」（吸引愛情、安撫情緒、帶來溫柔安全感，NT$1,500）和「蜜光之境」（吸引愛情與好人緣，NT$1,580）。",
+      "愛情、桃花或人緣需求，請優先從現貨商品知識中挑選功效包含愛情、桃花、人緣、正緣、關係修復、溫柔魅力或安全感的款式。",
     embedText: "愛情 桃花 人緣 感情 戀愛 交友 吸引異性 提升桃花 正緣 好人緣 脫單",
     keywords: ["愛情", "桃花", "人緣", "感情", "戀愛", "正緣", "交友", "脫單"],
-    category: "商品推薦",
-    relatedProductIds: ["d004-morning-whisper", "d005-moon-clear-heart", "d002-honey-realm"],
+    category: "選購需求",
   },
   {
     id: "rec-healing",
     question: "哪款手鍊適合療癒、釋放壓力或安撫情緒？",
     answer:
-      "推薦「月下密語」（淨化負能量、釋放壓力焦慮，NT$1,480起）、「月映淨心」（安撫情緒並帶來安全感，NT$1,500）和「晨光輕語」（柔化情緒並穩定氣場，NT$1,800）。",
+      "療癒、釋放壓力或安撫情緒時，請優先從現貨商品知識中挑選功效包含療癒、安撫、情緒穩定、釋放壓力、焦慮、不安或安全感的款式。",
     embedText: "療癒 壓力 焦慮 情緒 安撫 紓壓 放鬆 不安 釋放壓力 情緒穩定 心情不好 負面情緒",
     keywords: ["療癒", "壓力", "焦慮", "情緒", "安撫", "紓壓", "放鬆", "心情不好"],
-    category: "商品推薦",
-    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"],
+    category: "選購需求",
   },
   {
     id: "rec-protection",
     question: "哪款手鍊適合防護負能量、保護氣場？",
     answer:
-      "推薦「月下密語」（淨化並防護外在負能量，NT$1,480起）、「蜜光之境」（強化保護力與穩定氣場，NT$1,580）和「晨光輕語」（淨化負能量並維持柔和氣場，NT$1,800）。",
+      "防護負能量、保護氣場或防小人需求，請優先從現貨商品知識中挑選功效包含防護、保護、負能量、氣場、淨化、穩定或避邪的款式。",
     embedText: "防護 負能量 保護 氣場 淨化 穩定 防小人 避邪 保護能量 驅邪",
     keywords: ["防護", "負能量", "保護", "氣場", "淨化", "防小人", "驅邪"],
-    category: "商品推薦",
-    relatedProductIds: ["d001-moon-secret", "d002-honey-realm", "d004-morning-whisper"],
+    category: "選購需求",
   },
   {
     id: "rec-crystal-rose-quartz",
     question: "想要粉晶／粉水晶手鍊，有推薦的款式嗎？",
     answer:
-      "推薦「月映淨心手鍊」（以粉晶搭配白月光、藍月光與白水晶為主軸，溫柔招桃花與好人緣、安撫情緒，NT$1,500），以及「蜜光之境手鍊」（複方設計中含粉晶，同時兼顧財運、人緣與穩定氣場，NT$1,580）。若想指定粉晶比例或配色，也可考慮客製化手鍊。",
+      "顧客想找粉晶或粉水晶時，請優先從現貨商品知識中挑選 crystalType 或商品說明包含粉晶、粉水晶、玫瑰石英或愛情桃花功效的款式。",
     embedText:
       "粉晶 粉水晶 玫瑰石英 薔薇石英 rose quartz 想要粉晶 粉晶手鍊 粉晶推薦 有粉晶的手鍊嗎 粉晶款式 招桃花粉晶 人緣粉晶 愛情粉晶 推薦手鍊",
     keywords: ["粉晶", "粉水晶", "玫瑰石英", "薔薇石英", "rose quartz"],
-    category: "商品推薦",
-    relatedProductIds: ["d005-moon-clear-heart", "d002-honey-realm"],
+    category: "選購需求",
   },
   {
     id: "rec-crystal-strawberry",
     question: "想要草莓晶手鍊，有推薦嗎？",
     answer:
-      "推薦「蜜光之境手鍊」（配方含草莓晶，搭配黃水晶、銅髮晶等，有助招財聚能、好人緣與行動力，NT$1,580）。若希望草莓晶為主體或與其他晶石搭配，歡迎參考客製化方案。",
+      "顧客想找草莓晶時，請優先從現貨商品知識中挑選 crystalType 或商品說明包含草莓晶、草莓水晶、桃花、人緣或魅力功效的款式。",
     embedText: "草莓晶 草莓水晶 想要草莓晶 草莓晶手鍊 草莓晶推薦 有草莓晶的手鍊嗎 桃花草莓晶",
     keywords: ["草莓晶", "草莓水晶"],
-    category: "商品推薦",
-    relatedProductIds: ["d002-honey-realm"],
+    category: "選購需求",
   },
   {
     id: "rec-crystal-moonstone",
     question: "想要月光石／藍月光手鍊，有推薦嗎？",
     answer:
-      "推薦「月下密語手鍊」（藍月光、灰月光等，淨化與平衡情緒，NT$1,480起）、「晨光輕語手鍊」（藍月光、白月光等，愛情與人緣平衡，NT$1,800）、「月映淨心手鍊」（粉晶配白月光、藍月光，柔和療癒，NT$1,500）。吊飾「維納斯 Venus」亦含藍月光元素（NT$950）。",
+      "顧客想找月光石、藍月光、白月光或灰月光時，請優先從現貨商品知識中挑選 crystalType 或商品說明包含這些晶石，以及情緒平衡、療癒、直覺或柔和魅力功效的款式。",
     embedText:
       "月光石 月光石手鍊 藍月光 白月光 灰月光 月亮石 moonstone 想要月光石 有月光石的手鍊嗎 月光石推薦",
     keywords: ["月光石", "藍月光", "白月光", "灰月光", "月亮石", "moonstone"],
-    category: "商品推薦",
-    relatedProductIds: ["d001-moon-secret", "d004-morning-whisper", "d005-moon-clear-heart", "d003-venus"],
+    category: "選購需求",
   },
   {
     id: "rec-crystal-citrine-rutilated",
     question: "想要黃水晶、銅髮晶或招財系晶石手鍊，有推薦嗎？",
     answer:
-      "推薦「蜜光之境手鍊」（含銅髮晶、黃水晶、太陽石等，招財與行動力取向，NT$1,580）。若要以特定晶石為主或加強事業財運，也可透過客製化討論。",
+      "顧客想找黃水晶、銅髮晶、髮晶或招財系晶石時，請優先從現貨商品知識中挑選 crystalType 或商品說明包含這些晶石，以及招財、財運、事業、行動力或貴人功效的款式。",
     embedText: "黃水晶 銅髮晶 髮晶 招財水晶 財運水晶 想要黃水晶 黃水晶手鍊 銅髮晶手鍊 有黃水晶的手鍊嗎",
     keywords: ["黃水晶", "銅髮晶", "髮晶"],
-    category: "商品推薦",
-    relatedProductIds: ["d002-honey-realm"],
+    category: "選購需求",
   },
   {
     id: "rec-crystal-green-phantom-unavailable",
@@ -668,22 +659,20 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "rec-crystal-obsidian",
     question: "想要黑曜石手鍊，有推薦嗎？",
     answer:
-      "現貨設計中「蜜光之境手鍊」配方含黑曜石，可輔助穩定氣場與防護感（NT$1,580）。若希望以黑曜石為主軸，建議使用客製化服務與老闆討論比例與款式。",
+      "顧客想找黑曜石時，請優先從現貨商品知識中挑選 crystalType 或商品說明包含黑曜石，以及防護、避邪、穩定氣場、淨化或負能量相關功效的款式。",
     embedText: "黑曜石 黑曜石手鍊 想要黑曜石 黑曜石推薦 有黑曜石的手鍊嗎 避邪黑曜石",
     keywords: ["黑曜石"],
-    category: "商品推薦",
-    relatedProductIds: ["d002-honey-realm"],
+    category: "選購需求",
   },
   {
     id: "rec-crystal-white-phantom-tourmaline",
     question: "想要白幽靈、兔毛或粉碧璽手鍊，有推薦嗎？",
     answer:
-      "推薦「晨光輕語手鍊」（白幽靈、紅兔毛、白兔毛、粉碧璽與月光石等，愛情與人緣、情緒平衡，NT$1,800），以及「月下密語手鍊」（白幽靈、藍月光等，淨化與釋放壓力，NT$1,480起）。",
+      "顧客想找白幽靈、紅兔毛、白兔毛、兔毛或粉碧璽時，請優先從現貨商品知識中挑選 crystalType 或商品說明包含這些晶石，以及淨化、療癒、愛情人緣或情緒平衡功效的款式。",
     embedText:
       "白幽靈 白幽靈手鍊 紅兔毛 白兔毛 兔毛水晶 粉碧璽 想要白幽靈 有白幽靈的手鍊嗎 粉碧璽手鍊",
     keywords: ["白幽靈", "紅兔毛", "白兔毛", "兔毛", "粉碧璽"],
-    category: "商品推薦",
-    relatedProductIds: ["d004-morning-whisper", "d001-moon-secret"],
+    category: "選購需求",
   },
   {
     id: "product-d001-moon-secret",
