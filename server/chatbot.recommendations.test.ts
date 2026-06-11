@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildProductKnowledgeChunk, knowledgeChunks, searchKnowledge, type ScoredChunk } from "./crystalKnowledge";
+import {
+  buildProductKnowledgeChunk,
+  knowledgeChunks,
+  searchKnowledge,
+  selectStaticKnowledgeForSearch,
+  type ScoredChunk,
+} from "./crystalKnowledge";
 import { selectRelatedProductIds } from "./routers/chatbot";
 
 function recommendationChunk(id: string) {
@@ -131,6 +137,35 @@ describe("chatbot product recommendations", () => {
         relatedProductIds: [productId],
       });
     }
+  });
+
+  it("skips static product knowledge when the same product exists in dynamic knowledge", () => {
+    const dynamicProduct = buildProductKnowledgeChunk({
+      id: "d001-moon-secret",
+      name: "月下密語手鍊",
+      subtitle: "DB 商品知識",
+      category: "healing",
+      categoryLabel: "療癒系列",
+      categories: ["healing"],
+      categoryLabels: ["療癒系列"],
+      price: 1580,
+      priceRange: null,
+      tags: ["淨化"],
+      description: "",
+      story: "",
+      benefits: ["安撫情緒與壓力"],
+      suitableFor: [],
+      crystalType: "白幽靈、藍月光",
+      active: true,
+      isMonthlyLimited: false,
+    });
+
+    const searchable = selectStaticKnowledgeForSearch(knowledgeChunks, [dynamicProduct]);
+    const ids = searchable.map((chunk) => chunk.id);
+
+    expect(ids).not.toContain("product-d001-moon-secret");
+    expect(ids).toContain("rec-healing");
+    expect(ids).toContain("product-d002-honey-realm");
   });
 
   it("finds limited design products for limited-edition questions", async () => {
