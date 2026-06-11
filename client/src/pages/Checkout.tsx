@@ -24,7 +24,6 @@ import {
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
-import InAppBrowserWarning from "@/components/InAppBrowserWarning";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -445,9 +444,6 @@ export default function Checkout() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10">
-        <div className="mb-8 empty:hidden">
-          <InAppBrowserWarning />
-        </div>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10">
           {/* Left: Form */}
           <form onSubmit={handleSubmit} className="space-y-8">
