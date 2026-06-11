@@ -17,6 +17,7 @@ import {
 } from "@shared/overseasShipping";
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
+import InAppBrowserWarning from "@/components/InAppBrowserWarning";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -381,6 +382,11 @@ export default function BalancePayment() {
   return (
     <div className="min-h-screen bg-[oklch(0.98_0.005_60)]">
       <div className="max-w-2xl mx-auto px-4 sm:px-8 py-12">
+        {!isPaid && (
+          <div className="mb-6 empty:hidden">
+            <InAppBrowserWarning />
+          </div>
+        )}
         <div className="bg-white border border-[oklch(0.93_0_0)] p-8 sm:p-10">
           {/* Header */}
           <div className="text-center mb-8">
