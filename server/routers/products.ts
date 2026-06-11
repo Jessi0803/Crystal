@@ -96,6 +96,7 @@ async function ensureProductsTable() {
       \`featured\` boolean NOT NULL DEFAULT false,
       \`active\` boolean NOT NULL DEFAULT true,
       \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
+      \`twoItemFreeShippingEligible\` boolean NOT NULL DEFAULT true,
       \`claspOptions\` json DEFAULT NULL,
       \`showFitPreference\` boolean NOT NULL DEFAULT true,
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
@@ -116,6 +117,9 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`isMonthlyLimited\` boolean NOT NULL DEFAULT false`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`twoItemFreeShippingEligible\` boolean NOT NULL DEFAULT true`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`categories\` json DEFAULT NULL`);
@@ -242,6 +246,7 @@ function toFrontendProduct(p: DbProduct) {
     inStock: p.active,
     featured: p.featured,
     isMonthlyLimited: p.isMonthlyLimited,
+    twoItemFreeShippingEligible: p.twoItemFreeShippingEligible,
     claspOptions: p.claspOptions ?? undefined,
     showFitPreference: p.showFitPreference,
     wristSizeMin: p.wristSizeMin ?? 13,
@@ -286,6 +291,7 @@ const ProductInputSchema = z.object({
   featured: z.boolean().default(false),
   active: z.boolean().default(true),
   isMonthlyLimited: z.boolean().default(false),
+  twoItemFreeShippingEligible: z.boolean().default(true),
   claspOptions: z.array(z.enum(["elastic", "lobster", "magnetic"])).default([]),
   showFitPreference: z.boolean().default(true),
   wristSizeMin: wristSizeSchema.default(13),
@@ -304,6 +310,11 @@ const BulkDiscountInputSchema = z.object({
 
 const BulkClearDiscountInputSchema = z.object({
   productIds: z.array(z.string().min(1)).min(1),
+});
+
+const BulkTwoItemFreeShippingInputSchema = z.object({
+  productIds: z.array(z.string().min(1)).min(1),
+  eligible: z.boolean(),
 });
 
 export const productRouter = router({
@@ -454,6 +465,32 @@ export const productRouter = router({
       });
 
       return { count: products.length };
+    }),
+
+  bulkSetTwoItemFreeShipping: adminProcedure
+    .input(BulkTwoItemFreeShippingInputSchema)
+    .mutation(async ({ input }) => {
+      await ensureProductsTable();
+      await publishDueProducts();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
+
+      const rows = await db
+        .select({ id: dbProducts.id, category: dbProducts.category })
+        .from(dbProducts)
+        .where(inArray(dbProducts.id, input.productIds));
+      const productIds = rows
+        .filter((product) => product.category !== "test")
+        .map((product) => product.id);
+
+      if (productIds.length > 0) {
+        await db
+          .update(dbProducts)
+          .set({ twoItemFreeShippingEligible: input.eligible })
+          .where(inArray(dbProducts.id, productIds));
+      }
+
+      return { count: productIds.length };
     }),
 
   remove: adminProcedure

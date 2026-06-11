@@ -33,6 +33,7 @@ export type CheckoutFeeItem = {
   name?: string;
   price: number;
   quantity: number;
+  twoItemFreeShippingEligible?: boolean;
 };
 
 export function isCheckoutFeeExemptProduct(item: { id: string; baseProductId?: string; name?: string }) {
@@ -52,7 +53,7 @@ function isTestProduct(item: { id: string; baseProductId?: string; name?: string
 
 function calcFreeShippingQuantity(items: CheckoutFeeItem[]) {
   return items
-    .filter((item) => !isTestProduct(item))
+    .filter((item) => !isTestProduct(item) && item.twoItemFreeShippingEligible !== false)
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
