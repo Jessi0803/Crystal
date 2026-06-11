@@ -3,7 +3,7 @@
  * 流程：填寫購買人資料 → 選擇配送方式（超商/宅配）→ 選擇付款方式（信用卡/轉帳）→ 送出訂單
  * 物流類型：C2C 店到店（UNIMARTC2C / FAMIC2C）
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, CreditCard, Store, ShieldCheck, Lock, Banknote, MapPin, Home, Globe, ImageUp, X } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
@@ -98,6 +98,13 @@ export default function Checkout() {
     filename: string;
     previewUrl: string;
   } | null>(null);
+  const { data: liveProducts = [] } = trpc.product.list.useQuery(undefined, { enabled: items.length > 0 });
+  const twoItemFreeShippingEligibilityByProductId = useMemo(
+    () => new Map(liveProducts.map((product) => [product.id, product.twoItemFreeShippingEligible])),
+    [liveProducts]
+  );
+  const getTwoItemFreeShippingEligibility = (productId: string, fallback?: boolean) =>
+    twoItemFreeShippingEligibilityByProductId.get(productId) ?? fallback;
   // 計算總件數與費用
   const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
   const feeSummary = calcCheckoutFees({
@@ -107,7 +114,7 @@ export default function Checkout() {
       name: i.product.name,
       price: i.unitPrice,
       quantity: i.quantity,
-      twoItemFreeShippingEligible: i.product.twoItemFreeShippingEligible,
+      twoItemFreeShippingEligible: getTwoItemFreeShippingEligibility(i.product.id, i.product.twoItemFreeShippingEligible),
     })),
     checkoutRegion,
     shippingMethod,
@@ -306,7 +313,7 @@ export default function Checkout() {
           quantity: i.quantity,
           image: i.product.image,
           isPreorder: i.isPreorder,
-          twoItemFreeShippingEligible: i.product.twoItemFreeShippingEligible,
+          twoItemFreeShippingEligible: getTwoItemFreeShippingEligibility(i.product.id, i.product.twoItemFreeShippingEligible),
         })),
         origin: window.location.origin,
         customerNote: customConsultationNote,
