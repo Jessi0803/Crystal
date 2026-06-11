@@ -16,6 +16,7 @@ import {
 } from "@/lib/customOrderingContent";
 import {
   applySaleRate,
+  getDiscountLabel,
   getSaleRate,
   getTieredBraceletBasePrice,
   usesTieredBraceletPricing,
@@ -260,6 +261,8 @@ export default function ProductDetail() {
     : galleryImages[0] ?? product.image;
   const wristSizeNumber = Number(selectedWristSize);
   const saleRate = getSaleRate(product);
+  const discountLabel = getDiscountLabel(product);
+  const hasProductDiscount = Boolean(product.originalPrice && product.originalPrice > product.price);
   const originalBasePrice = hasTieredBraceletPricing
     ? getTieredBraceletBasePrice(product.id, wristSizeNumber)
     : product.price;
@@ -456,7 +459,7 @@ export default function ProductDetail() {
                         NT$ {originalCurrentPrice.toLocaleString()}
                       </span>
                       <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
-                        省 NT$ {(originalCurrentPrice - currentPrice).toLocaleString()}
+                        {discountLabel ?? `省 NT$ ${(originalCurrentPrice - currentPrice).toLocaleString()}`}
                       </span>
                     </>
                   )}
@@ -594,14 +597,14 @@ export default function ProductDetail() {
                   此為訂金價格
                 </span>
               )}
-              {product.originalPrice && (
+              {hasProductDiscount && product.originalPrice && (
                 <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
                   NT$ {product.originalPrice.toLocaleString()}
                 </span>
               )}
-              {product.originalPrice && (
+              {hasProductDiscount && product.originalPrice && (
                 <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
-                  省 NT$ {(product.originalPrice - product.price).toLocaleString()}
+                  {discountLabel ?? `省 NT$ ${(product.originalPrice - product.price).toLocaleString()}`}
                 </span>
               )}
             </div>

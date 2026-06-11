@@ -6,6 +6,7 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
+import { getDiscountLabel } from "@/lib/pricing";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -185,6 +186,7 @@ export default function Products() {
             {filtered.map((product) => {
               const availability = availabilityByProductId.get(product.id);
               const soldOut = availability?.isMonthlyLimited === true && availability.available === false;
+              const discountLabel = getDiscountLabel(product);
               return (
               <Link key={product.id} href={`/products/${product.id}`}>
                 <div className="product-card group">
@@ -201,9 +203,9 @@ export default function Products() {
                       </button>
                     )}
                     {/* Sale Badge */}
-                    {product.originalPrice && (
+                    {discountLabel && (
                       <span className="absolute top-3 left-3 bg-white text-[0.6rem] tracking-[0.08em] font-body px-2 py-1">
-                        SALE
+                        {discountLabel}
                       </span>
                     )}
                   </div>
