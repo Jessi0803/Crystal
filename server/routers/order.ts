@@ -45,7 +45,7 @@ import {
 } from "../ecpayLogistics";
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
-import { orders, orderItems, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
+import { dbProducts, orders, orderItems, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
 import { eq, inArray } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
@@ -105,10 +105,38 @@ const CartItemSchema = z.object({
   quantity: z.number(),
   image: z.string().optional(),
   isPreorder: z.boolean().optional(),
+  twoItemFreeShippingEligible: z.boolean().optional(),
 });
 
 function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
+}
+
+async function attachTwoItemFreeShippingEligibility<
+  T extends { id: string; baseProductId?: string; twoItemFreeShippingEligible?: boolean },
+>(items: T[]) {
+  const db = await getDb();
+  if (!db) return items;
+
+  const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
+  if (productIds.length === 0) return items;
+
+  const rows = await db
+    .select({
+      id: dbProducts.id,
+      twoItemFreeShippingEligible: dbProducts.twoItemFreeShippingEligible,
+    })
+    .from(dbProducts)
+    .where(inArray(dbProducts.id, productIds));
+  const eligibilityById = new Map(rows.map((row) => [row.id, row.twoItemFreeShippingEligible]));
+
+  return items.map((item) => {
+    const productId = item.baseProductId ?? item.id;
+    return {
+      ...item,
+      twoItemFreeShippingEligible: eligibilityById.get(productId) ?? item.twoItemFreeShippingEligible ?? true,
+    };
+  });
 }
 
 export const orderRouter = router({
@@ -284,8 +312,9 @@ export const orderRouter = router({
         receiverZipCode = formatted.receiverZipCode;
       }
 
+      const feeItemsForCalculation = await attachTwoItemFreeShippingEligibility(submittedItems);
       const feeSummary = calcCheckoutFees({
-        items: submittedItems,
+        items: feeItemsForCalculation,
         checkoutRegion: input.checkoutRegion,
         shippingMethod,
         paymentMethod,

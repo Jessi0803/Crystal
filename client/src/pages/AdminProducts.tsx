@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Package, Plus, Search, Save, X, Upload, ImageIcon,
-  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Users, Percent
+  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Users, Percent, Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -49,6 +49,7 @@ type FormState = {
   featured: boolean;
   active: boolean;
   isMonthlyLimited: boolean;
+  twoItemFreeShippingEligible: boolean;
   claspOptions: ("elastic" | "lobster" | "magnetic")[];
   showFitPreference: boolean;
   wristSizeMin: string;
@@ -74,6 +75,7 @@ const DEFAULT_FORM: FormState = {
   featured: false,
   active: true,
   isMonthlyLimited: false,
+  twoItemFreeShippingEligible: true,
   claspOptions: [...DEFAULT_CLASP_OPTIONS],
   showFitPreference: true,
   wristSizeMin: DEFAULT_WRIST_SIZE_MIN,
@@ -387,6 +389,11 @@ function ProductRow({
                 月限
               </span>
             )}
+            {product.twoItemFreeShippingEligible && (
+              <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-sky-50 text-sky-700 border border-sky-200">
+                兩件免運
+              </span>
+            )}
           </div>
         </div>
 
@@ -452,6 +459,7 @@ function ProductModal({
           featured: editing.featured,
           active: editing.active,
           isMonthlyLimited: editing.isMonthlyLimited,
+          twoItemFreeShippingEligible: editing.twoItemFreeShippingEligible ?? true,
           claspOptions: editing.claspOptions ?? [...DEFAULT_CLASP_OPTIONS],
           showFitPreference: editing.showFitPreference ?? true,
           wristSizeMin: String(editing.wristSizeMin ?? DEFAULT_WRIST_SIZE_MIN),
@@ -610,6 +618,7 @@ function ProductModal({
       color: editing?.color ?? "",
       featured: form.featured,
       isMonthlyLimited: form.isMonthlyLimited,
+      twoItemFreeShippingEligible: form.twoItemFreeShippingEligible,
       claspOptions: form.claspOptions,
       showFitPreference: form.showFitPreference,
       wristSizeMin,
@@ -969,6 +978,15 @@ function ProductModal({
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
+                checked={form.twoItemFreeShippingEligible}
+                onChange={(e) => setForm((p) => ({ ...p, twoItemFreeShippingEligible: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <span className="text-xs font-body text-[oklch(0.35_0_0)]">可計入兩件免運</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
                 checked={form.active}
                 disabled={Boolean(form.scheduledPublishAt)}
                 onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
@@ -1055,6 +1073,17 @@ export default function AdminProducts() {
     },
     onError: (err) => toast.error(err.message || "清除折扣失敗"),
   });
+  const bulkSetTwoItemFreeShipping = trpc.product.bulkSetTwoItemFreeShipping.useMutation({
+    onSuccess: async ({ count }, variables) => {
+      toast.success(`已${variables.eligible ? "套用" : "取消"} ${count} 件商品的兩件免運`);
+      setSelectedProductIds([]);
+      await Promise.all([
+        utils.product.adminList.invalidate(),
+        utils.product.list.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "更新兩件免運失敗"),
+  });
 
   const handleSeed = () => {
     const toSeed = staticProducts
@@ -1077,9 +1106,13 @@ export default function AdminProducts() {
     () => filtered.filter((product) => product.category !== "test").map((product) => product.id),
     [filtered]
   );
-  const selectedVisibleCount = selectedProductIds.filter((id) => selectableFilteredIds.includes(id)).length;
-  const allVisibleSelected = selectableFilteredIds.length > 0 && selectedVisibleCount === selectableFilteredIds.length;
-  const bulkPending = bulkApplyDiscount.isPending || bulkClearDiscount.isPending;
+  const selectableAllIds = useMemo(
+    () => dbProductList.filter((product) => product.category !== "test").map((product) => product.id),
+    [dbProductList]
+  );
+  const selectedAllCount = selectedProductIds.filter((id) => selectableAllIds.includes(id)).length;
+  const allProductsSelected = selectableAllIds.length > 0 && selectedAllCount === selectableAllIds.length;
+  const bulkPending = bulkApplyDiscount.isPending || bulkClearDiscount.isPending || bulkSetTwoItemFreeShipping.isPending;
 
   const openCreate = () => { setEditingProduct(null); setModalOpen(true); };
   const openEdit = (p: DbProduct) => { setEditingProduct(p); setModalOpen(true); };
@@ -1097,12 +1130,12 @@ export default function AdminProducts() {
       return current.filter((productId) => productId !== id);
     });
   };
-  const toggleSelectVisible = () => {
+  const toggleSelectAllProducts = () => {
     setSelectedProductIds((current) => {
-      if (allVisibleSelected) {
-        return current.filter((id) => !selectableFilteredIds.includes(id));
+      if (allProductsSelected) {
+        return current.filter((id) => !selectableAllIds.includes(id));
       }
-      return Array.from(new Set([...current, ...selectableFilteredIds]));
+      return Array.from(new Set([...current, ...selectableAllIds]));
     });
   };
   const applyBulkDiscount = () => {
@@ -1129,6 +1162,17 @@ export default function AdminProducts() {
     const confirmed = window.confirm(`確定要清除 ${productIds.length} 件商品的折扣嗎？`);
     if (!confirmed) return;
     bulkClearDiscount.mutate({ productIds });
+  };
+  const setBulkTwoItemFreeShipping = (eligible: boolean) => {
+    const productIds = selectedProductIds;
+    if (productIds.length === 0) {
+      toast.error("請先勾選商品");
+      return;
+    }
+    const action = eligible ? "套用兩件免運" : "取消兩件免運";
+    const confirmed = window.confirm(`確定要對 ${productIds.length} 件商品${action}嗎？`);
+    if (!confirmed) return;
+    bulkSetTwoItemFreeShipping.mutate({ productIds, eligible });
   };
 
   if (!authLoading && !user) {
@@ -1255,7 +1299,7 @@ export default function AdminProducts() {
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">批次折扣</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
                   {selectionMode
-                    ? `已選 ${selectedProductIds.length} 件；目前列表可選 ${selectableFilteredIds.length} 件。`
+                    ? `已選 ${selectedProductIds.length} 件；全部商品可選 ${selectableAllIds.length} 件。`
                     : "先進入選取模式，再勾選要套用折扣的商品。"}
                 </p>
               </div>
@@ -1265,11 +1309,11 @@ export default function AdminProducts() {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto_auto] lg:justify-end">
                 <button
                   type="button"
-                  onClick={toggleSelectVisible}
-                  disabled={selectableFilteredIds.length === 0 || bulkPending}
+                  onClick={toggleSelectAllProducts}
+                  disabled={selectableAllIds.length === 0 || bulkPending}
                   className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
                 >
-                  {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
+                  {allProductsSelected ? "取消全選全部商品" : "全選全部商品"}
                 </button>
                 <label className="flex items-center border border-[oklch(0.86_0_0)] bg-white focus-within:border-[oklch(0.2_0_0)]">
                   <span className="pl-3 text-xs font-body text-[oklch(0.45_0_0)]">折扣</span>
@@ -1301,6 +1345,71 @@ export default function AdminProducts() {
                   className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
                 >
                   清除折扣
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelSelection}
+                  disabled={bulkPending}
+                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                >
+                  完成選取
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={startSelection}
+                disabled={selectableFilteredIds.length === 0 || bulkPending}
+                className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+              >
+                開始選取商品
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bulk free shipping */}
+        <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center bg-[oklch(0.94_0_0)]">
+                <Truck className="w-5 h-5 text-[oklch(0.25_0_0)]" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[oklch(0.12_0_0)]">兩件免運規則</p>
+                <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
+                  {selectionMode
+                    ? `已選 ${selectedProductIds.length} 件；可一次套用或取消兩件免運。`
+                    : "先進入選取模式，再勾選要納入兩件免運的商品。"}
+                </p>
+              </div>
+            </div>
+
+            {selectionMode ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto_auto_auto] lg:justify-end">
+                <button
+                  type="button"
+                  onClick={toggleSelectAllProducts}
+                  disabled={selectableAllIds.length === 0 || bulkPending}
+                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                >
+                  {allProductsSelected ? "取消全選全部商品" : "全選全部商品"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkTwoItemFreeShipping(true)}
+                  disabled={selectedProductIds.length === 0 || bulkPending}
+                  className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+                >
+                  套用兩件免運
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkTwoItemFreeShipping(false)}
+                  disabled={selectedProductIds.length === 0 || bulkPending}
+                  className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  取消兩件免運
                 </button>
                 <button
                   type="button"

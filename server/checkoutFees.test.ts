@@ -103,6 +103,50 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1545);
   });
 
+  it("does not count products excluded from two-item domestic free shipping", () => {
+    const fees = calcCheckoutFees({
+      items: [
+        { id: "d001-moon-secret", name: "月下密語手鍊", price: 1480, quantity: 1 },
+        {
+          id: "prod-gift-box",
+          name: "禮盒",
+          price: 120,
+          quantity: 1,
+          twoItemFreeShippingEligible: false,
+        },
+      ],
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+    });
+
+    expect(fees.shippingFee).toBe(100);
+    expect(fees.domesticFreeShipping).toBe(false);
+    expect(fees.total).toBe(1700);
+  });
+
+  it("waives domestic shipping when eligible quantity reaches two and ignores excluded items", () => {
+    const fees = calcCheckoutFees({
+      items: [
+        { id: "d001-moon-secret", name: "月下密語手鍊", price: 1480, quantity: 2 },
+        {
+          id: "prod-gift-box",
+          name: "禮盒",
+          price: 120,
+          quantity: 3,
+          twoItemFreeShippingEligible: false,
+        },
+      ],
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+    });
+
+    expect(fees.shippingFee).toBe(0);
+    expect(fees.domesticFreeShipping).toBe(true);
+    expect(fees.total).toBe(3320);
+  });
+
   it("counts custom deposit products toward two-item domestic free shipping", () => {
     const fees = calcCheckoutFees({
       items: [

@@ -4,11 +4,23 @@ import { X, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { Link } from "wouter";
 import { toast } from "sonner"; // still used for remove toast
+import { trpc } from "@/lib/trpc";
 
 export default function CartDrawer() {
   const { items, isOpen, setIsOpen, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
+  const { data: liveProducts = [] } = trpc.product.list.useQuery(undefined, { enabled: isOpen && items.length > 0 });
+  const eligibilityByProductId = new Map(
+    liveProducts.map((product) => [product.id, product.twoItemFreeShippingEligible])
+  );
   const freeShippingEligibleQuantity = items
-    .filter(({ product }) => !product.id.startsWith("test-") && !product.name.includes("測試用"))
+    .filter(({ product }) => {
+      const latestEligibility = eligibilityByProductId.get(product.id);
+      return (
+        !product.id.startsWith("test-") &&
+        !product.name.includes("測試用") &&
+        (latestEligibility ?? product.twoItemFreeShippingEligible) !== false
+      );
+    })
     .reduce((sum, item) => sum + item.quantity, 0);
   const showFreeShippingHint = freeShippingEligibleQuantity === 1;
 
