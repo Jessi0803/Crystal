@@ -1110,8 +1110,6 @@ export default function AdminProducts() {
     () => dbProductList.filter((product) => product.category !== "test").map((product) => product.id),
     [dbProductList]
   );
-  const selectedVisibleCount = selectedProductIds.filter((id) => selectableFilteredIds.includes(id)).length;
-  const allVisibleSelected = selectableFilteredIds.length > 0 && selectedVisibleCount === selectableFilteredIds.length;
   const selectedAllCount = selectedProductIds.filter((id) => selectableAllIds.includes(id)).length;
   const allProductsSelected = selectableAllIds.length > 0 && selectedAllCount === selectableAllIds.length;
   const bulkPending = bulkApplyDiscount.isPending || bulkClearDiscount.isPending || bulkSetTwoItemFreeShipping.isPending;
@@ -1130,14 +1128,6 @@ export default function AdminProducts() {
     setSelectedProductIds((current) => {
       if (selected) return current.includes(id) ? current : [...current, id];
       return current.filter((productId) => productId !== id);
-    });
-  };
-  const toggleSelectVisible = () => {
-    setSelectedProductIds((current) => {
-      if (allVisibleSelected) {
-        return current.filter((id) => !selectableFilteredIds.includes(id));
-      }
-      return Array.from(new Set([...current, ...selectableFilteredIds]));
     });
   };
   const toggleSelectAllProducts = () => {
@@ -1309,22 +1299,14 @@ export default function AdminProducts() {
                 <p className="text-sm font-medium text-[oklch(0.12_0_0)]">批次折扣</p>
                 <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
                   {selectionMode
-                    ? `已選 ${selectedProductIds.length} 件；目前列表可選 ${selectableFilteredIds.length} 件。`
+                    ? `已選 ${selectedProductIds.length} 件；全部商品可選 ${selectableAllIds.length} 件。`
                     : "先進入選取模式，再勾選要套用折扣的商品。"}
                 </p>
               </div>
             </div>
 
             {selectionMode ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto_128px_auto_auto_auto] lg:justify-end">
-                <button
-                  type="button"
-                  onClick={toggleSelectVisible}
-                  disabled={selectableFilteredIds.length === 0 || bulkPending}
-                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
-                >
-                  {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
-                </button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto_auto] lg:justify-end">
                 <button
                   type="button"
                   onClick={toggleSelectAllProducts}
@@ -1404,15 +1386,7 @@ export default function AdminProducts() {
             </div>
 
             {selectionMode ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto_auto_auto_auto] lg:justify-end">
-                <button
-                  type="button"
-                  onClick={toggleSelectVisible}
-                  disabled={selectableFilteredIds.length === 0 || bulkPending}
-                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
-                >
-                  {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
-                </button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto_auto_auto] lg:justify-end">
                 <button
                   type="button"
                   onClick={toggleSelectAllProducts}
