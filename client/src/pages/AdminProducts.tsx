@@ -1089,13 +1089,10 @@ export default function AdminProducts() {
       return Array.from(new Set([...current, ...selectableFilteredIds]));
     });
   };
-  const getBulkTargetIds = (scope: "selected" | "visible") => {
-    return scope === "visible" ? selectableFilteredIds : selectedProductIds;
-  };
-  const applyBulkDiscount = (scope: "selected" | "visible") => {
-    const productIds = getBulkTargetIds(scope);
+  const applyBulkDiscount = () => {
+    const productIds = selectedProductIds;
     if (productIds.length === 0) {
-      toast.error(scope === "visible" ? "目前列表沒有可套用折扣的商品" : "請先勾選商品");
+      toast.error("請先勾選商品");
       return;
     }
     const discountRate = Number(bulkDiscountRate);
@@ -1107,10 +1104,10 @@ export default function AdminProducts() {
     if (!confirmed) return;
     bulkApplyDiscount.mutate({ productIds, discountRate });
   };
-  const clearBulkDiscount = (scope: "selected" | "visible") => {
-    const productIds = getBulkTargetIds(scope);
+  const clearBulkDiscount = () => {
+    const productIds = selectedProductIds;
     if (productIds.length === 0) {
-      toast.error(scope === "visible" ? "目前列表沒有可清除折扣的商品" : "請先勾選商品");
+      toast.error("請先勾選商品");
       return;
     }
     const confirmed = window.confirm(`確定要清除 ${productIds.length} 件商品的折扣嗎？`);
@@ -1246,7 +1243,7 @@ export default function AdminProducts() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_96px_auto_auto] lg:justify-end">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto] lg:justify-end">
               <button
                 type="button"
                 onClick={toggleSelectVisible}
@@ -1255,8 +1252,8 @@ export default function AdminProducts() {
               >
                 {allVisibleSelected ? "取消全選目前列表" : "全選目前列表"}
               </button>
-              <label className="block">
-                <span className="sr-only">折數</span>
+              <label className="flex items-center border border-[oklch(0.86_0_0)] bg-white focus-within:border-[oklch(0.2_0_0)]">
+                <span className="pl-3 text-xs font-body text-[oklch(0.45_0_0)]">折扣</span>
                 <input
                   type="number"
                   min={0.1}
@@ -1265,46 +1262,27 @@ export default function AdminProducts() {
                   value={bulkDiscountRate}
                   disabled={bulkPending}
                   onChange={(e) => setBulkDiscountRate(e.target.value)}
-                  className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] disabled:bg-[oklch(0.96_0_0)]"
+                  className="min-w-0 flex-1 border-0 px-2 py-2 text-sm font-body outline-none disabled:bg-[oklch(0.96_0_0)]"
                   placeholder="9"
                 />
+                <span className="pr-3 text-xs font-body text-[oklch(0.45_0_0)]">折</span>
               </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => applyBulkDiscount("selected")}
-                  disabled={selectedProductIds.length === 0 || bulkPending}
-                  className="flex-1 px-3 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
-                >
-                  套用勾選
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyBulkDiscount("visible")}
-                  disabled={selectableFilteredIds.length === 0 || bulkPending}
-                  className="flex-1 px-3 py-2 text-xs font-body border border-[oklch(0.25_0_0)] text-[oklch(0.18_0_0)] hover:bg-[oklch(0.97_0_0)] disabled:opacity-50"
-                >
-                  套用目前列表
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => clearBulkDiscount("selected")}
-                  disabled={selectedProductIds.length === 0 || bulkPending}
-                  className="flex-1 px-3 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  清除勾選
-                </button>
-                <button
-                  type="button"
-                  onClick={() => clearBulkDiscount("visible")}
-                  disabled={selectableFilteredIds.length === 0 || bulkPending}
-                  className="flex-1 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-                >
-                  清除目前列表
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={applyBulkDiscount}
+                disabled={selectedProductIds.length === 0 || bulkPending}
+                className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+              >
+                套用折扣
+              </button>
+              <button
+                type="button"
+                onClick={clearBulkDiscount}
+                disabled={selectedProductIds.length === 0 || bulkPending}
+                className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                清除折扣
+              </button>
             </div>
           </div>
         </div>
