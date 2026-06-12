@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { createAtmCustomDepositOrder, login, uploadTransferReceipt } from "./helpers";
 
+const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
+
 async function connectTestDb() {
   const env = dotenv.parse(readFileSync(".env.test.local"));
   const url = new URL(env.DATABASE_URL);
@@ -51,7 +53,45 @@ async function createDirectBalancePayment() {
       [orderId, balanceOrderNo]
     );
 
-    return balanceOrderNo;
+    return { orderNo, balanceOrderNo };
+  } finally {
+    await connection.end();
+  }
+}
+
+async function setClearQuartzChipsStock(stock: number) {
+  const connection = await connectTestDb();
+  try {
+    await connection.execute(
+      `UPDATE productInventory SET stock = ?, allowPreorder = false WHERE productId = ?`,
+      [stock, CLEAR_QUARTZ_CHIPS_PRODUCT_ID]
+    );
+  } finally {
+    await connection.end();
+  }
+}
+
+async function getClearQuartzChipsStock() {
+  const connection = await connectTestDb();
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      "SELECT stock FROM productInventory WHERE productId = ? LIMIT 1",
+      [CLEAR_QUARTZ_CHIPS_PRODUCT_ID]
+    );
+    return Number(rows[0]?.stock);
+  } finally {
+    await connection.end();
+  }
+}
+
+async function getOrderInventoryDeducted(orderNo: string) {
+  const connection = await connectTestDb();
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      "SELECT inventoryDeducted FROM orders WHERE merchantTradeNo = ? LIMIT 1",
+      [orderNo]
+    );
+    return Boolean(rows[0]?.inventoryDeducted);
   } finally {
     await connection.end();
   }
@@ -131,7 +171,7 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
 });
 
 test("ATM balance payment requires transfer last five digits and receipt before submission", async ({ page }) => {
-  const balanceOrderNo = await createDirectBalancePayment();
+  const { balanceOrderNo } = await createDirectBalancePayment();
 
   await page.goto(`/balance/${balanceOrderNo}`);
   await expect(page.getByRole("heading", { name: "請完成客製化尾款" })).toBeVisible();
@@ -156,4 +196,38 @@ test("ATM balance payment requires transfer last five digits and receipt before 
   await page.getByRole("button", { name: "確認送出" }).click();
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
   await expect(page.locator("body")).toContainText("67890");
+});
+
+test("clear quartz balance add-on stock is deducted only after ATM receipt submission", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "chromium",
+    "Balance payment database assertions only need one browser project.",
+  );
+
+  const { orderNo, balanceOrderNo } = await createDirectBalancePayment();
+  await setClearQuartzChipsStock(5);
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await expect(page.getByRole("heading", { name: "請完成客製化尾款" })).toBeVisible();
+  await page.getByLabel(/加購白水晶碎石/).check();
+  await expect(page.locator("body")).toContainText("加購白水晶碎石");
+
+  await page.locator('input[placeholder="郵遞區號"]').fill("100");
+  await page.locator('input[placeholder="縣市"]').fill("台北市");
+  await page.locator('input[placeholder="鄉鎮市區"]').fill("中正區");
+  await page.locator('input[placeholder="路名、門牌、樓層"]').fill("測試路 2 號");
+  await page.getByRole("button", { name: /^轉帳/ }).click();
+  await page.getByRole("button", { name: /確認使用轉帳/ }).click();
+  await expect(page.locator("body")).toContainText("轉帳資訊");
+
+  await expect.poll(getClearQuartzChipsStock).toBe(5);
+  await expect.poll(() => getOrderInventoryDeducted(orderNo)).toBe(false);
+
+  await page.locator('input[placeholder="12345"]').fill("67890");
+  await uploadTransferReceipt(page);
+  await page.getByRole("button", { name: "確認送出" }).click();
+
+  await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
+  await expect.poll(getClearQuartzChipsStock).toBe(4);
+  await expect.poll(() => getOrderInventoryDeducted(orderNo)).toBe(true);
 });
