@@ -453,7 +453,7 @@ export const orderRouter = router({
       }
 
       if (paymentMethod === "atm") {
-        // ATM 下單即扣減庫存（confirmTransfer 時會因 inventoryDeducted=true 跳過）
+        // 一般訂單的 ATM 結帳頁已要求末五碼與轉帳截圖，送出成立訂單時扣庫存。
         await deductInventoryAfterPayment(merchantTradeNo);
         return {
           kind: "atm" as const,
@@ -1106,7 +1106,6 @@ export const orderRouter = router({
         .where(eq(orders.id, balancePayment.orderId));
 
       if (input.paymentMethod === "atm") {
-        await deductInventoryAfterPayment(balancePayment.order.merchantTradeNo);
         return {
           kind: "atm" as const,
           amount: totalAmount,
@@ -1161,6 +1160,7 @@ export const orderRouter = router({
         receiptContentType
       );
       await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive, uploaded.url);
+      await deductInventoryAfterBalancePayment(input.merchantTradeNo);
       return { success: true };
     }),
 

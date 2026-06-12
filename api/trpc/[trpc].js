@@ -3510,7 +3510,6 @@ var orderRouter = router({
       ...clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}
     }).where(eq6(orders.id, balancePayment.orderId));
     if (input.paymentMethod === "atm") {
-      await deductInventoryAfterPayment(balancePayment.order.merchantTradeNo);
       return {
         kind: "atm",
         amount: totalAmount,
@@ -3560,6 +3559,7 @@ var orderRouter = router({
       receiptContentType
     );
     await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive, uploaded.url);
+    await deductInventoryAfterBalancePayment(input.merchantTradeNo);
     return { success: true };
   }),
   confirmBalanceTransfer: adminProcedure.input(z2.object({ merchantTradeNo: z2.string().min(1) })).mutation(async ({ input }) => {
