@@ -299,6 +299,14 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     relatedProductIds: ["crystal-chips"],
   },
   {
+    id: "faq-pre-shipping-cleanse",
+    question: "商品或水晶出貨前會消磁嗎？",
+    answer: "我們出貨之前都會淨化消磁，收到包裹之後可以直接攜帶～",
+    embedText: "商品或水晶出貨前會消磁嗎 出貨前 消磁 淨化 收到包裹 直接佩戴 直接攜帶",
+    keywords: ["出貨前", "出貨", "消磁", "淨化", "收到包裹", "直接佩戴", "直接攜帶"],
+    category: "常見問題",
+  },
+  {
     id: "faq-activate",
     question: "如何開啟水晶能量？",
     answer:
