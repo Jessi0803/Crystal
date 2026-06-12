@@ -61,6 +61,77 @@ test("pure custom form stores consultation note and continues to deposit checkou
   await expect(page.locator("body")).toContainText("NT$ 500");
 });
 
+test("custom deposit checkout with clear quartz add-on still omits shipping fields and fees", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("customConsultationNote", "【純客製水晶手鍊諮詢表單】\nE2E 加購測試");
+    sessionStorage.setItem(
+      "cart_items",
+      JSON.stringify([
+        {
+          id: "custom-deposit-product-default-default-default-500",
+          product: {
+            id: "custom-deposit-product",
+            name: "客製化商品",
+            subtitle: "客製化服務訂金下單專用",
+            category: "custom",
+            categoryLabel: "客製化",
+            price: 500,
+            image: "/images/custom3.jpg",
+            tags: [],
+            description: "純客製水晶手鍊服務訂金。",
+            story: "",
+            benefits: [],
+            suitableFor: [],
+            howToUse: [],
+            disclaimer: "",
+            inStock: true,
+            featured: false,
+            twoItemFreeShippingEligible: false,
+            crystalType: "客製化需求",
+            color: "訂金",
+          },
+          quantity: 1,
+          unitPrice: 500,
+        },
+        {
+          id: "prod-1781070485343-default-default-default-180",
+          product: {
+            id: "prod-1781070485343",
+            name: "白水晶碎石｜淨化能量首選",
+            subtitle: "Playwright 測試用加購商品",
+            category: "other",
+            categoryLabel: "淨化小物",
+            price: 180,
+            image: "/images/d-design/d005.jpg",
+            tags: ["加購", "白水晶"],
+            description: "測試用白水晶碎石加購商品。",
+            story: "",
+            benefits: ["淨化能量"],
+            suitableFor: [],
+            howToUse: [],
+            disclaimer: "",
+            inStock: true,
+            featured: false,
+            twoItemFreeShippingEligible: true,
+            crystalType: "白水晶碎石",
+            color: "透明白",
+          },
+          quantity: 1,
+          unitPrice: 180,
+        },
+      ])
+    );
+  });
+  await page.goto("/checkout");
+  await expect(page.locator("body")).toContainText("客製化商品");
+  await expect(page.locator("body")).toContainText("白水晶碎石");
+  await expectDepositCheckoutWithoutShipping(page);
+  await expect(page.locator("body")).toContainText("總計");
+  await expect(page.locator("body")).toContainText("NT$ 680");
+  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-custom-addon-${Date.now()}@example.com`);
+  await expect(page).toHaveURL(new RegExp(`/order/${orderNo}`));
+});
+
 async function expectConsultationNoteInAdmin(page: import("@playwright/test").Page, orderNo: string, expectedText: string) {
   await login(page, "e2e-admin@example.com");
   await expect(page).toHaveURL(/\/admin\/orders/);

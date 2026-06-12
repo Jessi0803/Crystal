@@ -71,8 +71,7 @@ export default function Checkout() {
   const customConsultationNote = sessionStorage.getItem("customConsultationNote") ?? undefined;
   const hasCustomDepositItem =
     items.length > 0 && items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
-  const isCustomDepositCheckout =
-    items.length > 0 && items.every((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
+  const isCustomDepositCheckout = hasCustomDepositItem;
   const displayShippingFee = !isCustomDepositCheckout;
 
   const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
@@ -125,8 +124,8 @@ export default function Checkout() {
     overseasCountry: overseasCode,
     buyerEmail: form.buyerEmail,
   });
-  const shippingFee = feeSummary.shippingFee;
-  const finalTotal = feeSummary.total;
+  const shippingFee = isCustomDepositCheckout ? 0 : feeSummary.shippingFee;
+  const finalTotal = isCustomDepositCheckout ? totalPrice : feeSummary.total;
   // 超商選店資訊（由綠界地圖回傳）
   const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});

@@ -2757,7 +2757,7 @@ var orderRouter = router({
       const isCustomDepositCheckout = data.items.filter((item) => {
         const productId = item.baseProductId ?? item.id;
         return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
-      }).every(isCustomCheckoutItem);
+      }).some(isCustomCheckoutItem);
       if (data.checkoutRegion === "domestic" && data.paymentMethod === "atm" && !/^\d{5}$/.test(data.transferLastFive ?? "")) {
         ctx.addIssue({
           code: "custom",
@@ -2827,9 +2827,6 @@ var orderRouter = router({
     })
   ).mutation(async ({ input, ctx }) => {
     await ensureOrdersColumns();
-    const isOverseas = input.checkoutRegion === "overseas";
-    const shippingMethod = isOverseas ? "home" : input.shippingMethod;
-    const paymentMethod = isOverseas ? "paypal" : input.paymentMethod;
     const submittedItems = input.items.filter((item) => {
       const productId = item.baseProductId ?? item.id;
       return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
@@ -2837,6 +2834,11 @@ var orderRouter = router({
     if (submittedItems.length === 0) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8CFC\u7269\u8ECA\u6C92\u6709\u53EF\u7D50\u5E33\u5546\u54C1" });
     }
+    const isCustomOrder = isCustomDepositProduct(submittedItems);
+    const checkoutRegion = isCustomOrder ? "domestic" : input.checkoutRegion;
+    const isOverseas = checkoutRegion === "overseas";
+    const shippingMethod = isCustomOrder ? "home" : isOverseas ? "home" : input.shippingMethod;
+    const paymentMethod = isOverseas ? "paypal" : input.paymentMethod;
     for (const item of submittedItems) {
       const productId = item.baseProductId ?? item.id;
       const availability = await getProductAvailability(productId);
@@ -2849,13 +2851,12 @@ var orderRouter = router({
     }
     const merchantTradeNo = generateMerchantTradeNo();
     const isPreorder = submittedItems.some((i) => i.isPreorder);
-    const isCustomOrder = isCustomDepositProduct(submittedItems);
     const buyerEmail = normalizeOrderEmail(input.buyerEmail);
-    let shippingAddress = input.shippingAddress;
-    let receiverZipCode = input.receiverZipCode;
-    let cvsStoreId = input.cvsStoreId;
-    let cvsStoreName = input.cvsStoreName;
-    let cvsType = input.cvsType;
+    let shippingAddress = isCustomOrder ? void 0 : input.shippingAddress;
+    let receiverZipCode = isCustomOrder ? void 0 : input.receiverZipCode;
+    let cvsStoreId = isCustomOrder ? void 0 : input.cvsStoreId;
+    let cvsStoreName = isCustomOrder ? void 0 : input.cvsStoreName;
+    let cvsType = isCustomOrder ? void 0 : input.cvsType;
     let overseasCountry = null;
     if (isOverseas) {
       cvsStoreId = void 0;
@@ -2878,9 +2879,12 @@ var orderRouter = router({
       receiverZipCode = formatted.receiverZipCode;
     }
     const feeItemsForCalculation = await attachTwoItemFreeShippingEligibility(submittedItems);
-    const feeSummary = calcCheckoutFees({
+    const feeSummary = isCustomOrder ? {
+      shippingFee: 0,
+      total: submittedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    } : calcCheckoutFees({
       items: feeItemsForCalculation,
-      checkoutRegion: input.checkoutRegion,
+      checkoutRegion,
       shippingMethod,
       paymentMethod,
       overseasCountry,
@@ -2920,7 +2924,7 @@ var orderRouter = router({
       paymentStatus: paymentMethod === "atm" ? "transfer_pending" : "pending",
       paymentMethod,
       shippingMethod,
-      deliveryRegion: isOverseas ? "overseas" : "domestic",
+      deliveryRegion: checkoutRegion,
       orderStatus: "pending_payment",
       isPreorder,
       isCustomOrder,

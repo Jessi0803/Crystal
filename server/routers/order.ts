@@ -181,7 +181,7 @@ export const orderRouter = router({
               const productId = item.baseProductId ?? item.id;
               return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
             })
-            .every(isCustomCheckoutItem);
+            .some(isCustomCheckoutItem);
 
           if (data.checkoutRegion === "domestic" && data.paymentMethod === "atm" && !/^\d{5}$/.test(data.transferLastFive ?? "")) {
             ctx.addIssue({
@@ -255,9 +255,6 @@ export const orderRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await ensureOrdersColumns();
-      const isOverseas = input.checkoutRegion === "overseas";
-      const shippingMethod = isOverseas ? ("home" as const) : input.shippingMethod;
-      const paymentMethod = isOverseas ? ("paypal" as const) : input.paymentMethod;
       const submittedItems = input.items.filter((item) => {
         const productId = item.baseProductId ?? item.id;
         return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
@@ -265,6 +262,11 @@ export const orderRouter = router({
       if (submittedItems.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "購物車沒有可結帳商品" });
       }
+      const isCustomOrder = isCustomDepositProduct(submittedItems);
+      const checkoutRegion = isCustomOrder ? ("domestic" as const) : input.checkoutRegion;
+      const isOverseas = checkoutRegion === "overseas";
+      const shippingMethod = isCustomOrder ? ("home" as const) : isOverseas ? ("home" as const) : input.shippingMethod;
+      const paymentMethod = isOverseas ? ("paypal" as const) : input.paymentMethod;
       for (const item of submittedItems) {
         const productId = item.baseProductId ?? item.id;
         const availability = await getProductAvailability(productId);
@@ -281,14 +283,13 @@ export const orderRouter = router({
 
       const merchantTradeNo = generateMerchantTradeNo();
       const isPreorder = submittedItems.some((i) => i.isPreorder);
-      const isCustomOrder = isCustomDepositProduct(submittedItems);
       const buyerEmail = normalizeOrderEmail(input.buyerEmail);
 
-      let shippingAddress = input.shippingAddress;
-      let receiverZipCode = input.receiverZipCode;
-      let cvsStoreId = input.cvsStoreId;
-      let cvsStoreName = input.cvsStoreName;
-      let cvsType = input.cvsType;
+      let shippingAddress = isCustomOrder ? undefined : input.shippingAddress;
+      let receiverZipCode = isCustomOrder ? undefined : input.receiverZipCode;
+      let cvsStoreId = isCustomOrder ? undefined : input.cvsStoreId;
+      let cvsStoreName = isCustomOrder ? undefined : input.cvsStoreName;
+      let cvsType = isCustomOrder ? undefined : input.cvsType;
       let overseasCountry: OverseasShipCountryCode | null = null;
 
       if (isOverseas) {
@@ -313,14 +314,19 @@ export const orderRouter = router({
       }
 
       const feeItemsForCalculation = await attachTwoItemFreeShippingEligibility(submittedItems);
-      const feeSummary = calcCheckoutFees({
-        items: feeItemsForCalculation,
-        checkoutRegion: input.checkoutRegion,
-        shippingMethod,
-        paymentMethod,
-        overseasCountry,
-        buyerEmail,
-      });
+      const feeSummary = isCustomOrder
+        ? {
+            shippingFee: 0,
+            total: submittedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+          }
+        : calcCheckoutFees({
+            items: feeItemsForCalculation,
+            checkoutRegion,
+            shippingMethod,
+            paymentMethod,
+            overseasCountry,
+            buyerEmail,
+          });
       const feeItems: typeof submittedItems = [];
       if (feeSummary.shippingFee > 0) {
         feeItems.push({
@@ -365,7 +371,7 @@ export const orderRouter = router({
         paymentStatus: paymentMethod === "atm" ? "transfer_pending" : "pending",
         paymentMethod,
         shippingMethod,
-        deliveryRegion: isOverseas ? "overseas" : "domestic",
+        deliveryRegion: checkoutRegion,
         orderStatus: "pending_payment",
         isPreorder,
         isCustomOrder,
