@@ -734,6 +734,16 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
   }
   await db.update(orders).set({ inventoryDeducted: true }).where(eq3(orders.merchantTradeNo, merchantTradeNo));
 }
+async function deductInventoryAfterBalancePayment(balanceMerchantTradeNo) {
+  const db = await getDb();
+  if (!db) return;
+  await ensureOrdersColumns();
+  const [balance] = await db.select({ orderId: orderBalancePayments.orderId }).from(orderBalancePayments).where(eq3(orderBalancePayments.merchantTradeNo, balanceMerchantTradeNo)).limit(1);
+  if (!balance) return;
+  const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq3(orders.id, balance.orderId)).limit(1);
+  if (!order) return;
+  await deductInventoryAfterPayment(order.merchantTradeNo);
+}
 
 // server/customerOrderNotification.ts
 import { eq as eq5 } from "drizzle-orm";
@@ -993,6 +1003,9 @@ function registerECPayRoutes(app2) {
       const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
       if (balancePayment) {
         await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        if (status === "paid") {
+          await deductInventoryAfterBalancePayment(merchantTradeNo);
+        }
         console.log(`[ECPay Notify] Balance ${merchantTradeNo} \u2192 ${status}`);
         res.send("1|OK");
         return;

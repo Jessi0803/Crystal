@@ -21,7 +21,7 @@ import {
   getBalancePaymentByMerchantTradeNo,
   updateBalancePaymentStatus,
 } from "./orderDb";
-import { deductInventoryAfterPayment } from "./inventoryDb";
+import { deductInventoryAfterBalancePayment, deductInventoryAfterPayment } from "./inventoryDb";
 import { notifyCustomerOrderShippedSafely } from "./customerOrderNotification";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
@@ -74,6 +74,9 @@ export function registerECPayRoutes(app: Application) {
       const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
       if (balancePayment) {
         await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+        if (status === "paid") {
+          await deductInventoryAfterBalancePayment(merchantTradeNo);
+        }
         console.log(`[ECPay Notify] Balance ${merchantTradeNo} → ${status}`);
         res.send("1|OK");
         return;

@@ -8,6 +8,7 @@ import {
   inventoryLocks,
   orders,
   orderItems,
+  orderBalancePayments,
   dbProducts,
   InsertInventoryLock,
   InsertProductInventory,
@@ -230,6 +231,29 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
     .update(orders)
     .set({ inventoryDeducted: true })
     .where(eq(orders.merchantTradeNo, merchantTradeNo));
+}
+
+export async function deductInventoryAfterBalancePayment(balanceMerchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await ensureOrdersColumns();
+
+  const [balance] = await db
+    .select({ orderId: orderBalancePayments.orderId })
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, balanceMerchantTradeNo))
+    .limit(1);
+  if (!balance) return;
+
+  const [order] = await db
+    .select({ merchantTradeNo: orders.merchantTradeNo })
+    .from(orders)
+    .where(eq(orders.id, balance.orderId))
+    .limit(1);
+  if (!order) return;
+
+  await deductInventoryAfterPayment(order.merchantTradeNo);
 }
 
 /**

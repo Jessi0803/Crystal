@@ -32,6 +32,7 @@ import {
   confirmBalanceTransfer,
 } from "../orderDb";
 import {
+  deductInventoryAfterBalancePayment,
   deductInventoryAfterPayment,
   restoreInventoryOnCancel,
   ensureOrdersColumns,
@@ -1100,10 +1101,12 @@ export const orderRouter = router({
           shippingAddress: shippingAddress ?? null,
           receiverZipCode: receiverZipCode ?? null,
           totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount,
+          ...(clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}),
         })
         .where(eq(orders.id, balancePayment.orderId));
 
       if (input.paymentMethod === "atm") {
+        await deductInventoryAfterPayment(balancePayment.order.merchantTradeNo);
         return {
           kind: "atm" as const,
           amount: totalAmount,
@@ -1165,6 +1168,7 @@ export const orderRouter = router({
     .input(z.object({ merchantTradeNo: z.string().min(1) }))
     .mutation(async ({ input }) => {
       await confirmBalanceTransfer(input.merchantTradeNo);
+      await deductInventoryAfterBalancePayment(input.merchantTradeNo);
       return { success: true };
     }),
 

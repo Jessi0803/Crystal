@@ -1527,6 +1527,16 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
   }
   await db.update(orders).set({ inventoryDeducted: true }).where(eq3(orders.merchantTradeNo, merchantTradeNo));
 }
+async function deductInventoryAfterBalancePayment(balanceMerchantTradeNo) {
+  const db = await getDb();
+  if (!db) return;
+  await ensureOrdersColumns();
+  const [balance] = await db.select({ orderId: orderBalancePayments.orderId }).from(orderBalancePayments).where(eq3(orderBalancePayments.merchantTradeNo, balanceMerchantTradeNo)).limit(1);
+  if (!balance) return;
+  const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq3(orders.id, balance.orderId)).limit(1);
+  if (!order) return;
+  await deductInventoryAfterPayment(order.merchantTradeNo);
+}
 async function restoreInventoryOnCancel(merchantTradeNo) {
   const db = await getDb();
   if (!db) return;
@@ -3496,9 +3506,11 @@ var orderRouter = router({
       cvsType: cvsType ?? null,
       shippingAddress: shippingAddress ?? null,
       receiverZipCode: receiverZipCode ?? null,
-      totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount
+      totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount,
+      ...clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}
     }).where(eq6(orders.id, balancePayment.orderId));
     if (input.paymentMethod === "atm") {
+      await deductInventoryAfterPayment(balancePayment.order.merchantTradeNo);
       return {
         kind: "atm",
         amount: totalAmount,
@@ -3552,6 +3564,7 @@ var orderRouter = router({
   }),
   confirmBalanceTransfer: adminProcedure.input(z2.object({ merchantTradeNo: z2.string().min(1) })).mutation(async ({ input }) => {
     await confirmBalanceTransfer(input.merchantTradeNo);
+    await deductInventoryAfterBalancePayment(input.merchantTradeNo);
     return { success: true };
   }),
   /**
