@@ -1,6 +1,6 @@
 /**
  * 結帳頁面
- * 流程：填寫購買人資料 → 選擇配送方式（超商/宅配）→ 選擇付款方式（信用卡/轉帳）→ 送出訂單
+ * 流程：填寫購買人資料 → 選擇配送方式（超商/宅配；客製訂金不需填）→ 選擇付款方式（信用卡/轉帳）→ 送出訂單
  * 物流類型：C2C 店到店（UNIMARTC2C / FAMIC2C）
  */
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -69,8 +69,11 @@ export default function Checkout() {
   const [, setLocation] = useLocation();
   const { items, totalPrice, clearCart } = useCart();
   const customConsultationNote = sessionStorage.getItem("customConsultationNote") ?? undefined;
+  const hasCustomDepositItem =
+    items.length > 0 && items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
   const isCustomDepositCheckout =
     items.length > 0 && items.every((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
+  const displayShippingFee = !isCustomDepositCheckout;
 
   const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
@@ -316,11 +319,13 @@ export default function Checkout() {
           twoItemFreeShippingEligible: getTwoItemFreeShippingEligibility(i.product.id, i.product.twoItemFreeShippingEligible),
         })),
         origin: window.location.origin,
-        customerNote: customConsultationNote,
+        customerNote: hasCustomDepositItem ? customConsultationNote : undefined,
       });
 
       clearCart();
-      sessionStorage.removeItem("customConsultationNote");
+      if (hasCustomDepositItem) {
+        sessionStorage.removeItem("customConsultationNote");
+      }
 
       if (result.kind === "atm") {
         setLocation(`/order/${result.merchantTradeNo}`);
@@ -1111,14 +1116,16 @@ export default function Checkout() {
                   <span className="text-[oklch(0.5_0_0)]">小計</span>
                   <span>NT$ {totalPrice.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-sm font-body">
-                  <span className="text-[oklch(0.5_0_0)]">運費</span>
-                  {shippingFee === 0 ? (
-                    <span className="text-green-600">免收</span>
-                  ) : (
-                    <span>NT$ {shippingFee}</span>
-                  )}
-                </div>
+                {displayShippingFee && (
+                  <div className="flex justify-between text-sm font-body">
+                    <span className="text-[oklch(0.5_0_0)]">運費</span>
+                    {shippingFee === 0 ? (
+                      <span className="text-green-600">免收</span>
+                    ) : (
+                      <span>NT$ {shippingFee}</span>
+                    )}
+                  </div>
+                )}
                 <div className="flex justify-between text-base font-medium border-t border-[oklch(0.93_0_0)] pt-3 mt-3">
                   <span>總計</span>
                   <span>NT$ {finalTotal.toLocaleString()}</span>

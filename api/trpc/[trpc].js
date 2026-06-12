@@ -20,10 +20,11 @@ __export(schema_exports, {
   orderItems: () => orderItems,
   orders: () => orders,
   productInventory: () => productInventory,
+  siteSettings: () => siteSettings,
   users: () => users
 });
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext } from "drizzle-orm/mysql-core";
-var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs, chatbotKnowledge, dbProducts;
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
+var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs, chatbotKnowledge, siteSettings, dbProducts;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -211,6 +212,7 @@ var init_schema = __esm({
         "cancelled"
       ]).default("pending").notNull(),
       transferLastFive: varchar("transferLastFive", { length: 5 }),
+      transferReceiptUrl: longtext("transferReceiptUrl"),
       tradeNo: varchar("tradeNo", { length: 64 }),
       ecpayNotifyData: json("ecpayNotifyData"),
       paidAt: timestamp("paidAt"),
@@ -299,6 +301,12 @@ var init_schema = __esm({
       index("chatbot_knowledge_source_idx").on(table.sourceType, table.sourceId),
       index("chatbot_knowledge_active_idx").on(table.active)
     ]);
+    siteSettings = mysqlTable("siteSettings", {
+      key: varchar("key", { length: 64 }).primaryKey(),
+      value: text("value").notNull(),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+    });
     dbProducts = mysqlTable("products", {
       id: varchar("id", { length: 64 }).primaryKey(),
       name: varchar("name", { length: 200 }).notNull(),
@@ -325,7 +333,11 @@ var init_schema = __esm({
       featured: boolean("featured").notNull().default(false),
       active: boolean("active").notNull().default(true),
       isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
+      twoItemFreeShippingEligible: boolean("twoItemFreeShippingEligible").notNull().default(true),
       claspOptions: json("claspOptions").$type(),
+      showFitPreference: boolean("showFitPreference").notNull().default(true),
+      wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
+      wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
       scheduledPublishAt: timestamp("scheduledPublishAt"),
       sortOrder: int("sortOrder").notNull().default(0),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -921,6 +933,7 @@ var balancePaymentLegacySelect = {
   paymentMethod: orderBalancePayments.paymentMethod,
   paymentStatus: orderBalancePayments.paymentStatus,
   transferLastFive: orderBalancePayments.transferLastFive,
+  transferReceiptUrl: orderBalancePayments.transferReceiptUrl,
   tradeNo: orderBalancePayments.tradeNo,
   ecpayNotifyData: orderBalancePayments.ecpayNotifyData,
   paidAt: orderBalancePayments.paidAt,
@@ -935,6 +948,15 @@ function hydrateBalancePayment(row) {
     paymentFee: 0,
     totalAmount: row.amount
   };
+}
+var balancePaymentColumnsEnsured = false;
+async function ensureBalancePaymentColumns(db) {
+  if (balancePaymentColumnsEnsured) return;
+  try {
+    await db.execute(sql2`ALTER TABLE \`orderBalancePayments\` ADD COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+  }
+  balancePaymentColumnsEnsured = true;
 }
 async function attachItemsAndLogisticsForOrders(db, orderRows) {
   if (orderRows.length === 0) return [];
@@ -984,6 +1006,7 @@ async function createOrder(orderData, items) {
 async function getOrderWithItems(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [order] = await db.select().from(orders).where(eq2(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!order) return null;
   const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
@@ -1108,6 +1131,7 @@ async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
 async function getAdminOrderDetail(orderId) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [order] = await db.select().from(orders).where(eq2(orders.id, orderId)).limit(1);
   if (!order) return null;
   const [items, logistics, balancePayment] = await Promise.all([
@@ -1234,6 +1258,7 @@ function generateBalanceMerchantTradeNo() {
 async function createOrReplaceBalancePayment(opts) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [order] = await db.select().from(orders).where(eq2(orders.id, opts.orderId)).limit(1);
   if (!order) throw new Error("Order not found");
   const [existing] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.orderId, opts.orderId)).limit(1);
@@ -1275,6 +1300,7 @@ async function createOrReplaceBalancePayment(opts) {
 async function getBalancePaymentDetail(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [row] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   const balancePayment = hydrateBalancePayment(row);
   if (!balancePayment) return null;
@@ -1282,11 +1308,12 @@ async function getBalancePaymentDetail(merchantTradeNo) {
   if (!order) return null;
   return { ...balancePayment, order };
 }
-async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive) {
+async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive, transferReceiptUrl) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [balance] = await db.select({ orderId: orderBalancePayments.orderId }).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
-  await db.update(orderBalancePayments).set({ transferLastFive: lastFive, paymentStatus: "transfer_pending" }).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo));
+  await db.update(orderBalancePayments).set({ transferLastFive: lastFive, transferReceiptUrl, paymentStatus: "transfer_pending" }).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo));
   if (balance) {
     await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq2(orders.id, balance.orderId));
   }
@@ -1294,6 +1321,7 @@ async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive) {
 async function confirmBalanceTransfer(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!balance) throw new Error("Balance payment not found");
   await db.update(orderBalancePayments).set({ paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq2(orderBalancePayments.id, balance.id));
@@ -2603,8 +2631,8 @@ function isTestProduct(item) {
   const productId = item.baseProductId ?? item.id;
   return productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
 }
-function calcBraceletQuantityForFreeShipping(items) {
-  return items.filter((item) => !isTestProduct(item) && item.name?.includes("\u624B\u934A") === true).reduce((sum, item) => sum + item.quantity, 0);
+function calcFreeShippingQuantity(items) {
+  return items.filter((item) => !isTestProduct(item) && item.twoItemFreeShippingEligible !== false).reduce((sum, item) => sum + item.quantity, 0);
 }
 function isFreeShippingEmail(email) {
   return email ? FREE_SHIPPING_EMAILS.includes(email.trim().toLowerCase()) : false;
@@ -2613,7 +2641,7 @@ function calcCheckoutFees(params) {
   const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const chargeableSubtotal = params.items.filter((item) => !isCheckoutFeeExemptProduct(item)).reduce((sum, item) => sum + item.price * item.quantity, 0);
   const appliesFees = chargeableSubtotal > 0;
-  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcBraceletQuantityForFreeShipping(params.items) >= 2;
+  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
   const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
   const shippingFee = !appliesFees ? 0 : emailFreeShipping ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
   const paymentFee = 0;
@@ -2668,10 +2696,29 @@ var CartItemSchema = z2.object({
   price: z2.number(),
   quantity: z2.number(),
   image: z2.string().optional(),
-  isPreorder: z2.boolean().optional()
+  isPreorder: z2.boolean().optional(),
+  twoItemFreeShippingEligible: z2.boolean().optional()
 });
 function isCustomCheckoutItem(item) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
+}
+async function attachTwoItemFreeShippingEligibility(items) {
+  const db = await getDb();
+  if (!db) return items;
+  const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
+  if (productIds.length === 0) return items;
+  const rows = await db.select({
+    id: dbProducts.id,
+    twoItemFreeShippingEligible: dbProducts.twoItemFreeShippingEligible
+  }).from(dbProducts).where(inArray2(dbProducts.id, productIds));
+  const eligibilityById = new Map(rows.map((row) => [row.id, row.twoItemFreeShippingEligible]));
+  return items.map((item) => {
+    const productId = item.baseProductId ?? item.id;
+    return {
+      ...item,
+      twoItemFreeShippingEligible: eligibilityById.get(productId) ?? item.twoItemFreeShippingEligible ?? true
+    };
+  });
 }
 var orderRouter = router({
   /**
@@ -2830,8 +2877,9 @@ var orderRouter = router({
       shippingAddress = formatted.shippingAddress;
       receiverZipCode = formatted.receiverZipCode;
     }
+    const feeItemsForCalculation = await attachTwoItemFreeShippingEligibility(submittedItems);
     const feeSummary = calcCheckoutFees({
-      items: submittedItems,
+      items: feeItemsForCalculation,
       checkoutRegion: input.checkoutRegion,
       shippingMethod,
       paymentMethod,
@@ -2906,9 +2954,10 @@ var orderRouter = router({
       }))
     );
     await notifyCustomerOrderPlacedSafely(createdOrderId);
+    const origin = siteBaseUrl(ctx.req);
     if (paymentMethod === "paypal") {
-      const returnUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
-      const cancelUrl = `${input.origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
+      const returnUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
+      const cancelUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
       try {
         const { approvalUrl } = await createPayPalCheckoutOrder({
           merchantTradeNo,
@@ -2939,9 +2988,9 @@ var orderRouter = router({
         bankInfo: STORE_BANK_INFO
       };
     }
-    const returnURL = `${input.origin}/api/ecpay/notify`;
-    const orderResultURL = `${input.origin}/api/ecpay/order-result`;
-    const clientBackURL = `${input.origin}/products`;
+    const returnURL = `${origin}/api/ecpay/notify`;
+    const orderResultURL = `${origin}/api/ecpay/order-result`;
+    const clientBackURL = `${origin}/products`;
     const paymentParams = buildCreditPaymentParams({
       merchantTradeNo,
       tradeDesc: "\u691BCrystal\u80FD\u91CF\u6C34\u6676",
@@ -3157,8 +3206,7 @@ var orderRouter = router({
       logisticsSubType,
       logisticsStatus: "created"
     });
-    const host = process.env.NODE_ENV === "production" ? "https://www.goodaytarot.com" : `http://localhost:${process.env.PORT || 3e3}`;
-    const serverReplyURL = `${host}/api/ecpay/logistics-notify`;
+    const serverReplyURL = `${siteBaseUrl(ctx.req)}/api/ecpay/logistics-notify`;
     let ecpayResult;
     try {
       if (order.shippingMethod === "home") {
@@ -3207,8 +3255,11 @@ var orderRouter = router({
           success: true,
           sandbox: useLogisticsSandbox,
           logisticsId: logisticsMerchantTradeNo,
+          logisticsSubType,
           allPayLogisticsId: ecpayResult.allPayLogisticsId,
-          cvsPaymentNo: ecpayResult.cvsPaymentNo || null
+          cvsPaymentNo: ecpayResult.cvsPaymentNo || null,
+          cvsValidationNo: ecpayResult.cvsValidationNo || null,
+          bookingNote: ecpayResult.bookingNote || null
         };
       } else {
         await db.delete(logisticsOrders).where(eq6(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
@@ -3322,7 +3373,7 @@ var orderRouter = router({
         }
       }
     })
-  ).mutation(async ({ input }) => {
+  ).mutation(async ({ input, ctx }) => {
     const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
     if (!balancePayment) {
       throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u5C3E\u6B3E\u8CC7\u6599" });
@@ -3399,14 +3450,15 @@ var orderRouter = router({
         bankInfo: STORE_BANK_INFO
       };
     }
+    const origin = siteBaseUrl(ctx.req);
     const paymentParams = buildCreditPaymentParams({
       merchantTradeNo: balancePayment.merchantTradeNo,
       tradeDesc: "\u691BCrystal\u5BA2\u88FD\u5316\u5C3E\u6B3E",
       itemName: `\u5BA2\u88FD\u5316\u5546\u54C1\u5C3E\u6B3E#${balancePayment.order.merchantTradeNo}`,
       totalAmount,
-      returnURL: `${input.origin}/api/ecpay/notify`,
-      orderResultURL: `${input.origin}/api/ecpay/balance-result`,
-      clientBackURL: `${input.origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`
+      returnURL: `${origin}/api/ecpay/notify`,
+      orderResultURL: `${origin}/api/ecpay/balance-result`,
+      clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`
     });
     return {
       kind: "credit",
@@ -3419,9 +3471,26 @@ var orderRouter = router({
   }),
   submitBalanceTransferCode: publicProcedure.input(z2.object({
     merchantTradeNo: z2.string().min(1),
-    lastFive: z2.string().length(5).regex(/^\d+$/)
+    lastFive: z2.string().length(5).regex(/^\d+$/),
+    transferReceiptImageBase64: z2.string().max(8e6),
+    transferReceiptImageContentType: z2.string(),
+    transferReceiptImageFilename: z2.string().optional()
   })).mutation(async ({ input }) => {
-    await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive);
+    const receiptContentType = input.transferReceiptImageContentType;
+    if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u8ACB\u4E0A\u50B3 JPG\u3001PNG \u6216 WebP \u5716\u7247" });
+    }
+    const receiptBuffer = Buffer.from(input.transferReceiptImageBase64, "base64");
+    if (receiptBuffer.length === 0 || receiptBuffer.length > 6 * 1024 * 1024) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u5927\u5C0F\u9700\u5C0F\u65BC 6MB" });
+    }
+    const ext = getReceiptExtension(receiptContentType, input.transferReceiptImageFilename);
+    const uploaded = await storagePut(
+      `balance-transfer-receipts/${input.merchantTradeNo}-${Date.now()}.${ext}`,
+      receiptBuffer,
+      receiptContentType
+    );
+    await updateBalancePaymentTransferCode(input.merchantTradeNo, input.lastFive, uploaded.url);
     return { success: true };
   }),
   confirmBalanceTransfer: adminProcedure.input(z2.object({ merchantTradeNo: z2.string().min(1) })).mutation(async ({ input }) => {
@@ -3923,7 +3992,7 @@ var knowledgeChunks = [
   {
     id: "faq-shipping-methods",
     question: "\u6709\u54EA\u4E9B\u914D\u9001\u65B9\u5F0F\uFF1F",
-    answer: "\u53F0\u7063\u5730\u5340\uFF08\u542B\u96E2\u5CF6\uFF09\u63D0\u4F9B\u9ED1\u8C93\u5B85\u6025\u4FBF\uFF08$100\uFF09\u53CA 7-11 \u5E97\u5230\u5E97\uFF08$60\uFF09\uFF0C\u55AE\u6B21\u8CFC\u8CB7\u5169\u689D\u4EE5\u4E0A\u514D\u904B\u3002\u6D77\u5916\u53EF\u5BC4\u9001\u81F3\u99AC\u4F86\u897F\u4E9E\u3001\u9999\u6E2F\u3001\u65B0\u52A0\u5761\u3001\u7F8E\u570B\u3001\u82F1\u570B\u3001\u6FB3\u6D32\u3002\u8A73\u898B\uFF1Ahttps://goodaytarot.com/shopping-guide",
+    answer: "\u53F0\u7063\u5730\u5340\uFF08\u542B\u96E2\u5CF6\uFF09\u63D0\u4F9B\u9ED1\u8C93\u5B85\u6025\u4FBF\uFF08$100\uFF09\u53CA 7-11 \u5E97\u5230\u5E97\uFF08$60\uFF09\uFF0C\u55AE\u6B21\u8CFC\u8CB7\u5169\u4EF6\u5546\u54C1\u4EE5\u4E0A\u514D\u904B\u3002\u6D77\u5916\u53EF\u5BC4\u9001\u81F3\u99AC\u4F86\u897F\u4E9E\u3001\u9999\u6E2F\u3001\u65B0\u52A0\u5761\u3001\u7F8E\u570B\u3001\u82F1\u570B\u3001\u6FB3\u6D32\u3002\u8A73\u898B\uFF1Ahttps://goodaytarot.com/shopping-guide",
     embedText: "\u914D\u9001\u65B9\u5F0F \u904B\u9001 \u9ED1\u8C93 7-11 \u5E97\u5230\u5E97 \u5B85\u914D \u514D\u904B \u5BC4\u9001",
     keywords: ["\u914D\u9001\u65B9\u5F0F", "\u904B\u9001", "\u9ED1\u8C93", "7-11", "\u5E97\u5230\u5E97", "\u5B85\u914D", "\u514D\u904B"],
     category: "\u5E38\u898B\u554F\u984C"
@@ -3931,7 +4000,7 @@ var knowledgeChunks = [
   {
     id: "faq-shipping-fee",
     question: "\u904B\u8CBB\u662F\u591A\u5C11\uFF1F",
-    answer: "\u9ED1\u8C93\u5B85\u6025\u4FBF $100\u30017-11 \u5E97\u5230\u5E97 $60\uFF0C\u55AE\u6B21\u8CFC\u8CB7\u5169\u689D\u4EE5\u4E0A\u514D\u904B\u3002",
+    answer: "\u9ED1\u8C93\u5B85\u6025\u4FBF $100\u30017-11 \u5E97\u5230\u5E97 $60\uFF0C\u55AE\u6B21\u8CFC\u8CB7\u5169\u4EF6\u5546\u54C1\u4EE5\u4E0A\u514D\u904B\u3002",
     embedText: "\u904B\u8CBB\u591A\u5C11 \u904B\u8CBB \u5B85\u914D\u8CBB \u514D\u904B \u904B\u8CBB\u8A08\u7B97",
     keywords: ["\u904B\u8CBB", "\u591A\u5C11", "\u5B85\u914D\u8CBB", "\u514D\u904B"],
     category: "\u5E38\u898B\u554F\u984C"
@@ -3955,83 +4024,74 @@ var knowledgeChunks = [
   {
     id: "rec-confidence",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u63D0\u5347\u81EA\u4FE1\u3001\u9B45\u529B\u6216\u5438\u5F15\u529B\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u7DAD\u7D0D\u65AF Venus\u300D\uFF08\u63D0\u5347\u81EA\u4FE1\u8207\u884C\u52D5\u529B\uFF0C\u8F15\u91CF\u65E5\u5E38\u6B3E\uFF0CNT$950\uFF09\u3001\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u589E\u5F37\u81EA\u4FE1\u3001\u5438\u5F15\u4EBA\u7DE3\u3001\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,580\uFF09\u548C\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u91CB\u653E\u58D3\u529B\u4E26\u63D0\u5347\u8868\u9054\u52C7\u6C23\uFF0CNT$1,480\u8D77\uFF09\u3002",
+    answer: "\u63D0\u5347\u81EA\u4FE1\u3001\u9B45\u529B\u6216\u5438\u5F15\u529B\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u81EA\u4FE1\u3001\u9B45\u529B\u3001\u5438\u5F15\u529B\u3001\u6C23\u5834\u3001\u884C\u52D5\u529B\u6216\u8868\u9054\u529B\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u63D0\u5347\u81EA\u4FE1 \u81EA\u4FE1\u5FC3 \u9B45\u529B \u5438\u5F15\u529B \u6C23\u5834 \u884C\u52D5\u529B \u589E\u5F37\u81EA\u4FE1 \u5EFA\u7ACB\u81EA\u4FE1 \u60F3\u8B8A\u81EA\u4FE1 \u81EA\u6211\u63D0\u5347",
     keywords: ["\u81EA\u4FE1", "\u9B45\u529B", "\u5438\u5F15\u529B", "\u6C23\u5834", "\u884C\u52D5\u529B", "\u63D0\u5347\u81EA\u4FE1"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d003-venus", "d002-honey-realm", "d001-moon-secret"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-wealth",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u62DB\u8CA1\u3001\u63D0\u5347\u8CA1\u904B\u6216\u4E8B\u696D\u904B\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u62DB\u8CA1\u805A\u80FD\u3001\u63D0\u5347\u884C\u52D5\u529B\u3001\u8CA1\u5BCC\u4EBA\u7DE3\u4E00\u6B21\u5230\u4F4D\uFF0CNT$1,580\uFF09\u548C\u300C\u7DAD\u7D0D\u65AF Venus\u300D\uFF08\u62DB\u8CA1\u653E\u5927\u6B63\u5411\u80FD\u91CF\u3001\u63D0\u5347\u81EA\u4FE1\u884C\u52D5\u529B\uFF0CNT$950\uFF09\u3002",
+    answer: "\u62DB\u8CA1\u3001\u8CA1\u904B\u6216\u4E8B\u696D\u9700\u6C42\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u62DB\u8CA1\u3001\u8CA1\u904B\u3001\u4E8B\u696D\u3001\u8CB4\u4EBA\u3001\u884C\u52D5\u529B\u3001\u76EE\u6A19\u6216\u81EA\u4FE1\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u62DB\u8CA1 \u8CA1\u904B \u8CA1\u5BCC \u9322\u8CA1 \u4E8B\u696D \u5DE5\u4F5C \u5347\u9077 \u884C\u52D5\u529B \u63D0\u5347\u8CA1\u904B \u62DB\u8CA1\u624B\u934A \u8CFA\u9322",
     keywords: ["\u62DB\u8CA1", "\u8CA1\u904B", "\u8CA1\u5BCC", "\u4E8B\u696D", "\u5DE5\u4F5C", "\u5347\u9077", "\u8CFA\u9322"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d002-honey-realm", "d003-venus"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-love",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u63D0\u5347\u611B\u60C5\u3001\u6843\u82B1\u6216\u4EBA\u7DE3\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6668\u5149\u8F15\u8A9E\u300D\uFF08\u63D0\u5347\u611B\u60C5\u4EBA\u7DE3\u3001\u67D4\u5316\u60C5\u7DD2\u589E\u52A0\u5B89\u5168\u611F\uFF0CNT$1,800\uFF09\u3001\u300C\u6708\u6620\u6DE8\u5FC3\u300D\uFF08\u5438\u5F15\u611B\u60C5\u3001\u5B89\u64AB\u60C5\u7DD2\u3001\u5E36\u4F86\u6EAB\u67D4\u5B89\u5168\u611F\uFF0CNT$1,500\uFF09\u548C\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u5438\u5F15\u611B\u60C5\u8207\u597D\u4EBA\u7DE3\uFF0CNT$1,580\uFF09\u3002",
+    answer: "\u611B\u60C5\u3001\u6843\u82B1\u6216\u4EBA\u7DE3\u9700\u6C42\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u611B\u60C5\u3001\u6843\u82B1\u3001\u4EBA\u7DE3\u3001\u6B63\u7DE3\u3001\u95DC\u4FC2\u4FEE\u5FA9\u3001\u6EAB\u67D4\u9B45\u529B\u6216\u5B89\u5168\u611F\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u611B\u60C5 \u6843\u82B1 \u4EBA\u7DE3 \u611F\u60C5 \u6200\u611B \u4EA4\u53CB \u5438\u5F15\u7570\u6027 \u63D0\u5347\u6843\u82B1 \u6B63\u7DE3 \u597D\u4EBA\u7DE3 \u812B\u55AE",
     keywords: ["\u611B\u60C5", "\u6843\u82B1", "\u4EBA\u7DE3", "\u611F\u60C5", "\u6200\u611B", "\u6B63\u7DE3", "\u4EA4\u53CB", "\u812B\u55AE"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d004-morning-whisper", "d005-moon-clear-heart", "d002-honey-realm"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-healing",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u7642\u7652\u3001\u91CB\u653E\u58D3\u529B\u6216\u5B89\u64AB\u60C5\u7DD2\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u6DE8\u5316\u8CA0\u80FD\u91CF\u3001\u91CB\u653E\u58D3\u529B\u7126\u616E\uFF0CNT$1,480\u8D77\uFF09\u3001\u300C\u6708\u6620\u6DE8\u5FC3\u300D\uFF08\u5B89\u64AB\u60C5\u7DD2\u4E26\u5E36\u4F86\u5B89\u5168\u611F\uFF0CNT$1,500\uFF09\u548C\u300C\u6668\u5149\u8F15\u8A9E\u300D\uFF08\u67D4\u5316\u60C5\u7DD2\u4E26\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,800\uFF09\u3002",
+    answer: "\u7642\u7652\u3001\u91CB\u653E\u58D3\u529B\u6216\u5B89\u64AB\u60C5\u7DD2\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u7642\u7652\u3001\u5B89\u64AB\u3001\u60C5\u7DD2\u7A69\u5B9A\u3001\u91CB\u653E\u58D3\u529B\u3001\u7126\u616E\u3001\u4E0D\u5B89\u6216\u5B89\u5168\u611F\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u7642\u7652 \u58D3\u529B \u7126\u616E \u60C5\u7DD2 \u5B89\u64AB \u7D13\u58D3 \u653E\u9B06 \u4E0D\u5B89 \u91CB\u653E\u58D3\u529B \u60C5\u7DD2\u7A69\u5B9A \u5FC3\u60C5\u4E0D\u597D \u8CA0\u9762\u60C5\u7DD2",
     keywords: ["\u7642\u7652", "\u58D3\u529B", "\u7126\u616E", "\u60C5\u7DD2", "\u5B89\u64AB", "\u7D13\u58D3", "\u653E\u9B06", "\u5FC3\u60C5\u4E0D\u597D"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-protection",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u9632\u8B77\u8CA0\u80FD\u91CF\u3001\u4FDD\u8B77\u6C23\u5834\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u300D\uFF08\u6DE8\u5316\u4E26\u9632\u8B77\u5916\u5728\u8CA0\u80FD\u91CF\uFF0CNT$1,480\u8D77\uFF09\u3001\u300C\u871C\u5149\u4E4B\u5883\u300D\uFF08\u5F37\u5316\u4FDD\u8B77\u529B\u8207\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,580\uFF09\u548C\u300C\u6668\u5149\u8F15\u8A9E\u300D\uFF08\u6DE8\u5316\u8CA0\u80FD\u91CF\u4E26\u7DAD\u6301\u67D4\u548C\u6C23\u5834\uFF0CNT$1,800\uFF09\u3002",
+    answer: "\u9632\u8B77\u8CA0\u80FD\u91CF\u3001\u4FDD\u8B77\u6C23\u5834\u6216\u9632\u5C0F\u4EBA\u9700\u6C42\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u9632\u8B77\u3001\u4FDD\u8B77\u3001\u8CA0\u80FD\u91CF\u3001\u6C23\u5834\u3001\u6DE8\u5316\u3001\u7A69\u5B9A\u6216\u907F\u90AA\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u9632\u8B77 \u8CA0\u80FD\u91CF \u4FDD\u8B77 \u6C23\u5834 \u6DE8\u5316 \u7A69\u5B9A \u9632\u5C0F\u4EBA \u907F\u90AA \u4FDD\u8B77\u80FD\u91CF \u9A45\u90AA",
     keywords: ["\u9632\u8B77", "\u8CA0\u80FD\u91CF", "\u4FDD\u8B77", "\u6C23\u5834", "\u6DE8\u5316", "\u9632\u5C0F\u4EBA", "\u9A45\u90AA"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d001-moon-secret", "d002-honey-realm", "d004-morning-whisper"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-crystal-rose-quartz",
     question: "\u60F3\u8981\u7C89\u6676\uFF0F\u7C89\u6C34\u6676\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u7684\u6B3E\u5F0F\u55CE\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6708\u6620\u6DE8\u5FC3\u624B\u934A\u300D\uFF08\u4EE5\u7C89\u6676\u642D\u914D\u767D\u6708\u5149\u3001\u85CD\u6708\u5149\u8207\u767D\u6C34\u6676\u70BA\u4E3B\u8EF8\uFF0C\u6EAB\u67D4\u62DB\u6843\u82B1\u8207\u597D\u4EBA\u7DE3\u3001\u5B89\u64AB\u60C5\u7DD2\uFF0CNT$1,500\uFF09\uFF0C\u4EE5\u53CA\u300C\u871C\u5149\u4E4B\u5883\u624B\u934A\u300D\uFF08\u8907\u65B9\u8A2D\u8A08\u4E2D\u542B\u7C89\u6676\uFF0C\u540C\u6642\u517C\u9867\u8CA1\u904B\u3001\u4EBA\u7DE3\u8207\u7A69\u5B9A\u6C23\u5834\uFF0CNT$1,580\uFF09\u3002\u82E5\u60F3\u6307\u5B9A\u7C89\u6676\u6BD4\u4F8B\u6216\u914D\u8272\uFF0C\u4E5F\u53EF\u8003\u616E\u5BA2\u88FD\u5316\u624B\u934A\u3002",
+    answer: "\u9867\u5BA2\u60F3\u627E\u7C89\u6676\u6216\u7C89\u6C34\u6676\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u7C89\u6676\u3001\u7C89\u6C34\u6676\u3001\u73AB\u7470\u77F3\u82F1\u6216\u611B\u60C5\u6843\u82B1\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u7C89\u6676 \u7C89\u6C34\u6676 \u73AB\u7470\u77F3\u82F1 \u8594\u8587\u77F3\u82F1 rose quartz \u60F3\u8981\u7C89\u6676 \u7C89\u6676\u624B\u934A \u7C89\u6676\u63A8\u85A6 \u6709\u7C89\u6676\u7684\u624B\u934A\u55CE \u7C89\u6676\u6B3E\u5F0F \u62DB\u6843\u82B1\u7C89\u6676 \u4EBA\u7DE3\u7C89\u6676 \u611B\u60C5\u7C89\u6676 \u63A8\u85A6\u624B\u934A",
     keywords: ["\u7C89\u6676", "\u7C89\u6C34\u6676", "\u73AB\u7470\u77F3\u82F1", "\u8594\u8587\u77F3\u82F1", "rose quartz"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d005-moon-clear-heart", "d002-honey-realm"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-crystal-strawberry",
     question: "\u60F3\u8981\u8349\u8393\u6676\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u871C\u5149\u4E4B\u5883\u624B\u934A\u300D\uFF08\u914D\u65B9\u542B\u8349\u8393\u6676\uFF0C\u642D\u914D\u9EC3\u6C34\u6676\u3001\u9285\u9AEE\u6676\u7B49\uFF0C\u6709\u52A9\u62DB\u8CA1\u805A\u80FD\u3001\u597D\u4EBA\u7DE3\u8207\u884C\u52D5\u529B\uFF0CNT$1,580\uFF09\u3002\u82E5\u5E0C\u671B\u8349\u8393\u6676\u70BA\u4E3B\u9AD4\u6216\u8207\u5176\u4ED6\u6676\u77F3\u642D\u914D\uFF0C\u6B61\u8FCE\u53C3\u8003\u5BA2\u88FD\u5316\u65B9\u6848\u3002",
+    answer: "\u9867\u5BA2\u60F3\u627E\u8349\u8393\u6676\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u8349\u8393\u6676\u3001\u8349\u8393\u6C34\u6676\u3001\u6843\u82B1\u3001\u4EBA\u7DE3\u6216\u9B45\u529B\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u8349\u8393\u6676 \u8349\u8393\u6C34\u6676 \u60F3\u8981\u8349\u8393\u6676 \u8349\u8393\u6676\u624B\u934A \u8349\u8393\u6676\u63A8\u85A6 \u6709\u8349\u8393\u6676\u7684\u624B\u934A\u55CE \u6843\u82B1\u8349\u8393\u6676",
     keywords: ["\u8349\u8393\u6676", "\u8349\u8393\u6C34\u6676"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d002-honey-realm"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-crystal-moonstone",
     question: "\u60F3\u8981\u6708\u5149\u77F3\uFF0F\u85CD\u6708\u5149\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u624B\u934A\u300D\uFF08\u85CD\u6708\u5149\u3001\u7070\u6708\u5149\u7B49\uFF0C\u6DE8\u5316\u8207\u5E73\u8861\u60C5\u7DD2\uFF0CNT$1,480\u8D77\uFF09\u3001\u300C\u6668\u5149\u8F15\u8A9E\u624B\u934A\u300D\uFF08\u85CD\u6708\u5149\u3001\u767D\u6708\u5149\u7B49\uFF0C\u611B\u60C5\u8207\u4EBA\u7DE3\u5E73\u8861\uFF0CNT$1,800\uFF09\u3001\u300C\u6708\u6620\u6DE8\u5FC3\u624B\u934A\u300D\uFF08\u7C89\u6676\u914D\u767D\u6708\u5149\u3001\u85CD\u6708\u5149\uFF0C\u67D4\u548C\u7642\u7652\uFF0CNT$1,500\uFF09\u3002\u540A\u98FE\u300C\u7DAD\u7D0D\u65AF Venus\u300D\u4EA6\u542B\u85CD\u6708\u5149\u5143\u7D20\uFF08NT$950\uFF09\u3002",
+    answer: "\u9867\u5BA2\u60F3\u627E\u6708\u5149\u77F3\u3001\u85CD\u6708\u5149\u3001\u767D\u6708\u5149\u6216\u7070\u6708\u5149\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9019\u4E9B\u6676\u77F3\uFF0C\u4EE5\u53CA\u60C5\u7DD2\u5E73\u8861\u3001\u7642\u7652\u3001\u76F4\u89BA\u6216\u67D4\u548C\u9B45\u529B\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u6708\u5149\u77F3 \u6708\u5149\u77F3\u624B\u934A \u85CD\u6708\u5149 \u767D\u6708\u5149 \u7070\u6708\u5149 \u6708\u4EAE\u77F3 moonstone \u60F3\u8981\u6708\u5149\u77F3 \u6709\u6708\u5149\u77F3\u7684\u624B\u934A\u55CE \u6708\u5149\u77F3\u63A8\u85A6",
     keywords: ["\u6708\u5149\u77F3", "\u85CD\u6708\u5149", "\u767D\u6708\u5149", "\u7070\u6708\u5149", "\u6708\u4EAE\u77F3", "moonstone"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d001-moon-secret", "d004-morning-whisper", "d005-moon-clear-heart", "d003-venus"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-crystal-citrine-rutilated",
     question: "\u60F3\u8981\u9EC3\u6C34\u6676\u3001\u9285\u9AEE\u6676\u6216\u62DB\u8CA1\u7CFB\u6676\u77F3\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u871C\u5149\u4E4B\u5883\u624B\u934A\u300D\uFF08\u542B\u9285\u9AEE\u6676\u3001\u9EC3\u6C34\u6676\u3001\u592A\u967D\u77F3\u7B49\uFF0C\u62DB\u8CA1\u8207\u884C\u52D5\u529B\u53D6\u5411\uFF0CNT$1,580\uFF09\u3002\u82E5\u8981\u4EE5\u7279\u5B9A\u6676\u77F3\u70BA\u4E3B\u6216\u52A0\u5F37\u4E8B\u696D\u8CA1\u904B\uFF0C\u4E5F\u53EF\u900F\u904E\u5BA2\u88FD\u5316\u8A0E\u8AD6\u3002",
+    answer: "\u9867\u5BA2\u60F3\u627E\u9EC3\u6C34\u6676\u3001\u9285\u9AEE\u6676\u3001\u9AEE\u6676\u6216\u62DB\u8CA1\u7CFB\u6676\u77F3\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9019\u4E9B\u6676\u77F3\uFF0C\u4EE5\u53CA\u62DB\u8CA1\u3001\u8CA1\u904B\u3001\u4E8B\u696D\u3001\u884C\u52D5\u529B\u6216\u8CB4\u4EBA\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u9EC3\u6C34\u6676 \u9285\u9AEE\u6676 \u9AEE\u6676 \u62DB\u8CA1\u6C34\u6676 \u8CA1\u904B\u6C34\u6676 \u60F3\u8981\u9EC3\u6C34\u6676 \u9EC3\u6C34\u6676\u624B\u934A \u9285\u9AEE\u6676\u624B\u934A \u6709\u9EC3\u6C34\u6676\u7684\u624B\u934A\u55CE",
     keywords: ["\u9EC3\u6C34\u6676", "\u9285\u9AEE\u6676", "\u9AEE\u6676"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d002-honey-realm"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-crystal-green-phantom-unavailable",
@@ -4044,20 +4104,18 @@ var knowledgeChunks = [
   {
     id: "rec-crystal-obsidian",
     question: "\u60F3\u8981\u9ED1\u66DC\u77F3\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
-    answer: "\u73FE\u8CA8\u8A2D\u8A08\u4E2D\u300C\u871C\u5149\u4E4B\u5883\u624B\u934A\u300D\u914D\u65B9\u542B\u9ED1\u66DC\u77F3\uFF0C\u53EF\u8F14\u52A9\u7A69\u5B9A\u6C23\u5834\u8207\u9632\u8B77\u611F\uFF08NT$1,580\uFF09\u3002\u82E5\u5E0C\u671B\u4EE5\u9ED1\u66DC\u77F3\u70BA\u4E3B\u8EF8\uFF0C\u5EFA\u8B70\u4F7F\u7528\u5BA2\u88FD\u5316\u670D\u52D9\u8207\u8001\u95C6\u8A0E\u8AD6\u6BD4\u4F8B\u8207\u6B3E\u5F0F\u3002",
+    answer: "\u9867\u5BA2\u60F3\u627E\u9ED1\u66DC\u77F3\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9ED1\u66DC\u77F3\uFF0C\u4EE5\u53CA\u9632\u8B77\u3001\u907F\u90AA\u3001\u7A69\u5B9A\u6C23\u5834\u3001\u6DE8\u5316\u6216\u8CA0\u80FD\u91CF\u76F8\u95DC\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u9ED1\u66DC\u77F3 \u9ED1\u66DC\u77F3\u624B\u934A \u60F3\u8981\u9ED1\u66DC\u77F3 \u9ED1\u66DC\u77F3\u63A8\u85A6 \u6709\u9ED1\u66DC\u77F3\u7684\u624B\u934A\u55CE \u907F\u90AA\u9ED1\u66DC\u77F3",
     keywords: ["\u9ED1\u66DC\u77F3"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d002-honey-realm"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "rec-crystal-white-phantom-tourmaline",
     question: "\u60F3\u8981\u767D\u5E7D\u9748\u3001\u5154\u6BDB\u6216\u7C89\u78A7\u74BD\u624B\u934A\uFF0C\u6709\u63A8\u85A6\u55CE\uFF1F",
-    answer: "\u63A8\u85A6\u300C\u6668\u5149\u8F15\u8A9E\u624B\u934A\u300D\uFF08\u767D\u5E7D\u9748\u3001\u7D05\u5154\u6BDB\u3001\u767D\u5154\u6BDB\u3001\u7C89\u78A7\u74BD\u8207\u6708\u5149\u77F3\u7B49\uFF0C\u611B\u60C5\u8207\u4EBA\u7DE3\u3001\u60C5\u7DD2\u5E73\u8861\uFF0CNT$1,800\uFF09\uFF0C\u4EE5\u53CA\u300C\u6708\u4E0B\u5BC6\u8A9E\u624B\u934A\u300D\uFF08\u767D\u5E7D\u9748\u3001\u85CD\u6708\u5149\u7B49\uFF0C\u6DE8\u5316\u8207\u91CB\u653E\u58D3\u529B\uFF0CNT$1,480\u8D77\uFF09\u3002",
+    answer: "\u9867\u5BA2\u60F3\u627E\u767D\u5E7D\u9748\u3001\u7D05\u5154\u6BDB\u3001\u767D\u5154\u6BDB\u3001\u5154\u6BDB\u6216\u7C89\u78A7\u74BD\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9019\u4E9B\u6676\u77F3\uFF0C\u4EE5\u53CA\u6DE8\u5316\u3001\u7642\u7652\u3001\u611B\u60C5\u4EBA\u7DE3\u6216\u60C5\u7DD2\u5E73\u8861\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u767D\u5E7D\u9748 \u767D\u5E7D\u9748\u624B\u934A \u7D05\u5154\u6BDB \u767D\u5154\u6BDB \u5154\u6BDB\u6C34\u6676 \u7C89\u78A7\u74BD \u60F3\u8981\u767D\u5E7D\u9748 \u6709\u767D\u5E7D\u9748\u7684\u624B\u934A\u55CE \u7C89\u78A7\u74BD\u624B\u934A",
     keywords: ["\u767D\u5E7D\u9748", "\u7D05\u5154\u6BDB", "\u767D\u5154\u6BDB", "\u5154\u6BDB", "\u7C89\u78A7\u74BD"],
-    category: "\u5546\u54C1\u63A8\u85A6",
-    relatedProductIds: ["d004-morning-whisper", "d001-moon-secret"]
+    category: "\u9078\u8CFC\u9700\u6C42"
   },
   {
     id: "product-d001-moon-secret",
@@ -4178,6 +4236,23 @@ function keywordBoostScore(chunk, hits) {
   }
   return Math.min(0.92, 0.6 + 0.12 * Math.min(hits, 3));
 }
+function productIdsFromChunk(chunk) {
+  if (chunk.relatedProductIds?.length) return chunk.relatedProductIds;
+  return chunk.id.startsWith("product-") ? [chunk.id.slice("product-".length)] : [];
+}
+function isProductRecommendationChunk(chunk) {
+  return chunk.category === "\u5546\u54C1\u63A8\u85A6" && chunk.id.startsWith("product-");
+}
+function selectStaticKnowledgeForSearch(staticChunks, dynamicChunks) {
+  const dynamicProductIds = new Set(
+    dynamicChunks.filter(isProductRecommendationChunk).flatMap(productIdsFromChunk)
+  );
+  if (dynamicProductIds.size === 0) return staticChunks;
+  return staticChunks.filter((chunk) => {
+    if (!isProductRecommendationChunk(chunk)) return true;
+    return productIdsFromChunk(chunk).every((id) => !dynamicProductIds.has(id));
+  });
+}
 async function searchKnowledge(query, queryVector, topK = 3, threshold = 0.45) {
   const embeddings = loadEmbeddings();
   const vectorById = new Map(embeddings.map((e) => [e.id, e.vector]));
@@ -4189,7 +4264,8 @@ async function searchKnowledge(query, queryVector, topK = 3, threshold = 0.45) {
     const score = Math.max(vecScore, kwScore);
     return { ...chunk, score };
   };
-  const staticScored = knowledgeChunks.map((chunk) => scoreChunk(chunk, vectorById.get(chunk.id)));
+  const searchableStaticChunks = selectStaticKnowledgeForSearch(knowledgeChunks, dynamicChunks);
+  const staticScored = searchableStaticChunks.map((chunk) => scoreChunk(chunk, vectorById.get(chunk.id)));
   const dynamicScored = dynamicChunks.map((chunk) => scoreChunk(chunk, chunk.vector));
   return [...staticScored, ...dynamicScored].filter((c) => c.score >= threshold).sort((a, b) => b.score - a.score).slice(0, topK);
 }
@@ -4625,13 +4701,30 @@ async function embedQuery(text2) {
   const data = await res.json();
   return data.embedding.values;
 }
-function selectRelatedProductIds(relevantChunks, scoreMin = 0.55, maxProducts = 4) {
+var LEGACY_STATIC_PRODUCT_IDS = /* @__PURE__ */ new Set([
+  "d001-moon-secret",
+  "d002-honey-realm",
+  "d003-venus",
+  "d004-morning-whisper",
+  "d005-moon-clear-heart"
+]);
+function uniqueProductIdsFromChunks(chunks) {
+  return Array.from(new Set(chunks.flatMap((chunk) => chunk.relatedProductIds ?? [])));
+}
+function selectRelatedProductIds(relevantChunks, scoreMin = 0.55, maxProducts = 6) {
   const matchingChunks = relevantChunks.filter(
     (chunk) => chunk.category === "\u5546\u54C1\u63A8\u85A6" && (chunk.relatedProductIds?.length ?? 0) > 0 && chunk.score >= scoreMin
-  ).sort((a, b) => b.score - a.score).slice(0, 2);
-  return Array.from(
-    new Set(matchingChunks.flatMap((chunk) => chunk.relatedProductIds ?? []))
-  ).slice(0, maxProducts);
+  ).sort((a, b) => b.score - a.score);
+  const standaloneProductChunks = matchingChunks.filter((chunk) => chunk.id.startsWith("product-"));
+  const fallbackRecommendationChunks = matchingChunks.filter((chunk) => !chunk.id.startsWith("product-"));
+  const standaloneProductIds = uniqueProductIdsFromChunks(standaloneProductChunks);
+  if (standaloneProductIds.length >= 2) {
+    const newerProductIds = standaloneProductIds.filter((id) => !LEGACY_STATIC_PRODUCT_IDS.has(id));
+    const legacyProductIds = standaloneProductIds.filter((id) => LEGACY_STATIC_PRODUCT_IDS.has(id));
+    const idsToUse = newerProductIds.length >= 2 ? [...newerProductIds, ...legacyProductIds] : standaloneProductIds;
+    return idsToUse.slice(0, maxProducts);
+  }
+  return uniqueProductIdsFromChunks([...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)]).slice(0, maxProducts);
 }
 function normalizeProductImageUrl(url) {
   const trimmed = url.trim();
@@ -4736,7 +4829,7 @@ var chatbotRouter = router({
       console.error("[chatbot] embed error:", e);
       throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: `Embed failed: ${e instanceof Error ? e.message : String(e)}` });
     }
-    const relevantChunks = await searchKnowledge(queryText, queryVector, 3, 0.45);
+    const relevantChunks = await searchKnowledge(queryText, queryVector, 10, 0.45);
     const hasUnavailableCrystalMatch = relevantChunks.some(
       (chunk) => chunk.id.endsWith("-unavailable") && chunk.score >= 0.55
     );
@@ -5260,8 +5353,8 @@ var memberRouter = router({
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq11 } = await import("drizzle-orm");
-        await db2.update(users2).set({ role: "admin" }).where(eq11(users2.id, user.id));
+        const { eq: eq12 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq12(users2.id, user.id));
         user = { ...user, role: "admin" };
       }
     }
@@ -5355,8 +5448,8 @@ var memberRouter = router({
     const db2 = await getDb();
     if (!db2) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq11 } = await import("drizzle-orm");
-    await db2.update(users2).set({ name: input.name }).where(eq11(users2.openId, ctx.user.openId));
+    const { eq: eq12 } = await import("drizzle-orm");
+    await db2.update(users2).set({ name: input.name }).where(eq12(users2.openId, ctx.user.openId));
     return { success: true };
   }),
   /** 查詢自己的訂單 */
@@ -5371,7 +5464,7 @@ var memberRouter = router({
 
 // server/routers/products.ts
 import { z as z6 } from "zod";
-import { eq as eq9, and as and5, sql as sql6 } from "drizzle-orm";
+import { eq as eq9, and as and5, inArray as inArray4, sql as sql6 } from "drizzle-orm";
 import { TRPCError as TRPCError6 } from "@trpc/server";
 init_schema();
 var tableEnsured = false;
@@ -5455,7 +5548,11 @@ async function ensureProductsTable() {
       \`featured\` boolean NOT NULL DEFAULT false,
       \`active\` boolean NOT NULL DEFAULT true,
       \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
+      \`twoItemFreeShippingEligible\` boolean NOT NULL DEFAULT true,
       \`claspOptions\` json DEFAULT NULL,
+      \`showFitPreference\` boolean NOT NULL DEFAULT true,
+      \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
+      \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -5476,6 +5573,10 @@ async function ensureProductsTable() {
   } catch {
   }
   try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`twoItemFreeShippingEligible\` boolean NOT NULL DEFAULT true`);
+  } catch {
+  }
+  try {
     await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`categories\` json DEFAULT NULL`);
   } catch {
   }
@@ -5489,6 +5590,18 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`claspOptions\` json DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`showFitPreference\` boolean NOT NULL DEFAULT true`);
+  } catch {
+  }
+  try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0`);
+  } catch {
+  }
+  try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0`);
   } catch {
   }
   try {
@@ -5591,7 +5704,11 @@ function toFrontendProduct(p) {
     inStock: p.active,
     featured: p.featured,
     isMonthlyLimited: p.isMonthlyLimited,
+    twoItemFreeShippingEligible: p.twoItemFreeShippingEligible,
     claspOptions: p.claspOptions ?? void 0,
+    showFitPreference: p.showFitPreference,
+    wristSizeMin: p.wristSizeMin ?? 13,
+    wristSizeMax: p.wristSizeMax ?? 19,
     scheduledPublishAt: p.scheduledPublishAt ?? void 0,
     crystalType: p.crystalType ?? "",
     color: p.color ?? ""
@@ -5601,6 +5718,9 @@ var scheduledPublishAtSchema = z6.preprocess(
   (value) => value === "" || value === void 0 ? null : value,
   z6.coerce.date().nullable()
 );
+var wristSizeSchema = z6.number().min(0).max(99).refine((value) => Number.isInteger(value * 2), {
+  message: "\u624B\u570D\u5C3A\u5BF8\u9700\u4EE5 0.5 cm \u70BA\u55AE\u4F4D"
+});
 var ProductInputSchema = z6.object({
   name: z6.string().min(1),
   subtitle: z6.string().default(""),
@@ -5626,9 +5746,27 @@ var ProductInputSchema = z6.object({
   featured: z6.boolean().default(false),
   active: z6.boolean().default(true),
   isMonthlyLimited: z6.boolean().default(false),
+  twoItemFreeShippingEligible: z6.boolean().default(true),
   claspOptions: z6.array(z6.enum(["elastic", "lobster", "magnetic"])).default([]),
+  showFitPreference: z6.boolean().default(true),
+  wristSizeMin: wristSizeSchema.default(13),
+  wristSizeMax: wristSizeSchema.default(19),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z6.number().int().default(0)
+}).refine((value) => value.wristSizeMin <= value.wristSizeMax, {
+  message: "\u624B\u570D\u6700\u5C0F\u503C\u4E0D\u53EF\u5927\u65BC\u6700\u5927\u503C",
+  path: ["wristSizeMax"]
+});
+var BulkDiscountInputSchema = z6.object({
+  productIds: z6.array(z6.string().min(1)).min(1),
+  discountRate: z6.number().min(0.1).max(10)
+});
+var BulkClearDiscountInputSchema = z6.object({
+  productIds: z6.array(z6.string().min(1)).min(1)
+});
+var BulkTwoItemFreeShippingInputSchema = z6.object({
+  productIds: z6.array(z6.string().min(1)).min(1),
+  eligible: z6.boolean()
 });
 var productRouter = router({
   list: publicProcedure.query(async () => {
@@ -5665,7 +5803,7 @@ var productRouter = router({
     await trySyncChatbotKnowledge(() => syncProductKnowledge({ id, ...input }));
     return { id };
   }),
-  update: adminProcedure.input(ProductInputSchema.extend({ id: z6.string() })).mutation(async ({ input }) => {
+  update: adminProcedure.input(ProductInputSchema.safeExtend({ id: z6.string() })).mutation(async ({ input }) => {
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
@@ -5683,6 +5821,58 @@ var productRouter = router({
     await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq9(dbProducts.id, input.id));
     await trySyncChatbotKnowledge(() => syncProductKnowledgeById(input.id));
     return { success: true };
+  }),
+  bulkApplyDiscount: adminProcedure.input(BulkDiscountInputSchema).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    const rows = await db.select().from(dbProducts).where(inArray4(dbProducts.id, input.productIds));
+    const products2 = rows.filter((product) => product.category !== "test");
+    for (const product of products2) {
+      const basePrice = product.originalPrice && product.originalPrice > product.price ? product.originalPrice : product.price;
+      const discountedPrice = Math.round(basePrice * (input.discountRate / 10));
+      await db.update(dbProducts).set({
+        originalPrice: basePrice,
+        price: discountedPrice
+      }).where(eq9(dbProducts.id, product.id));
+    }
+    await trySyncChatbotKnowledge(async () => {
+      await Promise.all(products2.map((product) => syncProductKnowledgeById(product.id)));
+    });
+    return { count: products2.length };
+  }),
+  bulkClearDiscount: adminProcedure.input(BulkClearDiscountInputSchema).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    const rows = await db.select().from(dbProducts).where(inArray4(dbProducts.id, input.productIds));
+    const products2 = rows.filter((product) => product.category !== "test" && product.originalPrice);
+    for (const product of products2) {
+      const originalPrice = product.originalPrice;
+      if (!originalPrice) continue;
+      await db.update(dbProducts).set({
+        price: originalPrice,
+        originalPrice: sql6`NULL`
+      }).where(eq9(dbProducts.id, product.id));
+    }
+    await trySyncChatbotKnowledge(async () => {
+      await Promise.all(products2.map((product) => syncProductKnowledgeById(product.id)));
+    });
+    return { count: products2.length };
+  }),
+  bulkSetTwoItemFreeShipping: adminProcedure.input(BulkTwoItemFreeShippingInputSchema).mutation(async ({ input }) => {
+    await ensureProductsTable();
+    await publishDueProducts();
+    const db = await getDb();
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    const rows = await db.select({ id: dbProducts.id, category: dbProducts.category }).from(dbProducts).where(inArray4(dbProducts.id, input.productIds));
+    const productIds = rows.filter((product) => product.category !== "test").map((product) => product.id);
+    if (productIds.length > 0) {
+      await db.update(dbProducts).set({ twoItemFreeShippingEligible: input.eligible }).where(inArray4(dbProducts.id, productIds));
+    }
+    return { count: productIds.length };
   }),
   remove: adminProcedure.input(z6.object({ id: z6.string() })).mutation(async ({ input }) => {
     await ensureProductsTable();
@@ -5704,7 +5894,7 @@ var productRouter = router({
     const result = await storagePut(key, buf, input.contentType);
     return { url: result.url };
   }),
-  seed: adminProcedure.input(z6.array(ProductInputSchema.extend({ id: z6.string() }))).mutation(async ({ input }) => {
+  seed: adminProcedure.input(z6.array(ProductInputSchema.safeExtend({ id: z6.string() }))).mutation(async ({ input }) => {
     await ensureProductsTable();
     const db = await getDb();
     if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
@@ -5900,6 +6090,81 @@ var adminMembersRouter = router({
   })
 });
 
+// server/routers/siteSettings.ts
+import { z as z8 } from "zod";
+import { eq as eq11, sql as sql8 } from "drizzle-orm";
+import { TRPCError as TRPCError8 } from "@trpc/server";
+init_schema();
+var DEFAULT_ANNOUNCEMENT_TEXT = "\u4EFB\u9078\u5169\u4EF6\u5546\u54C1\u514D\u904B \xB7 6/1\u20136/10 \u5168\u9762\u4E5D\u6298 \xB7";
+var ANNOUNCEMENT_TEXT_KEY = "announcementText";
+var ANNOUNCEMENT_ENABLED_KEY = "announcementEnabled";
+var tableEnsured2 = false;
+async function ensureSiteSettingsTable() {
+  if (tableEnsured2) return;
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql8`
+    CREATE TABLE IF NOT EXISTS \`siteSettings\` (
+      \`key\` varchar(64) NOT NULL,
+      \`value\` text NOT NULL,
+      \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+      \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`key\`)
+    )
+  `);
+  tableEnsured2 = true;
+}
+async function getSettingValue(key) {
+  const db = await getDb();
+  if (!db) return null;
+  await ensureSiteSettingsTable();
+  const rows = await db.select().from(siteSettings).where(eq11(siteSettings.key, key)).limit(1);
+  return rows[0]?.value ?? null;
+}
+async function upsertSettingValue(key, value) {
+  const db = await getDb();
+  if (!db) {
+    throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u5C1A\u672A\u9023\u7DDA\uFF0C\u7121\u6CD5\u5132\u5B58\u7DB2\u7AD9\u8A2D\u5B9A" });
+  }
+  await ensureSiteSettingsTable();
+  await db.insert(siteSettings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
+}
+var siteSettingsRouter = router({
+  public: publicProcedure.query(async () => {
+    const [announcementText, announcementEnabled] = await Promise.all([
+      getSettingValue(ANNOUNCEMENT_TEXT_KEY),
+      getSettingValue(ANNOUNCEMENT_ENABLED_KEY)
+    ]);
+    return {
+      announcementText: announcementText ?? DEFAULT_ANNOUNCEMENT_TEXT,
+      announcementEnabled: announcementEnabled == null ? true : announcementEnabled === "true"
+    };
+  }),
+  admin: adminProcedure.query(async () => {
+    const [announcementText, announcementEnabled] = await Promise.all([
+      getSettingValue(ANNOUNCEMENT_TEXT_KEY),
+      getSettingValue(ANNOUNCEMENT_ENABLED_KEY)
+    ]);
+    return {
+      announcementText: announcementText ?? DEFAULT_ANNOUNCEMENT_TEXT,
+      announcementEnabled: announcementEnabled == null ? true : announcementEnabled === "true"
+    };
+  }),
+  update: adminProcedure.input(z8.object({
+    announcementText: z8.string().trim().max(200, "\u516C\u544A\u6587\u5B57\u6700\u591A 200 \u5B57"),
+    announcementEnabled: z8.boolean()
+  })).mutation(async ({ input }) => {
+    await Promise.all([
+      upsertSettingValue(ANNOUNCEMENT_TEXT_KEY, input.announcementText),
+      upsertSettingValue(ANNOUNCEMENT_ENABLED_KEY, String(input.announcementEnabled))
+    ]);
+    return {
+      announcementText: input.announcementText,
+      announcementEnabled: input.announcementEnabled
+    };
+  })
+});
+
 // server/appRouter.ts
 var appRouter = router({
   system: systemRouter,
@@ -5918,7 +6183,8 @@ var appRouter = router({
   inventory: inventoryRouter,
   member: memberRouter,
   product: productRouter,
-  adminMembers: adminMembersRouter
+  adminMembers: adminMembersRouter,
+  siteSettings: siteSettingsRouter
 });
 
 // server/_core/context.ts
@@ -6088,8 +6354,8 @@ async function lineOAuthCallback(req, res) {
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq11 } = await import("drizzle-orm");
-        await db2.update(users2).set({ role: "admin" }).where(eq11(users2.id, user.id));
+        const { eq: eq12 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq12(users2.id, user.id));
         user = await getUserByOpenId(openId);
       }
     }

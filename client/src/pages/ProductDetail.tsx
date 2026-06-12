@@ -7,6 +7,10 @@ import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import ClearQuartzAddonOption, {
+  CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+  useClearQuartzChipsProduct,
+} from "@/components/ClearQuartzAddonOption";
 import {
   CUSTOM_BRACELET_NOTICES,
   CUSTOM_BRACELET_PRICE_DISPLAY,
@@ -187,11 +191,16 @@ export default function ProductDetail() {
   const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
   const [showClaspGuide, setShowClaspGuide] = useState(false);
   const [selectedFitPreference, setSelectedFitPreference] = useState<"just-right" | "loose">("just-right");
+  const [includeClearQuartzChips, setIncludeClearQuartzChips] = useState(false);
   const fitOptions = [
     { id: "just-right" as const, label: "剛好", desc: "會有水晶壓痕但不掐肉" },
     { id: "loose" as const, label: "微鬆", desc: "可輕微滑動" },
   ];
   const { addToCart, setIsOpen } = useCart();
+  const {
+    product: clearQuartzChipsProduct,
+    hasLiveProduct: hasLiveClearQuartzChipsProduct,
+  } = useClearQuartzChipsProduct();
   const { data: availability } = trpc.inventory.getAvailability.useQuery(
     { productId: product?.id ?? "" },
     { enabled: Boolean(product && product.category !== "custom") }
@@ -205,6 +214,7 @@ export default function ProductDetail() {
     setHasSelectedClasp(false);
     setShowWristMeasureGuide(false);
     setShowClaspGuide(false);
+    setIncludeClearQuartzChips(false);
     setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
   }, [id, product?.id]);
   useEffect(() => {
@@ -296,6 +306,8 @@ export default function ProductDetail() {
     product.category !== "custom" &&
     availability?.isMonthlyLimited === true &&
     availability.available === false;
+  const showClearQuartzAddon =
+    product.category !== "custom" && product.id !== CLEAR_QUARTZ_CHIPS_PRODUCT_ID;
   const fulfillmentNote = isSoldOutItem
       ? "本月限量商品已售完"
       : IN_STOCK_FULFILLMENT_NOTE;
@@ -321,8 +333,11 @@ export default function ProductDetail() {
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
-            }
+          }
       );
+    }
+    if (includeClearQuartzChips && hasLiveClearQuartzChipsProduct) {
+      addToCart(clearQuartzChipsProduct);
     }
     toast.success(`已加入購物袋：${product.name} × ${qty}`);
     setIsOpen(true);
@@ -728,6 +743,16 @@ export default function ProductDetail() {
             )}
 
             {/* Qty + Add to Cart */}
+            {showClearQuartzAddon && (
+              <ClearQuartzAddonOption
+                checked={includeClearQuartzChips}
+                onCheckedChange={setIncludeClearQuartzChips}
+                product={clearQuartzChipsProduct}
+                hasLiveProduct={hasLiveClearQuartzChipsProduct}
+                className="mb-4"
+              />
+            )}
+
             {product.category !== "custom" && <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center border border-[oklch(0.9_0_0)]">
                 <button

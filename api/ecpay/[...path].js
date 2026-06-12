@@ -219,7 +219,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
 // drizzle/schema.ts
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
 var users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -404,6 +404,7 @@ var orderBalancePayments = mysqlTable("orderBalancePayments", {
     "cancelled"
   ]).default("pending").notNull(),
   transferLastFive: varchar("transferLastFive", { length: 5 }),
+  transferReceiptUrl: longtext("transferReceiptUrl"),
   tradeNo: varchar("tradeNo", { length: 64 }),
   ecpayNotifyData: json("ecpayNotifyData"),
   paidAt: timestamp("paidAt"),
@@ -492,6 +493,12 @@ var chatbotKnowledge = mysqlTable("chatbotKnowledge", {
   index("chatbot_knowledge_source_idx").on(table.sourceType, table.sourceId),
   index("chatbot_knowledge_active_idx").on(table.active)
 ]);
+var siteSettings = mysqlTable("siteSettings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
 var dbProducts = mysqlTable("products", {
   id: varchar("id", { length: 64 }).primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
@@ -518,7 +525,11 @@ var dbProducts = mysqlTable("products", {
   featured: boolean("featured").notNull().default(false),
   active: boolean("active").notNull().default(true),
   isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
+  twoItemFreeShippingEligible: boolean("twoItemFreeShippingEligible").notNull().default(true),
   claspOptions: json("claspOptions").$type(),
+  showFitPreference: boolean("showFitPreference").notNull().default(true),
+  wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
+  wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -593,6 +604,7 @@ var balancePaymentLegacySelect = {
   paymentMethod: orderBalancePayments.paymentMethod,
   paymentStatus: orderBalancePayments.paymentStatus,
   transferLastFive: orderBalancePayments.transferLastFive,
+  transferReceiptUrl: orderBalancePayments.transferReceiptUrl,
   tradeNo: orderBalancePayments.tradeNo,
   ecpayNotifyData: orderBalancePayments.ecpayNotifyData,
   paidAt: orderBalancePayments.paidAt,
@@ -608,6 +620,15 @@ function hydrateBalancePayment(row) {
     totalAmount: row.amount
   };
 }
+var balancePaymentColumnsEnsured = false;
+async function ensureBalancePaymentColumns(db) {
+  if (balancePaymentColumnsEnsured) return;
+  try {
+    await db.execute(sql2`ALTER TABLE \`orderBalancePayments\` ADD COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+  }
+  balancePaymentColumnsEnsured = true;
+}
 async function getOrderByMerchantTradeNo(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -617,6 +638,7 @@ async function getOrderByMerchantTradeNo(merchantTradeNo) {
 async function getOrderWithItems(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [order] = await db.select().from(orders).where(eq2(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!order) return null;
   const items = await db.select().from(orderItems).where(eq2(orderItems.orderId, order.id));
@@ -647,12 +669,14 @@ async function updateLogisticsStatus(logisticsMerchantTradeNo, status, extra) {
 async function getBalancePaymentByMerchantTradeNo(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [row] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   return hydrateBalancePayment(row);
 }
 async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
   const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!balance) return null;
   await db.update(orderBalancePayments).set({

@@ -5,13 +5,22 @@ import { useCart } from "@/contexts/CartContext";
 import { Link } from "wouter";
 import { toast } from "sonner"; // still used for remove toast
 import { trpc } from "@/lib/trpc";
+import {
+  CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+  useClearQuartzChipsProduct,
+} from "@/components/ClearQuartzAddonOption";
 
 export default function CartDrawer() {
-  const { items, isOpen, setIsOpen, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
+  const { items, isOpen, setIsOpen, addToCart, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
   const { data: liveProducts = [] } = trpc.product.list.useQuery(undefined, { enabled: isOpen && items.length > 0 });
+  const {
+    product: clearQuartzChipsProduct,
+    hasLiveProduct: hasLiveClearQuartzChipsProduct,
+  } = useClearQuartzChipsProduct();
   const eligibilityByProductId = new Map(
     liveProducts.map((product) => [product.id, product.twoItemFreeShippingEligible])
   );
+  const hasClearQuartzChips = items.some((item) => item.product.id === CLEAR_QUARTZ_CHIPS_PRODUCT_ID);
   const freeShippingEligibleQuantity = items
     .filter(({ product }) => {
       const latestEligibility = eligibilityByProductId.get(product.id);
@@ -159,6 +168,37 @@ export default function CartDrawer() {
               <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] bg-[oklch(0.97_0.01_70)] border border-[oklch(0.9_0.02_70)] px-3 py-2 mb-5 tracking-wide">
                 購買 2 件商品享國內免運，目前還差 1 件
               </p>
+            )}
+            {hasLiveClearQuartzChipsProduct && !hasClearQuartzChips && (
+              <div className="mb-5 border border-[oklch(0.9_0_0)] bg-[oklch(0.99_0_0)] px-3 py-3">
+                <div className="flex items-start gap-3">
+                  {clearQuartzChipsProduct.image && (
+                    <img
+                      src={clearQuartzChipsProduct.image}
+                      alt={clearQuartzChipsProduct.name}
+                      className="h-12 w-12 shrink-0 border border-[oklch(0.92_0_0)] object-cover"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-body font-medium leading-snug text-[oklch(0.14_0_0)]">
+                      加購{clearQuartzChipsProduct.name}
+                    </p>
+                    <p className="mt-1 text-[0.65rem] font-body leading-relaxed text-[oklch(0.5_0_0)]">
+                      讓水晶多一份日常淨化儀式
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addToCart(clearQuartzChipsProduct);
+                      toast.success(`已加購：${clearQuartzChipsProduct.name}`);
+                    }}
+                    className="shrink-0 border border-[oklch(0.18_0_0)] px-2.5 py-1.5 text-[0.65rem] font-body text-[oklch(0.12_0_0)] transition-colors hover:bg-[oklch(0.96_0_0)]"
+                  >
+                    + NT$ {clearQuartzChipsProduct.price.toLocaleString()}
+                  </button>
+                </div>
+              </div>
             )}
             <Link href="/checkout/start">
               <button
