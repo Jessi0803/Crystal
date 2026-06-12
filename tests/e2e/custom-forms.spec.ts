@@ -15,6 +15,15 @@ async function getWristInput(page: import("@playwright/test").Page, path: string
   return page.locator('input[type="number"]').first();
 }
 
+async function expectDepositCheckoutWithoutShipping(page: import("@playwright/test").Page) {
+  await expect(page.locator("body")).toContainText("購買人資訊");
+  await expect(page.locator("body")).toContainText("付款方式");
+  await expect(page.locator("body")).not.toContainText("配送地區");
+  await expect(page.locator("body")).not.toContainText("配送方式");
+  await expect(page.locator("body")).not.toContainText("收件地址");
+  await expect(page.locator("body")).not.toContainText("運費");
+}
+
 test("custom service page links to every consultation form", async ({ page }) => {
   await page.goto("/custom");
 
@@ -47,7 +56,7 @@ test("pure custom form blocks a legacy wrist size below 13 cm", async ({ page })
 test("pure custom form stores consultation note and continues to deposit checkout", async ({ page }) => {
   await fillPureCustomDepositForm(page);
   await expect(page.locator("body")).toContainText("客製化商品");
-  await expect(page.locator("body")).toContainText("購買人資訊");
+  await expectDepositCheckoutWithoutShipping(page);
   await expect(page.locator("body")).toContainText("訂單摘要");
   await expect(page.locator("body")).toContainText("NT$ 500");
 });
@@ -62,6 +71,7 @@ async function expectConsultationNoteInAdmin(page: import("@playwright/test").Pa
 
 test("tarot custom form creates an ATM deposit order with its consultation note", async ({ page }) => {
   await fillTarotCustomDepositForm(page);
+  await expectDepositCheckoutWithoutShipping(page);
   const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-tarot-${Date.now()}@example.com`);
 
   await expectConsultationNoteInAdmin(page, orderNo, "占卜主題：財富密碼");
@@ -76,6 +86,7 @@ test("chakra custom form creates an ATM deposit order with its consultation note
     "E2E 脈輪客戶",
     "19",
   );
+  await expectDepositCheckoutWithoutShipping(page);
   const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-chakra-${Date.now()}@example.com`);
 
   await expectConsultationNoteInAdmin(page, orderNo, "【脈輪檢測 × 水晶手鍊諮詢表單】");
@@ -90,6 +101,7 @@ test("numerology custom form creates an ATM deposit order with its consultation 
     "E2E 靈數客戶",
     "13",
   );
+  await expectDepositCheckoutWithoutShipping(page);
   const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-numerology-${Date.now()}@example.com`);
 
   await expectConsultationNoteInAdmin(page, orderNo, "【生命靈數 × 水晶手鍊諮詢表單】");
