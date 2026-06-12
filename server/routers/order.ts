@@ -63,12 +63,11 @@ import {
   validateOverseasAddress,
 } from "@shared/overseasAddress";
 import { calcCheckoutFees } from "@shared/checkoutFees";
-import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "@shared/const";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
 
 async function getClearQuartzChipsAddOn(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
   const [product] = await db

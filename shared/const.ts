@@ -9,3 +9,4 @@ export const CUSTOM_TAROT_PRODUCT_ID = "tarot-crystal-deposit-product";
 export const CUSTOM_CHAKRA_PRODUCT_ID = "chakra-crystal-deposit-product";
 export const CUSTOM_NUMEROLOGY_PRODUCT_ID = "numerology-crystal-deposit-product";
 export const CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID, CUSTOM_CHAKRA_PRODUCT_ID, CUSTOM_NUMEROLOGY_PRODUCT_ID];
+export const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";

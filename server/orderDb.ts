@@ -15,7 +15,7 @@ import {
   InsertOrderBalancePayment,
   InsertLogisticsOrder,
 } from "../drizzle/schema";
-import { CUSTOM_PRODUCT_IDS } from "../shared/const";
+import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "../shared/const";
 
 type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type OrderRow = typeof orders.$inferSelect;
@@ -806,7 +806,16 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     .limit(1);
   if (!order) return null;
 
-  return { ...balancePayment, order };
+  const [clearQuartzChipsItem] = await db
+    .select()
+    .from(orderItems)
+    .where(and(
+      eq(orderItems.orderId, row.orderId),
+      eq(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID),
+    ))
+    .limit(1);
+
+  return { ...balancePayment, order, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
 }
 
 export async function updateBalancePaymentStatus(

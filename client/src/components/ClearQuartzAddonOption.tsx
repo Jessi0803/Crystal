@@ -1,8 +1,9 @@
 import { Sparkles } from "lucide-react";
 import { Product } from "@/lib/data";
 import { trpc } from "@/lib/trpc";
+import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID } from "@shared/const";
 
-export const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
+export { CLEAR_QUARTZ_CHIPS_PRODUCT_ID };
 
 const FALLBACK_CLEAR_QUARTZ_CHIPS_PRODUCT: Product = {
   id: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,

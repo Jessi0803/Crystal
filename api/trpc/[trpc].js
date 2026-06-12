@@ -361,6 +361,7 @@ var CUSTOM_TAROT_PRODUCT_ID = "tarot-crystal-deposit-product";
 var CUSTOM_CHAKRA_PRODUCT_ID = "chakra-crystal-deposit-product";
 var CUSTOM_NUMEROLOGY_PRODUCT_ID = "numerology-crystal-deposit-product";
 var CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID, CUSTOM_CHAKRA_PRODUCT_ID, CUSTOM_NUMEROLOGY_PRODUCT_ID];
+var CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -1306,7 +1307,11 @@ async function getBalancePaymentDetail(merchantTradeNo) {
   if (!balancePayment) return null;
   const [order] = await db.select().from(orders).where(eq2(orders.id, row.orderId)).limit(1);
   if (!order) return null;
-  return { ...balancePayment, order };
+  const [clearQuartzChipsItem] = await db.select().from(orderItems).where(and2(
+    eq2(orderItems.orderId, row.orderId),
+    eq2(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
+  )).limit(1);
+  return { ...balancePayment, order, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
 }
 async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive, transferReceiptUrl) {
   const db = await getDb();
@@ -2667,7 +2672,6 @@ var STORE_BANK_INFO = {
 
 // server/routers/order.ts
 var TRANSFER_RECEIPT_CONTENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
-var CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
 async function getClearQuartzChipsAddOn(db) {
   const [product] = await db.select().from(dbProducts).where(eq6(dbProducts.id, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)).limit(1);
   if (!product || !product.active) {

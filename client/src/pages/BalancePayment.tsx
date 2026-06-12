@@ -447,6 +447,22 @@ export default function BalancePayment() {
               <span className="text-[oklch(0.5_0_0)]">尾款小計</span>
               <span className="text-[oklch(0.12_0_0)] font-medium">NT$ {data.amount.toLocaleString()}</span>
             </div>
+            {showPaymentChoice && (
+              <div className="border-t border-[oklch(0.9_0_0)] pt-3">
+                <ClearQuartzAddonOption
+                  checked={includeClearQuartzChips}
+                  onCheckedChange={setIncludeClearQuartzChips}
+                  product={clearQuartzChipsProduct}
+                  hasLiveProduct={hasLiveClearQuartzChipsProduct}
+                />
+              </div>
+            )}
+            {!showPaymentChoice && data.clearQuartzChipsItem && (
+              <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
+                <span className="text-[oklch(0.5_0_0)]">{data.clearQuartzChipsItem.productName}</span>
+                <span className="text-[oklch(0.12_0_0)]">NT$ {data.clearQuartzChipsItem.subtotal.toLocaleString()}</span>
+              </div>
+            )}
             {!isPaid && !isTransferPending && (
               <>
                 {includeClearQuartzChips && hasLiveClearQuartzChipsProduct && (
@@ -484,14 +500,6 @@ export default function BalancePayment() {
           {/* 選擇付款方式 */}
           {showPaymentChoice && (
             <>
-              <ClearQuartzAddonOption
-                checked={includeClearQuartzChips}
-                onCheckedChange={setIncludeClearQuartzChips}
-                product={clearQuartzChipsProduct}
-                hasLiveProduct={hasLiveClearQuartzChipsProduct}
-                className="mb-5"
-              />
-
               <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送地區</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <button
