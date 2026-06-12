@@ -7,7 +7,6 @@ import { products } from "@/lib/data";
 import { toast } from "sonner";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
-import ClearQuartzAddonOption, { useClearQuartzChipsProduct } from "@/components/ClearQuartzAddonOption";
 import { CUSTOM_WRIST_SIZE_MAX, CUSTOM_WRIST_SIZE_MIN, CUSTOM_WRIST_SIZE_STEP, isValidCustomWristSize } from "@/lib/customOrderingContent";
 
 interface FormData {
@@ -66,13 +65,8 @@ const ACCENT = "oklch(0.68 0.11 30)";
 
 export default function CustomFormD() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const [includeClearQuartzChips, setIncludeClearQuartzChips] = useState(false);
   const [, navigate] = useLocation();
   const { addToCart, setIsOpen } = useCart();
-  const {
-    product: clearQuartzChipsProduct,
-    hasLiveProduct: hasLiveClearQuartzChipsProduct,
-  } = useClearQuartzChipsProduct();
 
   const depositProduct = products.find((p) => p.id === "numerology-crystal-deposit-product");
 
@@ -388,9 +382,6 @@ export default function CustomFormD() {
     if (!validateForm()) return;
     sessionStorage.setItem("customConsultationNote", buildNote(form));
     addToCart(depositProduct);
-    if (includeClearQuartzChips && hasLiveClearQuartzChipsProduct) {
-      addToCart(clearQuartzChipsProduct);
-    }
     setIsOpen(false);
     navigate("/checkout");
     toast.success("諮詢內容已儲存，請完成結帳以預約訂金");
@@ -439,14 +430,6 @@ export default function CustomFormD() {
             </section>
           ))}
         </div>
-
-        <ClearQuartzAddonOption
-          checked={includeClearQuartzChips}
-          onCheckedChange={setIncludeClearQuartzChips}
-          product={clearQuartzChipsProduct}
-          hasLiveProduct={hasLiveClearQuartzChipsProduct}
-          className="mb-5"
-        />
 
         <div className="flex items-center justify-between">
           <button
