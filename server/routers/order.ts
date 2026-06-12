@@ -46,7 +46,7 @@ import {
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
 import { dbProducts, orders, orderItems, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
   verifyPayPalOrderBelongsToMerchant,
@@ -68,6 +68,21 @@ import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
+
+async function getClearQuartzChipsAddOn(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  const [product] = await db
+    .select()
+    .from(dbProducts)
+    .where(eq(dbProducts.id, CLEAR_QUARTZ_CHIPS_PRODUCT_ID))
+    .limit(1);
+
+  if (!product || !product.active) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "找不到白水晶碎石加購商品" });
+  }
+
+  return product;
+}
 
 async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>, orderIds: number[]) {
   if (!db) throw new Error("Database not available");
@@ -900,6 +915,7 @@ export const orderRouter = router({
         .object({
           merchantTradeNo: z.string().min(1),
           paymentMethod: z.enum(["credit", "atm"]),
+          includeClearQuartzChips: z.boolean().optional(),
           checkoutRegion: z.enum(["domestic", "overseas"]),
           shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
           cvsStoreId: z.string().optional(),
@@ -992,13 +1008,35 @@ export const orderRouter = router({
         receiverZipCode = formatted.receiverZipCode;
       }
 
-      const feeSummary = calcCheckoutFees({
-        items: [{
+      const balanceItems: Array<{
+        id: string;
+        name: string;
+        price: number;
+        quantity: number;
+        twoItemFreeShippingEligible?: boolean;
+      }> = [{
           id: "custom-balance-payment",
           name: "客製化商品尾款",
           price: balancePayment.amount,
           quantity: 1,
-        }],
+          twoItemFreeShippingEligible: false,
+        }];
+      const clearQuartzChipsAddOn = input.includeClearQuartzChips
+        ? await getClearQuartzChipsAddOn(db)
+        : null;
+
+      if (clearQuartzChipsAddOn) {
+        balanceItems.push({
+          id: clearQuartzChipsAddOn.id,
+          name: clearQuartzChipsAddOn.name,
+          price: clearQuartzChipsAddOn.price,
+          quantity: 1,
+          twoItemFreeShippingEligible: clearQuartzChipsAddOn.twoItemFreeShippingEligible,
+        });
+      }
+
+      const feeSummary = calcCheckoutFees({
+        items: balanceItems,
         checkoutRegion: input.checkoutRegion,
         shippingMethod,
         paymentMethod: input.paymentMethod,
@@ -1015,6 +1053,43 @@ export const orderRouter = router({
           totalAmount,
         })
         .where(eq(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
+
+      const [existingClearQuartzItem] = await db
+        .select()
+        .from(orderItems)
+        .where(and(
+          eq(orderItems.orderId, balancePayment.orderId),
+          eq(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID),
+        ))
+        .limit(1);
+
+      if (clearQuartzChipsAddOn) {
+        const itemValues = {
+          productName: clearQuartzChipsAddOn.name,
+          productImage: clearQuartzChipsAddOn.image,
+          quantity: 1,
+          unitPrice: clearQuartzChipsAddOn.price,
+          subtotal: clearQuartzChipsAddOn.price,
+          isPreorder: false,
+        };
+        if (existingClearQuartzItem) {
+          await db.update(orderItems)
+            .set(itemValues)
+            .where(eq(orderItems.id, existingClearQuartzItem.id));
+        } else {
+          await db.insert(orderItems).values({
+            orderId: balancePayment.orderId,
+            productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+            ...itemValues,
+          });
+        }
+      } else if (existingClearQuartzItem) {
+        await db.delete(orderItems)
+          .where(and(
+            eq(orderItems.orderId, balancePayment.orderId),
+            eq(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID),
+          ));
+      }
 
       await db.update(orders)
         .set({
@@ -1043,7 +1118,7 @@ export const orderRouter = router({
       const paymentParams = buildCreditPaymentParams({
         merchantTradeNo: balancePayment.merchantTradeNo,
         tradeDesc: "椛Crystal客製化尾款",
-        itemName: `客製化商品尾款#${balancePayment.order.merchantTradeNo}`,
+        itemName: balanceItems.map((item) => `${item.name} x${item.quantity}`).join("#"),
         totalAmount,
         returnURL: `${origin}/api/ecpay/notify`,
         orderResultURL: `${origin}/api/ecpay/balance-result`,

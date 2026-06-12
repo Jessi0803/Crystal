@@ -1708,7 +1708,7 @@ function buildPrintTradeDocURL(opts) {
 
 // server/routers/order.ts
 init_schema();
-import { eq as eq6, inArray as inArray2 } from "drizzle-orm";
+import { and as and4, eq as eq6, inArray as inArray2 } from "drizzle-orm";
 
 // server/_core/paypal.ts
 function getApiBase() {
@@ -2667,6 +2667,14 @@ var STORE_BANK_INFO = {
 
 // server/routers/order.ts
 var TRANSFER_RECEIPT_CONTENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
+var CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
+async function getClearQuartzChipsAddOn(db) {
+  const [product] = await db.select().from(dbProducts).where(eq6(dbProducts.id, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)).limit(1);
+  if (!product || !product.active) {
+    throw new TRPCError3({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u767D\u6C34\u6676\u788E\u77F3\u52A0\u8CFC\u5546\u54C1" });
+  }
+  return product;
+}
 async function deleteCancelledOrderRecords(db, orderIds) {
   if (!db) throw new Error("Database not available");
   await db.delete(orderBalancePayments).where(inArray2(orderBalancePayments.orderId, orderIds));
@@ -3329,6 +3337,7 @@ var orderRouter = router({
     z2.object({
       merchantTradeNo: z2.string().min(1),
       paymentMethod: z2.enum(["credit", "atm"]),
+      includeClearQuartzChips: z2.boolean().optional(),
       checkoutRegion: z2.enum(["domestic", "overseas"]),
       shippingMethod: z2.enum(["cvs_711", "cvs_family", "home"]),
       cvsStoreId: z2.string().optional(),
@@ -3415,13 +3424,25 @@ var orderRouter = router({
       shippingAddress = formatted.shippingAddress;
       receiverZipCode = formatted.receiverZipCode;
     }
+    const balanceItems = [{
+      id: "custom-balance-payment",
+      name: "\u5BA2\u88FD\u5316\u5546\u54C1\u5C3E\u6B3E",
+      price: balancePayment.amount,
+      quantity: 1,
+      twoItemFreeShippingEligible: false
+    }];
+    const clearQuartzChipsAddOn = input.includeClearQuartzChips ? await getClearQuartzChipsAddOn(db) : null;
+    if (clearQuartzChipsAddOn) {
+      balanceItems.push({
+        id: clearQuartzChipsAddOn.id,
+        name: clearQuartzChipsAddOn.name,
+        price: clearQuartzChipsAddOn.price,
+        quantity: 1,
+        twoItemFreeShippingEligible: clearQuartzChipsAddOn.twoItemFreeShippingEligible
+      });
+    }
     const feeSummary = calcCheckoutFees({
-      items: [{
-        id: "custom-balance-payment",
-        name: "\u5BA2\u88FD\u5316\u5546\u54C1\u5C3E\u6B3E",
-        price: balancePayment.amount,
-        quantity: 1
-      }],
+      items: balanceItems,
       checkoutRegion: input.checkoutRegion,
       shippingMethod,
       paymentMethod: input.paymentMethod,
@@ -3435,6 +3456,34 @@ var orderRouter = router({
       paymentFee: feeSummary.paymentFee,
       totalAmount
     }).where(eq6(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
+    const [existingClearQuartzItem] = await db.select().from(orderItems).where(and4(
+      eq6(orderItems.orderId, balancePayment.orderId),
+      eq6(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
+    )).limit(1);
+    if (clearQuartzChipsAddOn) {
+      const itemValues = {
+        productName: clearQuartzChipsAddOn.name,
+        productImage: clearQuartzChipsAddOn.image,
+        quantity: 1,
+        unitPrice: clearQuartzChipsAddOn.price,
+        subtotal: clearQuartzChipsAddOn.price,
+        isPreorder: false
+      };
+      if (existingClearQuartzItem) {
+        await db.update(orderItems).set(itemValues).where(eq6(orderItems.id, existingClearQuartzItem.id));
+      } else {
+        await db.insert(orderItems).values({
+          orderId: balancePayment.orderId,
+          productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+          ...itemValues
+        });
+      }
+    } else if (existingClearQuartzItem) {
+      await db.delete(orderItems).where(and4(
+        eq6(orderItems.orderId, balancePayment.orderId),
+        eq6(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
+      ));
+    }
     await db.update(orders).set({
       deliveryRegion: isOverseas ? "overseas" : "domestic",
       shippingMethod,
@@ -3458,7 +3507,7 @@ var orderRouter = router({
     const paymentParams = buildCreditPaymentParams({
       merchantTradeNo: balancePayment.merchantTradeNo,
       tradeDesc: "\u691BCrystal\u5BA2\u88FD\u5316\u5C3E\u6B3E",
-      itemName: `\u5BA2\u88FD\u5316\u5546\u54C1\u5C3E\u6B3E#${balancePayment.order.merchantTradeNo}`,
+      itemName: balanceItems.map((item) => `${item.name} x${item.quantity}`).join("#"),
       totalAmount,
       returnURL: `${origin}/api/ecpay/notify`,
       orderResultURL: `${origin}/api/ecpay/balance-result`,
@@ -3535,7 +3584,7 @@ var orderRouter = router({
 // server/routers/chatbot.ts
 import { z as z3 } from "zod";
 import { TRPCError as TRPCError4 } from "@trpc/server";
-import { and as and4, desc as desc2, eq as eq8, inArray as inArray3, or as or2, sql as sql5 } from "drizzle-orm";
+import { and as and5, desc as desc2, eq as eq8, inArray as inArray3, or as or2, sql as sql5 } from "drizzle-orm";
 
 // server/crystalKnowledge.ts
 init_schema();
@@ -4750,7 +4799,7 @@ async function loadRelatedProducts(productIds) {
         subtitle: dbProducts.subtitle,
         price: dbProducts.price,
         image: dbProducts.image
-      }).from(dbProducts).where(and4(
+      }).from(dbProducts).where(and5(
         inArray3(dbProducts.id, productIds),
         eq8(dbProducts.active, true),
         sql5`${dbProducts.category} != 'test'`
@@ -4930,7 +4979,7 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
         )
       );
     }
-    const where = conditions.length > 0 ? and4(...conditions) : void 0;
+    const where = conditions.length > 0 ? and5(...conditions) : void 0;
     const rowsQuery = db.select().from(chatbotLogs).orderBy(desc2(chatbotLogs.createdAt)).limit(input.limit).offset(input.offset);
     const countQuery = db.select({ count: sql5`CAST(COUNT(*) AS SIGNED)` }).from(chatbotLogs);
     const [items, countRows] = await Promise.all([
@@ -5468,7 +5517,7 @@ var memberRouter = router({
 
 // server/routers/products.ts
 import { z as z6 } from "zod";
-import { eq as eq9, and as and5, inArray as inArray4, sql as sql6 } from "drizzle-orm";
+import { eq as eq9, and as and6, inArray as inArray4, sql as sql6 } from "drizzle-orm";
 import { TRPCError as TRPCError6 } from "@trpc/server";
 init_schema();
 var tableEnsured = false;
@@ -5670,7 +5719,7 @@ async function ensureProductsTable() {
 async function publishDueProducts() {
   const db = await getDb();
   if (!db) return;
-  await db.update(dbProducts).set({ active: true, scheduledPublishAt: null }).where(and5(eq9(dbProducts.active, false), sql6`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
+  await db.update(dbProducts).set({ active: true, scheduledPublishAt: null }).where(and6(eq9(dbProducts.active, false), sql6`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
 }
 function toFrontendProduct(p) {
   const { categories, categoryLabels } = normalizeProductCategories(p);
@@ -5778,7 +5827,7 @@ var productRouter = router({
     await publishDueProducts();
     const db = await getDb();
     if (!db) return [];
-    const rows = await db.select().from(dbProducts).where(and5(eq9(dbProducts.active, true)));
+    const rows = await db.select().from(dbProducts).where(and6(eq9(dbProducts.active, true)));
     return rows.filter((p) => p.category !== "test").sort((a, b) => a.sortOrder - b.sortOrder || b.createdAt.getTime() - a.createdAt.getTime()).map(toFrontendProduct);
   }),
   getById: publicProcedure.input(z6.object({ id: z6.string() })).query(async ({ input }) => {
@@ -5786,7 +5835,7 @@ var productRouter = router({
     await publishDueProducts();
     const db = await getDb();
     if (!db) return null;
-    const rows = await db.select().from(dbProducts).where(and5(eq9(dbProducts.id, input.id), eq9(dbProducts.active, true))).limit(1);
+    const rows = await db.select().from(dbProducts).where(and6(eq9(dbProducts.id, input.id), eq9(dbProducts.active, true))).limit(1);
     return rows[0] ? toFrontendProduct(rows[0]) : null;
   }),
   adminList: adminProcedure.query(async () => {
@@ -5917,7 +5966,7 @@ var productRouter = router({
 // server/routers/adminMembers.ts
 init_schema();
 import { TRPCError as TRPCError7 } from "@trpc/server";
-import { and as and6, desc as desc3, eq as eq10, or as or3, sql as sql7 } from "drizzle-orm";
+import { and as and7, desc as desc3, eq as eq10, or as or3, sql as sql7 } from "drizzle-orm";
 import { z as z7 } from "zod";
 var VIP_TIERS = ["none", "vip", "vvip"];
 async function ensureMemberVipColumns() {
@@ -5986,7 +6035,7 @@ var adminMembersRouter = router({
       orders,
       or3(
         eq10(orders.userId, users.id),
-        and6(
+        and7(
           sql7`${users.email} IS NOT NULL`,
           sql7`${users.email} != ''`,
           sql7`LOWER(TRIM(${orders.buyerEmail})) = LOWER(TRIM(${users.email}))`

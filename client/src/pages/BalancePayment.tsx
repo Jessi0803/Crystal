@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { CheckCircle, CreditCard, Banknote, XCircle, Home, Store, MapPin, Globe, ImageUp, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import ClearQuartzAddonOption, { useClearQuartzChipsProduct } from "@/components/ClearQuartzAddonOption";
 import {
   AU_STATE_OPTIONS,
   OVERSEAS_COUNTRY_EN,
@@ -15,7 +16,7 @@ import {
   OVERSEAS_SHIP_COUNTRY_OPTIONS,
   isOverseasShipCountryCode,
 } from "@shared/overseasShipping";
-import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
+import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES, type CheckoutFeeItem } from "@shared/checkoutFees";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 type PaymentMethod = "credit" | "atm";
@@ -64,6 +65,7 @@ export default function BalancePayment() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
   const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("home");
+  const [includeClearQuartzChips, setIncludeClearQuartzChips] = useState(false);
   const [form, setForm] = useState({
     shippingZip: "",
     shippingCity: "",
@@ -88,6 +90,10 @@ export default function BalancePayment() {
   const [codeSubmitted, setCodeSubmitted] = useState(false);
   const cvsWindowRef = useRef<Window | null>(null);
   const transferReceiptInputRef = useRef<HTMLInputElement>(null);
+  const {
+    product: clearQuartzChipsProduct,
+    hasLiveProduct: hasLiveClearQuartzChipsProduct,
+  } = useClearQuartzChipsProduct();
 
   const { data, isLoading, refetch } = trpc.order.getBalancePayment.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
@@ -155,6 +161,9 @@ export default function BalancePayment() {
         if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod);
         if (saved.checkoutRegion) setCheckoutRegion(saved.checkoutRegion);
         if (saved.shippingMethod) setShippingMethod(saved.shippingMethod);
+        if (typeof saved.includeClearQuartzChips === "boolean") {
+          setIncludeClearQuartzChips(saved.includeClearQuartzChips);
+        }
         if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
       }
     } catch {
@@ -283,8 +292,27 @@ export default function BalancePayment() {
   const isTransferPending = data.paymentStatus === "transfer_pending";
   const showPaymentChoice = !isPaid && !isTransferPending && !startCheckout.isSuccess;
   const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
+  const balanceItems: CheckoutFeeItem[] = [
+    {
+      id: "custom-balance-payment",
+      name: "客製化商品尾款",
+      price: data.amount,
+      quantity: 1,
+      twoItemFreeShippingEligible: false,
+    },
+  ];
+  if (includeClearQuartzChips && hasLiveClearQuartzChipsProduct) {
+    balanceItems.push({
+      id: clearQuartzChipsProduct.id,
+      baseProductId: clearQuartzChipsProduct.id,
+      name: clearQuartzChipsProduct.name,
+      price: clearQuartzChipsProduct.price,
+      quantity: 1,
+      twoItemFreeShippingEligible: clearQuartzChipsProduct.twoItemFreeShippingEligible,
+    });
+  }
   const feeSummary = calcCheckoutFees({
-    items: [{ id: "custom-balance-payment", name: "客製化商品尾款", price: data.amount, quantity: 1 }],
+    items: balanceItems,
     checkoutRegion,
     shippingMethod,
     paymentMethod,
@@ -341,7 +369,7 @@ export default function BalancePayment() {
     try {
       sessionStorage.setItem(
         BALANCE_FORM_KEY,
-        JSON.stringify({ paymentMethod, checkoutRegion, shippingMethod, form })
+        JSON.stringify({ paymentMethod, checkoutRegion, shippingMethod, includeClearQuartzChips, form })
       );
     } catch {
       /* 暫存失敗仍可繼續 */
@@ -358,6 +386,7 @@ export default function BalancePayment() {
     startCheckout.mutate({
       merchantTradeNo: data.merchantTradeNo,
       paymentMethod,
+      includeClearQuartzChips: includeClearQuartzChips && hasLiveClearQuartzChipsProduct,
       checkoutRegion,
       shippingMethod: checkoutRegion === "overseas" ? "home" : shippingMethod,
       cvsStoreId: checkoutRegion === "domestic" ? cvsStore?.storeId : undefined,
@@ -420,6 +449,12 @@ export default function BalancePayment() {
             </div>
             {!isPaid && !isTransferPending && (
               <>
+                {includeClearQuartzChips && hasLiveClearQuartzChipsProduct && (
+                  <div className="flex justify-between gap-4 text-sm font-body">
+                    <span className="text-[oklch(0.5_0_0)]">加購白水晶碎石</span>
+                    <span className="text-[oklch(0.12_0_0)]">NT$ {clearQuartzChipsProduct.price.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between gap-4 text-sm font-body">
                   <span className="text-[oklch(0.5_0_0)]">運費</span>
                   <span className="text-[oklch(0.12_0_0)]">NT$ {feeSummary.shippingFee.toLocaleString()}</span>
@@ -449,6 +484,14 @@ export default function BalancePayment() {
           {/* 選擇付款方式 */}
           {showPaymentChoice && (
             <>
+              <ClearQuartzAddonOption
+                checked={includeClearQuartzChips}
+                onCheckedChange={setIncludeClearQuartzChips}
+                product={clearQuartzChipsProduct}
+                hasLiveProduct={hasLiveClearQuartzChipsProduct}
+                className="mb-5"
+              />
+
               <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送地區</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <button

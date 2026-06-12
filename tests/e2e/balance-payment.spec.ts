@@ -93,6 +93,9 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
 
   await expect(page.getByRole("heading", { name: "請完成客製化尾款" })).toBeVisible();
   await expect(page.locator("body")).toContainText("尾款小計");
+  await expect(page.locator("body")).toContainText("加購白水晶碎石");
+  await page.getByLabel(/加購白水晶碎石/).check();
+  await expect(page.locator("body")).toContainText("NT$ 180");
 
   await page.getByRole("button", { name: "前往信用卡付款" }).click();
   await expect(page.locator("body")).toContainText("請輸入有效郵遞區號");
