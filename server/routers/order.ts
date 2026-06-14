@@ -420,7 +420,9 @@ export const orderRouter = router({
           isPreorder: item.isPreorder ?? false,
         }))
       );
-      await notifyCustomerOrderPlacedSafely(createdOrderId);
+      if (paymentMethod === "atm") {
+        await notifyCustomerOrderPlacedSafely(createdOrderId);
+      }
 
       const origin = siteBaseUrl(ctx.req);
 
@@ -534,6 +536,7 @@ export const orderRouter = router({
         }
         await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
         await deductInventoryAfterPayment(input.merchantTradeNo);
+        await notifyCustomerOrderPlacedSafely(order.id);
         return { success: true as const, alreadyPaid: false as const };
       } catch (e) {
         if (e instanceof TRPCError) throw e;

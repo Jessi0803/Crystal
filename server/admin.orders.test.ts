@@ -84,12 +84,30 @@ vi.mock("./storage", () => ({
   storagePut: vi.fn(),
 }));
 
-import { getAdminOrderSummaries } from "./orderDb";
+import {
+  createOrder,
+  getAdminOrderSummaries,
+  getOrderWithItems,
+} from "./orderDb";
 import { getDb } from "./db";
 import { appRouter } from "./appRouter";
+import { getProductAvailability } from "./inventoryDb";
+import {
+  capturePayPalOrder,
+  verifyPayPalOrderBelongsToMerchant,
+} from "./_core/paypal";
+import { storagePut } from "./storage";
+import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
 
 const getAdminOrderSummariesMock = vi.mocked(getAdminOrderSummaries);
+const createOrderMock = vi.mocked(createOrder);
+const getOrderWithItemsMock = vi.mocked(getOrderWithItems);
 const getDbMock = vi.mocked(getDb);
+const getProductAvailabilityMock = vi.mocked(getProductAvailability);
+const verifyPayPalOrderBelongsToMerchantMock = vi.mocked(verifyPayPalOrderBelongsToMerchant);
+const capturePayPalOrderMock = vi.mocked(capturePayPalOrder);
+const storagePutMock = vi.mocked(storagePut);
+const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
 
 function createCaller(user: { id: number; role: string } | null) {
   return appRouter.createCaller({
@@ -122,6 +140,61 @@ function createMockDb(selectResults: unknown[]) {
     select: vi.fn(() => createQueryChain(queue.shift() ?? [])),
     delete: vi.fn(() => deleteChain),
   };
+}
+
+function createPublicCaller() {
+  return appRouter.createCaller({
+    user: null,
+    req: {
+      get: (name: string) => (name === "host" ? "example.test" : undefined),
+      protocol: "https",
+    } as any,
+    res: {} as any,
+  });
+}
+
+const receiptBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lZn+7QAAAABJRU5ErkJggg==";
+
+function checkoutInput(paymentMethod: "atm" | "credit" = "atm") {
+  return {
+    buyerName: "通知測試顧客",
+    buyerEmail: "notify@example.com",
+    buyerPhone: "0912345678",
+    checkoutRegion: "domestic" as const,
+    paymentMethod,
+    shippingMethod: "home" as const,
+    shippingAddress: "台北市中正區測試路 1 號",
+    receiverZipCode: "100",
+    ...(paymentMethod === "atm"
+      ? {
+          transferLastFive: "54321",
+          transferReceiptImageBase64: receiptBase64,
+          transferReceiptImageContentType: "image/png",
+          transferReceiptImageFilename: "receipt.png",
+        }
+      : {}),
+    items: [
+      {
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1280,
+        quantity: 1,
+        image: "",
+      },
+    ],
+    origin: "https://example.test",
+  };
+}
+
+function mockAvailableProducts() {
+  getProductAvailabilityMock.mockResolvedValue({
+    available: true,
+    stock: 10,
+    isPreorder: false,
+    preorderNote: null,
+    isMonthlyLimited: false,
+  });
 }
 
 describe("order.listOrders (admin procedure)", () => {
@@ -167,6 +240,67 @@ describe("order.listOrders (admin procedure)", () => {
     await caller.order.listOrders({ status: "all", limit: 50 });
 
     expect(getAdminOrderSummariesMock).toHaveBeenCalledWith(50, 0, "all");
+  });
+});
+
+describe("order notification timing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getDbMock.mockResolvedValue(null as any);
+    createOrderMock.mockResolvedValue(101);
+    storagePutMock.mockResolvedValue({ url: "https://example.test/receipt.png", key: "receipt.png" });
+    mockAvailableProducts();
+  });
+
+  it("ATM checkout notifies after the customer submits transfer code and receipt", async () => {
+    const caller = createPublicCaller();
+
+    await caller.order.createAndPay(checkoutInput("atm"));
+
+    expect(createOrderMock).toHaveBeenCalled();
+    expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledWith(101);
+  });
+
+  it("credit-card checkout creates the order without sending the placed notification immediately", async () => {
+    const caller = createPublicCaller();
+
+    await caller.order.createAndPay(checkoutInput("credit"));
+
+    expect(createOrderMock).toHaveBeenCalled();
+    expect(notifyCustomerOrderPlacedSafelyMock).not.toHaveBeenCalled();
+  });
+
+  it("PayPal checkout notifies only after capture succeeds", async () => {
+    const caller = createPublicCaller();
+    getOrderWithItemsMock.mockResolvedValue({
+      id: 202,
+      merchantTradeNo: "PAYPAL001",
+      paymentMethod: "paypal",
+      paymentStatus: "pending",
+      buyerName: "PayPal 顧客",
+      buyerEmail: "paypal@example.com",
+      buyerPhone: "0912345678",
+      shippingMethod: "home",
+      deliveryRegion: "overseas",
+      orderStatus: "pending_payment",
+      totalAmount: 1880,
+      items: [],
+      logistics: null,
+      balancePayment: null,
+    } as Awaited<ReturnType<typeof getOrderWithItems>>);
+    verifyPayPalOrderBelongsToMerchantMock.mockResolvedValue(undefined);
+    capturePayPalOrderMock.mockResolvedValue({
+      status: "completed",
+      captureId: "CAPTURE001",
+      raw: { id: "PAYPAL-ORDER-001" },
+    });
+
+    await caller.order.capturePayPal({
+      merchantTradeNo: "PAYPAL001",
+      paypalOrderId: "PAYPAL-ORDER-001",
+    });
+
+    expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledWith(202);
   });
 });
 

@@ -22,7 +22,10 @@ import {
   updateBalancePaymentStatus,
 } from "./orderDb";
 import { deductInventoryAfterBalancePayment, deductInventoryAfterPayment } from "./inventoryDb";
-import { notifyCustomerOrderShippedSafely } from "./customerOrderNotification";
+import {
+  notifyCustomerOrderPlacedSafely,
+  notifyCustomerOrderShippedSafely,
+} from "./customerOrderNotification";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -38,6 +41,49 @@ function safeReturnPath(p: unknown): string {
   return path;
 }
 
+export async function handleECPayPaymentNotify(notifyData: Record<string, string>) {
+  console.log("[ECPay Notify]", notifyData);
+
+  const isValid = verifyCheckMacValue(notifyData);
+  if (!isValid) {
+    console.error("[ECPay Notify] CheckMacValue verification failed");
+    return "0|CheckMacValue Error";
+  }
+
+  const merchantTradeNo = notifyData.MerchantTradeNo;
+  const rtnCode = notifyData.RtnCode;
+  const tradeNo = notifyData.TradeNo ?? "";
+
+  const status = rtnCode === "1" ? "paid" : "failed";
+  const order = await getOrderByMerchantTradeNo(merchantTradeNo);
+  if (order) {
+    const shouldNotifyOrderPlaced =
+      status === "paid" && order.paymentStatus !== "paid" && order.paymentStatus !== "confirmed";
+    await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (status === "paid") {
+      await deductInventoryAfterPayment(merchantTradeNo);
+      if (shouldNotifyOrderPlaced) {
+        await notifyCustomerOrderPlacedSafely(order.id);
+      }
+    }
+    console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
+    return "1|OK";
+  }
+
+  const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
+  if (balancePayment) {
+    await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (status === "paid") {
+      await deductInventoryAfterBalancePayment(merchantTradeNo);
+    }
+    console.log(`[ECPay Notify] Balance ${merchantTradeNo} → ${status}`);
+    return "1|OK";
+  }
+
+  console.error("[ECPay Notify] Order not found:", merchantTradeNo);
+  return "0|Order Not Found";
+}
+
 export function registerECPayRoutes(app: Application) {
   /**
    * 綠界金流付款結果通知（ReturnURL）
@@ -46,45 +92,7 @@ export function registerECPayRoutes(app: Application) {
   app.post("/api/ecpay/notify", async (req: Request, res: Response) => {
     try {
       const notifyData = req.body as Record<string, string>;
-      console.log("[ECPay Notify]", notifyData);
-
-      const isValid = verifyCheckMacValue(notifyData);
-      if (!isValid) {
-        console.error("[ECPay Notify] CheckMacValue verification failed");
-        res.send("0|CheckMacValue Error");
-        return;
-      }
-
-      const merchantTradeNo = notifyData.MerchantTradeNo;
-      const rtnCode = notifyData.RtnCode;
-      const tradeNo = notifyData.TradeNo ?? "";
-
-      const status = rtnCode === "1" ? "paid" : "failed";
-      const order = await getOrderByMerchantTradeNo(merchantTradeNo);
-      if (order) {
-        await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-        if (status === "paid") {
-          await deductInventoryAfterPayment(merchantTradeNo);
-        }
-        console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
-        res.send("1|OK");
-        return;
-      }
-
-      const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
-      if (balancePayment) {
-        await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-        if (status === "paid") {
-          await deductInventoryAfterBalancePayment(merchantTradeNo);
-        }
-        console.log(`[ECPay Notify] Balance ${merchantTradeNo} → ${status}`);
-        res.send("1|OK");
-        return;
-      }
-
-      console.error("[ECPay Notify] Order not found:", merchantTradeNo);
-      res.send("0|Order Not Found");
-      return;
+      res.send(await handleECPayPaymentNotify(notifyData));
     } catch (err) {
       console.error("[ECPay Notify] Error:", err);
       res.send("0|Server Error");

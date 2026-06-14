@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:notifications": "tsx scripts/test-notifications.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ecpay-sandbox": "RUN_ECPAY_SANDBOX=true playwright test tests/e2e/ecpay-sandbox.spec.ts",
