@@ -18,4 +18,8 @@ describe("mapECPayLogisticsStatus", () => {
     expect(mapECPayLogisticsStatus({ LogisticsSubType: "FAMIC2C", RtnCode: "3024" })).toBe("in_transit");
     expect(mapECPayLogisticsStatus({ LogisticsSubType: "UNIMARTC2C", RtnCode: "300" })).toBe("in_transit");
   });
+
+  it("marks expired seller-unshipped logistics orders as failed", () => {
+    expect(mapECPayLogisticsStatus({ LogisticsType: "CVS_UNIMARTC2C", RtnCode: "7013" })).toBe("failed");
+  });
 });

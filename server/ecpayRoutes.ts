@@ -36,7 +36,7 @@ export function mapECPayLogisticsStatus(data: { RtnCode?: string; LogisticsSubTy
   const rtnCode = data.RtnCode ?? "";
   const logisticsSubType = data.LogisticsSubType || data.LogisticsType || "";
 
-  if (["3002", "3003", "3004"].includes(rtnCode)) return "failed";
+  if (["3002", "3003", "3004", "7013"].includes(rtnCode)) return "failed";
 
   if (logisticsSubType.includes("UNIMART")) {
     if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
