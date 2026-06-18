@@ -2074,14 +2074,6 @@ async function sendOrderConfirmEmail(payload) {
               </tr>
             </table>
 
-            ${paymentMethod === "atm" || paymentMethod === "bank_transfer" ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbf5;border:1px solid #f0e8d8;padding:16px 20px;margin-top:24px;">
-                <tr><td style="font-size:12px;color:#b8936a;font-weight:600;padding-bottom:8px;">\u26A0 \u8F49\u5E33\u63D0\u9192</td></tr>
-                <tr><td style="font-size:12px;color:#666;line-height:1.8;">
-                  \u8ACB\u65BC <strong>3 \u5929\u5167</strong>\u5B8C\u6210\u8F49\u5E33\uFF0C\u4E26\u5728\u6703\u54E1\u4E2D\u5FC3\u8F38\u5165\u8F49\u5E33\u672B\u4E94\u78BC\uFF0C\u4EE5\u4FBF\u6211\u5011\u78BA\u8A8D\u6536\u6B3E\u3002
-                  \u903E\u671F\u672A\u4ED8\u6B3E\u8A02\u55AE\u5C07\u81EA\u52D5\u53D6\u6D88\u3002
-                </td></tr>
-              </table>` : ""}
-
             <p style="margin:24px 0 0;font-size:12px;color:#999;line-height:1.8;">
               \u82E5\u60A8\u6709\u4EFB\u4F55\u554F\u984C\uFF0C\u6B61\u8FCE\u900F\u904E\u5B98\u7DB2\u806F\u7D61\u6211\u5011\u3002<br>
               \u611F\u8B1D\u60A8\u9078\u64C7 ${BRAND_NAME}\uFF0C\u795D\u60A8\u80FD\u91CF\u6EFF\u6EFF \u2728
@@ -2979,7 +2971,9 @@ var orderRouter = router({
         isPreorder: item.isPreorder ?? false
       }))
     );
-    await notifyCustomerOrderPlacedSafely(createdOrderId);
+    if (paymentMethod === "atm") {
+      await notifyCustomerOrderPlacedSafely(createdOrderId);
+    }
     const origin = siteBaseUrl(ctx.req);
     if (paymentMethod === "paypal") {
       const returnUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
@@ -3075,6 +3069,7 @@ var orderRouter = router({
       }
       await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
       await deductInventoryAfterPayment(input.merchantTradeNo);
+      await notifyCustomerOrderPlacedSafely(order.id);
       return { success: true, alreadyPaid: false };
     } catch (e) {
       if (e instanceof TRPCError3) throw e;
@@ -3836,6 +3831,14 @@ var knowledgeChunks = [
     keywords: ["\u6DE8\u5316", "\u6D88\u78C1", "\u6C34\u6676\u788E\u77F3", "\u6C34\u6676\u6D1E", "\u9F20\u5C3E\u8349", "\u6708\u5149", "\u97F3\u53C9", "\u6DE8\u5316\u65B9\u6CD5"],
     category: "\u5E38\u898B\u554F\u984C",
     relatedProductIds: ["crystal-chips"]
+  },
+  {
+    id: "faq-pre-shipping-cleanse",
+    question: "\u5546\u54C1\u6216\u6C34\u6676\u51FA\u8CA8\u524D\u6703\u6D88\u78C1\u55CE\uFF1F",
+    answer: "\u6211\u5011\u51FA\u8CA8\u4E4B\u524D\u90FD\u6703\u6DE8\u5316\u6D88\u78C1\uFF0C\u6536\u5230\u5305\u88F9\u4E4B\u5F8C\u53EF\u4EE5\u76F4\u63A5\u651C\u5E36\uFF5E",
+    embedText: "\u5546\u54C1\u6216\u6C34\u6676\u51FA\u8CA8\u524D\u6703\u6D88\u78C1\u55CE \u51FA\u8CA8\u524D \u6D88\u78C1 \u6DE8\u5316 \u6536\u5230\u5305\u88F9 \u76F4\u63A5\u4F69\u6234 \u76F4\u63A5\u651C\u5E36",
+    keywords: ["\u51FA\u8CA8\u524D", "\u51FA\u8CA8", "\u6D88\u78C1", "\u6DE8\u5316", "\u6536\u5230\u5305\u88F9", "\u76F4\u63A5\u4F69\u6234", "\u76F4\u63A5\u651C\u5E36"],
+    category: "\u5E38\u898B\u554F\u984C"
   },
   {
     id: "faq-activate",

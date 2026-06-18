@@ -76,11 +76,16 @@ async function getOrderAndLogisticsStatus(orderNo: string) {
 
 async function postLogisticsNotify(request: APIRequestContext, logisticsNo: string, rtnCode: string) {
   const env = dotenv.parse(readFileSync(".env.test.local"));
+  const rtnMsg =
+    rtnCode === "2073" ? "商品已送達門市" :
+    rtnCode === "2067" ? "消費者成功取件" :
+    rtnCode === "2074" ? "消費者七天未取件" :
+    "物流狀態更新";
   const payload: Record<string, string> = {
     MerchantID: env.ECPAY_LOGISTICS_MERCHANT_ID ?? "2000933",
     MerchantTradeNo: logisticsNo,
     RtnCode: rtnCode,
-    RtnMsg: rtnCode === "300" ? "已到店" : rtnCode === "3024" ? "已取貨" : "退件",
+    RtnMsg: rtnMsg,
     AllPayLogisticsID: "E2ELOGISTICSID",
     LogisticsType: "CVS",
     LogisticsSubType: "UNIMARTC2C",
@@ -100,7 +105,7 @@ async function postLogisticsNotify(request: APIRequestContext, logisticsNo: stri
 test("ECPay logistics notify updates order and storefront result status", async ({ page, request }) => {
   const { orderNo, logisticsNo } = await createPaidOrderWithLogistics();
 
-  await postLogisticsNotify(request, logisticsNo, "300");
+  await postLogisticsNotify(request, logisticsNo, "2073");
   await expect.poll(() => getOrderAndLogisticsStatus(orderNo)).toMatchObject({
     orderStatus: "arrived",
     logisticsStatus: "arrived",
@@ -108,7 +113,7 @@ test("ECPay logistics notify updates order and storefront result status", async 
   await page.goto(`/order/${orderNo}`);
   await expect(page.getByRole("heading", { name: "包裹已到店" })).toBeVisible();
 
-  await postLogisticsNotify(request, logisticsNo, "3024");
+  await postLogisticsNotify(request, logisticsNo, "2067");
   await expect.poll(() => getOrderAndLogisticsStatus(orderNo)).toMatchObject({
     orderStatus: "picked_up",
     logisticsStatus: "picked_up",
@@ -120,7 +125,7 @@ test("ECPay logistics notify updates order and storefront result status", async 
 test("ECPay logistics returned notify marks the order as not picked and updates member center", async ({ page, request }) => {
   const { orderNo, logisticsNo } = await createPaidOrderWithLogistics();
 
-  await postLogisticsNotify(request, logisticsNo, "3022");
+  await postLogisticsNotify(request, logisticsNo, "2074");
   await expect.poll(() => getOrderAndLogisticsStatus(orderNo)).toMatchObject({
     orderStatus: "not_picked",
     logisticsStatus: "returned",

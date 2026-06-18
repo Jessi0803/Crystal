@@ -276,6 +276,7 @@ export async function queryLogisticsStatus(opts: {
   const params: Record<string, string> = {
     MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
     MerchantTradeNo: opts.logisticsMerchantTradeNo,
+    AllPayLogisticsID: opts.allPayLogisticsId,
     TimeStamp: String(Math.floor(Date.now() / 1000)),
   };
 
@@ -289,12 +290,7 @@ export async function queryLogisticsStatus(opts: {
   });
 
   const text = await response.text();
-  const result: Record<string, string> = {};
-  text.split("|").forEach((pair) => {
-    const [k, ...v] = pair.split("=");
-    if (k) result[k.trim()] = v.join("=").trim();
-  });
-
+  const { result } = parseLogisticsResponse(text);
   return result;
 }
 

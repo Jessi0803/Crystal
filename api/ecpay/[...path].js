@@ -772,6 +772,104 @@ var PAYMENT_LABEL = {
 function escapeHtml(value) {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
+async function sendOrderConfirmEmail(payload) {
+  const resend = getResend();
+  const {
+    to,
+    buyerName,
+    merchantTradeNo,
+    totalAmount,
+    shippingMethod,
+    paymentMethod,
+    cvsStoreName,
+    receiverAddress,
+    items
+  } = payload;
+  const itemRows = items.map(
+    (item) => `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;">${item.productName}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#666;text-align:center;">\xD7 ${item.quantity}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;text-align:right;">NT$ ${item.subtotal.toLocaleString()}</td>
+      </tr>`
+  ).join("");
+  const deliveryInfo = shippingMethod === "home" ? `<p style="margin:4px 0;font-size:13px;color:#555;">\u914D\u9001\u5730\u5740\uFF1A${receiverAddress ?? "\u2014"}</p>` : `<p style="margin:4px 0;font-size:13px;color:#555;">\u53D6\u8CA8\u9580\u5E02\uFF1A${cvsStoreName ?? "\u2014"}</p>`;
+  const html = `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f9f7f4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e8e4df;">
+        <!-- Header -->
+        <tr>
+          <td style="padding:32px 40px 24px;border-bottom:1px solid #f0ece7;text-align:center;">
+            <p style="margin:0;font-size:11px;letter-spacing:0.2em;color:#999;text-transform:uppercase;">Crystal Energy</p>
+            <h1 style="margin:8px 0 0;font-size:22px;font-weight:300;color:#1a1a1a;letter-spacing:0.08em;">${BRAND_NAME}</h1>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="margin:0 0 4px;font-size:13px;color:#555;">\u89AA\u611B\u7684 ${buyerName}\uFF0C</p>
+            <h2 style="margin:0 0 20px;font-size:18px;font-weight:500;color:#1a1a1a;">\u611F\u8B1D\u60A8\u7684\u8A02\u8CFC\uFF01</h2>
+
+            <!-- \u8A02\u55AE\u8CC7\u8A0A -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:16px 20px;margin-bottom:24px;">
+              <tr>
+                <td style="font-size:11px;letter-spacing:0.1em;color:#999;padding-bottom:10px;">\u8A02\u55AE\u8CC7\u8A0A</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;color:#555;padding:2px 0;">\u8A02\u55AE\u7DE8\u865F\uFF1A<strong style="color:#1a1a1a;">${merchantTradeNo}</strong></td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;color:#555;padding:2px 0;">\u4ED8\u6B3E\u65B9\u5F0F\uFF1A${PAYMENT_LABEL[paymentMethod] ?? paymentMethod}</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;color:#555;padding:2px 0;">\u914D\u9001\u65B9\u5F0F\uFF1A${SHIPPING_LABEL[shippingMethod] ?? shippingMethod}</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;color:#555;padding:2px 0;">${deliveryInfo}</td>
+              </tr>
+            </table>
+
+            <!-- \u5546\u54C1\u660E\u7D30 -->
+            <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.1em;color:#999;">\u5546\u54C1\u660E\u7D30</p>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${itemRows}
+              <tr>
+                <td colspan="2" style="padding:14px 0 0;font-size:13px;font-weight:600;color:#1a1a1a;">\u8A02\u55AE\u7E3D\u8A08</td>
+                <td style="padding:14px 0 0;font-size:15px;font-weight:600;color:#1a1a1a;text-align:right;">NT$ ${totalAmount.toLocaleString()}</td>
+              </tr>
+            </table>
+
+            <p style="margin:24px 0 0;font-size:12px;color:#999;line-height:1.8;">
+              \u82E5\u60A8\u6709\u4EFB\u4F55\u554F\u984C\uFF0C\u6B61\u8FCE\u900F\u904E\u5B98\u7DB2\u806F\u7D61\u6211\u5011\u3002<br>
+              \u611F\u8B1D\u60A8\u9078\u64C7 ${BRAND_NAME}\uFF0C\u795D\u60A8\u80FD\u91CF\u6EFF\u6EFF \u2728
+            </p>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #f0ece7;text-align:center;">
+            <p style="margin:0;font-size:10px;color:#bbb;letter-spacing:0.1em;">
+              \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} ${BRAND_NAME} \xB7 \u5929\u7136\u6C34\u6676\u80FD\u91CF\u98FE\u54C1
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  return resend.emails.send({
+    from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
+    to,
+    subject: `\u3010${BRAND_NAME}\u3011\u8A02\u55AE\u78BA\u8A8D #${merchantTradeNo}`,
+    html
+  });
+}
 async function sendOrderShippedEmail(payload) {
   const resend = getResend();
   const {
@@ -870,6 +968,9 @@ function extractLineUserId(openId) {
   if (!openId?.startsWith("line:")) return null;
   return openId.slice("line:".length);
 }
+function formatCurrency(amount) {
+  return `NT$ ${amount.toLocaleString("zh-TW")}`;
+}
 async function pushLineTextMessage(to, text2) {
   const token = getLineAccessToken();
   if (!token) {
@@ -901,6 +1002,29 @@ async function getLineUserIdForOrder(orderId) {
   if (!order?.userId) return null;
   const [user] = await db.select({ openId: users.openId }).from(users).where(eq4(users.id, order.userId)).limit(1);
   return extractLineUserId(user?.openId);
+}
+async function notifyLineOrderPlaced(orderId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const lineUserId = await getLineUserIdForOrder(orderId);
+  if (!lineUserId) return { sent: false, reason: "missing_line_user" };
+  const [order] = await db.select().from(orders).where(eq4(orders.id, orderId)).limit(1);
+  if (!order) return { sent: false, reason: "missing_order" };
+  const items = await db.select().from(orderItems).where(eq4(orderItems.orderId, orderId));
+  const productLines = items.filter((item) => !["shipping-fee", "payment-fee"].includes(item.productId)).slice(0, 6).map((item) => `\u30FB${item.productName} x${item.quantity}`).join("\n");
+  const paymentLabel = order.paymentMethod === "atm" ? "\u9280\u884C\u8F49\u5E33" : order.paymentMethod === "paypal" ? "PayPal" : "\u4FE1\u7528\u5361";
+  const text2 = [
+    `${order.buyerName} \u60A8\u597D\uFF0C\u5DF2\u6536\u5230\u60A8\u7684\u8A02\u55AE\u3002`,
+    "",
+    `\u8A02\u55AE\u7DE8\u865F\uFF1A${order.merchantTradeNo}`,
+    `\u4ED8\u6B3E\u65B9\u5F0F\uFF1A${paymentLabel}`,
+    `\u8A02\u55AE\u91D1\u984D\uFF1A${formatCurrency(order.totalAmount)}`,
+    productLines ? `\u5546\u54C1\uFF1A
+${productLines}` : "",
+    "",
+    `\u67E5\u770B\u8A02\u55AE\uFF1A${getSiteUrl()}/order/${encodeURIComponent(order.merchantTradeNo)}`
+  ].filter(Boolean).join("\n");
+  return pushLineTextMessage(lineUserId, text2);
 }
 async function notifyLineOrderShipped(orderId) {
   const db = await getDb();
@@ -953,6 +1077,18 @@ async function getOrderEmailPayload(orderId) {
     }))
   };
 }
+async function notifyCustomerOrderPlacedSafely(orderId) {
+  try {
+    const lineResult = await notifyLineOrderPlaced(orderId);
+    if (lineResult.sent) return;
+    if (lineResult.reason === "missing_order") return;
+    const emailPayload = await getOrderEmailPayload(orderId);
+    if (!emailPayload) return;
+    await sendOrderConfirmEmail(emailPayload);
+  } catch (error) {
+    console.error("[CustomerOrderNotification] order placed failed:", error);
+  }
+}
 async function notifyCustomerOrderShippedSafely(orderId) {
   try {
     const lineResult = await notifyLineOrderShipped(orderId);
@@ -968,6 +1104,27 @@ async function notifyCustomerOrderShippedSafely(orderId) {
 
 // server/ecpayRoutes.ts
 import { eq as eq6 } from "drizzle-orm";
+function mapECPayLogisticsStatus(data) {
+  const rtnCode = data.RtnCode ?? "";
+  const logisticsSubType = data.LogisticsSubType || data.LogisticsType || "";
+  if (["3002", "3003", "3004"].includes(rtnCode)) return "failed";
+  if (logisticsSubType.includes("UNIMART")) {
+    if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
+    if (rtnCode === "2067") return "picked_up";
+    if (rtnCode === "2074") return "returned";
+    if (rtnCode === "2098") return "arrived";
+  }
+  if (logisticsSubType.includes("FAMI")) {
+    if (rtnCode === "3018") return "arrived";
+    if (rtnCode === "3022") return "picked_up";
+    if (rtnCode === "3020") return "returned";
+  }
+  if (rtnCode === "3018") return "arrived";
+  if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
+  if (rtnCode === "3022" || rtnCode === "2067") return "picked_up";
+  if (rtnCode === "3020" || rtnCode === "2074" || rtnCode === "3028") return "returned";
+  return "in_transit";
+}
 function safeReturnPath(p) {
   if (typeof p !== "string") return "/checkout";
   const path = p.split(/[?#]/)[0];
@@ -975,44 +1132,47 @@ function safeReturnPath(p) {
   if (path.includes(":")) return "/checkout";
   return path;
 }
+async function handleECPayPaymentNotify(notifyData) {
+  console.log("[ECPay Notify]", notifyData);
+  const isValid = verifyCheckMacValue(notifyData);
+  if (!isValid) {
+    console.error("[ECPay Notify] CheckMacValue verification failed");
+    return "0|CheckMacValue Error";
+  }
+  const merchantTradeNo = notifyData.MerchantTradeNo;
+  const rtnCode = notifyData.RtnCode;
+  const tradeNo = notifyData.TradeNo ?? "";
+  const status = rtnCode === "1" ? "paid" : "failed";
+  const order = await getOrderByMerchantTradeNo(merchantTradeNo);
+  if (order) {
+    const shouldNotifyOrderPlaced = status === "paid" && order.paymentStatus !== "paid" && order.paymentStatus !== "confirmed";
+    await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (status === "paid") {
+      await deductInventoryAfterPayment(merchantTradeNo);
+      if (shouldNotifyOrderPlaced) {
+        await notifyCustomerOrderPlacedSafely(order.id);
+      }
+    }
+    console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
+    return "1|OK";
+  }
+  const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
+  if (balancePayment) {
+    await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (status === "paid") {
+      await deductInventoryAfterBalancePayment(merchantTradeNo);
+    }
+    console.log(`[ECPay Notify] Balance ${merchantTradeNo} \u2192 ${status}`);
+    return "1|OK";
+  }
+  console.error("[ECPay Notify] Order not found:", merchantTradeNo);
+  return "0|Order Not Found";
+}
 function registerECPayRoutes(app2) {
   app2.post("/api/ecpay/notify", async (req, res) => {
     try {
       const notifyData = req.body;
-      console.log("[ECPay Notify]", notifyData);
-      const isValid = verifyCheckMacValue(notifyData);
-      if (!isValid) {
-        console.error("[ECPay Notify] CheckMacValue verification failed");
-        res.send("0|CheckMacValue Error");
-        return;
-      }
-      const merchantTradeNo = notifyData.MerchantTradeNo;
-      const rtnCode = notifyData.RtnCode;
-      const tradeNo = notifyData.TradeNo ?? "";
-      const status = rtnCode === "1" ? "paid" : "failed";
-      const order = await getOrderByMerchantTradeNo(merchantTradeNo);
-      if (order) {
-        await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-        if (status === "paid") {
-          await deductInventoryAfterPayment(merchantTradeNo);
-        }
-        console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
-        res.send("1|OK");
-        return;
-      }
-      const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
-      if (balancePayment) {
-        await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-        if (status === "paid") {
-          await deductInventoryAfterBalancePayment(merchantTradeNo);
-        }
-        console.log(`[ECPay Notify] Balance ${merchantTradeNo} \u2192 ${status}`);
-        res.send("1|OK");
-        return;
-      }
-      console.error("[ECPay Notify] Order not found:", merchantTradeNo);
-      res.send("0|Order Not Found");
-      return;
+      res.send(await handleECPayPaymentNotify(notifyData));
     } catch (err) {
       console.error("[ECPay Notify] Error:", err);
       res.send("0|Server Error");
@@ -1110,13 +1270,15 @@ ${inputs}
         return;
       }
       const logisticsMerchantTradeNo = data.MerchantTradeNo;
-      const rtnCode = data.RtnCode;
-      let newStatus = "in_transit";
-      if (rtnCode === "300" || rtnCode === "3018") newStatus = "arrived";
-      else if (rtnCode === "3024") newStatus = "picked_up";
-      else if (rtnCode === "3022" || rtnCode === "3028") newStatus = "returned";
-      else if (["3002", "3003", "3004"].includes(rtnCode)) newStatus = "failed";
-      await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus);
+      const newStatus = mapECPayLogisticsStatus(data);
+      await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus, {
+        cvsPaymentNo: data.CVSPaymentNo,
+        cvsValidationNo: data.CVSValidationNo,
+        bookingNote: data.BookingNote,
+        arrivedAt: newStatus === "arrived" ? /* @__PURE__ */ new Date() : void 0,
+        pickedUpAt: newStatus === "picked_up" ? /* @__PURE__ */ new Date() : void 0,
+        ecpayLogisticsData: data
+      });
       if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
         const db = await getDb();
         if (db) {

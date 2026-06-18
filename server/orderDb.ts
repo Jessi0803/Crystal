@@ -682,7 +682,14 @@ export async function createLogisticsOrder(data: InsertLogisticsOrder) {
 export async function updateLogisticsStatus(
   logisticsMerchantTradeNo: string,
   status: "created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed",
-  extra?: { cvsPaymentNo?: string; cvsValidationNo?: string; bookingNote?: string; arrivedAt?: Date; pickedUpAt?: Date }
+  extra?: {
+    cvsPaymentNo?: string;
+    cvsValidationNo?: string;
+    bookingNote?: string;
+    arrivedAt?: Date;
+    pickedUpAt?: Date;
+    ecpayLogisticsData?: unknown;
+  }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

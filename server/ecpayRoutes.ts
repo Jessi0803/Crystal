@@ -30,6 +30,35 @@ import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
+type LogisticsStatus = "created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed";
+
+export function mapECPayLogisticsStatus(data: { RtnCode?: string; LogisticsSubType?: string; LogisticsType?: string }): LogisticsStatus {
+  const rtnCode = data.RtnCode ?? "";
+  const logisticsSubType = data.LogisticsSubType || data.LogisticsType || "";
+
+  if (["3002", "3003", "3004"].includes(rtnCode)) return "failed";
+
+  if (logisticsSubType.includes("UNIMART")) {
+    if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
+    if (rtnCode === "2067") return "picked_up";
+    if (rtnCode === "2074") return "returned";
+    if (rtnCode === "2098") return "arrived";
+  }
+
+  if (logisticsSubType.includes("FAMI")) {
+    if (rtnCode === "3018") return "arrived";
+    if (rtnCode === "3022") return "picked_up";
+    if (rtnCode === "3020") return "returned";
+  }
+
+  if (rtnCode === "3018") return "arrived";
+  if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
+  if (rtnCode === "3022" || rtnCode === "2067") return "picked_up";
+  if (rtnCode === "3020" || rtnCode === "2074" || rtnCode === "3028") return "returned";
+
+  return "in_transit";
+}
+
 // 只允許導回本站的相對路徑（必須以單一 "/" 開頭），避免開放轉址。
 // 不合法時退回結帳頁。
 function safeReturnPath(p: unknown): string {
@@ -241,17 +270,16 @@ ${inputs}
       }
 
       const logisticsMerchantTradeNo = data.MerchantTradeNo;
-      const rtnCode = data.RtnCode;
+      const newStatus = mapECPayLogisticsStatus(data);
 
-      // 狀態對應
-      // 300 = 到店, 3024 = 已取貨, 3022 = 退件
-      let newStatus: "in_transit" | "arrived" | "picked_up" | "returned" | "failed" = "in_transit";
-      if (rtnCode === "300" || rtnCode === "3018") newStatus = "arrived";
-      else if (rtnCode === "3024") newStatus = "picked_up";
-      else if (rtnCode === "3022" || rtnCode === "3028") newStatus = "returned";
-      else if (["3002", "3003", "3004"].includes(rtnCode)) newStatus = "failed";
-
-      await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus);
+      await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus, {
+        cvsPaymentNo: data.CVSPaymentNo,
+        cvsValidationNo: data.CVSValidationNo,
+        bookingNote: data.BookingNote,
+        arrivedAt: newStatus === "arrived" ? new Date() : undefined,
+        pickedUpAt: newStatus === "picked_up" ? new Date() : undefined,
+        ecpayLogisticsData: data,
+      });
 
       // 如果物流狀態已到店、已取貨或退件，同步更新訂單狀態
       if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
