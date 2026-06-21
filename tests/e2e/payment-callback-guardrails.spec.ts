@@ -17,18 +17,23 @@ async function connectTestDb() {
   });
 }
 
-async function createPendingPaymentOrder(prefix: string, method: "credit" | "paypal" = "credit") {
+async function createPendingPaymentOrder(
+  prefix: string,
+  method: "credit" | "paypal" = "credit",
+  options: { isCustomOrder?: boolean; totalAmount?: number; productName?: string } = {},
+) {
   const connection = await connectTestDb();
   try {
     const orderNo = `${prefix}${Date.now().toString(36).toUpperCase()}`.slice(0, 32);
+    const totalAmount = options.totalAmount ?? 1880;
     await connection.execute(
       `INSERT INTO orders (
         merchantTradeNo, paymentStatus, paymentMethod, deliveryRegion, shippingMethod,
-        orderStatus, totalAmount, buyerName, buyerEmail, buyerPhone,
+        orderStatus, isCustomOrder, totalAmount, buyerName, buyerEmail, buyerPhone,
         shippingAddress, receiverZipCode, inventoryDeducted, createdAt, updatedAt
-      ) VALUES (?, 'pending', ?, 'domestic', 'home', 'pending_payment', 1880,
+      ) VALUES (?, 'pending', ?, 'domestic', 'home', 'pending_payment', ?, ?,
         'E2E 金流安全測試', ?, '0912345678', '台北市中正區測試路 1 號', '100', false, NOW(), NOW())`,
-      [orderNo, method, `${orderNo.toLowerCase()}@example.com`]
+      [orderNo, method, Boolean(options.isCustomOrder), totalAmount, `${orderNo.toLowerCase()}@example.com`]
     );
     const [rows] = await connection.execute<RowDataPacket[]>(
       "SELECT id FROM orders WHERE merchantTradeNo = ? LIMIT 1",
@@ -36,8 +41,14 @@ async function createPendingPaymentOrder(prefix: string, method: "credit" | "pay
     );
     await connection.execute(
       `INSERT INTO orderItems (orderId, productId, productName, quantity, unitPrice, subtotal, isPreorder)
-       VALUES (?, 'e2e-bracelet-in-stock', 'E2E 現貨手鍊', 1, 1780, 1780, false)`,
-      [rows[0]?.id]
+       VALUES (?, ?, ?, 1, ?, ?, false)`,
+      [
+        rows[0]?.id,
+        options.isCustomOrder ? "custom-product-deposit" : "e2e-bracelet-in-stock",
+        options.productName ?? (options.isCustomOrder ? "客製化商品訂金" : "E2E 現貨手鍊"),
+        totalAmount,
+        totalAmount,
+      ]
     );
     return orderNo;
   } finally {
@@ -119,6 +130,36 @@ test("repeated valid ECPay payment notify is idempotent for inventory deduction"
   await expect.poll(() => getOrderPaymentState(orderNo)).toMatchObject({
     paymentStatus: "paid",
     orderStatus: "paid",
+    inventoryDeducted: true,
+    tradeNo: payload.TradeNo,
+  });
+});
+
+test("valid ECPay credit-card notify marks a custom deposit order as deposit paid", async ({ request }) => {
+  const orderNo = await createPendingPaymentOrder("E2ECDEP", "credit", {
+    isCustomOrder: true,
+    totalAmount: 500,
+  });
+  const payload = {
+    MerchantID: "3002607",
+    MerchantTradeNo: orderNo,
+    RtnCode: "1",
+    RtnMsg: "Succeeded",
+    TradeNo: `E2ETRADE${Date.now()}`,
+    TradeAmt: "500",
+    PaymentDate: "2026/05/29 12:00:00",
+    PaymentType: "Credit_CreditCard",
+    PaymentTypeChargeFee: "0",
+    SimulatePaid: "1",
+  };
+  const mac = generateCheckMacValue(payload);
+
+  const response = await request.post("/api/ecpay/notify", { form: { ...payload, CheckMacValue: mac } });
+
+  expect(await response.text()).toBe("1|OK");
+  await expect.poll(() => getOrderPaymentState(orderNo)).toMatchObject({
+    paymentStatus: "paid",
+    orderStatus: "deposit_paid",
     inventoryDeducted: true,
     tradeNo: payload.TradeNo,
   });

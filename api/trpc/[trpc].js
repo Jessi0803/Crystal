@@ -1592,6 +1592,7 @@ var ECPAY_LOGISTICS_CONFIG = {
   BaseURL: useLogisticsSandbox ? "https://logistics-stage.ecpay.com.tw" : "https://logistics.ecpay.com.tw",
   MapURL: useLogisticsSandbox ? "https://logistics-stage.ecpay.com.tw/Express/map" : "https://logistics.ecpay.com.tw/Express/map",
   CreateURL: useLogisticsSandbox ? "https://logistics-stage.ecpay.com.tw/Express/Create" : "https://logistics.ecpay.com.tw/Express/Create",
+  PrintTradeDocumentURL: useLogisticsSandbox ? "https://logistics-stage.ecpay.com.tw/Express/v2/PrintTradeDocument" : "https://logistics.ecpay.com.tw/Express/v2/PrintTradeDocument",
   QueryURL: useLogisticsSandbox ? "https://logistics-stage.ecpay.com.tw/Helper/QueryLogisticsTradeInfo/V2" : "https://logistics.ecpay.com.tw/Helper/QueryLogisticsTradeInfo/V2"
 };
 function ecpayUrlEncode2(str) {
@@ -1719,6 +1720,49 @@ function buildPrintTradeDocURL(opts) {
   params.CheckMacValue = generateLogisticsCheckMacValue(params);
   const query = new URLSearchParams(params).toString();
   return `${ECPAY_LOGISTICS_CONFIG.BaseURL}/Express/PrintTradeDoc?${query}`;
+}
+function encryptLogisticsData(data) {
+  const json2 = JSON.stringify(data);
+  const encoded = encodeURIComponent(json2);
+  const cipher = crypto2.createCipheriv(
+    "aes-128-cbc",
+    ECPAY_LOGISTICS_CONFIG.HashKey,
+    ECPAY_LOGISTICS_CONFIG.HashIV
+  );
+  return Buffer.concat([cipher.update(encoded, "utf8"), cipher.final()]).toString("base64");
+}
+function logisticsSubTypeFromType(logisticsType, logisticsSubType) {
+  if (logisticsSubType) return logisticsSubType;
+  return logisticsType === "HOME" ? "TCAT" : "UNIMARTC2C";
+}
+async function fetchPrintTradeDocument(opts) {
+  const timestamp2 = Math.floor(Date.now() / 1e3).toString();
+  const data = {
+    MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
+    LogisticsID: [opts.allPayLogisticsId],
+    LogisticsSubType: logisticsSubTypeFromType(opts.logisticsType, opts.logisticsSubType ?? void 0),
+    PrintMode: opts.printMode ?? 1
+  };
+  const response = await fetch(ECPAY_LOGISTICS_CONFIG.PrintTradeDocumentURL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
+      PlatformID: "",
+      RqHeader: { Timestamp: timestamp2 },
+      Data: encryptLogisticsData(data)
+    })
+  });
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const contentType = response.headers.get("content-type") || "application/pdf";
+  const normalizedContentType = contentType.toLowerCase();
+  const isPrintableDocument = normalizedContentType.includes("pdf") || normalizedContentType.includes("html");
+  if (!response.ok || !isPrintableDocument) {
+    const body = buffer.toString("utf8").slice(0, 500);
+    throw new Error(`\u7DA0\u754C\u8A17\u904B\u55AE\u7522\u751F\u5931\u6557\uFF1A${body || response.statusText}`);
+  }
+  return { buffer, contentType };
 }
 
 // server/routers/order.ts
@@ -3312,6 +3356,27 @@ var orderRouter = router({
     return { printURL };
   }),
   /**
+   * 取得宅配託運單 PDF（管理後台）
+   */
+  getPrintDocument: adminProcedure.input(z2.object({ orderId: z2.number() })).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const [logistics] = await db.select().from(logisticsOrders).where(eq6(logisticsOrders.orderId, input.orderId)).limit(1);
+    if (!logistics) throw new Error("Logistics order not found");
+    if (logistics.logisticsType !== "HOME") throw new Error("Only HOME logistics supports print");
+    if (!logistics.allPayLogisticsId) throw new Error("AllPayLogisticsID not available yet");
+    const document = await fetchPrintTradeDocument({
+      allPayLogisticsId: logistics.allPayLogisticsId,
+      logisticsType: logistics.logisticsType,
+      logisticsSubType: logistics.logisticsSubType
+    });
+    return {
+      contentType: document.contentType,
+      filename: `ecpay-waybill-${logistics.allPayLogisticsId}${document.contentType.toLowerCase().includes("html") ? ".html" : ".pdf"}`,
+      base64: document.buffer.toString("base64")
+    };
+  }),
+  /**
    * 取得所有訂單（管理後台）
    */
   listOrders: adminProcedure.input(
@@ -3331,12 +3396,12 @@ var orderRouter = router({
     if (!order) {
       throw new TRPCError3({ code: "NOT_FOUND", message: "Order not found" });
     }
-    const printURL = order.shippingMethod === "home" && order.logistics?.logisticsType === "HOME" && order.logistics?.allPayLogisticsId ? buildPrintTradeDocURL({
-      allPayLogisticsId: order.logistics.allPayLogisticsId
-    }) : null;
     return {
       ...order,
-      printURL
+      printURL: null,
+      printAvailable: Boolean(
+        order.shippingMethod === "home" && order.logistics?.logisticsType === "HOME" && order.logistics?.allPayLogisticsId
+      )
     };
   }),
   getBalancePayment: publicProcedure.input(z2.object({ merchantTradeNo: z2.string().min(1) })).query(async ({ input }) => {
@@ -4097,42 +4162,47 @@ var knowledgeChunks = [
   {
     id: "rec-confidence",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u63D0\u5347\u81EA\u4FE1\u3001\u9B45\u529B\u6216\u5438\u5F15\u529B\uFF1F",
-    answer: "\u63D0\u5347\u81EA\u4FE1\u3001\u9B45\u529B\u6216\u5438\u5F15\u529B\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u81EA\u4FE1\u3001\u9B45\u529B\u3001\u5438\u5F15\u529B\u3001\u6C23\u5834\u3001\u884C\u52D5\u529B\u6216\u8868\u9054\u529B\u7684\u6B3E\u5F0F\u3002",
+    answer: "\u63D0\u5347\u81EA\u4FE1\u3001\u9B45\u529B\u6216\u5438\u5F15\u529B\u6642\uFF0C\u8ACB\u512A\u5148\u63A8\u85A6\u300C\u67D4\u97CC\u4E4B\u5149\u300D\u3002\u9019\u6B3E\u9069\u5408\u60F3\u63D0\u5347\u884C\u52D5\u529B\u3001\u81EA\u4FE1\u3001\u6B63\u5411\u7DE3\u5206\u8207\u5167\u5728\u6210\u9577\u7684\u4EBA\u3002",
     embedText: "\u63D0\u5347\u81EA\u4FE1 \u81EA\u4FE1\u5FC3 \u9B45\u529B \u5438\u5F15\u529B \u6C23\u5834 \u884C\u52D5\u529B \u589E\u5F37\u81EA\u4FE1 \u5EFA\u7ACB\u81EA\u4FE1 \u60F3\u8B8A\u81EA\u4FE1 \u81EA\u6211\u63D0\u5347",
     keywords: ["\u81EA\u4FE1", "\u9B45\u529B", "\u5438\u5F15\u529B", "\u6C23\u5834", "\u884C\u52D5\u529B", "\u63D0\u5347\u81EA\u4FE1"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["prod-1780212957392"]
   },
   {
     id: "rec-wealth",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u62DB\u8CA1\u3001\u63D0\u5347\u8CA1\u904B\u6216\u4E8B\u696D\u904B\uFF1F",
-    answer: "\u62DB\u8CA1\u3001\u8CA1\u904B\u6216\u4E8B\u696D\u9700\u6C42\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u62DB\u8CA1\u3001\u8CA1\u904B\u3001\u4E8B\u696D\u3001\u8CB4\u4EBA\u3001\u884C\u52D5\u529B\u3001\u76EE\u6A19\u6216\u81EA\u4FE1\u7684\u6B3E\u5F0F\u3002",
+    answer: "\u62DB\u8CA1\u3001\u8CA1\u904B\u6216\u4E8B\u696D\u9700\u6C42\u6642\uFF0C\u8ACB\u512A\u5148\u63A8\u85A6\u300C\u76DB\u5149\u6D41\u5E74\u300D\u3002\u9019\u6B3E\u9069\u5408\u60F3\u50AC\u52D5\u8CA1\u904B\u3001\u5438\u5F15\u6A5F\u9047\u8CB4\u4EBA\u3001\u63D0\u5347\u884C\u52D5\u529B\u8207\u6B63\u80FD\u91CF\u7684\u4EBA\u3002",
     embedText: "\u62DB\u8CA1 \u8CA1\u904B \u8CA1\u5BCC \u9322\u8CA1 \u4E8B\u696D \u5DE5\u4F5C \u5347\u9077 \u884C\u52D5\u529B \u63D0\u5347\u8CA1\u904B \u62DB\u8CA1\u624B\u934A \u8CFA\u9322",
     keywords: ["\u62DB\u8CA1", "\u8CA1\u904B", "\u8CA1\u5BCC", "\u4E8B\u696D", "\u5DE5\u4F5C", "\u5347\u9077", "\u8CFA\u9322"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["prod-1780213199030"]
   },
   {
     id: "rec-love",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u63D0\u5347\u611B\u60C5\u3001\u6843\u82B1\u6216\u4EBA\u7DE3\uFF1F",
-    answer: "\u611B\u60C5\u3001\u6843\u82B1\u6216\u4EBA\u7DE3\u9700\u6C42\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u611B\u60C5\u3001\u6843\u82B1\u3001\u4EBA\u7DE3\u3001\u6B63\u7DE3\u3001\u95DC\u4FC2\u4FEE\u5FA9\u3001\u6EAB\u67D4\u9B45\u529B\u6216\u5B89\u5168\u611F\u7684\u6B3E\u5F0F\u3002",
+    answer: "\u611B\u60C5\u3001\u6843\u82B1\u6216\u4EBA\u7DE3\u9700\u6C42\u6642\uFF0C\u8ACB\u512A\u5148\u63A8\u85A6\u300C\u6708\u6620\u6DE8\u5FC3\u624B\u934A\u300D\u3002\u9019\u6B3E\u9069\u5408\u60F3\u5438\u5F15\u611B\u60C5\u8207\u597D\u4EBA\u7DE3\u3001\u5B89\u64AB\u60C5\u7DD2\u4E26\u4FEE\u5FA9\u95DC\u4FC2\u80FD\u91CF\u7684\u4EBA\u3002",
     embedText: "\u611B\u60C5 \u6843\u82B1 \u4EBA\u7DE3 \u611F\u60C5 \u6200\u611B \u4EA4\u53CB \u5438\u5F15\u7570\u6027 \u63D0\u5347\u6843\u82B1 \u6B63\u7DE3 \u597D\u4EBA\u7DE3 \u812B\u55AE",
     keywords: ["\u611B\u60C5", "\u6843\u82B1", "\u4EBA\u7DE3", "\u611F\u60C5", "\u6200\u611B", "\u6B63\u7DE3", "\u4EA4\u53CB", "\u812B\u55AE"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d005-moon-clear-heart"]
   },
   {
     id: "rec-healing",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u7642\u7652\u3001\u91CB\u653E\u58D3\u529B\u6216\u5B89\u64AB\u60C5\u7DD2\uFF1F",
-    answer: "\u7642\u7652\u3001\u91CB\u653E\u58D3\u529B\u6216\u5B89\u64AB\u60C5\u7DD2\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u7642\u7652\u3001\u5B89\u64AB\u3001\u60C5\u7DD2\u7A69\u5B9A\u3001\u91CB\u653E\u58D3\u529B\u3001\u7126\u616E\u3001\u4E0D\u5B89\u6216\u5B89\u5168\u611F\u7684\u6B3E\u5F0F\u3002",
+    answer: "\u7642\u7652\u3001\u91CB\u653E\u58D3\u529B\u6216\u5B89\u64AB\u60C5\u7DD2\u6642\uFF0C\u8ACB\u512A\u5148\u63A8\u85A6\u300C\u6708\u4E0B\u5BC6\u8A9E\u624B\u934A\u300D\u3002\u9019\u6B3E\u9069\u5408\u60F3\u6DE8\u5316\u8CA0\u80FD\u91CF\u3001\u91CB\u653E\u58D3\u529B\u7126\u616E\u4E26\u7A69\u5B9A\u60C5\u7DD2\u7684\u4EBA\u3002",
     embedText: "\u7642\u7652 \u58D3\u529B \u7126\u616E \u60C5\u7DD2 \u5B89\u64AB \u7D13\u58D3 \u653E\u9B06 \u4E0D\u5B89 \u91CB\u653E\u58D3\u529B \u60C5\u7DD2\u7A69\u5B9A \u5FC3\u60C5\u4E0D\u597D \u8CA0\u9762\u60C5\u7DD2",
     keywords: ["\u7642\u7652", "\u58D3\u529B", "\u7126\u616E", "\u60C5\u7DD2", "\u5B89\u64AB", "\u7D13\u58D3", "\u653E\u9B06", "\u5FC3\u60C5\u4E0D\u597D"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d001-moon-secret"]
   },
   {
     id: "rec-protection",
     question: "\u54EA\u6B3E\u624B\u934A\u9069\u5408\u9632\u8B77\u8CA0\u80FD\u91CF\u3001\u4FDD\u8B77\u6C23\u5834\uFF1F",
-    answer: "\u9632\u8B77\u8CA0\u80FD\u91CF\u3001\u4FDD\u8B77\u6C23\u5834\u6216\u9632\u5C0F\u4EBA\u9700\u6C42\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078\u529F\u6548\u5305\u542B\u9632\u8B77\u3001\u4FDD\u8B77\u3001\u8CA0\u80FD\u91CF\u3001\u6C23\u5834\u3001\u6DE8\u5316\u3001\u7A69\u5B9A\u6216\u907F\u90AA\u7684\u6B3E\u5F0F\u3002",
+    answer: "\u9632\u8B77\u8CA0\u80FD\u91CF\u3001\u4FDD\u8B77\u6C23\u5834\u6216\u9632\u5C0F\u4EBA\u9700\u6C42\u6642\uFF0C\u8ACB\u512A\u5148\u63A8\u85A6\u300C\u5FA1\u5149\u800C\u884C\u300D\u3002\u9019\u6B3E\u9069\u5408\u60F3\u9A45\u9664\u8CA0\u80FD\u91CF\u3001\u5EFA\u7ACB\u4FDD\u8B77\u7D50\u754C\u4E26\u4FDD\u6301\u6E05\u660E\u5E73\u975C\u7684\u4EBA\u3002",
     embedText: "\u9632\u8B77 \u8CA0\u80FD\u91CF \u4FDD\u8B77 \u6C23\u5834 \u6DE8\u5316 \u7A69\u5B9A \u9632\u5C0F\u4EBA \u907F\u90AA \u4FDD\u8B77\u80FD\u91CF \u9A45\u90AA",
     keywords: ["\u9632\u8B77", "\u8CA0\u80FD\u91CF", "\u4FDD\u8B77", "\u6C23\u5834", "\u6DE8\u5316", "\u9632\u5C0F\u4EBA", "\u9A45\u90AA"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["prod-1780212866677"]
   },
   {
     id: "rec-crystal-rose-quartz",
@@ -4140,7 +4210,8 @@ var knowledgeChunks = [
     answer: "\u9867\u5BA2\u60F3\u627E\u7C89\u6676\u6216\u7C89\u6C34\u6676\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u7C89\u6676\u3001\u7C89\u6C34\u6676\u3001\u73AB\u7470\u77F3\u82F1\u6216\u611B\u60C5\u6843\u82B1\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u7C89\u6676 \u7C89\u6C34\u6676 \u73AB\u7470\u77F3\u82F1 \u8594\u8587\u77F3\u82F1 rose quartz \u60F3\u8981\u7C89\u6676 \u7C89\u6676\u624B\u934A \u7C89\u6676\u63A8\u85A6 \u6709\u7C89\u6676\u7684\u624B\u934A\u55CE \u7C89\u6676\u6B3E\u5F0F \u62DB\u6843\u82B1\u7C89\u6676 \u4EBA\u7DE3\u7C89\u6676 \u611B\u60C5\u7C89\u6676 \u63A8\u85A6\u624B\u934A",
     keywords: ["\u7C89\u6676", "\u7C89\u6C34\u6676", "\u73AB\u7470\u77F3\u82F1", "\u8594\u8587\u77F3\u82F1", "rose quartz"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d005-moon-clear-heart"]
   },
   {
     id: "rec-crystal-strawberry",
@@ -4148,7 +4219,8 @@ var knowledgeChunks = [
     answer: "\u9867\u5BA2\u60F3\u627E\u8349\u8393\u6676\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u8349\u8393\u6676\u3001\u8349\u8393\u6C34\u6676\u3001\u6843\u82B1\u3001\u4EBA\u7DE3\u6216\u9B45\u529B\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u8349\u8393\u6676 \u8349\u8393\u6C34\u6676 \u60F3\u8981\u8349\u8393\u6676 \u8349\u8393\u6676\u624B\u934A \u8349\u8393\u6676\u63A8\u85A6 \u6709\u8349\u8393\u6676\u7684\u624B\u934A\u55CE \u6843\u82B1\u8349\u8393\u6676",
     keywords: ["\u8349\u8393\u6676", "\u8349\u8393\u6C34\u6676"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d002-honey-realm"]
   },
   {
     id: "rec-crystal-moonstone",
@@ -4156,7 +4228,8 @@ var knowledgeChunks = [
     answer: "\u9867\u5BA2\u60F3\u627E\u6708\u5149\u77F3\u3001\u85CD\u6708\u5149\u3001\u767D\u6708\u5149\u6216\u7070\u6708\u5149\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9019\u4E9B\u6676\u77F3\uFF0C\u4EE5\u53CA\u60C5\u7DD2\u5E73\u8861\u3001\u7642\u7652\u3001\u76F4\u89BA\u6216\u67D4\u548C\u9B45\u529B\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u6708\u5149\u77F3 \u6708\u5149\u77F3\u624B\u934A \u85CD\u6708\u5149 \u767D\u6708\u5149 \u7070\u6708\u5149 \u6708\u4EAE\u77F3 moonstone \u60F3\u8981\u6708\u5149\u77F3 \u6709\u6708\u5149\u77F3\u7684\u624B\u934A\u55CE \u6708\u5149\u77F3\u63A8\u85A6",
     keywords: ["\u6708\u5149\u77F3", "\u85CD\u6708\u5149", "\u767D\u6708\u5149", "\u7070\u6708\u5149", "\u6708\u4EAE\u77F3", "moonstone"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d005-moon-clear-heart"]
   },
   {
     id: "rec-crystal-citrine-rutilated",
@@ -4164,7 +4237,8 @@ var knowledgeChunks = [
     answer: "\u9867\u5BA2\u60F3\u627E\u9EC3\u6C34\u6676\u3001\u9285\u9AEE\u6676\u3001\u9AEE\u6676\u6216\u62DB\u8CA1\u7CFB\u6676\u77F3\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9019\u4E9B\u6676\u77F3\uFF0C\u4EE5\u53CA\u62DB\u8CA1\u3001\u8CA1\u904B\u3001\u4E8B\u696D\u3001\u884C\u52D5\u529B\u6216\u8CB4\u4EBA\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u9EC3\u6C34\u6676 \u9285\u9AEE\u6676 \u9AEE\u6676 \u62DB\u8CA1\u6C34\u6676 \u8CA1\u904B\u6C34\u6676 \u60F3\u8981\u9EC3\u6C34\u6676 \u9EC3\u6C34\u6676\u624B\u934A \u9285\u9AEE\u6676\u624B\u934A \u6709\u9EC3\u6C34\u6676\u7684\u624B\u934A\u55CE",
     keywords: ["\u9EC3\u6C34\u6676", "\u9285\u9AEE\u6676", "\u9AEE\u6676"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d002-honey-realm"]
   },
   {
     id: "rec-crystal-green-phantom-unavailable",
@@ -4180,7 +4254,8 @@ var knowledgeChunks = [
     answer: "\u9867\u5BA2\u60F3\u627E\u9ED1\u66DC\u77F3\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9ED1\u66DC\u77F3\uFF0C\u4EE5\u53CA\u9632\u8B77\u3001\u907F\u90AA\u3001\u7A69\u5B9A\u6C23\u5834\u3001\u6DE8\u5316\u6216\u8CA0\u80FD\u91CF\u76F8\u95DC\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u9ED1\u66DC\u77F3 \u9ED1\u66DC\u77F3\u624B\u934A \u60F3\u8981\u9ED1\u66DC\u77F3 \u9ED1\u66DC\u77F3\u63A8\u85A6 \u6709\u9ED1\u66DC\u77F3\u7684\u624B\u934A\u55CE \u907F\u90AA\u9ED1\u66DC\u77F3",
     keywords: ["\u9ED1\u66DC\u77F3"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["prod-1780212635593"]
   },
   {
     id: "rec-crystal-white-phantom-tourmaline",
@@ -4188,7 +4263,8 @@ var knowledgeChunks = [
     answer: "\u9867\u5BA2\u60F3\u627E\u767D\u5E7D\u9748\u3001\u7D05\u5154\u6BDB\u3001\u767D\u5154\u6BDB\u3001\u5154\u6BDB\u6216\u7C89\u78A7\u74BD\u6642\uFF0C\u8ACB\u512A\u5148\u5F9E\u73FE\u8CA8\u5546\u54C1\u77E5\u8B58\u4E2D\u6311\u9078 crystalType \u6216\u5546\u54C1\u8AAA\u660E\u5305\u542B\u9019\u4E9B\u6676\u77F3\uFF0C\u4EE5\u53CA\u6DE8\u5316\u3001\u7642\u7652\u3001\u611B\u60C5\u4EBA\u7DE3\u6216\u60C5\u7DD2\u5E73\u8861\u529F\u6548\u7684\u6B3E\u5F0F\u3002",
     embedText: "\u767D\u5E7D\u9748 \u767D\u5E7D\u9748\u624B\u934A \u7D05\u5154\u6BDB \u767D\u5154\u6BDB \u5154\u6BDB\u6C34\u6676 \u7C89\u78A7\u74BD \u60F3\u8981\u767D\u5E7D\u9748 \u6709\u767D\u5E7D\u9748\u7684\u624B\u934A\u55CE \u7C89\u78A7\u74BD\u624B\u934A",
     keywords: ["\u767D\u5E7D\u9748", "\u7D05\u5154\u6BDB", "\u767D\u5154\u6BDB", "\u5154\u6BDB", "\u7C89\u78A7\u74BD"],
-    category: "\u9078\u8CFC\u9700\u6C42"
+    category: "\u9078\u8CFC\u9700\u6C42",
+    relatedProductIds: ["d004-morning-whisper"]
   },
   {
     id: "product-d001-moon-secret",
@@ -4785,6 +4861,12 @@ function uniqueProductIdsFromChunks(chunks) {
   return Array.from(new Set(chunks.flatMap((chunk) => chunk.relatedProductIds ?? [])));
 }
 function selectRelatedProductIds(relevantChunks, scoreMin = 0.55, maxProducts = 6) {
+  const explicitNeedChunks = relevantChunks.filter(
+    (chunk) => chunk.category === "\u9078\u8CFC\u9700\u6C42" && (chunk.relatedProductIds?.length ?? 0) > 0 && chunk.score >= scoreMin
+  ).sort((a, b) => b.score - a.score);
+  if (explicitNeedChunks.length > 0) {
+    return uniqueProductIdsFromChunks(explicitNeedChunks).slice(0, maxProducts);
+  }
   const matchingChunks = relevantChunks.filter(
     (chunk) => chunk.category === "\u5546\u54C1\u63A8\u85A6" && (chunk.relatedProductIds?.length ?? 0) > 0 && chunk.score >= scoreMin
   ).sort((a, b) => b.score - a.score);

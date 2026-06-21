@@ -227,8 +227,8 @@ test("domestic shipping switches from home fee to convenience-store fee", async 
   await proceedThroughCheckoutGate(page);
 
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("NT$ 100");
-  await expect(page.locator("body")).toContainText("NT$ 1,364");
+  await expect(page.locator("body")).toContainText("NT$ 130");
+  await expect(page.locator("body")).toContainText("NT$ 1,394");
 
   await page.locator("button").filter({ hasText: "先付款再取貨" }).click();
   await expect(page.locator("body")).toContainText("NT$ 60");
@@ -303,7 +303,7 @@ test("excluded products do not count toward two-item free shipping in cart or ch
     await proceedThroughCheckoutGate(page);
 
     await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
-    await expect(page.locator("body")).toContainText("NT$ 100");
+    await expect(page.locator("body")).toContainText("NT$ 130");
     await expect(page.locator("body")).not.toContainText("免收");
   } finally {
     await deleteTestProduct(productId);

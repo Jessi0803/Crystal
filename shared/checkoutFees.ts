@@ -6,7 +6,7 @@ export type DomesticShippingMethod = "cvs_711" | "cvs_family" | "home";
 export type CheckoutPaymentMethod = "credit" | "atm" | "paypal";
 
 export const DOMESTIC_SHIPPING_FEES: Record<DomesticShippingMethod, number> = {
-  home: 100,
+  home: 130,
   cvs_711: 60,
   cvs_family: 60,
 };

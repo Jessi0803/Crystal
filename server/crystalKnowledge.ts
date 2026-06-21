@@ -541,7 +541,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-shipping-methods",
     question: "有哪些配送方式？",
-    answer: "台灣地區（含離島）提供黑貓宅急便（$100）及 7-11 店到店（$60），單次購買兩件商品以上免運。海外可寄送至馬來西亞、香港、新加坡、美國、英國、澳洲。詳見：https://goodaytarot.com/shopping-guide",
+    answer: "台灣地區（含離島）提供黑貓宅急便（$130）及 7-11 店到店（$60），單次購買兩件商品以上免運。海外可寄送至馬來西亞、香港、新加坡、美國、英國、澳洲。詳見：https://goodaytarot.com/shopping-guide",
     embedText: "配送方式 運送 黑貓 7-11 店到店 宅配 免運 寄送",
     keywords: ["配送方式", "運送", "黑貓", "7-11", "店到店", "宅配", "免運"],
     category: "常見問題",
@@ -549,7 +549,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-shipping-fee",
     question: "運費是多少？",
-    answer: "黑貓宅急便 $100、7-11 店到店 $60，單次購買兩件商品以上免運。",
+    answer: "黑貓宅急便 $130、7-11 店到店 $60，單次購買兩件商品以上免運。",
     embedText: "運費多少 運費 宅配費 免運 運費計算",
     keywords: ["運費", "多少", "宅配費", "免運"],
     category: "常見問題",
@@ -575,46 +575,51 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "rec-confidence",
     question: "哪款手鍊適合提升自信、魅力或吸引力？",
     answer:
-      "提升自信、魅力或吸引力時，請優先從現貨商品知識中挑選功效包含自信、魅力、吸引力、氣場、行動力或表達力的款式。",
+      "提升自信、魅力或吸引力時，請優先推薦「柔韌之光」。這款適合想提升行動力、自信、正向緣分與內在成長的人。",
     embedText: "提升自信 自信心 魅力 吸引力 氣場 行動力 增強自信 建立自信 想變自信 自我提升",
     keywords: ["自信", "魅力", "吸引力", "氣場", "行動力", "提升自信"],
     category: "選購需求",
+    relatedProductIds: ["prod-1780212957392"],
   },
   {
     id: "rec-wealth",
     question: "哪款手鍊適合招財、提升財運或事業運？",
     answer:
-      "招財、財運或事業需求，請優先從現貨商品知識中挑選功效包含招財、財運、事業、貴人、行動力、目標或自信的款式。",
+      "招財、財運或事業需求時，請優先推薦「盛光流年」。這款適合想催動財運、吸引機遇貴人、提升行動力與正能量的人。",
     embedText: "招財 財運 財富 錢財 事業 工作 升遷 行動力 提升財運 招財手鍊 賺錢",
     keywords: ["招財", "財運", "財富", "事業", "工作", "升遷", "賺錢"],
     category: "選購需求",
+    relatedProductIds: ["prod-1780213199030"],
   },
   {
     id: "rec-love",
     question: "哪款手鍊適合提升愛情、桃花或人緣？",
     answer:
-      "愛情、桃花或人緣需求，請優先從現貨商品知識中挑選功效包含愛情、桃花、人緣、正緣、關係修復、溫柔魅力或安全感的款式。",
+      "愛情、桃花或人緣需求時，請優先推薦「月映淨心手鍊」。這款適合想吸引愛情與好人緣、安撫情緒並修復關係能量的人。",
     embedText: "愛情 桃花 人緣 感情 戀愛 交友 吸引異性 提升桃花 正緣 好人緣 脫單",
     keywords: ["愛情", "桃花", "人緣", "感情", "戀愛", "正緣", "交友", "脫單"],
     category: "選購需求",
+    relatedProductIds: ["d005-moon-clear-heart"],
   },
   {
     id: "rec-healing",
     question: "哪款手鍊適合療癒、釋放壓力或安撫情緒？",
     answer:
-      "療癒、釋放壓力或安撫情緒時，請優先從現貨商品知識中挑選功效包含療癒、安撫、情緒穩定、釋放壓力、焦慮、不安或安全感的款式。",
+      "療癒、釋放壓力或安撫情緒時，請優先推薦「月下密語手鍊」。這款適合想淨化負能量、釋放壓力焦慮並穩定情緒的人。",
     embedText: "療癒 壓力 焦慮 情緒 安撫 紓壓 放鬆 不安 釋放壓力 情緒穩定 心情不好 負面情緒",
     keywords: ["療癒", "壓力", "焦慮", "情緒", "安撫", "紓壓", "放鬆", "心情不好"],
     category: "選購需求",
+    relatedProductIds: ["d001-moon-secret"],
   },
   {
     id: "rec-protection",
     question: "哪款手鍊適合防護負能量、保護氣場？",
     answer:
-      "防護負能量、保護氣場或防小人需求，請優先從現貨商品知識中挑選功效包含防護、保護、負能量、氣場、淨化、穩定或避邪的款式。",
+      "防護負能量、保護氣場或防小人需求時，請優先推薦「御光而行」。這款適合想驅除負能量、建立保護結界並保持清明平靜的人。",
     embedText: "防護 負能量 保護 氣場 淨化 穩定 防小人 避邪 保護能量 驅邪",
     keywords: ["防護", "負能量", "保護", "氣場", "淨化", "防小人", "驅邪"],
     category: "選購需求",
+    relatedProductIds: ["prod-1780212866677"],
   },
   {
     id: "rec-crystal-rose-quartz",
@@ -625,6 +630,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
       "粉晶 粉水晶 玫瑰石英 薔薇石英 rose quartz 想要粉晶 粉晶手鍊 粉晶推薦 有粉晶的手鍊嗎 粉晶款式 招桃花粉晶 人緣粉晶 愛情粉晶 推薦手鍊",
     keywords: ["粉晶", "粉水晶", "玫瑰石英", "薔薇石英", "rose quartz"],
     category: "選購需求",
+    relatedProductIds: ["d005-moon-clear-heart"],
   },
   {
     id: "rec-crystal-strawberry",
@@ -634,6 +640,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     embedText: "草莓晶 草莓水晶 想要草莓晶 草莓晶手鍊 草莓晶推薦 有草莓晶的手鍊嗎 桃花草莓晶",
     keywords: ["草莓晶", "草莓水晶"],
     category: "選購需求",
+    relatedProductIds: ["d002-honey-realm"],
   },
   {
     id: "rec-crystal-moonstone",
@@ -644,6 +651,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
       "月光石 月光石手鍊 藍月光 白月光 灰月光 月亮石 moonstone 想要月光石 有月光石的手鍊嗎 月光石推薦",
     keywords: ["月光石", "藍月光", "白月光", "灰月光", "月亮石", "moonstone"],
     category: "選購需求",
+    relatedProductIds: ["d005-moon-clear-heart"],
   },
   {
     id: "rec-crystal-citrine-rutilated",
@@ -653,6 +661,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     embedText: "黃水晶 銅髮晶 髮晶 招財水晶 財運水晶 想要黃水晶 黃水晶手鍊 銅髮晶手鍊 有黃水晶的手鍊嗎",
     keywords: ["黃水晶", "銅髮晶", "髮晶"],
     category: "選購需求",
+    relatedProductIds: ["d002-honey-realm"],
   },
   {
     id: "rec-crystal-green-phantom-unavailable",
@@ -671,6 +680,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     embedText: "黑曜石 黑曜石手鍊 想要黑曜石 黑曜石推薦 有黑曜石的手鍊嗎 避邪黑曜石",
     keywords: ["黑曜石"],
     category: "選購需求",
+    relatedProductIds: ["prod-1780212635593"],
   },
   {
     id: "rec-crystal-white-phantom-tourmaline",
@@ -681,6 +691,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
       "白幽靈 白幽靈手鍊 紅兔毛 白兔毛 兔毛水晶 粉碧璽 想要白幽靈 有白幽靈的手鍊嗎 粉碧璽手鍊",
     keywords: ["白幽靈", "紅兔毛", "白兔毛", "兔毛", "粉碧璽"],
     category: "選購需求",
+    relatedProductIds: ["d004-morning-whisper"],
   },
   {
     id: "product-d001-moon-secret",

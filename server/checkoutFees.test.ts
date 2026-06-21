@@ -11,9 +11,9 @@ describe("checkout fee calculation", () => {
       paymentMethod: "credit",
     });
 
-    expect(fees.shippingFee).toBe(100);
+    expect(fees.shippingFee).toBe(130);
     expect(fees.paymentFee).toBe(0);
-    expect(fees.total).toBe(1580);
+    expect(fees.total).toBe(1610);
   });
 
   it("adds domestic 7-11 shipping without fee for bank transfer", () => {
@@ -120,9 +120,9 @@ describe("checkout fee calculation", () => {
       paymentMethod: "credit",
     });
 
-    expect(fees.shippingFee).toBe(100);
+    expect(fees.shippingFee).toBe(130);
     expect(fees.domesticFreeShipping).toBe(false);
-    expect(fees.total).toBe(1700);
+    expect(fees.total).toBe(1730);
   });
 
   it("waives domestic shipping when eligible quantity reaches two and ignores excluded items", () => {

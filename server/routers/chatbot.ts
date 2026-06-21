@@ -177,6 +177,19 @@ export function selectRelatedProductIds(
   scoreMin = 0.55,
   maxProducts = 6
 ): string[] {
+  const explicitNeedChunks = relevantChunks
+    .filter(
+      (chunk) =>
+        chunk.category === "選購需求" &&
+        (chunk.relatedProductIds?.length ?? 0) > 0 &&
+        chunk.score >= scoreMin
+    )
+    .sort((a, b) => b.score - a.score);
+
+  if (explicitNeedChunks.length > 0) {
+    return uniqueProductIdsFromChunks(explicitNeedChunks).slice(0, maxProducts);
+  }
+
   const matchingChunks = relevantChunks
     .filter(
       (chunk) =>
