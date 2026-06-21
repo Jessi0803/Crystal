@@ -66,6 +66,7 @@ vi.mock("./ecpayLogistics", () => ({
   buildPrintTradeDocURL: vi.fn(),
   createCVSLogisticsOrder: vi.fn(),
   createHomeLogisticsOrder: vi.fn(),
+  fetchPrintTradeDocument: vi.fn(),
   useLogisticsSandbox: true,
 }));
 

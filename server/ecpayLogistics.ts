@@ -25,6 +25,9 @@ export const ECPAY_LOGISTICS_CONFIG = {
   CreateURL: useLogisticsSandbox
     ? "https://logistics-stage.ecpay.com.tw/Express/Create"
     : "https://logistics.ecpay.com.tw/Express/Create",
+  PrintTradeDocumentURL: useLogisticsSandbox
+    ? "https://logistics-stage.ecpay.com.tw/Express/v2/PrintTradeDocument"
+    : "https://logistics.ecpay.com.tw/Express/v2/PrintTradeDocument",
   QueryURL: useLogisticsSandbox
     ? "https://logistics-stage.ecpay.com.tw/Helper/QueryLogisticsTradeInfo/V2"
     : "https://logistics.ecpay.com.tw/Helper/QueryLogisticsTradeInfo/V2",
@@ -312,4 +315,64 @@ export function buildPrintTradeDocURL(opts: {
 
   const query = new URLSearchParams(params).toString();
   return `${ECPAY_LOGISTICS_CONFIG.BaseURL}/Express/PrintTradeDoc?${query}`;
+}
+
+function encryptLogisticsData(data: Record<string, unknown>): string {
+  const json = JSON.stringify(data);
+  const encoded = encodeURIComponent(json);
+  const cipher = crypto.createCipheriv(
+    "aes-128-cbc",
+    ECPAY_LOGISTICS_CONFIG.HashKey,
+    ECPAY_LOGISTICS_CONFIG.HashIV
+  );
+  return Buffer.concat([cipher.update(encoded, "utf8"), cipher.final()]).toString("base64");
+}
+
+function logisticsSubTypeFromType(logisticsType: "HOME" | "CVS", logisticsSubType?: string) {
+  if (logisticsSubType) return logisticsSubType;
+  return logisticsType === "HOME" ? "TCAT" : "UNIMARTC2C";
+}
+
+/**
+ * 透過綠界 v2 API 取得託運單列印文件。
+ * v2 規格是 POST application/json，不能再用舊版 GET URL 直接開啟。
+ */
+export async function fetchPrintTradeDocument(opts: {
+  allPayLogisticsId: string;
+  logisticsType: "HOME" | "CVS";
+  logisticsSubType?: string | null;
+  printMode?: 1 | 2;
+}): Promise<{ buffer: Buffer; contentType: string }> {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const data = {
+    MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
+    LogisticsID: [opts.allPayLogisticsId],
+    LogisticsSubType: logisticsSubTypeFromType(opts.logisticsType, opts.logisticsSubType ?? undefined),
+    PrintMode: opts.printMode ?? 1,
+  };
+
+  const response = await fetch(ECPAY_LOGISTICS_CONFIG.PrintTradeDocumentURL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
+      PlatformID: "",
+      RqHeader: { Timestamp: timestamp },
+      Data: encryptLogisticsData(data),
+    }),
+  });
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const contentType = response.headers.get("content-type") || "application/pdf";
+  const normalizedContentType = contentType.toLowerCase();
+  const isPrintableDocument =
+    normalizedContentType.includes("pdf") || normalizedContentType.includes("html");
+
+  if (!response.ok || !isPrintableDocument) {
+    const body = buffer.toString("utf8").slice(0, 500);
+    throw new Error(`綠界託運單產生失敗：${body || response.statusText}`);
+  }
+
+  return { buffer, contentType };
 }

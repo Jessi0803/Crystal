@@ -115,6 +115,18 @@ type OrderSummary = {
   }[];
 };
 
+function openBase64DocumentInNewTab(base64: string, contentType: string) {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: contentType || "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function OrderRowCard({
   order,
   isExpanded,
@@ -174,6 +186,14 @@ function OrderRowCard({
       toast.success("尾款已確認收款，訂單狀態已更新");
     },
     onError: (err) => toast.error(err.message || "確認失敗"),
+  });
+
+  const printTradeDocument = trpc.order.getPrintDocument.useMutation({
+    onSuccess: (data) => {
+      openBase64DocumentInNewTab(data.base64, data.contentType);
+      toast.success("託運單已開啟");
+    },
+    onError: (err) => toast.error(`託運單產生失敗：${err.message}`),
   });
 
   const displayStatus = order.orderStatus;
@@ -390,16 +410,16 @@ function OrderRowCard({
                         )}
                       </div>
                     )}
-                    {detail.printURL && (
-                      <a
-                        href={detail.printURL}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    {detail.printAvailable && (
+                      <button
+                        type="button"
+                        onClick={() => printTradeDocument.mutate({ orderId: detail.id })}
+                        disabled={printTradeDocument.isPending}
                         className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-xs font-body hover:bg-emerald-700 transition-colors"
                       >
                         <Truck className="w-3.5 h-3.5" />
-                        列印託運單 PDF
-                      </a>
+                        {printTradeDocument.isPending ? "產生中..." : "列印託運單"}
+                      </button>
                     )}
                   </div>
                 )}

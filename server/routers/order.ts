@@ -42,6 +42,7 @@ import {
   buildPrintTradeDocURL,
   createCVSLogisticsOrder,
   createHomeLogisticsOrder,
+  fetchPrintTradeDocument,
   useLogisticsSandbox,
 } from "../ecpayLogistics";
 import { getDb } from "../db";
@@ -866,6 +867,38 @@ export const orderRouter = router({
     }),
 
   /**
+   * 取得宅配託運單 PDF（管理後台）
+   */
+  getPrintDocument: adminProcedure
+    .input(z.object({ orderId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const [logistics] = await db
+        .select()
+        .from(logisticsOrders)
+        .where(eq(logisticsOrders.orderId, input.orderId))
+        .limit(1);
+      if (!logistics) throw new Error("Logistics order not found");
+      if (logistics.logisticsType !== "HOME") throw new Error("Only HOME logistics supports print");
+      if (!logistics.allPayLogisticsId) throw new Error("AllPayLogisticsID not available yet");
+
+      const document = await fetchPrintTradeDocument({
+        allPayLogisticsId: logistics.allPayLogisticsId,
+        logisticsType: logistics.logisticsType,
+        logisticsSubType: logistics.logisticsSubType,
+      });
+
+      return {
+        contentType: document.contentType,
+        filename: `ecpay-waybill-${logistics.allPayLogisticsId}${
+          document.contentType.toLowerCase().includes("html") ? ".html" : ".pdf"
+        }`,
+        base64: document.buffer.toString("base64"),
+      };
+    }),
+
+  /**
    * 取得所有訂單（管理後台）
    */
   listOrders: adminProcedure
@@ -891,18 +924,14 @@ export const orderRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
       }
 
-      const printURL =
-        order.shippingMethod === "home" &&
-        order.logistics?.logisticsType === "HOME" &&
-        order.logistics?.allPayLogisticsId
-          ? buildPrintTradeDocURL({
-              allPayLogisticsId: order.logistics.allPayLogisticsId,
-            })
-          : null;
-
       return {
         ...order,
-        printURL,
+        printURL: null,
+        printAvailable: Boolean(
+          order.shippingMethod === "home" &&
+          order.logistics?.logisticsType === "HOME" &&
+          order.logistics?.allPayLogisticsId
+        ),
       };
     }),
 
