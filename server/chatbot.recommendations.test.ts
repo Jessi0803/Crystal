@@ -15,37 +15,13 @@ function recommendationChunk(id: string) {
 }
 
 describe("chatbot product recommendations", () => {
-  it("maps each broad energy need to a focused bracelet recommendation", () => {
-    expect(recommendationChunk("rec-confidence")).toMatchObject({
-      category: "選購需求",
-      relatedProductIds: ["prod-1780212957392"],
-    });
-    expect(recommendationChunk("rec-wealth")).toMatchObject({
-      category: "選購需求",
-      relatedProductIds: ["prod-1780213199030"],
-    });
-    expect(recommendationChunk("rec-love")).toMatchObject({
-      category: "選購需求",
-      relatedProductIds: ["d005-moon-clear-heart"],
-    });
-    expect(recommendationChunk("rec-healing")).toMatchObject({
-      category: "選購需求",
-      relatedProductIds: ["d001-moon-secret"],
-    });
-    expect(recommendationChunk("rec-protection")).toMatchObject({
-      category: "選購需求",
-      relatedProductIds: ["prod-1780212866677"],
-    });
-  });
-
-  it("uses focused energy mappings before broadly matching product knowledge", () => {
-    const chunks = [
-      { ...recommendationChunk("rec-love"), score: 0.84 },
-      { ...recommendationChunk("product-d002-honey-realm"), score: 0.78 },
-      { ...recommendationChunk("product-d005-moon-clear-heart"), score: 0.76 },
-    ] as ScoredChunk[];
-
-    expect(selectRelatedProductIds(chunks)).toEqual(["d005-moon-clear-heart"]);
+  it("uses broad need knowledge as guidance instead of hard-coded product bundles", () => {
+    expect(recommendationChunk("rec-confidence")).toMatchObject({ category: "選購需求" });
+    expect(recommendationChunk("rec-healing")).toMatchObject({ category: "選購需求" });
+    expect(recommendationChunk("rec-protection")).toMatchObject({ category: "選購需求" });
+    expect(recommendationChunk("rec-confidence").relatedProductIds).toBeUndefined();
+    expect(recommendationChunk("rec-healing").relatedProductIds).toBeUndefined();
+    expect(recommendationChunk("rec-protection").relatedProductIds).toBeUndefined();
   });
 
   it("merges two relevant recommendation matches without duplicate or excessive cards", () => {
