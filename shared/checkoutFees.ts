@@ -68,6 +68,7 @@ export function calcCheckoutFees(params: {
   paymentMethod: CheckoutPaymentMethod;
   overseasCountry?: OverseasShipCountryCode | null;
   buyerEmail?: string | null;
+  forceFreeShipping?: boolean;
 }) {
   const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const chargeableSubtotal = params.items
@@ -76,9 +77,12 @@ export function calcCheckoutFees(params: {
   const appliesFees = chargeableSubtotal > 0;
   const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
   const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
+  const forcedFreeShipping = params.forceFreeShipping === true;
 
   const shippingFee = !appliesFees
     ? 0
+    : forcedFreeShipping
+      ? 0
     : emailFreeShipping
       ? 0
     : domesticFreeShipping
@@ -101,5 +105,6 @@ export function calcCheckoutFees(params: {
     appliesFees,
     domesticFreeShipping,
     emailFreeShipping,
+    forcedFreeShipping,
   };
 }

@@ -109,6 +109,8 @@ export const orders = mysqlTable("orders", {
   isPreorder: boolean("isPreorder").default(false).notNull(),
   // 是否為客製化訂金訂單
   isCustomOrder: boolean("isCustomOrder").default(false).notNull(),
+  // 單筆訂單免運覆寫（例如合併訂單後由後台處理免運）
+  freeShippingOverride: boolean("freeShippingOverride").default(false).notNull(),
   // 訂單金額
   totalAmount: int("totalAmount").notNull(),
   // 購買人資訊

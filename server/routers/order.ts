@@ -1074,6 +1074,7 @@ export const orderRouter = router({
         paymentMethod: input.paymentMethod,
         overseasCountry,
         buyerEmail: balancePayment.order.buyerEmail,
+        forceFreeShipping: balancePayment.order.freeShippingOverride,
       });
       const totalAmount = feeSummary.total;
 
