@@ -29,6 +29,9 @@ export async function ensureOrdersColumns() {
   try {
     await db.execute(sql`ALTER TABLE \`orders\` MODIFY COLUMN \`transferReceiptUrl\` longtext NULL`);
   } catch { /* column type already compatible */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`freeShippingOverride\` BOOLEAN NOT NULL DEFAULT FALSE`);
+  } catch { /* column already exists */ }
   ordersColumnsEnsured = true;
 }
 

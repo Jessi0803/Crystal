@@ -107,3 +107,24 @@ test("numerology custom form creates an ATM deposit order with its consultation 
   await expectConsultationNoteInAdmin(page, orderNo, "【生命靈數 × 水晶手鍊諮詢表單】");
   await expect(page.locator("body")).toContainText("E2E 靈數客戶");
 });
+
+test("multiple custom products in one order keep every consultation note", async ({ page }) => {
+  await fillPureCustomDepositForm(page);
+  await fillProfileCustomDepositForm(
+    page,
+    "/custom/form-d",
+    "生命靈數 × 水晶手鍊客製化商品",
+    "E2E 多客製靈數客戶",
+    "14",
+  );
+  await expectDepositCheckoutWithoutShipping(page);
+  await expect(page.locator("body")).toContainText("客製化商品");
+  await expect(page.locator("body")).toContainText("生命靈數 × 水晶手鍊客製化商品");
+
+  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-multi-custom-${Date.now()}@example.com`);
+
+  await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶手鍊諮詢表單】");
+  await expect(page.locator("body")).toContainText("E2E 測試：希望提升專注力與穩定情緒");
+  await expect(page.locator("body")).toContainText("【生命靈數 × 水晶手鍊諮詢表單】");
+  await expect(page.locator("body")).toContainText("E2E 多客製靈數客戶");
+});

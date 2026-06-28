@@ -349,8 +349,9 @@ export default function CustomForm() {
   const handleSubmit = () => {
     if (!depositProduct) { toast.error("找不到訂金商品，請聯繫客服"); return; }
     if (!validateForm()) return;
-    sessionStorage.setItem("customConsultationNote", buildNote(form));
-    addToCart(depositProduct);
+    const customConsultationNote = buildNote(form);
+    sessionStorage.setItem("customConsultationNote", customConsultationNote);
+    addToCart(depositProduct, { customConsultationNote });
     setIsOpen(false);
     navigate("/checkout");
     toast.success("諮詢內容已儲存，請完成結帳以預約訂金");

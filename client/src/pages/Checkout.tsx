@@ -68,9 +68,16 @@ function compressTransferReceipt(file: File): Promise<{ dataBase64: string; cont
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { items, totalPrice, clearCart } = useCart();
-  const customConsultationNote = sessionStorage.getItem("customConsultationNote") ?? undefined;
   const hasCustomDepositItem =
     items.length > 0 && items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
+  const customConsultationNotes = items
+    .filter((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id))
+    .map((item) => item.customConsultationNote?.trim())
+    .filter((note): note is string => Boolean(note));
+  const customConsultationNote =
+    customConsultationNotes.length > 0
+      ? customConsultationNotes.join("\n\n")
+      : sessionStorage.getItem("customConsultationNote") ?? undefined;
   const isCustomDepositCheckout = hasCustomDepositItem;
   const displayShippingFee = !isCustomDepositCheckout;
 

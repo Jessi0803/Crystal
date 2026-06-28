@@ -619,10 +619,11 @@ export default function CustomFormB() {
     if (tarot.group === "single_q") return;
     if (!validateTarotData()) return;
     if (!validateBraceletData()) return;
-    sessionStorage.setItem("customConsultationNote", buildNote(tarot, bracelet));
+    const customConsultationNote = buildNote(tarot, bracelet);
+    sessionStorage.setItem("customConsultationNote", customConsultationNote);
     const priceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
     const unitPrice = depositProduct.price + priceAdjust;
-    addToCart(depositProduct, { unitPrice });
+    addToCart(depositProduct, { unitPrice, customConsultationNote });
     setIsOpen(false);
     navigate("/checkout");
     toast.success("諮詢內容已儲存，請完成結帳以預約訂金");

@@ -28,6 +28,7 @@ export interface CartItem {
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
   isPreorder?: boolean;
+  customConsultationNote?: string;
 }
 
 type AddToCartOptions = {
@@ -36,6 +37,7 @@ type AddToCartOptions = {
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
   isPreorder?: boolean;
+  customConsultationNote?: string;
 };
 
 interface CartContextType {
@@ -70,7 +72,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     options?: AddToCartOptions
   ) => {
     const unitPrice = options?.unitPrice ?? product.price;
-    const itemId = `${product.id}-${options?.wristSize ?? "default"}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}`;
+    const consultationKey = options?.customConsultationNote
+      ? (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      : "default";
+    const itemId = `${product.id}-${options?.wristSize ?? "default"}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
     setItems(prev => {
       const existing = prev.find(item => item.id === itemId);
       if (existing) {
@@ -91,6 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           claspType: options?.claspType,
           fitPreference: options?.fitPreference,
           isPreorder: options?.isPreorder,
+          customConsultationNote: options?.customConsultationNote,
         },
       ];
     });

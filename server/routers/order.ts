@@ -189,7 +189,7 @@ export const orderRouter = router({
           items: z.array(CartItemSchema).min(1),
           origin: z.string(),
           sessionToken: z.string().optional(),
-          customerNote: z.string().max(2000).optional(),
+          customerNote: z.string().max(10000).optional(),
         })
         .superRefine((data, ctx) => {
           const isCustomDepositCheckout = data.items
