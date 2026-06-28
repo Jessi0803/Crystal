@@ -7,6 +7,7 @@ import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import {
   CUSTOM_BRACELET_NOTICES,
   CUSTOM_BRACELET_PRICE_DISPLAY,
@@ -673,6 +674,9 @@ export default function ProductDetail() {
                           <span className="block text-[0.6rem] mt-0.5 opacity-70">{opt.price}</span>
                         </button>
                       ))}
+                    </div>
+                    <div className="mt-3">
+                      <ClaspDurabilityNotice />
                     </div>
                     <Dialog open={showClaspGuide} onOpenChange={setShowClaspGuide}>
                       <DialogContent className="w-[calc(100vw-2rem)] max-w-[900px] rounded-sm border-0 bg-white p-3 shadow-xl sm:max-w-[900px] sm:p-4">

@@ -5,6 +5,7 @@ import { useLocation, Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
+import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 import { CUSTOM_WRIST_SIZE_MAX, CUSTOM_WRIST_SIZE_MIN, CUSTOM_WRIST_SIZE_STEP, isValidCustomWristSize } from "@/lib/customOrderingContent";
@@ -482,22 +483,25 @@ export default function CustomFormB() {
       subtitle: "預設為彈力繩；若更換扣具需額外加收 200 元",
       required: true,
       field: (
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { id: "lobster" as const, label: "龍蝦扣", sub: "+200元", img: "/lobster-clasp.jpg" },
-            { id: "magnet" as const, label: "磁扣", sub: "+200元", img: "/magnet-clasp.png" },
-            { id: "elastic" as const, label: "彈力繩", sub: "免費", img: "/elastic-cord.jpg" },
-          ].map((opt) => (
-            <button key={opt.id} type="button" onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
-              className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
-              <div className="bg-[oklch(0.97_0_0)] p-1">
-                <img src={opt.img} alt={opt.label} className="w-full h-72 object-contain" />
-              </div>
-              <p className={`text-xs font-body py-2 ${bracelet.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
-                {opt.label}<br /><span className="text-[0.6rem] text-[oklch(0.55_0_0)]">（{opt.sub}）</span>
-              </p>
-            </button>
-          ))}
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { id: "lobster" as const, label: "龍蝦扣", sub: "+200元", img: "/lobster-clasp.jpg" },
+              { id: "magnet" as const, label: "磁扣", sub: "+200元", img: "/magnet-clasp.png" },
+              { id: "elastic" as const, label: "彈力繩", sub: "免費", img: "/elastic-cord.jpg" },
+            ].map((opt) => (
+              <button key={opt.id} type="button" onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
+                className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
+                <div className="flex aspect-square items-center justify-center bg-[oklch(0.97_0_0)] p-1">
+                  <img src={opt.img} alt={opt.label} className="h-full w-full object-contain" />
+                </div>
+                <p className={`text-xs font-body py-2 ${bracelet.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
+                  {opt.label}<br /><span className="text-[0.6rem] text-[oklch(0.55_0_0)]">（{opt.sub}）</span>
+                </p>
+              </button>
+            ))}
+          </div>
+          <ClaspDurabilityNotice />
         </div>
       ),
     },
