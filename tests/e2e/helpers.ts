@@ -62,6 +62,12 @@ export async function fillTransferCheckoutFields(page: Page, lastFive = "54321")
   await uploadTransferReceipt(page);
 }
 
+export async function proceedToCheckoutFromCart(page: Page) {
+  await page.getByRole("link", { name: "前往結帳" }).click();
+  await proceedThroughCheckoutGate(page);
+  await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
+}
+
 export async function createAtmHomeDeliveryOrder(page: Page, email: string) {
   await goToCheckoutWithSeededBracelet(page);
   await fillDomesticHomeCheckout(page, email);
@@ -72,7 +78,8 @@ export async function createAtmHomeDeliveryOrder(page: Page, email: string) {
   return page.url().split("/order/")[1]?.split("?")[0] ?? "";
 }
 
-export async function fillPureCustomDepositForm(page: Page) {
+export async function fillPureCustomDepositForm(page: Page, options: { proceedToCheckout?: boolean } = {}) {
+  const { proceedToCheckout = true } = options;
   await page.goto("/custom/form");
   await page.locator("textarea").first().fill("E2E 測試：希望提升專注力與穩定情緒");
   await page.locator('input[type="number"]').fill("13");
@@ -83,8 +90,12 @@ export async function fillPureCustomDepositForm(page: Page) {
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.locator("section").filter({ hasText: "要加吊飾嗎" }).getByRole("button", { name: "不要" }).click();
   await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_line_id");
-  await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
-  await expect(page).toHaveURL(/\/checkout/);
+  await page.getByRole("button", { name: /確認，加入購物車/ }).click();
+  await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
+  await expect(page.locator("body")).toContainText("客製化商品");
+  if (proceedToCheckout) {
+    await proceedToCheckoutFromCart(page);
+  }
 }
 
 export async function createAtmCustomDepositOrder(page: Page, email: string) {
@@ -109,7 +120,9 @@ export async function fillProfileCustomDepositForm(
   productName: string,
   customerName: string,
   wristSize = "15.5",
+  options: { proceedToCheckout?: boolean } = {},
 ) {
+  const { proceedToCheckout = true } = options;
   await page.goto(path);
   await page.locator('input[placeholder="請填寫真實姓名"]').fill(customerName);
   await page.locator('input[placeholder="例如：1995/08/22"]').fill("1994/06/18");
@@ -122,13 +135,17 @@ export async function fillProfileCustomDepositForm(
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: "不要吊飾" }).click();
   await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_profile_line");
-  await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
+  await page.getByRole("button", { name: /確認，加入購物車/ }).click();
 
-  await expect(page).toHaveURL(/\/checkout/);
+  await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
   await expect(page.locator("body")).toContainText(productName);
+  if (proceedToCheckout) {
+    await proceedToCheckoutFromCart(page);
+  }
 }
 
-export async function fillTarotCustomDepositForm(page: Page) {
+export async function fillTarotCustomDepositForm(page: Page, options: { proceedToCheckout?: boolean } = {}) {
+  const { proceedToCheckout = true } = options;
   await page.goto("/custom/form-b");
   await page.getByRole("button", { name: /財富密碼/ }).click();
   await page.locator('input[placeholder="請填寫真實姓名"]').fill("E2E 塔羅客戶");
@@ -142,8 +159,11 @@ export async function fillTarotCustomDepositForm(page: Page) {
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: "不要吊飾" }).click();
   await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_tarot_line");
-  await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
+  await page.getByRole("button", { name: /確認，加入購物車/ }).click();
 
-  await expect(page).toHaveURL(/\/checkout/);
+  await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
   await expect(page.locator("body")).toContainText("塔羅 × 水晶手鍊客製化商品");
+  if (proceedToCheckout) {
+    await proceedToCheckoutFromCart(page);
+  }
 }

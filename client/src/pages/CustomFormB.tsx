@@ -1,7 +1,7 @@
 // 椛˙Crystal — 塔羅 × 水晶手鍊報名表單
 import { useState } from "react";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
@@ -209,8 +209,7 @@ function buildNote(tarot: TarotData, bracelet: BraceletData): string {
 export default function CustomFormB() {
   const [tarot, setTarot] = useState<TarotData>(EMPTY_TAROT);
   const [bracelet, setBracelet] = useState<BraceletData>(EMPTY_BRACELET);
-  const [, navigate] = useLocation();
-  const { addToCart, setIsOpen } = useCart();
+  const { addToCart } = useCart();
 
   const depositProduct = products.find((p) => p.id === "tarot-crystal-deposit-product");
 
@@ -624,9 +623,7 @@ export default function CustomFormB() {
     const priceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
     const unitPrice = depositProduct.price + priceAdjust;
     addToCart(depositProduct, { unitPrice, customConsultationNote });
-    setIsOpen(false);
-    navigate("/checkout");
-    toast.success("諮詢內容已儲存，請完成結帳以預約訂金");
+    toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
   }
 
   const canShowDetails = Boolean(tarot.topic) && tarot.group !== "single_q";
@@ -768,18 +765,20 @@ export default function CustomFormB() {
         </div>
 
         <div className="flex items-center justify-between">
-          <button type="button" onClick={() => navigate("/custom")}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm">
-            <ArrowLeft className="w-4 h-4" />
-            返回方案頁
-          </button>
+          <Link href="/custom">
+            <button type="button"
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm">
+              <ArrowLeft className="w-4 h-4" />
+              返回方案頁
+            </button>
+          </Link>
 
           {tarot.group !== "single_q" && (
             <button type="button" onClick={handleSubmit}
               className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
               style={{ backgroundColor: "oklch(0.65 0.12 290)" }}>
               <Check className="w-4 h-4" />
-              確認，前往下訂金
+              確認，加入購物車
             </button>
           )}
         </div>

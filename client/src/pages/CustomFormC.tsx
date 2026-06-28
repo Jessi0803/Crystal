@@ -1,7 +1,7 @@
 // 椛˙Crystal — 脈輪檢測 × 水晶手鍊報名表單
 import { useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
@@ -66,8 +66,7 @@ const ACCENT = "oklch(0.62 0.14 200)";
 
 export default function CustomFormC() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const [, navigate] = useLocation();
-  const { addToCart, setIsOpen } = useCart();
+  const { addToCart } = useCart();
 
   const depositProduct = products.find((p) => p.id === "chakra-crystal-deposit-product");
 
@@ -387,9 +386,7 @@ export default function CustomFormC() {
     const customConsultationNote = buildNote(form);
     sessionStorage.setItem("customConsultationNote", customConsultationNote);
     addToCart(depositProduct, { customConsultationNote });
-    setIsOpen(false);
-    navigate("/checkout");
-    toast.success("諮詢內容已儲存，請完成結帳以預約訂金");
+    toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
   };
 
   return (
@@ -437,14 +434,15 @@ export default function CustomFormC() {
         </div>
 
         <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/custom")}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            返回方案頁
-          </button>
+          <Link href="/custom">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              返回方案頁
+            </button>
+          </Link>
 
           <button
             type="button"
@@ -453,7 +451,7 @@ export default function CustomFormC() {
             style={{ backgroundColor: ACCENT }}
           >
             <Check className="w-4 h-4" />
-            確認，前往下訂金
+            確認，加入購物車
           </button>
         </div>
       </div>

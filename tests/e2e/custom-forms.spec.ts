@@ -4,6 +4,7 @@ import {
   fillPureCustomDepositForm,
   fillTarotCustomDepositForm,
   login,
+  proceedToCheckoutFromCart,
   submitAtmCustomDepositCheckout,
 } from "./helpers";
 
@@ -47,14 +48,18 @@ test("pure custom form blocks a legacy wrist size below 13 cm", async ({ page })
   await page.goto("/custom/form");
   await page.locator("textarea").first().fill("E2E 手圍邊界驗證");
   await page.locator('input[type="number"]').fill("12.5");
-  await page.getByRole("button", { name: /確認，前往下訂金/ }).click();
+  await page.getByRole("button", { name: /確認，加入購物車/ }).click();
 
   await expect(page.locator("body")).toContainText("手圍尺寸請輸入 13 至 19 cm");
   await expect(page).toHaveURL(/\/custom\/form$/);
 });
 
-test("pure custom form stores consultation note and continues to deposit checkout", async ({ page }) => {
-  await fillPureCustomDepositForm(page);
+test("pure custom form adds consultation note to cart before checkout", async ({ page }) => {
+  await fillPureCustomDepositForm(page, { proceedToCheckout: false });
+  await expect(page).toHaveURL(/\/custom\/form$/);
+  await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
+  await expect(page.locator("body")).toContainText("購買 2 件商品享國內免運，目前還差 1 件");
+  await proceedToCheckoutFromCart(page);
   await expect(page.locator("body")).toContainText("客製化商品");
   await expectDepositCheckoutWithoutShipping(page);
   await expect(page.locator("body")).toContainText("訂單摘要");
@@ -109,14 +114,16 @@ test("numerology custom form creates an ATM deposit order with its consultation 
 });
 
 test("multiple custom products in one order keep every consultation note", async ({ page }) => {
-  await fillPureCustomDepositForm(page);
+  await fillPureCustomDepositForm(page, { proceedToCheckout: false });
   await fillProfileCustomDepositForm(
     page,
     "/custom/form-d",
     "生命靈數 × 水晶手鍊客製化商品",
     "E2E 多客製靈數客戶",
     "14",
+    { proceedToCheckout: false },
   );
+  await proceedToCheckoutFromCart(page);
   await expectDepositCheckoutWithoutShipping(page);
   await expect(page.locator("body")).toContainText("客製化商品");
   await expect(page.locator("body")).toContainText("生命靈數 × 水晶手鍊客製化商品");
