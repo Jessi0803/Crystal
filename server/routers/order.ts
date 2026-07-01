@@ -616,10 +616,41 @@ export const orderRouter = router({
       const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
 
+      const [mergeMember] = await db
+        .select({
+          groupId: orderMergeMembers.groupId,
+          mainOrderId: orderMergeGroups.mainOrderId,
+        })
+        .from(orderMergeMembers)
+        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+        .where(eq(orderMergeMembers.orderId, input.orderId))
+        .limit(1);
+
+      if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單已併入主訂單，請從主訂單操作" });
+      }
+
       // 轉帳待確認屬於「付款狀態」(paymentStatus)，不是訂單狀態(orderStatus)，
       // 列表與統計也是用 paymentStatus 篩選，因此直接更新 paymentStatus。
       if (input.status === "transfer_pending") {
         await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq(orders.id, order.id));
+        return { success: true };
+      }
+
+      if (input.status === "cancelled" && mergeMember?.groupId) {
+        const mergedOrders = await db
+          .select({
+            id: orders.id,
+            merchantTradeNo: orders.merchantTradeNo,
+          })
+          .from(orderMergeMembers)
+          .leftJoin(orders, eq(orderMergeMembers.orderId, orders.id))
+          .where(eq(orderMergeMembers.groupId, mergeMember.groupId));
+        for (const mergedOrder of mergedOrders) {
+          if (!mergedOrder.id || !mergedOrder.merchantTradeNo) continue;
+          await dbUpdateOrderStatus(mergedOrder.merchantTradeNo, "cancelled");
+          await restoreInventoryOnCancel(mergedOrder.merchantTradeNo);
+        }
         return { success: true };
       }
 
@@ -870,6 +901,20 @@ export const orderRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const [mergeMember] = await db
+        .select({
+          mainOrderId: orderMergeGroups.mainOrderId,
+        })
+        .from(orderMergeMembers)
+        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+        .where(eq(orderMergeMembers.orderId, input.orderId))
+        .limit(1);
+      if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "被合併訂單不可產生尾款，請從主訂單產生合併尾款" });
+      }
+
       const payment = await createOrReplaceBalancePayment(input);
       const origin = siteBaseUrl(ctx.req);
       return {

@@ -161,6 +161,18 @@ async function getMergeInfoForOrderIds(db: DbInstance, orderIds: number[]) {
   return infoByOrderId;
 }
 
+function visibleOrdersOnlyWhere(baseWhere?: SQL): SQL {
+  const visibleWhere = sql`NOT EXISTS (
+    SELECT 1
+    FROM \`orderMergeMembers\` omm
+    INNER JOIN \`orderMergeGroups\` omg ON omm.\`groupId\` = omg.\`id\`
+    WHERE omm.\`orderId\` = ${orders.id}
+      AND omg.\`mainOrderId\` <> ${orders.id}
+  )`;
+
+  return baseWhere ? and(baseWhere, visibleWhere)! : visibleWhere;
+}
+
 async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<OrderMergeDetail | null> {
   const infoByOrderId = await getMergeInfoForOrderIds(db, [orderId]);
   const info = infoByOrderId.get(orderId);
@@ -202,8 +214,39 @@ async function attachItemsAndLogisticsForOrders(
   if (orderRows.length === 0) return [];
 
   const orderIds = orderRows.map((o) => o.id);
-  const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds));
-  const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+  const mergeInfoByOrderId = await getMergeInfoForOrderIds(db, orderIds);
+  const visibleOrderRows = orderRows.filter((order) => mergeInfoByOrderId.get(order.id)?.role !== "member");
+  if (visibleOrderRows.length === 0) return [];
+
+  const visibleOrderIds = visibleOrderRows.map((order) => order.id);
+  const visibleMergeInfos = visibleOrderIds.map((orderId) => mergeInfoByOrderId.get(orderId)).filter((info): info is OrderMergeInfo => Boolean(info));
+  const groupIds = Array.from(new Set(visibleMergeInfos.filter((info) => info.role === "main").map((info) => info.groupId)));
+  const mergeMemberRows = groupIds.length > 0
+    ? await db
+        .select({
+          groupId: orderMergeMembers.groupId,
+          orderId: orderMergeMembers.orderId,
+          mainOrderId: orderMergeGroups.mainOrderId,
+        })
+        .from(orderMergeMembers)
+        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+        .where(inArray(orderMergeMembers.groupId, groupIds))
+    : [];
+
+  const combinedOrderIdsByMainId = new Map<number, number[]>();
+  for (const row of mergeMemberRows) {
+    if (!row.mainOrderId) continue;
+    const current = combinedOrderIdsByMainId.get(row.mainOrderId) ?? [];
+    current.push(row.orderId);
+    combinedOrderIdsByMainId.set(row.mainOrderId, current);
+  }
+
+  const allItemOrderIds = Array.from(new Set([
+    ...visibleOrderIds,
+    ...Array.from(combinedOrderIdsByMainId.values()).flat(),
+  ]));
+  const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, allItemOrderIds));
+  const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, visibleOrderIds));
 
   const itemsByOrder = new Map<number, OrderItemRow[]>();
   for (const item of allItems) {
@@ -217,11 +260,17 @@ async function attachItemsAndLogisticsForOrders(
     logisticsByOrder.set(log.orderId, log);
   }
 
-  return orderRows.map((order) => ({
-    ...order,
-    items: itemsByOrder.get(order.id) ?? [],
-    logistics: logisticsByOrder.get(order.id) ?? null,
-  }));
+  return visibleOrderRows.map((order) => {
+    const combinedOrderIds = combinedOrderIdsByMainId.get(order.id) ?? [order.id];
+    const items = combinedOrderIds.flatMap((orderId) => itemsByOrder.get(orderId) ?? []);
+
+    return {
+      ...order,
+      items,
+      logistics: logisticsByOrder.get(order.id) ?? null,
+      mergeInfo: null,
+    };
+  });
 }
 
 // productImage 欄位是 TEXT（約 64KB）。內嵌 base64 圖（data: 開頭）或過長字串
@@ -482,7 +531,7 @@ export async function getAdminOrderSummaries(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const statusWhere = buildOrderStatusWhere(statusFilter);
+  const statusWhere = visibleOrdersOnlyWhere(buildOrderStatusWhere(statusFilter));
 
   const summarySelect = {
     id: orders.id,
@@ -536,13 +585,47 @@ export async function getAdminOrderSummaries(
   }
 
   const orderIds = orderRows.map((order) => order.id);
+  const mergeInfoByOrderId = await getMergeInfoForOrderIds(db, orderIds);
+  const mainMergeInfos = orderIds
+    .map((orderId) => mergeInfoByOrderId.get(orderId))
+    .filter((info): info is OrderMergeInfo => Boolean(info && info.role === "main"));
+  const groupIds = Array.from(new Set(mainMergeInfos.map((info) => info.groupId)));
+  const mergeMemberRows = groupIds.length > 0
+    ? await db
+        .select({
+          groupId: orderMergeMembers.groupId,
+          orderId: orderMergeMembers.orderId,
+          mainOrderId: orderMergeGroups.mainOrderId,
+          totalAmount: orders.totalAmount,
+        })
+        .from(orderMergeMembers)
+        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+        .leftJoin(orders, eq(orderMergeMembers.orderId, orders.id))
+        .where(inArray(orderMergeMembers.groupId, groupIds))
+    : [];
+  const combinedOrderIdsByMainId = new Map<number, number[]>();
+  const extraTotalByMainId = new Map<number, number>();
+  for (const row of mergeMemberRows) {
+    if (!row.mainOrderId) continue;
+    const current = combinedOrderIdsByMainId.get(row.mainOrderId) ?? [];
+    current.push(row.orderId);
+    combinedOrderIdsByMainId.set(row.mainOrderId, current);
+
+    if (row.orderId !== row.mainOrderId) {
+      extraTotalByMainId.set(row.mainOrderId, (extraTotalByMainId.get(row.mainOrderId) ?? 0) + Number(row.totalAmount ?? 0));
+    }
+  }
+  const allSummaryOrderIds = Array.from(new Set([
+    ...orderIds,
+    ...Array.from(combinedOrderIdsByMainId.values()).flat(),
+  ]));
   const itemCounts = await db
     .select({
       orderId: orderItems.orderId,
       itemCount: sql<number>`CAST(COUNT(*) AS SIGNED)`,
     })
     .from(orderItems)
-    .where(inArray(orderItems.orderId, orderIds))
+    .where(inArray(orderItems.orderId, allSummaryOrderIds))
     .groupBy(orderItems.orderId);
 
   const logisticsRows = await db
@@ -559,12 +642,11 @@ export async function getAdminOrderSummaries(
     })
     .from(orderItems)
     .leftJoin(dbProducts, eq(orderItems.productId, dbProducts.id))
-    .where(inArray(orderItems.orderId, orderIds))
+    .where(inArray(orderItems.orderId, allSummaryOrderIds))
     .orderBy(orderItems.id);
 
   const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
   const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
-  const mergeInfoByOrderId = await getMergeInfoForOrderIds(db, orderIds);
   const thumbnailsByOrderId = new Map<
     number,
     { id: number; productName: string; productImage: string }[]
@@ -583,13 +665,20 @@ export async function getAdminOrderSummaries(
   }
 
   return {
-    items: orderRows.map((order) => ({
-      ...order,
-      itemCount: itemCountByOrderId.get(order.id) ?? 0,
-      hasLogistics: logisticsOrderIds.has(order.id),
-      mergeInfo: mergeInfoByOrderId.get(order.id) ?? null,
-      productThumbnails: thumbnailsByOrderId.get(order.id) ?? [],
-    })),
+    items: orderRows.map((order) => {
+      const combinedOrderIds = combinedOrderIdsByMainId.get(order.id) ?? [order.id];
+      const itemCount = combinedOrderIds.reduce((sum, orderId) => sum + (itemCountByOrderId.get(orderId) ?? 0), 0);
+      const productThumbnails = combinedOrderIds.flatMap((orderId) => thumbnailsByOrderId.get(orderId) ?? []).slice(0, 3);
+
+      return {
+        ...order,
+        totalAmount: order.totalAmount + (extraTotalByMainId.get(order.id) ?? 0),
+        itemCount,
+        hasLogistics: logisticsOrderIds.has(order.id),
+        mergeInfo: mergeInfoByOrderId.get(order.id) ?? null,
+        productThumbnails,
+      };
+    }),
     total,
     page,
     pageSize: limit,
@@ -609,7 +698,13 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
 
   if (!order) return null;
 
-  const [items, logistics, balancePayment, mergeInfo] = await Promise.all([
+  const mergeInfo = await getMergeDetailForOrder(db, order.id);
+  const itemOrderIds = mergeInfo?.role === "main" ? mergeInfo.members.map((member) => member.orderId) : [order.id];
+  const displayTotalAmount = mergeInfo?.role === "main"
+    ? mergeInfo.members.reduce((sum, member) => sum + member.totalAmount, 0)
+    : order.totalAmount;
+
+  const [items, logistics, balancePayment] = await Promise.all([
     db
       .select({
         id: orderItems.id,
@@ -624,14 +719,14 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
       })
       .from(orderItems)
       .leftJoin(dbProducts, eq(orderItems.productId, dbProducts.id))
-      .where(eq(orderItems.orderId, order.id)),
+      .where(inArray(orderItems.orderId, itemOrderIds)),
     db.select().from(logisticsOrders).where(eq(logisticsOrders.orderId, order.id)).limit(1),
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
-    getMergeDetailForOrder(db, order.id),
   ]);
 
   return {
     ...order,
+    totalAmount: displayTotalAmount,
     items,
     logistics: logistics[0] ?? null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
@@ -1026,7 +1121,7 @@ export async function getOrdersByUserId(userId: number) {
   const memberOrders = await db
     .select()
     .from(orders)
-    .where(eq(orders.userId, userId))
+    .where(visibleOrdersOnlyWhere(eq(orders.userId, userId)))
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
@@ -1042,7 +1137,7 @@ export async function getOrdersByEmail(email: string) {
   const memberOrders = await db
     .select()
     .from(orders)
-    .where(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`)
+    .where(visibleOrdersOnlyWhere(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`))
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
@@ -1067,7 +1162,7 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
 
   if (conditions.length === 0) return [];
 
-  const whereClause = conditions.length === 1 ? conditions[0] : or(...conditions)!;
+  const whereClause = visibleOrdersOnlyWhere(conditions.length === 1 ? conditions[0] : or(...conditions)!);
 
   try {
     const memberOrders = await db
@@ -1115,7 +1210,7 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
         updatedAt: orders.updatedAt,
       })
       .from(orders)
-      .where(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`)
+      .where(visibleOrdersOnlyWhere(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`))
       .orderBy(desc(orders.createdAt))
       .limit(100);
 

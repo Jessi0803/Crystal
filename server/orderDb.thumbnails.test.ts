@@ -59,6 +59,7 @@ describe("admin order product thumbnails", () => {
     const mockDb = createMockDb([
       [order],
       [{ count: 1 }],
+      [],
       [{ orderId: 1, itemCount: 1 }],
       [],
       [
@@ -104,6 +105,7 @@ describe("admin order product thumbnails", () => {
     const mockDb = createMockDb([
       [order],
       [{ count: 1 }],
+      [],
       [{ orderId: 1, itemCount: 2 }],
       [],
       [
@@ -118,6 +120,54 @@ describe("admin order product thumbnails", () => {
     const result = await getAdminOrderSummaries(50, 0, "all");
 
     expect(result.items[0].productThumbnails).toEqual([]);
+  });
+
+  it("combines merged member totals and thumbnails into the main admin order summary", async () => {
+    const order = {
+      id: 1,
+      merchantTradeNo: "MAIN001",
+      paymentStatus: "paid",
+      paymentMethod: "credit",
+      shippingMethod: "home",
+      orderStatus: "paid",
+      isPreorder: false,
+      isCustomOrder: true,
+      freeShippingOverride: true,
+      totalAmount: 1000,
+      buyerName: "Test User",
+      createdAt: new Date("2026-06-01T08:00:00Z"),
+    };
+    const mockDb = createMockDb([
+      [order],
+      [{ count: 1 }],
+      [{ orderId: 1, groupId: 9, mergeCode: "OMTEST", mainOrderId: 1 }],
+      [{ id: 1, merchantTradeNo: "MAIN001" }],
+      [
+        { groupId: 9, orderId: 1, mainOrderId: 1, totalAmount: 1000 },
+        { groupId: 9, orderId: 2, mainOrderId: 1, totalAmount: 800 },
+      ],
+      [
+        { orderId: 1, itemCount: 1 },
+        { orderId: 2, itemCount: 1 },
+      ],
+      [],
+      [
+        { id: 11, orderId: 1, productName: "主訂單商品", productImage: "/main.jpg" },
+        { id: 12, orderId: 2, productName: "被併入商品", productImage: "/member.jpg" },
+      ],
+    ]);
+    getDb.mockResolvedValue(mockDb);
+
+    const { getAdminOrderSummaries } = await import("./orderDb");
+    const result = await getAdminOrderSummaries(50, 0, "all");
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].totalAmount).toBe(1800);
+    expect(result.items[0].itemCount).toBe(2);
+    expect(result.items[0].productThumbnails).toEqual([
+      { id: 11, productName: "主訂單商品", productImage: "/main.jpg" },
+      { id: 12, productName: "被併入商品", productImage: "/member.jpg" },
+    ]);
   });
 
   it("returns fallback product images in expanded admin order details", async () => {
@@ -151,8 +201,8 @@ describe("admin order product thumbnails", () => {
     };
     const mockDb = createMockDb([
       [order],
-      [item],
       [],
+      [item],
       [],
       [],
     ]);
