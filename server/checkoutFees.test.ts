@@ -63,6 +63,28 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1800);
   });
 
+  it("charges shipping when a merged balance order is explicitly set to include shipping", () => {
+    const fees = calcCheckoutFees({
+      items: [{
+        id: "custom-balance-payment",
+        name: "客製化商品尾款",
+        price: 1800,
+        quantity: 1,
+        twoItemFreeShippingEligible: false,
+      }],
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+      buyerEmail: "baby90522@gmail.com",
+      forcePaidShipping: true,
+    });
+
+    expect(fees.shippingFee).toBe(130);
+    expect(fees.emailFreeShipping).toBe(true);
+    expect(fees.forcedPaidShipping).toBe(true);
+    expect(fees.total).toBe(1930);
+  });
+
   it("adds overseas shipping without PayPal fee for normal products", () => {
     const fees = calcCheckoutFees({
       items: [{ id: "d002-honey-realm", name: "蜜光之境手鍊", price: 1580, quantity: 1 }],

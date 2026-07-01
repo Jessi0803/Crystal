@@ -319,6 +319,7 @@ export default function BalancePayment() {
     overseasCountry: overseasCode,
     buyerEmail: data.order.buyerEmail,
     forceFreeShipping: data.order.freeShippingOverride,
+    forcePaidShipping: Boolean((data as any).orderMergeInfo && !data.order.freeShippingOverride),
   });
   const payableAmount = feeSummary.total;
 

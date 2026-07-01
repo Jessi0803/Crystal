@@ -1011,6 +1011,7 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     .where(eq(orders.id, row.orderId))
     .limit(1);
   if (!order) return null;
+  const orderMergeInfo = await getMergeDetailForOrder(db, order.id);
 
   const [clearQuartzChipsItem] = await db
     .select()
@@ -1021,7 +1022,7 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     ))
     .limit(1);
 
-  return { ...balancePayment, order, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
+  return { ...balancePayment, order, orderMergeInfo, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
 }
 
 export async function updateBalancePaymentStatus(
