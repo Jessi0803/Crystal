@@ -706,7 +706,8 @@ export const orderRouter = router({
     }),
 
   /**
-   * 手動合併訂單：客製化訂單固定作為主訂單，整組免運覆寫。
+   * 手動合併訂單：允許多筆客製化，第一筆選取的客製化訂單作為主訂單。
+   * 方案 A：尾款收款集中在主訂單，其它客製化訂單只作為合併紀錄。
    */
   mergeOrders: adminProcedure
     .input(
@@ -733,9 +734,9 @@ export const orderRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "部分訂單不存在，請重新整理後再試" });
       }
 
-      const customOrders = rows.filter((order) => order.isCustomOrder);
-      if (customOrders.length !== 1) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "合併訂單必須剛好包含一筆客製化訂單作為主訂單" });
+      const customOrderIds = new Set(rows.filter((order) => order.isCustomOrder).map((order) => order.id));
+      if (customOrderIds.size < 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "合併訂單至少要包含一筆客製化訂單作為主訂單" });
       }
 
       const unmergeable = rows.filter((order) => !mergeableOrderStatuses.has(order.orderStatus));
@@ -767,7 +768,11 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "選取的訂單已有合併紀錄" });
       }
 
-      const mainOrder = customOrders[0];
+      const mainOrderId = orderIds.find((orderId) => customOrderIds.has(orderId));
+      const mainOrder = rows.find((order) => order.id === mainOrderId);
+      if (!mainOrder) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "找不到可作為主訂單的客製化訂單" });
+      }
       const mergeCode = generateOrderMergeCode();
 
       await db.insert(orderMergeGroups).values({
@@ -801,6 +806,60 @@ export const orderRouter = router({
         mainOrderMerchantTradeNo: mainOrder.merchantTradeNo,
         mergedOrderIds: orderIds,
       };
+    }),
+
+  updateFreeShippingOverride: adminProcedure
+    .input(z.object({
+      orderId: z.number().int().positive(),
+      freeShippingOverride: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [order] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, input.orderId))
+        .limit(1);
+      if (!order) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+      }
+
+      const [mergeMember] = await db
+        .select({
+          groupId: orderMergeMembers.groupId,
+          mainOrderId: orderMergeGroups.mainOrderId,
+        })
+        .from(orderMergeMembers)
+        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+        .where(eq(orderMergeMembers.orderId, input.orderId))
+        .limit(1);
+
+      if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "請從合併主訂單調整免運設定" });
+      }
+
+      if (mergeMember?.groupId) {
+        const mergeRows = await db
+          .select({ orderId: orderMergeMembers.orderId })
+          .from(orderMergeMembers)
+          .where(eq(orderMergeMembers.groupId, mergeMember.groupId));
+        const orderIds = mergeRows.map((row) => row.orderId);
+        if (orderIds.length > 0) {
+          await db
+            .update(orders)
+            .set({ freeShippingOverride: input.freeShippingOverride })
+            .where(inArray(orders.id, orderIds));
+        }
+      } else {
+        await db
+          .update(orders)
+          .set({ freeShippingOverride: input.freeShippingOverride })
+          .where(eq(orders.id, input.orderId));
+      }
+
+      return { success: true, freeShippingOverride: input.freeShippingOverride };
     }),
 
   createBalancePaymentLink: adminProcedure

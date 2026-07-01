@@ -121,6 +121,7 @@ function createCaller(user: { id: number; role: string } | null) {
 function createQueryChain<T>(result: T) {
   const chain: any = {
     from: vi.fn(() => chain),
+    leftJoin: vi.fn(() => chain),
     where: vi.fn(() => chain),
     limit: vi.fn(() => chain),
     then: (resolve: (value: T) => unknown, reject?: (reason: unknown) => unknown) =>
@@ -404,7 +405,39 @@ describe("order.mergeOrders (admin procedure)", () => {
     expect(db.updateChain.set).toHaveBeenCalledWith({ freeShippingOverride: true });
   });
 
-  it("沒有剛好一筆客製化訂單時拒絕合併", async () => {
+  it("多筆客製化訂單合併時以第一個選取的客製化訂單作為主訂單", async () => {
+    const db = createMutationMockDb([
+      [
+        {
+          id: 40,
+          merchantTradeNo: "CUSTOM001",
+          buyerEmail: "same@example.com",
+          orderStatus: "deposit_paid",
+          isCustomOrder: true,
+        },
+        {
+          id: 41,
+          merchantTradeNo: "CUSTOM002",
+          buyerEmail: "same@example.com",
+          orderStatus: "deposit_paid",
+          isCustomOrder: true,
+        },
+      ],
+      [],
+      [],
+      [{ id: 8, mergeCode: "OMTEST2", mainOrderId: 41 }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+    const result = await caller.order.mergeOrders({ orderIds: [41, 40] });
+
+    expect(result.success).toBe(true);
+    expect(result.mainOrderId).toBe(41);
+    expect(result.mainOrderMerchantTradeNo).toBe("CUSTOM002");
+  });
+
+  it("沒有客製化訂單時拒絕合併", async () => {
     const db = createMutationMockDb([
       [
         {
@@ -431,6 +464,49 @@ describe("order.mergeOrders (admin procedure)", () => {
       code: "BAD_REQUEST",
     });
     expect(db.insert).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("order.updateFreeShippingOverride (admin procedure)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("主訂單調整合併尾款運費時同步更新整組訂單", async () => {
+    const db = createMutationMockDb([
+      [{ id: 20 }],
+      [{ groupId: 7, mainOrderId: 20 }],
+      [{ orderId: 20 }, { orderId: 21 }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+    const result = await caller.order.updateFreeShippingOverride({
+      orderId: 20,
+      freeShippingOverride: false,
+    });
+
+    expect(result).toEqual({ success: true, freeShippingOverride: false });
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.updateChain.set).toHaveBeenCalledWith({ freeShippingOverride: false });
+  });
+
+  it("被併入訂單不能直接調整免運設定", async () => {
+    const db = createMutationMockDb([
+      [{ id: 21 }],
+      [{ groupId: 7, mainOrderId: 20 }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+
+    await expect(caller.order.updateFreeShippingOverride({
+      orderId: 21,
+      freeShippingOverride: false,
+    })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
     expect(db.update).not.toHaveBeenCalled();
   });
 });

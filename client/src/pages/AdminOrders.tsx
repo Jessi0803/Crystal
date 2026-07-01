@@ -197,6 +197,15 @@ function OrderRowCard({
     onError: (err) => toast.error(err.message || "確認失敗"),
   });
 
+  const updateFreeShippingOverride = trpc.order.updateFreeShippingOverride.useMutation({
+    onSuccess: async (data) => {
+      await utils.order.getOrderDetail.invalidate({ orderId: order.id });
+      await utils.order.listOrders.invalidate();
+      toast.success(data.freeShippingOverride ? "已設定合併尾款免運" : "已設定合併尾款加入運費");
+    },
+    onError: (err) => toast.error(err.message || "免運設定更新失敗"),
+  });
+
   const printTradeDocument = trpc.order.getPrintDocument.useMutation({
     onSuccess: (data) => {
       openBase64DocumentInNewTab(data.base64, data.contentType);
@@ -379,6 +388,41 @@ function OrderRowCard({
                       </div>
                     ))}
                   </div>
+                  {(detail as any).mergeInfo.role === "main" && (
+                    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-emerald-100 pt-3">
+                      <span className="font-medium">合併尾款運費</span>
+                      <button
+                        type="button"
+                        onClick={() => updateFreeShippingOverride.mutate({
+                          orderId: detail.id,
+                          freeShippingOverride: true,
+                        })}
+                        disabled={updateFreeShippingOverride.isPending || detail.freeShippingOverride === true}
+                        className={`px-3 py-1.5 text-xs transition-colors ${
+                          detail.freeShippingOverride
+                            ? "bg-emerald-700 text-white"
+                            : "border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100"
+                        } disabled:opacity-60`}
+                      >
+                        免運
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateFreeShippingOverride.mutate({
+                          orderId: detail.id,
+                          freeShippingOverride: false,
+                        })}
+                        disabled={updateFreeShippingOverride.isPending || detail.freeShippingOverride === false}
+                        className={`px-3 py-1.5 text-xs transition-colors ${
+                          !detail.freeShippingOverride
+                            ? "bg-slate-700 text-white"
+                            : "border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100"
+                        } disabled:opacity-60`}
+                      >
+                        加入運費
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -395,6 +439,7 @@ function OrderRowCard({
                 )}
 
                 {detail.isCustomOrder && detail.orderStatus === "deposit_paid" &&
+                  (!(detail as any).mergeInfo || (detail as any).mergeInfo.role === "main") &&
                   detail.balancePayment?.paymentStatus !== "transfer_pending" &&
                   detail.balancePayment?.paymentStatus !== "paid" && (
                   <button
@@ -765,7 +810,7 @@ export default function AdminOrders() {
   const selectedMergeOrderIdSet = new Set(selectedMergeOrderIds);
   const selectedMergeOrders = allOrders.filter((order) => selectedMergeOrderIdSet.has(order.id));
   const selectedMergeCustomCount = selectedMergeOrders.filter((order) => order.isCustomOrder).length;
-  const canMergeSelectedOrders = selectedMergeOrderIds.length >= 2 && selectedMergeCustomCount === 1;
+  const canMergeSelectedOrders = selectedMergeOrderIds.length >= 2 && selectedMergeCustomCount >= 1;
   const allPageMergeSelected =
     selectableMergeOrderIds.length > 0 &&
     selectableMergeOrderIds.every((orderId) => selectedMergeOrderIdSet.has(orderId));
@@ -826,12 +871,14 @@ export default function AdminOrders() {
 
   const mergeSelectedOrders = () => {
     if (!canMergeSelectedOrders) {
-      toast.error("請選取至少兩筆訂單，且其中剛好一筆為客製化訂單");
+      toast.error("請選取至少兩筆訂單，且其中至少一筆為客製化訂單");
       return;
     }
-    const customOrder = selectedMergeOrders.find((order) => order.isCustomOrder);
+    const customOrder = selectedMergeOrderIds
+      .map((orderId) => allOrders.find((order) => order.id === orderId))
+      .find((order) => order?.isCustomOrder);
     const confirmed = window.confirm(
-      `確定要合併 ${selectedMergeOrderIds.length} 筆訂單嗎？客製化訂單 ${customOrder?.merchantTradeNo ?? ""} 會成為主訂單，整組尾款/後續結帳將免運。`
+      `確定要合併 ${selectedMergeOrderIds.length} 筆訂單嗎？最先選取的客製化訂單 ${customOrder?.merchantTradeNo ?? ""} 會成為主訂單。合併後預設免運，也可以在主訂單內改成加入運費。`
     );
     if (!confirmed) return;
     mergeOrdersMutation.mutate({ orderIds: selectedMergeOrderIds });
