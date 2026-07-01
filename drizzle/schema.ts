@@ -152,6 +152,34 @@ export const orders = mysqlTable("orders", {
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 
+// ─── 後台手動合併訂單 ───────────────────────────────────────────────────────
+export const orderMergeGroups = mysqlTable("orderMergeGroups", {
+  id: int("id").autoincrement().primaryKey(),
+  mergeCode: varchar("mergeCode", { length: 32 }).notNull().unique(),
+  mainOrderId: int("mainOrderId").notNull().unique(),
+  adminNote: text("adminNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("order_merge_groups_main_order_id_idx").on(table.mainOrderId),
+]);
+
+export type OrderMergeGroup = typeof orderMergeGroups.$inferSelect;
+export type InsertOrderMergeGroup = typeof orderMergeGroups.$inferInsert;
+
+export const orderMergeMembers = mysqlTable("orderMergeMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("groupId").notNull(),
+  orderId: int("orderId").notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("order_merge_members_group_id_idx").on(table.groupId),
+  index("order_merge_members_order_id_idx").on(table.orderId),
+]);
+
+export type OrderMergeMember = typeof orderMergeMembers.$inferSelect;
+export type InsertOrderMergeMember = typeof orderMergeMembers.$inferInsert;
+
 // ─── 訂單商品明細表 ───────────────────────────────────────────────────────────
 export const orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),

@@ -143,6 +143,25 @@ function createMockDb(selectResults: unknown[]) {
   };
 }
 
+function createMutationMockDb(selectResults: unknown[]) {
+  const queue = [...selectResults];
+  const insertChain = {
+    values: vi.fn().mockResolvedValue(undefined),
+  };
+  const updateChain = {
+    set: vi.fn(() => updateChain),
+    where: vi.fn().mockResolvedValue(undefined),
+  };
+
+  return {
+    select: vi.fn(() => createQueryChain(queue.shift() ?? [])),
+    insert: vi.fn(() => insertChain),
+    update: vi.fn(() => updateChain),
+    insertChain,
+    updateChain,
+  };
+}
+
 function createPublicCaller() {
   return appRouter.createCaller({
     user: null,
@@ -342,5 +361,76 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
       code: "BAD_REQUEST",
     });
     expect(db.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("order.mergeOrders (admin procedure)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("合併訂單時以客製化訂單作為主訂單並套用免運覆寫", async () => {
+    const db = createMutationMockDb([
+      [
+        {
+          id: 20,
+          merchantTradeNo: "CUSTOM001",
+          buyerEmail: "same@example.com",
+          orderStatus: "deposit_paid",
+          isCustomOrder: true,
+        },
+        {
+          id: 21,
+          merchantTradeNo: "NORMAL001",
+          buyerEmail: "same@example.com",
+          orderStatus: "paid",
+          isCustomOrder: false,
+        },
+      ],
+      [],
+      [],
+      [{ id: 7, mergeCode: "OMTEST", mainOrderId: 20 }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+    const result = await caller.order.mergeOrders({ orderIds: [20, 21] });
+
+    expect(result.success).toBe(true);
+    expect(result.mainOrderId).toBe(20);
+    expect(result.mainOrderMerchantTradeNo).toBe("CUSTOM001");
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.updateChain.set).toHaveBeenCalledWith({ freeShippingOverride: true });
+  });
+
+  it("沒有剛好一筆客製化訂單時拒絕合併", async () => {
+    const db = createMutationMockDb([
+      [
+        {
+          id: 30,
+          merchantTradeNo: "NORMAL001",
+          buyerEmail: "same@example.com",
+          orderStatus: "paid",
+          isCustomOrder: false,
+        },
+        {
+          id: 31,
+          merchantTradeNo: "NORMAL002",
+          buyerEmail: "same@example.com",
+          orderStatus: "paid",
+          isCustomOrder: false,
+        },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createCaller({ id: 1, role: "admin" });
+
+    await expect(caller.order.mergeOrders({ orderIds: [30, 31] })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

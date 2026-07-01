@@ -9,6 +9,8 @@ import {
   orderItems,
   logisticsOrders,
   orderBalancePayments,
+  orderMergeGroups,
+  orderMergeMembers,
   dbProducts,
   InsertOrder,
   InsertOrderItem,
@@ -23,10 +25,30 @@ type OrderItemRow = typeof orderItems.$inferSelect;
 type LogisticsRow = typeof logisticsOrders.$inferSelect;
 type BalancePaymentRow = typeof orderBalancePayments.$inferSelect;
 
+export type OrderMergeInfo = {
+  groupId: number;
+  mergeCode: string;
+  mainOrderId: number;
+  mainOrderMerchantTradeNo: string;
+  role: "main" | "member";
+};
+
+export type OrderMergeDetail = OrderMergeInfo & {
+  members: {
+    orderId: number;
+    merchantTradeNo: string;
+    buyerName: string;
+    isCustomOrder: boolean;
+    orderStatus: OrderRow["orderStatus"];
+    totalAmount: number;
+  }[];
+};
+
 export type OrderWithItemsAndLogistics = OrderRow & {
   items: OrderItemRow[];
   logistics: LogisticsRow | null;
   balancePayment?: BalancePaymentRow | null;
+  mergeInfo?: OrderMergeDetail | null;
 };
 
 export type AdminOrderListItem = Pick<
@@ -39,12 +61,15 @@ export type AdminOrderListItem = Pick<
   | "orderStatus"
   | "isPreorder"
   | "isCustomOrder"
+  | "freeShippingOverride"
   | "totalAmount"
   | "buyerName"
   | "createdAt"
 > & {
   itemCount: number;
   hasLogistics: boolean;
+  freeShippingOverride: boolean;
+  mergeInfo: OrderMergeInfo | null;
   productThumbnails: {
     id: number;
     productName: string;
@@ -96,6 +121,77 @@ async function ensureBalancePaymentColumns(db: DbInstance) {
     /* column already exists */
   }
   balancePaymentColumnsEnsured = true;
+}
+
+async function getMergeInfoForOrderIds(db: DbInstance, orderIds: number[]) {
+  if (orderIds.length === 0) return new Map<number, OrderMergeInfo>();
+
+  const memberRows = await db
+    .select({
+      orderId: orderMergeMembers.orderId,
+      groupId: orderMergeMembers.groupId,
+      mergeCode: orderMergeGroups.mergeCode,
+      mainOrderId: orderMergeGroups.mainOrderId,
+    })
+    .from(orderMergeMembers)
+    .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+    .where(inArray(orderMergeMembers.orderId, orderIds));
+
+  const mainOrderIds = Array.from(new Set(memberRows.map((row) => row.mainOrderId).filter((id): id is number => typeof id === "number")));
+  const mainOrders = mainOrderIds.length > 0
+    ? await db
+        .select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo })
+        .from(orders)
+        .where(inArray(orders.id, mainOrderIds))
+    : [];
+  const mainTradeNoById = new Map(mainOrders.map((order) => [order.id, order.merchantTradeNo]));
+
+  const infoByOrderId = new Map<number, OrderMergeInfo>();
+  for (const row of memberRows) {
+    if (!row.groupId || !row.mergeCode || !row.mainOrderId) continue;
+    infoByOrderId.set(row.orderId, {
+      groupId: row.groupId,
+      mergeCode: row.mergeCode,
+      mainOrderId: row.mainOrderId,
+      mainOrderMerchantTradeNo: mainTradeNoById.get(row.mainOrderId) ?? "",
+      role: row.orderId === row.mainOrderId ? "main" : "member",
+    });
+  }
+
+  return infoByOrderId;
+}
+
+async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<OrderMergeDetail | null> {
+  const infoByOrderId = await getMergeInfoForOrderIds(db, [orderId]);
+  const info = infoByOrderId.get(orderId);
+  if (!info) return null;
+
+  const memberRows = await db
+    .select({
+      orderId: orders.id,
+      merchantTradeNo: orders.merchantTradeNo,
+      buyerName: orders.buyerName,
+      isCustomOrder: orders.isCustomOrder,
+      orderStatus: orders.orderStatus,
+      totalAmount: orders.totalAmount,
+    })
+    .from(orderMergeMembers)
+    .leftJoin(orders, eq(orderMergeMembers.orderId, orders.id))
+    .where(eq(orderMergeMembers.groupId, info.groupId));
+
+  return {
+    ...info,
+    members: memberRows
+      .filter((row): row is typeof row & { orderId: number; merchantTradeNo: string; buyerName: string; isCustomOrder: boolean; orderStatus: OrderRow["orderStatus"]; totalAmount: number } => Boolean(row.orderId))
+      .map((row) => ({
+        orderId: row.orderId,
+        merchantTradeNo: row.merchantTradeNo,
+        buyerName: row.buyerName,
+        isCustomOrder: row.isCustomOrder,
+        orderStatus: row.orderStatus,
+        totalAmount: row.totalAmount,
+      })),
+  };
 }
 
 /** 批次載入商品明細與物流，避免 N+1 查詢（管理後台 list、會員訂單） */
@@ -397,6 +493,7 @@ export async function getAdminOrderSummaries(
     orderStatus: orders.orderStatus,
     isPreorder: orders.isPreorder,
     isCustomOrder: orders.isCustomOrder,
+    freeShippingOverride: orders.freeShippingOverride,
     totalAmount: orders.totalAmount,
     buyerName: orders.buyerName,
     createdAt: orders.createdAt,
@@ -467,6 +564,7 @@ export async function getAdminOrderSummaries(
 
   const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
   const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
+  const mergeInfoByOrderId = await getMergeInfoForOrderIds(db, orderIds);
   const thumbnailsByOrderId = new Map<
     number,
     { id: number; productName: string; productImage: string }[]
@@ -489,6 +587,7 @@ export async function getAdminOrderSummaries(
       ...order,
       itemCount: itemCountByOrderId.get(order.id) ?? 0,
       hasLogistics: logisticsOrderIds.has(order.id),
+      mergeInfo: mergeInfoByOrderId.get(order.id) ?? null,
       productThumbnails: thumbnailsByOrderId.get(order.id) ?? [],
     })),
     total,
@@ -510,7 +609,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
 
   if (!order) return null;
 
-  const [items, logistics, balancePayment] = await Promise.all([
+  const [items, logistics, balancePayment, mergeInfo] = await Promise.all([
     db
       .select({
         id: orderItems.id,
@@ -528,6 +627,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
       .where(eq(orderItems.orderId, order.id)),
     db.select().from(logisticsOrders).where(eq(logisticsOrders.orderId, order.id)).limit(1),
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
+    getMergeDetailForOrder(db, order.id),
   ]);
 
   return {
@@ -535,6 +635,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
     items,
     logistics: logistics[0] ?? null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
+    mergeInfo,
   };
 }
 

@@ -47,7 +47,7 @@ import {
 } from "../ecpayLogistics";
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
-import { dbProducts, orders, orderItems, logisticsOrders, orderBalancePayments } from "../../drizzle/schema";
+import { dbProducts, orders, orderItems, logisticsOrders, orderBalancePayments, orderMergeGroups, orderMergeMembers } from "../../drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
@@ -112,6 +112,20 @@ function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: st
     (req.protocol === "https" ? "https" : "http");
   return `${proto}://${host}`;
 }
+
+function generateOrderMergeCode() {
+  const now = new Date();
+  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `OM${ymd}${rand}`.slice(0, 32);
+}
+
+const mergeableOrderStatuses = new Set([
+  "pending_payment",
+  "deposit_paid",
+  "paid",
+  "processing",
+]);
 
 const CartItemSchema = z.object({
   id: z.string(),
@@ -691,6 +705,104 @@ export const orderRouter = router({
       return { success: true, deletedCount: orderIds.length };
     }),
 
+  /**
+   * 手動合併訂單：客製化訂單固定作為主訂單，整組免運覆寫。
+   */
+  mergeOrders: adminProcedure
+    .input(
+      z.object({
+        orderIds: z.array(z.number().int().positive()).min(2).max(20),
+        adminNote: z.string().max(1000).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const orderIds = Array.from(new Set(input.orderIds));
+      if (orderIds.length < 2) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "請至少選取兩筆不同訂單" });
+      }
+
+      const rows = await db
+        .select()
+        .from(orders)
+        .where(inArray(orders.id, orderIds));
+
+      if (rows.length !== orderIds.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "部分訂單不存在，請重新整理後再試" });
+      }
+
+      const customOrders = rows.filter((order) => order.isCustomOrder);
+      if (customOrders.length !== 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "合併訂單必須剛好包含一筆客製化訂單作為主訂單" });
+      }
+
+      const unmergeable = rows.filter((order) => !mergeableOrderStatuses.has(order.orderStatus));
+      if (unmergeable.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `只能合併尚未出貨/未取消的訂單：${unmergeable.map((order) => order.merchantTradeNo).join(", ")}`,
+        });
+      }
+
+      const normalizedEmails = new Set(rows.map((order) => normalizeOrderEmail(order.buyerEmail)));
+      if (normalizedEmails.size > 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "只能合併同一位買家的訂單" });
+      }
+
+      const existingLogistics = await db
+        .select({ orderId: logisticsOrders.orderId })
+        .from(logisticsOrders)
+        .where(inArray(logisticsOrders.orderId, orderIds));
+      if (existingLogistics.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "已有物流單的訂單不能再合併" });
+      }
+
+      const existingMergeMembers = await db
+        .select({ orderId: orderMergeMembers.orderId })
+        .from(orderMergeMembers)
+        .where(inArray(orderMergeMembers.orderId, orderIds));
+      if (existingMergeMembers.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "選取的訂單已有合併紀錄" });
+      }
+
+      const mainOrder = customOrders[0];
+      const mergeCode = generateOrderMergeCode();
+
+      await db.insert(orderMergeGroups).values({
+        mergeCode,
+        mainOrderId: mainOrder.id,
+        adminNote: input.adminNote?.trim() || null,
+      });
+      const [group] = await db
+        .select()
+        .from(orderMergeGroups)
+        .where(eq(orderMergeGroups.mergeCode, mergeCode))
+        .limit(1);
+      if (!group) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "合併群組建立失敗" });
+      }
+
+      await db.insert(orderMergeMembers).values(orderIds.map((orderId) => ({
+        groupId: group.id,
+        orderId,
+      })));
+      await db
+        .update(orders)
+        .set({ freeShippingOverride: true })
+        .where(inArray(orders.id, orderIds));
+
+      return {
+        success: true,
+        mergeCode,
+        groupId: group.id,
+        mainOrderId: mainOrder.id,
+        mainOrderMerchantTradeNo: mainOrder.merchantTradeNo,
+        mergedOrderIds: orderIds,
+      };
+    }),
+
   createBalancePaymentLink: adminProcedure
     .input(
       z.object({
@@ -718,6 +830,29 @@ export const orderRouter = router({
       if (!db) throw new Error("Database not available");
       const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
+
+      const [mergeMember] = await db
+        .select({
+          groupId: orderMergeMembers.groupId,
+          mainOrderId: orderMergeGroups.mainOrderId,
+          mergeCode: orderMergeGroups.mergeCode,
+        })
+        .from(orderMergeMembers)
+        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+        .where(eq(orderMergeMembers.orderId, input.orderId))
+        .limit(1);
+
+      if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+        const [mainOrder] = await db
+          .select({ merchantTradeNo: orders.merchantTradeNo })
+          .from(orders)
+          .where(eq(orders.id, mergeMember.mainOrderId))
+          .limit(1);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `此訂單已併入主訂單 ${mainOrder?.merchantTradeNo ?? mergeMember.mainOrderId}，請從主訂單建立物流`,
+        });
+      }
 
       // 強制使用 C2C 物流類型（避免舊訂單存了 B2C 類型）
       const logisticsMerchantTradeNo = `L${Date.now()}`;
@@ -807,9 +942,21 @@ export const orderRouter = router({
             })
             .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
 
-          // 更新訂單狀態為已出貨
-          await dbUpdateOrderStatus(order.merchantTradeNo, "shipped");
-          await notifyCustomerOrderShippedSafely(input.orderId);
+          // 更新訂單狀態為已出貨；若是合併主單，整組訂單同步出貨狀態。
+          if (mergeMember?.groupId) {
+            const mergeRows = await db
+              .select({ orderId: orderMergeMembers.orderId })
+              .from(orderMergeMembers)
+              .where(eq(orderMergeMembers.groupId, mergeMember.groupId));
+            const mergedOrderIds = mergeRows.map((row) => row.orderId);
+            if (mergedOrderIds.length > 0) {
+              await db.update(orders).set({ orderStatus: "shipped" }).where(inArray(orders.id, mergedOrderIds));
+              await Promise.all(mergedOrderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId)));
+            }
+          } else {
+            await dbUpdateOrderStatus(order.merchantTradeNo, "shipped");
+            await notifyCustomerOrderShippedSafely(input.orderId);
+          }
 
           return {
             success: true,

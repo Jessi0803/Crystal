@@ -51,6 +51,7 @@ describe("admin order product thumbnails", () => {
       orderStatus: "paid",
       isPreorder: false,
       isCustomOrder: false,
+      freeShippingOverride: false,
       totalAmount: 1280,
       buyerName: "Test User",
       createdAt: new Date("2026-06-01T08:00:00Z"),
@@ -68,6 +69,7 @@ describe("admin order product thumbnails", () => {
           productImage: "/images/products/fallback.jpg",
         },
       ],
+      [],
     ]);
     getDb.mockResolvedValue(mockDb);
 
@@ -94,6 +96,7 @@ describe("admin order product thumbnails", () => {
       orderStatus: "paid",
       isPreorder: false,
       isCustomOrder: false,
+      freeShippingOverride: false,
       totalAmount: 1280,
       buyerName: "Test User",
       createdAt: new Date("2026-06-01T08:00:00Z"),
@@ -107,6 +110,7 @@ describe("admin order product thumbnails", () => {
         { id: 11, orderId: 1, productName: "空圖商品", productImage: "" },
         { id: 12, orderId: 1, productName: "Base64 商品", productImage: "data:image/png;base64,abc" },
       ],
+      [],
     ]);
     getDb.mockResolvedValue(mockDb);
 
@@ -126,6 +130,7 @@ describe("admin order product thumbnails", () => {
       orderStatus: "paid",
       isPreorder: false,
       isCustomOrder: false,
+      freeShippingOverride: false,
       totalAmount: 1280,
       buyerName: "Test User",
       buyerEmail: "test@example.com",
@@ -147,6 +152,7 @@ describe("admin order product thumbnails", () => {
     const mockDb = createMockDb([
       [order],
       [item],
+      [],
       [],
       [],
     ]);

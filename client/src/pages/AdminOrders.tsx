@@ -24,6 +24,7 @@ import {
   BarChart3,
   Users,
   Trash2,
+  GitMerge,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -105,9 +106,17 @@ type OrderSummary = {
   totalAmount: number;
   isPreorder: boolean;
   isCustomOrder: boolean;
+  freeShippingOverride: boolean;
   createdAt: Date | string;
   itemCount: number;
   hasLogistics: boolean;
+  mergeInfo: {
+    groupId: number;
+    mergeCode: string;
+    mainOrderId: number;
+    mainOrderMerchantTradeNo: string;
+    role: "main" | "member";
+  } | null;
   productThumbnails: {
     id: number;
     productName: string;
@@ -223,6 +232,19 @@ function OrderRowCard({
               {order.isPreorder && (
                 <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">預購</span>
               )}
+              {order.mergeInfo && (
+                <span className={`inline-flex items-center gap-1 text-xs border px-2 py-0.5 rounded-full ${
+                  order.mergeInfo.role === "main"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-50 text-slate-700 border-slate-200"
+                }`}>
+                  <GitMerge className="h-3 w-3" />
+                  {order.mergeInfo.role === "main" ? "合併主單" : `併入 ${order.mergeInfo.mainOrderMerchantTradeNo}`}
+                </span>
+              )}
+              {order.freeShippingOverride && (
+                <span className="text-xs bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 rounded-full">免運覆寫</span>
+              )}
             </div>
             <div className="flex items-center gap-4 text-xs font-body text-[oklch(0.5_0_0)] flex-wrap">
               <span className="flex items-center gap-1"><User className="w-3 h-3" />{order.buyerName}</span>
@@ -335,6 +357,31 @@ function OrderRowCard({
                 </div>
               )}
 
+              {(detail as any).mergeInfo && (
+                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 text-xs font-body text-emerald-800">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <GitMerge className="h-3.5 w-3.5" />
+                    <p className="font-medium">
+                      合併訂單 {(detail as any).mergeInfo.mergeCode}
+                    </p>
+                    <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5">
+                      {(detail as any).mergeInfo.role === "main" ? "此筆為主訂單" : `主訂單 ${(detail as any).mergeInfo.mainOrderMerchantTradeNo}`}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {(detail as any).mergeInfo.members?.map((member: any) => (
+                      <div key={member.orderId} className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono">{member.merchantTradeNo}</span>
+                        <span>{member.buyerName}</span>
+                        {member.isCustomOrder && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">客製化主單</span>}
+                        {member.orderId === (detail as any).mergeInfo.mainOrderId && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">主單</span>}
+                        <span>NT$ {Number(member.totalAmount ?? 0).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2 pt-4 border-t border-[oklch(0.93_0_0)]">
                 {detail.paymentStatus === "transfer_pending" && detail.balancePayment?.paymentStatus !== "transfer_pending" && (
                   <button
@@ -370,7 +417,9 @@ function OrderRowCard({
                   </button>
                 )}
 
-                {(detail.orderStatus === "paid" || detail.orderStatus === "processing") && !detail.logistics && (
+                {(detail.orderStatus === "paid" || detail.orderStatus === "processing") &&
+                  !detail.logistics &&
+                  (!(detail as any).mergeInfo || (detail as any).mergeInfo.role === "main") && (
                   <button
                     onClick={() => createLogistics.mutate({ orderId: detail.id })}
                     disabled={createLogistics.isPending}
@@ -571,6 +620,7 @@ export default function AdminOrders() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [selectedCancelledOrderIds, setSelectedCancelledOrderIds] = useState<number[]>([]);
+  const [selectedMergeOrderIds, setSelectedMergeOrderIds] = useState<number[]>([]);
 
   const { data: dashStats, isLoading: dashStatsLoading, isFetching: dashStatsFetching, refetch: refetchDashStats } =
     trpc.order.getStats.useQuery(undefined, {
@@ -594,7 +644,13 @@ export default function AdminOrders() {
     setPage(1);
     setExpandedId(null);
     setSelectedCancelledOrderIds([]);
+    setSelectedMergeOrderIds([]);
   }, [statusFilter, pageSize]);
+
+  useEffect(() => {
+    setSelectedCancelledOrderIds([]);
+    setSelectedMergeOrderIds([]);
+  }, [page]);
 
   const utils = trpc.useUtils();
 
@@ -665,6 +721,17 @@ export default function AdminOrders() {
     onError: (err) => toast.error(err.message || "批次刪除失敗，請重試"),
   });
 
+  const mergeOrdersMutation = trpc.order.mergeOrders.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`已合併訂單，主訂單：${result.mainOrderMerchantTradeNo}`);
+      setSelectedMergeOrderIds([]);
+      setExpandedId(result.mainOrderId);
+      await utils.order.getOrderDetail.invalidate();
+      refetchListAndStats();
+    },
+    onError: (err) => toast.error(err.message || "合併訂單失敗，請重試"),
+  });
+
   // 未登入 → 導向登入
   if (!authLoading && !user) {
     window.location.href = getLoginUrl();
@@ -688,6 +755,20 @@ export default function AdminOrders() {
   }
 
   const allOrders = orders?.items ?? [];
+  const mergeableStatuses = new Set(["pending_payment", "deposit_paid", "paid", "processing"]);
+  const isMergeSelectableOrder = (order: OrderSummary) =>
+    statusFilter !== "cancelled" &&
+    mergeableStatuses.has(order.orderStatus) &&
+    !order.hasLogistics &&
+    !order.mergeInfo;
+  const selectableMergeOrderIds = allOrders.filter(isMergeSelectableOrder).map((order) => order.id);
+  const selectedMergeOrderIdSet = new Set(selectedMergeOrderIds);
+  const selectedMergeOrders = allOrders.filter((order) => selectedMergeOrderIdSet.has(order.id));
+  const selectedMergeCustomCount = selectedMergeOrders.filter((order) => order.isCustomOrder).length;
+  const canMergeSelectedOrders = selectedMergeOrderIds.length >= 2 && selectedMergeCustomCount === 1;
+  const allPageMergeSelected =
+    selectableMergeOrderIds.length > 0 &&
+    selectableMergeOrderIds.every((orderId) => selectedMergeOrderIdSet.has(orderId));
   const selectableCancelledOrderIds =
     statusFilter === "cancelled" ? allOrders.filter((order) => order.orderStatus === "cancelled").map((order) => order.id) : [];
   const selectedCancelledOrderIdSet = new Set(selectedCancelledOrderIds);
@@ -726,6 +807,34 @@ export default function AdminOrders() {
       if (checked) return current.includes(orderId) ? current : [...current, orderId];
       return current.filter((id) => id !== orderId);
     });
+  };
+
+  const toggleMergeOrderSelection = (orderId: number, checked: boolean) => {
+    setSelectedMergeOrderIds((current) => {
+      if (checked) return current.includes(orderId) ? current : [...current, orderId];
+      return current.filter((id) => id !== orderId);
+    });
+  };
+
+  const selectAllMergeOrdersOnPage = () => {
+    setSelectedMergeOrderIds((current) => Array.from(new Set([...current, ...selectableMergeOrderIds])));
+  };
+
+  const clearMergeOrderSelection = () => {
+    setSelectedMergeOrderIds([]);
+  };
+
+  const mergeSelectedOrders = () => {
+    if (!canMergeSelectedOrders) {
+      toast.error("請選取至少兩筆訂單，且其中剛好一筆為客製化訂單");
+      return;
+    }
+    const customOrder = selectedMergeOrders.find((order) => order.isCustomOrder);
+    const confirmed = window.confirm(
+      `確定要合併 ${selectedMergeOrderIds.length} 筆訂單嗎？客製化訂單 ${customOrder?.merchantTradeNo ?? ""} 會成為主訂單，整組尾款/後續結帳將免運。`
+    );
+    if (!confirmed) return;
+    mergeOrdersMutation.mutate({ orderIds: selectedMergeOrderIds });
   };
 
   const selectAllCancelledOrdersOnPage = () => {
@@ -867,6 +976,49 @@ export default function AdminOrders() {
           目前顯示第 {currentPage} / {totalPages} 頁，共 {totalOrders} 筆；本頁 {startItem}-{endItem} 筆。
         </p>
 
+        {statusFilter !== "cancelled" && allOrders.length > 0 && (
+          <div className="mb-4 flex flex-col gap-3 border border-emerald-100 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-body text-emerald-800">
+              <label className="inline-flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allPageMergeSelected}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      selectAllMergeOrdersOnPage();
+                    } else {
+                      clearMergeOrderSelection();
+                    }
+                  }}
+                  className="h-4 w-4 accent-emerald-600"
+                />
+                選取本頁可合併訂單
+              </label>
+              <span>已選 {selectedMergeOrderIds.length} 筆</span>
+              <span>客製化 {selectedMergeCustomCount} 筆</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={clearMergeOrderSelection}
+                disabled={selectedMergeOrderIds.length === 0 || mergeOrdersMutation.isPending}
+                className="border border-emerald-200 bg-white px-3 py-2 text-xs font-body text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+              >
+                清除選取
+              </button>
+              <button
+                type="button"
+                onClick={mergeSelectedOrders}
+                disabled={!canMergeSelectedOrders || mergeOrdersMutation.isPending}
+                className="inline-flex items-center gap-1.5 bg-emerald-700 px-3 py-2 text-xs font-body text-white transition-colors hover:bg-emerald-800 disabled:opacity-50"
+              >
+                <GitMerge className="h-3.5 w-3.5" />
+                {mergeOrdersMutation.isPending ? "合併中..." : "合併選取訂單"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {statusFilter === "cancelled" && allOrders.length > 0 && (
           <div className="mb-4 flex flex-col gap-3 border border-red-100 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-3 text-xs font-body text-red-800">
@@ -942,9 +1094,23 @@ export default function AdminOrders() {
                   updateOrderStatus={updateOrderStatus}
                   deleteCancelledOrder={deleteCancelledOrder}
                   isLogisticsSandbox={Boolean(envCheck?.ecpayLogisticsSandbox)}
-                  isSelectable={statusFilter === "cancelled" && order.orderStatus === "cancelled"}
-                  isSelected={selectedCancelledOrderIdSet.has(order.id)}
-                  onSelectChange={(checked) => toggleCancelledOrderSelection(order.id, checked)}
+                  isSelectable={
+                    statusFilter === "cancelled"
+                      ? order.orderStatus === "cancelled"
+                      : isMergeSelectableOrder(order)
+                  }
+                  isSelected={
+                    statusFilter === "cancelled"
+                      ? selectedCancelledOrderIdSet.has(order.id)
+                      : selectedMergeOrderIdSet.has(order.id)
+                  }
+                  onSelectChange={(checked) => {
+                    if (statusFilter === "cancelled") {
+                      toggleCancelledOrderSelection(order.id, checked);
+                    } else {
+                      toggleMergeOrderSelection(order.id, checked);
+                    }
+                  }}
                 />
               );
             })}
