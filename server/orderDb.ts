@@ -41,6 +41,7 @@ export type OrderMergeDetail = OrderMergeInfo & {
     isCustomOrder: boolean;
     orderStatus: OrderRow["orderStatus"];
     totalAmount: number;
+    customerNote: string | null;
   }[];
 };
 
@@ -186,6 +187,7 @@ async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<
       isCustomOrder: orders.isCustomOrder,
       orderStatus: orders.orderStatus,
       totalAmount: orders.totalAmount,
+      customerNote: orders.customerNote,
     })
     .from(orderMergeMembers)
     .leftJoin(orders, eq(orderMergeMembers.orderId, orders.id))
@@ -194,7 +196,7 @@ async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<
   return {
     ...info,
     members: memberRows
-      .filter((row): row is typeof row & { orderId: number; merchantTradeNo: string; buyerName: string; isCustomOrder: boolean; orderStatus: OrderRow["orderStatus"]; totalAmount: number } => Boolean(row.orderId))
+      .filter((row): row is typeof row & { orderId: number; merchantTradeNo: string; buyerName: string; isCustomOrder: boolean; orderStatus: OrderRow["orderStatus"]; totalAmount: number; customerNote: string | null } => Boolean(row.orderId))
       .map((row) => ({
         orderId: row.orderId,
         merchantTradeNo: row.merchantTradeNo,
@@ -202,6 +204,7 @@ async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<
         isCustomOrder: row.isCustomOrder,
         orderStatus: row.orderStatus,
         totalAmount: row.totalAmount,
+        customerNote: row.customerNote,
       })),
   };
 }

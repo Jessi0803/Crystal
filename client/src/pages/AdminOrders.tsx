@@ -575,12 +575,27 @@ function OrderRowCard({
                 </div>
               )}
 
-              {(detail as any).customerNote && (
+              {((detail as any).mergeInfo?.members?.some((member: any) => member.customerNote) || (detail as any).customerNote) && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-100 text-xs font-body text-amber-800">
                   <p className="font-medium mb-2">客製化諮詢內容</p>
-                  <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                    {(detail as any).customerNote}
-                  </pre>
+                  {(detail as any).mergeInfo?.members?.some((member: any) => member.customerNote) ? (
+                    <div className="space-y-3">
+                      {(detail as any).mergeInfo.members
+                        .filter((member: any) => member.customerNote)
+                        .map((member: any) => (
+                          <div key={member.orderId}>
+                            <p className="mb-1 font-mono text-[11px] text-amber-700">{member.merchantTradeNo}</p>
+                            <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                              {member.customerNote}
+                            </pre>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      {(detail as any).customerNote}
+                    </pre>
+                  )}
                 </div>
               )}
 
