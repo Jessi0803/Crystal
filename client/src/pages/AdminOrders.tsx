@@ -825,7 +825,7 @@ export default function AdminOrders() {
   const selectedMergeOrderIdSet = new Set(selectedMergeOrderIds);
   const selectedMergeOrders = allOrders.filter((order) => selectedMergeOrderIdSet.has(order.id));
   const selectedMergeCustomCount = selectedMergeOrders.filter((order) => order.isCustomOrder).length;
-  const canMergeSelectedOrders = selectedMergeOrderIds.length >= 2 && selectedMergeCustomCount >= 1;
+  const canMergeSelectedOrders = selectedMergeOrderIds.length >= 2;
   const allPageMergeSelected =
     selectableMergeOrderIds.length > 0 &&
     selectableMergeOrderIds.every((orderId) => selectedMergeOrderIdSet.has(orderId));
@@ -886,14 +886,19 @@ export default function AdminOrders() {
 
   const mergeSelectedOrders = () => {
     if (!canMergeSelectedOrders) {
-      toast.error("請選取至少兩筆訂單，且其中至少一筆為客製化訂單");
+      toast.error("請至少選取兩筆訂單");
       return;
     }
     const customOrder = selectedMergeOrderIds
       .map((orderId) => allOrders.find((order) => order.id === orderId))
       .find((order) => order?.isCustomOrder);
+    const latestOrder = selectedMergeOrders.reduce((latest, order) =>
+      new Date(order.createdAt).getTime() > new Date(latest.createdAt).getTime() ? order : latest
+    );
+    const mainOrder = customOrder ?? latestOrder;
+    const mainRule = customOrder ? "最先選取的客製化訂單" : "最晚建立的訂單";
     const confirmed = window.confirm(
-      `確定要合併 ${selectedMergeOrderIds.length} 筆訂單嗎？最先選取的客製化訂單 ${customOrder?.merchantTradeNo ?? ""} 會成為主訂單。合併後預設免運，也可以在主訂單內改成加入運費。`
+      `確定要合併 ${selectedMergeOrderIds.length} 筆訂單嗎？${mainRule} ${mainOrder?.merchantTradeNo ?? ""} 會成為主訂單。合併後預設免運，也可以在主訂單內改成加入運費。`
     );
     if (!confirmed) return;
     mergeOrdersMutation.mutate({ orderIds: selectedMergeOrderIds });

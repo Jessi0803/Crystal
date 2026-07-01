@@ -737,8 +737,8 @@ export const orderRouter = router({
     }),
 
   /**
-   * 手動合併訂單：允許多筆客製化，第一筆選取的客製化訂單作為主訂單。
-   * 方案 A：尾款收款集中在主訂單，其它客製化訂單只作為合併紀錄。
+   * 手動合併訂單：有客製化時用第一筆選取的客製化作為主訂單；
+   * 純一般商品合併時，使用最晚建立的訂單作為主訂單。
    */
   mergeOrders: adminProcedure
     .input(
@@ -766,9 +766,6 @@ export const orderRouter = router({
       }
 
       const customOrderIds = new Set(rows.filter((order) => order.isCustomOrder).map((order) => order.id));
-      if (customOrderIds.size < 1) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "合併訂單至少要包含一筆客製化訂單作為主訂單" });
-      }
 
       const unmergeable = rows.filter((order) => !mergeableOrderStatuses.has(order.orderStatus));
       if (unmergeable.length > 0) {
@@ -799,10 +796,13 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "選取的訂單已有合併紀錄" });
       }
 
-      const mainOrderId = orderIds.find((orderId) => customOrderIds.has(orderId));
+      const latestOrder = rows.reduce((latest, order) =>
+        new Date(order.createdAt).getTime() > new Date(latest.createdAt).getTime() ? order : latest
+      );
+      const mainOrderId = orderIds.find((orderId) => customOrderIds.has(orderId)) ?? latestOrder.id;
       const mainOrder = rows.find((order) => order.id === mainOrderId);
       if (!mainOrder) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "找不到可作為主訂單的客製化訂單" });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "找不到可作為主訂單的訂單" });
       }
       const mergeCode = generateOrderMergeCode();
 

@@ -437,7 +437,7 @@ describe("order.mergeOrders (admin procedure)", () => {
     expect(result.mainOrderMerchantTradeNo).toBe("CUSTOM002");
   });
 
-  it("沒有客製化訂單時拒絕合併", async () => {
+  it("純一般商品合併時以最晚建立的訂單作為主訂單", async () => {
     const db = createMutationMockDb([
       [
         {
@@ -446,6 +446,7 @@ describe("order.mergeOrders (admin procedure)", () => {
           buyerEmail: "same@example.com",
           orderStatus: "paid",
           isCustomOrder: false,
+          createdAt: new Date("2026-07-01T10:00:00Z"),
         },
         {
           id: 31,
@@ -453,18 +454,21 @@ describe("order.mergeOrders (admin procedure)", () => {
           buyerEmail: "same@example.com",
           orderStatus: "paid",
           isCustomOrder: false,
+          createdAt: new Date("2026-07-01T10:05:00Z"),
         },
       ],
+      [],
+      [],
+      [{ id: 9, mergeCode: "OMNORMAL", mainOrderId: 31 }],
     ]);
     getDbMock.mockResolvedValue(db as any);
 
     const caller = createCaller({ id: 1, role: "admin" });
+    const result = await caller.order.mergeOrders({ orderIds: [30, 31] });
 
-    await expect(caller.order.mergeOrders({ orderIds: [30, 31] })).rejects.toMatchObject({
-      code: "BAD_REQUEST",
-    });
-    expect(db.insert).not.toHaveBeenCalled();
-    expect(db.update).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(result.mainOrderId).toBe(31);
+    expect(result.mainOrderMerchantTradeNo).toBe("NORMAL002");
   });
 });
 
