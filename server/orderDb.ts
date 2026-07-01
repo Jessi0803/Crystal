@@ -954,7 +954,10 @@ export async function updateBalancePaymentStatus(
     .where(eq(orderBalancePayments.id, balance.id));
 
   if (status === "paid") {
-    await db.update(orders).set({ orderStatus: "paid" }).where(eq(orders.id, balance.orderId));
+    await db
+      .update(orders)
+      .set({ orderStatus: "paid", paymentStatus: "paid", paidAt: new Date() })
+      .where(eq(orders.id, balance.orderId));
   }
 
   return hydrateBalancePayment(balance);
