@@ -337,6 +337,8 @@ var orders = mysqlTable("orders", {
   isPreorder: boolean("isPreorder").default(false).notNull(),
   // 是否為客製化訂金訂單
   isCustomOrder: boolean("isCustomOrder").default(false).notNull(),
+  // 單筆訂單免運覆寫（例如合併訂單後由後台處理免運）
+  freeShippingOverride: boolean("freeShippingOverride").default(false).notNull(),
   // 訂單金額
   totalAmount: int("totalAmount").notNull(),
   // 購買人資訊
@@ -373,6 +375,25 @@ var orders = mysqlTable("orders", {
   index("orders_order_status_created_at_idx").on(table.orderStatus, table.createdAt),
   index("orders_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
   index("orders_paid_at_idx").on(table.paidAt)
+]);
+var orderMergeGroups = mysqlTable("orderMergeGroups", {
+  id: int("id").autoincrement().primaryKey(),
+  mergeCode: varchar("mergeCode", { length: 32 }).notNull().unique(),
+  mainOrderId: int("mainOrderId").notNull().unique(),
+  adminNote: text("adminNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+}, (table) => [
+  index("order_merge_groups_main_order_id_idx").on(table.mainOrderId)
+]);
+var orderMergeMembers = mysqlTable("orderMergeMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("groupId").notNull(),
+  orderId: int("orderId").notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+}, (table) => [
+  index("order_merge_members_group_id_idx").on(table.groupId),
+  index("order_merge_members_order_id_idx").on(table.orderId)
 ]);
 var orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),
@@ -531,6 +552,7 @@ var dbProducts = mysqlTable("products", {
   showFitPreference: boolean("showFitPreference").notNull().default(true),
   wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
   wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
+  wristSizePriceRules: json("wristSizePriceRules").$type(),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -687,7 +709,7 @@ async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, noti
     paidAt: status === "paid" ? /* @__PURE__ */ new Date() : null
   }).where(eq2(orderBalancePayments.id, balance.id));
   if (status === "paid") {
-    await db.update(orders).set({ orderStatus: "paid" }).where(eq2(orders.id, balance.orderId));
+    await db.update(orders).set({ orderStatus: "paid", paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq2(orders.id, balance.orderId));
   }
   return hydrateBalancePayment(balance);
 }
@@ -709,6 +731,10 @@ async function ensureOrdersColumns() {
   }
   try {
     await db.execute(sql3`ALTER TABLE \`orders\` MODIFY COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`freeShippingOverride\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch {
   }
   ordersColumnsEnsured = true;

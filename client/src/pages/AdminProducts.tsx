@@ -54,6 +54,7 @@ type FormState = {
   showFitPreference: boolean;
   wristSizeMin: string;
   wristSizeMax: string;
+  wristSizePriceRules: { maxWristSize: string; price: string }[];
   scheduledPublishAt: string;
   initialStock: string;
 };
@@ -80,6 +81,7 @@ const DEFAULT_FORM: FormState = {
   showFitPreference: true,
   wristSizeMin: DEFAULT_WRIST_SIZE_MIN,
   wristSizeMax: DEFAULT_WRIST_SIZE_MAX,
+  wristSizePriceRules: [],
   scheduledPublishAt: "",
   initialStock: "5",
 };
@@ -122,6 +124,20 @@ function parseWristSize(value: string) {
 
 function isValidWristSize(value: number) {
   return Number.isFinite(value) && value >= 0 && value <= 99 && Number.isInteger(value * 2);
+}
+
+function formatRuleNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function toFormWristSizePriceRules(rules?: { maxWristSize: number; price: number }[] | null) {
+  return (rules ?? [])
+    .filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price))
+    .sort((a, b) => a.maxWristSize - b.maxWristSize)
+    .map((rule) => ({
+      maxWristSize: formatRuleNumber(rule.maxWristSize),
+      price: String(rule.price),
+    }));
 }
 
 function formatPriceRange(value: string) {
@@ -464,6 +480,7 @@ function ProductModal({
           showFitPreference: editing.showFitPreference ?? true,
           wristSizeMin: String(editing.wristSizeMin ?? DEFAULT_WRIST_SIZE_MIN),
           wristSizeMax: String(editing.wristSizeMax ?? DEFAULT_WRIST_SIZE_MAX),
+          wristSizePriceRules: toFormWristSizePriceRules(editing.wristSizePriceRules),
           scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
           initialStock: "5",
         }
@@ -482,6 +499,30 @@ function ProductModal({
       claspOptions: current.claspOptions.includes(id)
         ? current.claspOptions.filter((option) => option !== id)
         : [...current.claspOptions, id],
+    }));
+  };
+  const addWristSizePriceRule = () => {
+    setForm((current) => ({
+      ...current,
+      wristSizePriceRules: [...current.wristSizePriceRules, { maxWristSize: "", price: current.price }],
+    }));
+  };
+  const updateWristSizePriceRule = (
+    index: number,
+    field: keyof FormState["wristSizePriceRules"][number],
+    value: string
+  ) => {
+    setForm((current) => ({
+      ...current,
+      wristSizePriceRules: current.wristSizePriceRules.map((rule, ruleIndex) =>
+        ruleIndex === index ? { ...rule, [field]: value } : rule
+      ),
+    }));
+  };
+  const removeWristSizePriceRule = (index: number) => {
+    setForm((current) => ({
+      ...current,
+      wristSizePriceRules: current.wristSizePriceRules.filter((_, ruleIndex) => ruleIndex !== index),
     }));
   };
 
@@ -592,6 +633,28 @@ function ProductModal({
       toast.error("手圍最小值不可大於最大值");
       return;
     }
+    const wristSizePriceRules = form.wristSizePriceRules
+      .map((rule) => ({
+        maxWristSize: parseWristSize(rule.maxWristSize),
+        price: Number(rule.price),
+      }))
+      .filter((rule) => !(Number.isNaN(rule.maxWristSize) && !Number.isFinite(rule.price)));
+    if (wristSizePriceRules.some((rule) => !isValidWristSize(rule.maxWristSize) || !Number.isInteger(rule.price) || rule.price < 0)) {
+      toast.error("手圍價格請填 0.5 cm 為單位的手圍，以及 0 以上整數價格");
+      return;
+    }
+    if (wristSizePriceRules.some((rule) => rule.maxWristSize < wristSizeMin || rule.maxWristSize > wristSizeMax)) {
+      toast.error("手圍價格的上限需落在手圍範圍內");
+      return;
+    }
+    const sortedWristSizePriceRules = [...wristSizePriceRules].sort((a, b) => a.maxWristSize - b.maxWristSize);
+    const duplicatedWristSize = sortedWristSizePriceRules.some(
+      (rule, index) => index > 0 && rule.maxWristSize === sortedWristSizePriceRules[index - 1].maxWristSize
+    );
+    if (duplicatedWristSize) {
+      toast.error("手圍價格上限不可重複");
+      return;
+    }
 
     const formattedPriceRange = formatPriceRange(form.priceRange);
     const originalPrice = form.originalPrice ? parseInt(form.originalPrice, 10) : null;
@@ -623,6 +686,7 @@ function ProductModal({
       showFitPreference: form.showFitPreference,
       wristSizeMin,
       wristSizeMax,
+      wristSizePriceRules: sortedWristSizePriceRules,
       active: scheduledPublishAt ? false : form.active,
       scheduledPublishAt,
       sortOrder: editing?.sortOrder ?? 0,
@@ -909,6 +973,62 @@ function ProductModal({
                   className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                 />
               </label>
+            </div>
+          </fieldset>
+
+          <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">
+            <legend className="px-1 text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">手圍價格規則</legend>
+            <div className="space-y-2">
+              {form.wristSizePriceRules.length === 0 ? (
+                <p className="text-xs font-body text-[oklch(0.55_0_0)] leading-relaxed">
+                  未設定時使用上方售價。可新增多段，例如 13.5 以下、17 以下、19 以下各一個價格。
+                </p>
+              ) : (
+                form.wristSizePriceRules.map((rule, index) => (
+                  <div key={index} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-2 items-end">
+                    <label className="block">
+                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">最大手圍（cm）</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        aria-label={`手圍價格 ${index + 1} 最大手圍`}
+                        value={rule.maxWristSize}
+                        onChange={(e) => updateWristSizePriceRule(index, "maxWristSize", e.target.value)}
+                        placeholder="13.5"
+                        className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">價格（NT$）</span>
+                      <input
+                        type="number"
+                        min={0}
+                        aria-label={`手圍價格 ${index + 1} 價格`}
+                        value={rule.price}
+                        onChange={(e) => updateWristSizePriceRule(index, "price", e.target.value)}
+                        placeholder="1580"
+                        className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeWristSizePriceRule(index)}
+                      aria-label={`刪除手圍價格 ${index + 1}`}
+                      className="h-9 w-8 border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+              <button
+                type="button"
+                onClick={addWristSizePriceRule}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                新增手圍價格
+              </button>
             </div>
           </fieldset>
 

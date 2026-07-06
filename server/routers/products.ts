@@ -101,6 +101,7 @@ async function ensureProductsTable() {
       \`showFitPreference\` boolean NOT NULL DEFAULT true,
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
       \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
+      \`wristSizePriceRules\` json DEFAULT NULL,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -142,6 +143,31 @@ async function ensureProductsTable() {
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizePriceRules\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    const existingProductRules: Record<string, { maxWristSize: number; price: number }[]> = {
+      "d004-morning-whisper": [
+        { maxWristSize: 13.5, price: 1700 },
+        { maxWristSize: 17, price: 1800 },
+        { maxWristSize: 19, price: 1900 },
+      ],
+      "d005-moon-clear-heart": [
+        { maxWristSize: 13.5, price: 1480 },
+        { maxWristSize: 17, price: 1580 },
+        { maxWristSize: 19, price: 1680 },
+      ],
+    };
+    for (const [id, rules] of Object.entries(existingProductRules)) {
+      await db.execute(sql`
+        UPDATE \`products\`
+        SET \`wristSizePriceRules\` = ${JSON.stringify(rules)}
+        WHERE \`id\` = ${id}
+          AND \`wristSizePriceRules\` IS NULL
+      `);
+    }
+  } catch { /* 補既有手圍價格失敗不影響商品列表 */ }
   try {
     for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
       await db.execute(sql`
@@ -251,6 +277,7 @@ function toFrontendProduct(p: DbProduct) {
     showFitPreference: p.showFitPreference,
     wristSizeMin: p.wristSizeMin ?? 13,
     wristSizeMax: p.wristSizeMax ?? 19,
+    wristSizePriceRules: p.wristSizePriceRules ?? undefined,
     scheduledPublishAt: p.scheduledPublishAt ?? undefined,
     crystalType: p.crystalType ?? "",
     color: p.color ?? "",
@@ -264,6 +291,11 @@ const scheduledPublishAtSchema = z.preprocess(
 
 const wristSizeSchema = z.number().min(0).max(99).refine((value) => Number.isInteger(value * 2), {
   message: "手圍尺寸需以 0.5 cm 為單位",
+});
+
+const WristSizePriceRuleSchema = z.object({
+  maxWristSize: wristSizeSchema,
+  price: z.number().int().min(0),
 });
 
 const ProductInputSchema = z.object({
@@ -296,6 +328,7 @@ const ProductInputSchema = z.object({
   showFitPreference: z.boolean().default(true),
   wristSizeMin: wristSizeSchema.default(13),
   wristSizeMax: wristSizeSchema.default(19),
+  wristSizePriceRules: z.array(WristSizePriceRuleSchema).default([]),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z.number().int().default(0),
 }).refine((value) => value.wristSizeMin <= value.wristSizeMax, {

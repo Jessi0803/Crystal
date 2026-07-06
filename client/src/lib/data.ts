@@ -30,6 +30,7 @@ export interface Product {
   showFitPreference?: boolean;
   wristSizeMin?: number;
   wristSizeMax?: number;
+  wristSizePriceRules?: { maxWristSize: number; price: number }[];
   crystalType: string;
   color: string;
 }
@@ -241,6 +242,11 @@ export const products: Product[] = [
     categoryLabels: ["愛情桃花", "療癒系列", "能量防護"],
     price: 1800,
     originalPrice: 2100,
+    wristSizePriceRules: [
+      { maxWristSize: 13.5, price: 1700 },
+      { maxWristSize: 17, price: 1800 },
+      { maxWristSize: 19, price: 1900 },
+    ],
     image: "/images/d-design/d004.jpg",
     tags: ["人緣", "平衡"],
     description: "由白幽靈、紅兔毛、藍月光、白兔毛、粉碧璽等晶石構成，層次柔和且氣場飽滿。",
@@ -270,8 +276,13 @@ export const products: Product[] = [
     categoryLabel: "療癒系列",
     categories: ["healing", "love"],
     categoryLabels: ["療癒系列", "愛情桃花"],
-    price: 1500,
-    originalPrice: 1800,
+    price: 1580,
+    originalPrice: 1580,
+    wristSizePriceRules: [
+      { maxWristSize: 13.5, price: 1480 },
+      { maxWristSize: 17, price: 1580 },
+      { maxWristSize: 19, price: 1680 },
+    ],
     image: "/images/d-design/d005.jpg",
     tags: ["淨化", "愛情"],
     description: "以粉晶、白月光、藍月光與白水晶為主軸，搭配珍珠呈現溫柔安定的月光系設計。",

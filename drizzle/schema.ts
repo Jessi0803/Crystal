@@ -327,6 +327,11 @@ export const siteSettings = mysqlTable("siteSettings", {
 export type SiteSetting = typeof siteSettings.$inferSelect;
 export type InsertSiteSetting = typeof siteSettings.$inferInsert;
 
+export type WristSizePriceRule = {
+  maxWristSize: number;
+  price: number;
+};
+
 // ─── 商品表 ───────────────────────────────────────────────────────────────────
 export const dbProducts = mysqlTable("products", {
   id: varchar("id", { length: 64 }).primaryKey(),
@@ -359,6 +364,7 @@ export const dbProducts = mysqlTable("products", {
   showFitPreference: boolean("showFitPreference").notNull().default(true),
   wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
   wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
+  wristSizePriceRules: json("wristSizePriceRules").$type<WristSizePriceRule[]>(),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

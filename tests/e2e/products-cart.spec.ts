@@ -155,6 +155,40 @@ test("bracelet options and cart controls update line price and quantity", async 
   await expect(drawer).toContainText("你的購物袋是空的");
 });
 
+test("moon clear heart wrist size rules update price and cart line", async ({ page }) => {
+  await page.goto("/products/d005-moon-clear-heart");
+  await expect(page.getByRole("heading", { name: "月映淨心手鍊" })).toBeVisible();
+
+  const wristSelect = page.getByRole("combobox").first();
+  await expect(page.locator("body")).toContainText("NT$ 1,580");
+
+  await wristSelect.selectOption("13.5");
+  await expect(page.locator("body")).toContainText("NT$ 1,480");
+
+  await wristSelect.selectOption("18");
+  await expect(page.locator("body")).toContainText("NT$ 1,680");
+  await page.getByRole("button", { name: /彈力繩/ }).click();
+  await page.getByRole("button", { name: /加入購物袋/ }).click();
+
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText("手圍 18 cm");
+  await expect(drawer).toContainText("NT$ 1,680");
+});
+
+test("morning whisper uses wrist size price rules without discounting them", async ({ page }) => {
+  await page.goto("/products/d004-morning-whisper");
+  await expect(page.getByRole("heading", { name: "晨光輕語手鍊" })).toBeVisible();
+
+  const wristSelect = page.getByRole("combobox").first();
+  await expect(page.locator("body")).toContainText("NT$ 1,800");
+
+  await wristSelect.selectOption("13.5");
+  await expect(page.locator("body")).toContainText("NT$ 1,700");
+
+  await wristSelect.selectOption("18");
+  await expect(page.locator("body")).toContainText("NT$ 1,900");
+});
+
 test("monthly limited bracelet products keep wrist size and clasp through checkout", async ({ page }) => {
   await page.goto("/products/e2e-monthly-in-stock");
 

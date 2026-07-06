@@ -18,13 +18,15 @@ __export(schema_exports, {
   logisticsOrders: () => logisticsOrders,
   orderBalancePayments: () => orderBalancePayments,
   orderItems: () => orderItems,
+  orderMergeGroups: () => orderMergeGroups,
+  orderMergeMembers: () => orderMergeMembers,
   orders: () => orders,
   productInventory: () => productInventory,
   siteSettings: () => siteSettings,
   users: () => users
 });
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
-var users, productInventory, inventoryLocks, orders, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs, chatbotKnowledge, siteSettings, dbProducts;
+var users, productInventory, inventoryLocks, orders, orderMergeGroups, orderMergeMembers, orderItems, orderBalancePayments, logisticsOrders, chatbotLogs, chatbotKnowledge, siteSettings, dbProducts;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -144,6 +146,8 @@ var init_schema = __esm({
       isPreorder: boolean("isPreorder").default(false).notNull(),
       // 是否為客製化訂金訂單
       isCustomOrder: boolean("isCustomOrder").default(false).notNull(),
+      // 單筆訂單免運覆寫（例如合併訂單後由後台處理免運）
+      freeShippingOverride: boolean("freeShippingOverride").default(false).notNull(),
       // 訂單金額
       totalAmount: int("totalAmount").notNull(),
       // 購買人資訊
@@ -180,6 +184,25 @@ var init_schema = __esm({
       index("orders_order_status_created_at_idx").on(table.orderStatus, table.createdAt),
       index("orders_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
       index("orders_paid_at_idx").on(table.paidAt)
+    ]);
+    orderMergeGroups = mysqlTable("orderMergeGroups", {
+      id: int("id").autoincrement().primaryKey(),
+      mergeCode: varchar("mergeCode", { length: 32 }).notNull().unique(),
+      mainOrderId: int("mainOrderId").notNull().unique(),
+      adminNote: text("adminNote"),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+    }, (table) => [
+      index("order_merge_groups_main_order_id_idx").on(table.mainOrderId)
+    ]);
+    orderMergeMembers = mysqlTable("orderMergeMembers", {
+      id: int("id").autoincrement().primaryKey(),
+      groupId: int("groupId").notNull(),
+      orderId: int("orderId").notNull().unique(),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    }, (table) => [
+      index("order_merge_members_group_id_idx").on(table.groupId),
+      index("order_merge_members_order_id_idx").on(table.orderId)
     ]);
     orderItems = mysqlTable("orderItems", {
       id: int("id").autoincrement().primaryKey(),
@@ -338,6 +361,7 @@ var init_schema = __esm({
       showFitPreference: boolean("showFitPreference").notNull().default(true),
       wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
       wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
+      wristSizePriceRules: json("wristSizePriceRules").$type(),
       scheduledPublishAt: timestamp("scheduledPublishAt"),
       sortOrder: int("sortOrder").notNull().default(0),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -959,11 +983,93 @@ async function ensureBalancePaymentColumns(db) {
   }
   balancePaymentColumnsEnsured = true;
 }
+async function getMergeInfoForOrderIds(db, orderIds) {
+  if (orderIds.length === 0) return /* @__PURE__ */ new Map();
+  const memberRows = await db.select({
+    orderId: orderMergeMembers.orderId,
+    groupId: orderMergeMembers.groupId,
+    mergeCode: orderMergeGroups.mergeCode,
+    mainOrderId: orderMergeGroups.mainOrderId
+  }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq2(orderMergeMembers.groupId, orderMergeGroups.id)).where(inArray(orderMergeMembers.orderId, orderIds));
+  const mainOrderIds = Array.from(new Set(memberRows.map((row) => row.mainOrderId).filter((id) => typeof id === "number")));
+  const mainOrders = mainOrderIds.length > 0 ? await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(inArray(orders.id, mainOrderIds)) : [];
+  const mainTradeNoById = new Map(mainOrders.map((order) => [order.id, order.merchantTradeNo]));
+  const infoByOrderId = /* @__PURE__ */ new Map();
+  for (const row of memberRows) {
+    if (!row.groupId || !row.mergeCode || !row.mainOrderId) continue;
+    infoByOrderId.set(row.orderId, {
+      groupId: row.groupId,
+      mergeCode: row.mergeCode,
+      mainOrderId: row.mainOrderId,
+      mainOrderMerchantTradeNo: mainTradeNoById.get(row.mainOrderId) ?? "",
+      role: row.orderId === row.mainOrderId ? "main" : "member"
+    });
+  }
+  return infoByOrderId;
+}
+function visibleOrdersOnlyWhere(baseWhere) {
+  const visibleWhere = sql2`NOT EXISTS (
+    SELECT 1
+    FROM \`orderMergeMembers\` omm
+    INNER JOIN \`orderMergeGroups\` omg ON omm.\`groupId\` = omg.\`id\`
+    WHERE omm.\`orderId\` = ${orders.id}
+      AND omg.\`mainOrderId\` <> ${orders.id}
+  )`;
+  return baseWhere ? and2(baseWhere, visibleWhere) : visibleWhere;
+}
+async function getMergeDetailForOrder(db, orderId) {
+  const infoByOrderId = await getMergeInfoForOrderIds(db, [orderId]);
+  const info = infoByOrderId.get(orderId);
+  if (!info) return null;
+  const memberRows = await db.select({
+    orderId: orders.id,
+    merchantTradeNo: orders.merchantTradeNo,
+    buyerName: orders.buyerName,
+    isCustomOrder: orders.isCustomOrder,
+    orderStatus: orders.orderStatus,
+    totalAmount: orders.totalAmount,
+    customerNote: orders.customerNote
+  }).from(orderMergeMembers).leftJoin(orders, eq2(orderMergeMembers.orderId, orders.id)).where(eq2(orderMergeMembers.groupId, info.groupId));
+  return {
+    ...info,
+    members: memberRows.filter((row) => Boolean(row.orderId)).map((row) => ({
+      orderId: row.orderId,
+      merchantTradeNo: row.merchantTradeNo,
+      buyerName: row.buyerName,
+      isCustomOrder: row.isCustomOrder,
+      orderStatus: row.orderStatus,
+      totalAmount: row.totalAmount,
+      customerNote: row.customerNote
+    }))
+  };
+}
 async function attachItemsAndLogisticsForOrders(db, orderRows) {
   if (orderRows.length === 0) return [];
   const orderIds = orderRows.map((o) => o.id);
-  const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds));
-  const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+  const mergeInfoByOrderId = await getMergeInfoForOrderIds(db, orderIds);
+  const visibleOrderRows = orderRows.filter((order) => mergeInfoByOrderId.get(order.id)?.role !== "member");
+  if (visibleOrderRows.length === 0) return [];
+  const visibleOrderIds = visibleOrderRows.map((order) => order.id);
+  const visibleMergeInfos = visibleOrderIds.map((orderId) => mergeInfoByOrderId.get(orderId)).filter((info) => Boolean(info));
+  const groupIds = Array.from(new Set(visibleMergeInfos.filter((info) => info.role === "main").map((info) => info.groupId)));
+  const mergeMemberRows = groupIds.length > 0 ? await db.select({
+    groupId: orderMergeMembers.groupId,
+    orderId: orderMergeMembers.orderId,
+    mainOrderId: orderMergeGroups.mainOrderId
+  }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq2(orderMergeMembers.groupId, orderMergeGroups.id)).where(inArray(orderMergeMembers.groupId, groupIds)) : [];
+  const combinedOrderIdsByMainId = /* @__PURE__ */ new Map();
+  for (const row of mergeMemberRows) {
+    if (!row.mainOrderId) continue;
+    const current = combinedOrderIdsByMainId.get(row.mainOrderId) ?? [];
+    current.push(row.orderId);
+    combinedOrderIdsByMainId.set(row.mainOrderId, current);
+  }
+  const allItemOrderIds = Array.from(/* @__PURE__ */ new Set([
+    ...visibleOrderIds,
+    ...Array.from(combinedOrderIdsByMainId.values()).flat()
+  ]));
+  const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, allItemOrderIds));
+  const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, visibleOrderIds));
   const itemsByOrder = /* @__PURE__ */ new Map();
   for (const item of allItems) {
     const arr = itemsByOrder.get(item.orderId) ?? [];
@@ -974,11 +1080,16 @@ async function attachItemsAndLogisticsForOrders(db, orderRows) {
   for (const log of allLogistics) {
     logisticsByOrder.set(log.orderId, log);
   }
-  return orderRows.map((order) => ({
-    ...order,
-    items: itemsByOrder.get(order.id) ?? [],
-    logistics: logisticsByOrder.get(order.id) ?? null
-  }));
+  return visibleOrderRows.map((order) => {
+    const combinedOrderIds = combinedOrderIdsByMainId.get(order.id) ?? [order.id];
+    const items = combinedOrderIds.flatMap((orderId) => itemsByOrder.get(orderId) ?? []);
+    return {
+      ...order,
+      items,
+      logistics: logisticsByOrder.get(order.id) ?? null,
+      mergeInfo: null
+    };
+  });
 }
 var MAX_PRODUCT_IMAGE_LEN = 6e4;
 function sanitizeProductImage(image) {
@@ -1064,7 +1175,7 @@ function buildOrderStatusWhere(statusFilter) {
 async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const statusWhere = buildOrderStatusWhere(statusFilter);
+  const statusWhere = visibleOrdersOnlyWhere(buildOrderStatusWhere(statusFilter));
   const summarySelect = {
     id: orders.id,
     merchantTradeNo: orders.merchantTradeNo,
@@ -1074,6 +1185,7 @@ async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
     orderStatus: orders.orderStatus,
     isPreorder: orders.isPreorder,
     isCustomOrder: orders.isCustomOrder,
+    freeShippingOverride: orders.freeShippingOverride,
     totalAmount: orders.totalAmount,
     buyerName: orders.buyerName,
     createdAt: orders.createdAt
@@ -1091,17 +1203,41 @@ async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
     };
   }
   const orderIds = orderRows.map((order) => order.id);
+  const mergeInfoByOrderId = await getMergeInfoForOrderIds(db, orderIds);
+  const mainMergeInfos = orderIds.map((orderId) => mergeInfoByOrderId.get(orderId)).filter((info) => Boolean(info && info.role === "main"));
+  const groupIds = Array.from(new Set(mainMergeInfos.map((info) => info.groupId)));
+  const mergeMemberRows = groupIds.length > 0 ? await db.select({
+    groupId: orderMergeMembers.groupId,
+    orderId: orderMergeMembers.orderId,
+    mainOrderId: orderMergeGroups.mainOrderId,
+    totalAmount: orders.totalAmount
+  }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq2(orderMergeMembers.groupId, orderMergeGroups.id)).leftJoin(orders, eq2(orderMergeMembers.orderId, orders.id)).where(inArray(orderMergeMembers.groupId, groupIds)) : [];
+  const combinedOrderIdsByMainId = /* @__PURE__ */ new Map();
+  const extraTotalByMainId = /* @__PURE__ */ new Map();
+  for (const row of mergeMemberRows) {
+    if (!row.mainOrderId) continue;
+    const current = combinedOrderIdsByMainId.get(row.mainOrderId) ?? [];
+    current.push(row.orderId);
+    combinedOrderIdsByMainId.set(row.mainOrderId, current);
+    if (row.orderId !== row.mainOrderId) {
+      extraTotalByMainId.set(row.mainOrderId, (extraTotalByMainId.get(row.mainOrderId) ?? 0) + Number(row.totalAmount ?? 0));
+    }
+  }
+  const allSummaryOrderIds = Array.from(/* @__PURE__ */ new Set([
+    ...orderIds,
+    ...Array.from(combinedOrderIdsByMainId.values()).flat()
+  ]));
   const itemCounts = await db.select({
     orderId: orderItems.orderId,
     itemCount: sql2`CAST(COUNT(*) AS SIGNED)`
-  }).from(orderItems).where(inArray(orderItems.orderId, orderIds)).groupBy(orderItems.orderId);
+  }).from(orderItems).where(inArray(orderItems.orderId, allSummaryOrderIds)).groupBy(orderItems.orderId);
   const logisticsRows = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
   const thumbnailRows = await db.select({
     id: orderItems.id,
     orderId: orderItems.orderId,
     productName: orderItems.productName,
     productImage: sql2`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`
-  }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(inArray(orderItems.orderId, orderIds)).orderBy(orderItems.id);
+  }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(inArray(orderItems.orderId, allSummaryOrderIds)).orderBy(orderItems.id);
   const itemCountByOrderId = new Map(itemCounts.map((row) => [row.orderId, Number(row.itemCount ?? 0)]));
   const logisticsOrderIds = new Set(logisticsRows.map((row) => row.orderId));
   const thumbnailsByOrderId = /* @__PURE__ */ new Map();
@@ -1118,12 +1254,19 @@ async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
     thumbnailsByOrderId.set(row.orderId, current);
   }
   return {
-    items: orderRows.map((order) => ({
-      ...order,
-      itemCount: itemCountByOrderId.get(order.id) ?? 0,
-      hasLogistics: logisticsOrderIds.has(order.id),
-      productThumbnails: thumbnailsByOrderId.get(order.id) ?? []
-    })),
+    items: orderRows.map((order) => {
+      const combinedOrderIds = combinedOrderIdsByMainId.get(order.id) ?? [order.id];
+      const itemCount = combinedOrderIds.reduce((sum, orderId) => sum + (itemCountByOrderId.get(orderId) ?? 0), 0);
+      const productThumbnails = combinedOrderIds.flatMap((orderId) => thumbnailsByOrderId.get(orderId) ?? []).slice(0, 3);
+      return {
+        ...order,
+        totalAmount: order.totalAmount + (extraTotalByMainId.get(order.id) ?? 0),
+        itemCount,
+        hasLogistics: logisticsOrderIds.has(order.id),
+        mergeInfo: mergeInfoByOrderId.get(order.id) ?? null,
+        productThumbnails
+      };
+    }),
     total,
     page,
     pageSize: limit
@@ -1135,6 +1278,9 @@ async function getAdminOrderDetail(orderId) {
   await ensureBalancePaymentColumns(db);
   const [order] = await db.select().from(orders).where(eq2(orders.id, orderId)).limit(1);
   if (!order) return null;
+  const mergeInfo = await getMergeDetailForOrder(db, order.id);
+  const itemOrderIds = mergeInfo?.role === "main" ? mergeInfo.members.map((member) => member.orderId) : [order.id];
+  const displayTotalAmount = mergeInfo?.role === "main" ? mergeInfo.members.reduce((sum, member) => sum + member.totalAmount, 0) : order.totalAmount;
   const [items, logistics, balancePayment] = await Promise.all([
     db.select({
       id: orderItems.id,
@@ -1146,15 +1292,17 @@ async function getAdminOrderDetail(orderId) {
       unitPrice: orderItems.unitPrice,
       subtotal: orderItems.subtotal,
       isPreorder: orderItems.isPreorder
-    }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(eq2(orderItems.orderId, order.id)),
+    }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(inArray(orderItems.orderId, itemOrderIds)),
     db.select().from(logisticsOrders).where(eq2(logisticsOrders.orderId, order.id)).limit(1),
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.orderId, order.id)).limit(1)
   ]);
   return {
     ...order,
+    totalAmount: displayTotalAmount,
     items,
     logistics: logistics[0] ?? null,
-    balancePayment: hydrateBalancePayment(balancePayment[0])
+    balancePayment: hydrateBalancePayment(balancePayment[0]),
+    mergeInfo
   };
 }
 async function getOrderStats() {
@@ -1307,11 +1455,12 @@ async function getBalancePaymentDetail(merchantTradeNo) {
   if (!balancePayment) return null;
   const [order] = await db.select().from(orders).where(eq2(orders.id, row.orderId)).limit(1);
   if (!order) return null;
+  const orderMergeInfo = await getMergeDetailForOrder(db, order.id);
   const [clearQuartzChipsItem] = await db.select().from(orderItems).where(and2(
     eq2(orderItems.orderId, row.orderId),
     eq2(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
   )).limit(1);
-  return { ...balancePayment, order, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
+  return { ...balancePayment, order, orderMergeInfo, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
 }
 async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive, transferReceiptUrl) {
   const db = await getDb();
@@ -1347,7 +1496,7 @@ async function getOrdersForMember(opts) {
     conditions.push(sql2`LOWER(TRIM(${orders.buyerEmail})) = ${key}`);
   }
   if (conditions.length === 0) return [];
-  const whereClause = conditions.length === 1 ? conditions[0] : or(...conditions);
+  const whereClause = visibleOrdersOnlyWhere(conditions.length === 1 ? conditions[0] : or(...conditions));
   try {
     const memberOrders = await db.select().from(orders).where(whereClause).orderBy(desc(orders.createdAt)).limit(100);
     return attachItemsAndLogisticsForOrders(db, memberOrders);
@@ -1383,7 +1532,7 @@ async function getOrdersForMember(opts) {
       confirmedAt: orders.confirmedAt,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt
-    }).from(orders).where(sql2`LOWER(TRIM(${orders.buyerEmail})) = ${key}`).orderBy(desc(orders.createdAt)).limit(100);
+    }).from(orders).where(visibleOrdersOnlyWhere(sql2`LOWER(TRIM(${orders.buyerEmail})) = ${key}`)).orderBy(desc(orders.createdAt)).limit(100);
     const normalizedOrders = legacyOrders.map((order) => ({
       ...order,
       userId: null,
@@ -1412,6 +1561,10 @@ async function ensureOrdersColumns() {
   }
   try {
     await db.execute(sql3`ALTER TABLE \`orders\` MODIFY COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`freeShippingOverride\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch {
   }
   ordersColumnsEnsured = true;
@@ -2694,7 +2847,9 @@ function calcCheckoutFees(params) {
   const appliesFees = chargeableSubtotal > 0;
   const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
   const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
-  const shippingFee = !appliesFees ? 0 : emailFreeShipping ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
+  const forcedFreeShipping = params.forceFreeShipping === true;
+  const forcedPaidShipping = params.forcePaidShipping === true;
+  const shippingFee = !appliesFees ? 0 : forcedFreeShipping ? 0 : forcedPaidShipping ? params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod] : emailFreeShipping ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
   const paymentFee = 0;
   const total = subtotal + shippingFee + paymentFee;
   return {
@@ -2705,7 +2860,9 @@ function calcCheckoutFees(params) {
     total,
     appliesFees,
     domesticFreeShipping,
-    emailFreeShipping
+    emailFreeShipping,
+    forcedFreeShipping,
+    forcedPaidShipping
   };
 }
 
@@ -2747,6 +2904,18 @@ function siteBaseUrl(req) {
   const proto = (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader?.split(",")[0]?.trim()) || (req.protocol === "https" ? "https" : "http");
   return `${proto}://${host}`;
 }
+function generateOrderMergeCode() {
+  const now = /* @__PURE__ */ new Date();
+  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `OM${ymd}${rand}`.slice(0, 32);
+}
+var mergeableOrderStatuses = /* @__PURE__ */ new Set([
+  "pending_payment",
+  "deposit_paid",
+  "paid",
+  "processing"
+]);
 var CartItemSchema = z2.object({
   id: z2.string(),
   baseProductId: z2.string().optional(),
@@ -2810,7 +2979,7 @@ var orderRouter = router({
       items: z2.array(CartItemSchema).min(1),
       origin: z2.string(),
       sessionToken: z2.string().optional(),
-      customerNote: z2.string().max(2e3).optional()
+      customerNote: z2.string().max(1e4).optional()
     }).superRefine((data, ctx) => {
       const isCustomDepositCheckout = data.items.filter((item) => {
         const productId = item.baseProductId ?? item.id;
@@ -3165,8 +3334,27 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq6(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
+    const [mergeMember] = await db.select({
+      groupId: orderMergeMembers.groupId,
+      mainOrderId: orderMergeGroups.mainOrderId
+    }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
+    if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u64CD\u4F5C" });
+    }
     if (input.status === "transfer_pending") {
       await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq6(orders.id, order.id));
+      return { success: true };
+    }
+    if (input.status === "cancelled" && mergeMember?.groupId) {
+      const mergedOrders = await db.select({
+        id: orders.id,
+        merchantTradeNo: orders.merchantTradeNo
+      }).from(orderMergeMembers).leftJoin(orders, eq6(orderMergeMembers.orderId, orders.id)).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
+      for (const mergedOrder of mergedOrders) {
+        if (!mergedOrder.id || !mergedOrder.merchantTradeNo) continue;
+        await updateOrderStatus(mergedOrder.merchantTradeNo, "cancelled");
+        await restoreInventoryOnCancel(mergedOrder.merchantTradeNo);
+      }
       return { success: true };
     }
     await updateOrderStatus(order.merchantTradeNo, input.status);
@@ -3225,12 +3413,120 @@ var orderRouter = router({
     await deleteCancelledOrderRecords(db, orderIds);
     return { success: true, deletedCount: orderIds.length };
   }),
+  /**
+   * 手動合併訂單：有客製化時用第一筆選取的客製化作為主訂單；
+   * 純一般商品合併時，使用最晚建立的訂單作為主訂單。
+   */
+  mergeOrders: adminProcedure.input(
+    z2.object({
+      orderIds: z2.array(z2.number().int().positive()).min(2).max(20),
+      adminNote: z2.string().max(1e3).optional()
+    })
+  ).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const orderIds = Array.from(new Set(input.orderIds));
+    if (orderIds.length < 2) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u81F3\u5C11\u9078\u53D6\u5169\u7B46\u4E0D\u540C\u8A02\u55AE" });
+    }
+    const rows = await db.select().from(orders).where(inArray2(orders.id, orderIds));
+    if (rows.length !== orderIds.length) {
+      throw new TRPCError3({ code: "NOT_FOUND", message: "\u90E8\u5206\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
+    }
+    const customOrderIds = new Set(rows.filter((order) => order.isCustomOrder).map((order) => order.id));
+    const unmergeable = rows.filter((order) => !mergeableOrderStatuses.has(order.orderStatus));
+    if (unmergeable.length > 0) {
+      throw new TRPCError3({
+        code: "BAD_REQUEST",
+        message: `\u53EA\u80FD\u5408\u4F75\u5C1A\u672A\u51FA\u8CA8/\u672A\u53D6\u6D88\u7684\u8A02\u55AE\uFF1A${unmergeable.map((order) => order.merchantTradeNo).join(", ")}`
+      });
+    }
+    const normalizedEmails = new Set(rows.map((order) => normalizeOrderEmail(order.buyerEmail)));
+    if (normalizedEmails.size > 1) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u53EA\u80FD\u5408\u4F75\u540C\u4E00\u4F4D\u8CB7\u5BB6\u7684\u8A02\u55AE" });
+    }
+    const existingLogistics = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(inArray2(logisticsOrders.orderId, orderIds));
+    if (existingLogistics.length > 0) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5DF2\u6709\u7269\u6D41\u55AE\u7684\u8A02\u55AE\u4E0D\u80FD\u518D\u5408\u4F75" });
+    }
+    const existingMergeMembers = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(inArray2(orderMergeMembers.orderId, orderIds));
+    if (existingMergeMembers.length > 0) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u9078\u53D6\u7684\u8A02\u55AE\u5DF2\u6709\u5408\u4F75\u7D00\u9304" });
+    }
+    const latestOrder = rows.reduce(
+      (latest, order) => new Date(order.createdAt).getTime() > new Date(latest.createdAt).getTime() ? order : latest
+    );
+    const mainOrderId = orderIds.find((orderId) => customOrderIds.has(orderId)) ?? latestOrder.id;
+    const mainOrder = rows.find((order) => order.id === mainOrderId);
+    if (!mainOrder) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u53EF\u4F5C\u70BA\u4E3B\u8A02\u55AE\u7684\u8A02\u55AE" });
+    }
+    const mergeCode = generateOrderMergeCode();
+    await db.insert(orderMergeGroups).values({
+      mergeCode,
+      mainOrderId: mainOrder.id,
+      adminNote: input.adminNote?.trim() || null
+    });
+    const [group] = await db.select().from(orderMergeGroups).where(eq6(orderMergeGroups.mergeCode, mergeCode)).limit(1);
+    if (!group) {
+      throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "\u5408\u4F75\u7FA4\u7D44\u5EFA\u7ACB\u5931\u6557" });
+    }
+    await db.insert(orderMergeMembers).values(orderIds.map((orderId) => ({
+      groupId: group.id,
+      orderId
+    })));
+    await db.update(orders).set({ freeShippingOverride: true }).where(inArray2(orders.id, orderIds));
+    return {
+      success: true,
+      mergeCode,
+      groupId: group.id,
+      mainOrderId: mainOrder.id,
+      mainOrderMerchantTradeNo: mainOrder.merchantTradeNo,
+      mergedOrderIds: orderIds
+    };
+  }),
+  updateFreeShippingOverride: adminProcedure.input(z2.object({
+    orderId: z2.number().int().positive(),
+    freeShippingOverride: z2.boolean()
+  })).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const [order] = await db.select({ id: orders.id }).from(orders).where(eq6(orders.id, input.orderId)).limit(1);
+    if (!order) {
+      throw new TRPCError3({ code: "NOT_FOUND", message: "Order not found" });
+    }
+    const [mergeMember] = await db.select({
+      groupId: orderMergeMembers.groupId,
+      mainOrderId: orderMergeGroups.mainOrderId
+    }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
+    if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u5F9E\u5408\u4F75\u4E3B\u8A02\u55AE\u8ABF\u6574\u514D\u904B\u8A2D\u5B9A" });
+    }
+    if (mergeMember?.groupId) {
+      const mergeRows = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
+      const orderIds = mergeRows.map((row) => row.orderId);
+      if (orderIds.length > 0) {
+        await db.update(orders).set({ freeShippingOverride: input.freeShippingOverride }).where(inArray2(orders.id, orderIds));
+      }
+    } else {
+      await db.update(orders).set({ freeShippingOverride: input.freeShippingOverride }).where(eq6(orders.id, input.orderId));
+    }
+    return { success: true, freeShippingOverride: input.freeShippingOverride };
+  }),
   createBalancePaymentLink: adminProcedure.input(
     z2.object({
       orderId: z2.number(),
       amount: z2.number().int().min(1)
     })
   ).mutation(async ({ input, ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const [mergeMember] = await db.select({
+      mainOrderId: orderMergeGroups.mainOrderId
+    }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
+    if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u88AB\u5408\u4F75\u8A02\u55AE\u4E0D\u53EF\u7522\u751F\u5C3E\u6B3E\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u7522\u751F\u5408\u4F75\u5C3E\u6B3E" });
+    }
     const payment = await createOrReplaceBalancePayment(input);
     const origin = siteBaseUrl(ctx.req);
     return {
@@ -3247,6 +3543,18 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const [order] = await db.select().from(orders).where(eq6(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
+    const [mergeMember] = await db.select({
+      groupId: orderMergeMembers.groupId,
+      mainOrderId: orderMergeGroups.mainOrderId,
+      mergeCode: orderMergeGroups.mergeCode
+    }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
+    if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
+      const [mainOrder] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq6(orders.id, mergeMember.mainOrderId)).limit(1);
+      throw new TRPCError3({
+        code: "BAD_REQUEST",
+        message: `\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE ${mainOrder?.merchantTradeNo ?? mergeMember.mainOrderId}\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u5EFA\u7ACB\u7269\u6D41`
+      });
+    }
     const logisticsMerchantTradeNo = `L${Date.now()}`;
     const logisticsType = order.shippingMethod === "home" ? "HOME" : "CVS";
     const logisticsSubType = order.shippingMethod === "cvs_711" ? "UNIMARTC2C" : order.shippingMethod === "cvs_family" ? "FAMIC2C" : "TCAT";
@@ -3314,8 +3622,17 @@ var orderRouter = router({
           logisticsStatus: "in_transit",
           ecpayLogisticsData: ecpayResult.raw
         }).where(eq6(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
-        await updateOrderStatus(order.merchantTradeNo, "shipped");
-        await notifyCustomerOrderShippedSafely(input.orderId);
+        if (mergeMember?.groupId) {
+          const mergeRows = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
+          const mergedOrderIds = mergeRows.map((row) => row.orderId);
+          if (mergedOrderIds.length > 0) {
+            await db.update(orders).set({ orderStatus: "shipped" }).where(inArray2(orders.id, mergedOrderIds));
+            await Promise.all(mergedOrderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId)));
+          }
+        } else {
+          await updateOrderStatus(order.merchantTradeNo, "shipped");
+          await notifyCustomerOrderShippedSafely(input.orderId);
+        }
         return {
           success: true,
           sandbox: useLogisticsSandbox,
@@ -3521,7 +3838,9 @@ var orderRouter = router({
       shippingMethod,
       paymentMethod: input.paymentMethod,
       overseasCountry,
-      buyerEmail: balancePayment.order.buyerEmail
+      buyerEmail: balancePayment.order.buyerEmail,
+      forceFreeShipping: balancePayment.order.freeShippingOverride,
+      forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !balancePayment.order.freeShippingOverride)
     });
     const totalAmount = feeSummary.total;
     await db.update(orderBalancePayments).set({
@@ -4294,7 +4613,7 @@ var knowledgeChunks = [
   {
     id: "product-d005-moon-clear-heart",
     question: "\u6708\u6620\u6DE8\u5FC3\u624B\u934A\u9069\u5408\u4EC0\u9EBC\u9700\u6C42\uFF1F",
-    answer: "\u300C\u6708\u6620\u6DE8\u5FC3\u624B\u934A\u300D\u6C34\u6676\u5305\u542B\u7C89\u6676\u3001\u767D\u6708\u5149\u3001\u73CD\u73E0\u3001\u767D\u6C34\u6676\u8207\u85CD\u6708\u5149\u3002\u9069\u5408\u60F3\u5438\u5F15\u611B\u60C5\u8207\u597D\u4EBA\u7DE3\u3001\u5B89\u64AB\u60C5\u7DD2\u3001\u4FEE\u5FA9\u95DC\u4FC2\u80FD\u91CF\u3001\u67D4\u5316\u5FC3\u6027\u3001\u63D0\u5347\u76F4\u89BA\u4E26\u56DE\u5230\u7A69\u5B9A\u5B89\u5168\u611F\u7684\u4EBA\u3002\u50F9\u683C NT$1,500\uFF0C\u5546\u54C1\u9023\u7D50\uFF1Ahttps://goodaytarot.com/products/d005-moon-clear-heart",
+    answer: "\u300C\u6708\u6620\u6DE8\u5FC3\u624B\u934A\u300D\u6C34\u6676\u5305\u542B\u7C89\u6676\u3001\u767D\u6708\u5149\u3001\u73CD\u73E0\u3001\u767D\u6C34\u6676\u8207\u85CD\u6708\u5149\u3002\u9069\u5408\u60F3\u5438\u5F15\u611B\u60C5\u8207\u597D\u4EBA\u7DE3\u3001\u5B89\u64AB\u60C5\u7DD2\u3001\u4FEE\u5FA9\u95DC\u4FC2\u80FD\u91CF\u3001\u67D4\u5316\u5FC3\u6027\u3001\u63D0\u5347\u76F4\u89BA\u4E26\u56DE\u5230\u7A69\u5B9A\u5B89\u5168\u611F\u7684\u4EBA\u3002\u50F9\u683C\u4F9D\u624B\u570D\u70BA NT$1,480\uFF0FNT$1,580\uFF0FNT$1,680\uFF0C\u5546\u54C1\u9023\u7D50\uFF1Ahttps://goodaytarot.com/products/d005-moon-clear-heart",
     embedText: "\u6708\u6620\u6DE8\u5FC3 \u6708\u6620\u6DE8\u5FC3\u624B\u934A \u6620\u6DE8\u5FC3 d005 D005 \u611B\u60C5 \u6843\u82B1 \u4EBA\u7DE3 \u95DC\u4FC2\u4FEE\u5FA9 \u60C5\u7DD2 \u5B89\u64AB \u7642\u7652 \u5B89\u5168\u611F \u6EAB\u67D4 \u6DE8\u5316 \u6B63\u5411\u80FD\u91CF \u76F4\u89BA \u7C89\u6676 \u767D\u6708\u5149 \u85CD\u6708\u5149 \u767D\u6C34\u6676 \u73CD\u73E0",
     keywords: ["\u6708\u6620\u6DE8\u5FC3", "\u6620\u6DE8\u5FC3", "d005", "D005", "\u611B\u60C5", "\u6843\u82B1", "\u4EBA\u7DE3", "\u95DC\u4FC2", "\u60C5\u7DD2", "\u5B89\u64AB", "\u7642\u7652", "\u5B89\u5168\u611F", "\u7C89\u6676", "\u767D\u6708\u5149", "\u85CD\u6708\u5149", "\u767D\u6C34\u6676"],
     category: "\u5546\u54C1\u63A8\u85A6",
@@ -4616,6 +4935,11 @@ var products = [
     categoryLabels: ["\u611B\u60C5\u6843\u82B1", "\u7642\u7652\u7CFB\u5217", "\u80FD\u91CF\u9632\u8B77"],
     price: 1800,
     originalPrice: 2100,
+    wristSizePriceRules: [
+      { maxWristSize: 13.5, price: 1700 },
+      { maxWristSize: 17, price: 1800 },
+      { maxWristSize: 19, price: 1900 }
+    ],
     image: "/images/d-design/d004.jpg",
     tags: ["\u4EBA\u7DE3", "\u5E73\u8861"],
     description: "\u7531\u767D\u5E7D\u9748\u3001\u7D05\u5154\u6BDB\u3001\u85CD\u6708\u5149\u3001\u767D\u5154\u6BDB\u3001\u7C89\u78A7\u74BD\u7B49\u6676\u77F3\u69CB\u6210\uFF0C\u5C64\u6B21\u67D4\u548C\u4E14\u6C23\u5834\u98FD\u6EFF\u3002",
@@ -4645,8 +4969,13 @@ var products = [
     categoryLabel: "\u7642\u7652\u7CFB\u5217",
     categories: ["healing", "love"],
     categoryLabels: ["\u7642\u7652\u7CFB\u5217", "\u611B\u60C5\u6843\u82B1"],
-    price: 1500,
-    originalPrice: 1800,
+    price: 1580,
+    originalPrice: 1580,
+    wristSizePriceRules: [
+      { maxWristSize: 13.5, price: 1480 },
+      { maxWristSize: 17, price: 1580 },
+      { maxWristSize: 19, price: 1680 }
+    ],
     image: "/images/d-design/d005.jpg",
     tags: ["\u6DE8\u5316", "\u611B\u60C5"],
     description: "\u4EE5\u7C89\u6676\u3001\u767D\u6708\u5149\u3001\u85CD\u6708\u5149\u8207\u767D\u6C34\u6676\u70BA\u4E3B\u8EF8\uFF0C\u642D\u914D\u73CD\u73E0\u5448\u73FE\u6EAB\u67D4\u5B89\u5B9A\u7684\u6708\u5149\u7CFB\u8A2D\u8A08\u3002",
@@ -5691,6 +6020,7 @@ async function ensureProductsTable() {
       \`showFitPreference\` boolean NOT NULL DEFAULT true,
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
       \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
+      \`wristSizePriceRules\` json DEFAULT NULL,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -5740,6 +6070,33 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0`);
+  } catch {
+  }
+  try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`wristSizePriceRules\` json DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    const existingProductRules = {
+      "d004-morning-whisper": [
+        { maxWristSize: 13.5, price: 1700 },
+        { maxWristSize: 17, price: 1800 },
+        { maxWristSize: 19, price: 1900 }
+      ],
+      "d005-moon-clear-heart": [
+        { maxWristSize: 13.5, price: 1480 },
+        { maxWristSize: 17, price: 1580 },
+        { maxWristSize: 19, price: 1680 }
+      ]
+    };
+    for (const [id, rules] of Object.entries(existingProductRules)) {
+      await db.execute(sql6`
+        UPDATE \`products\`
+        SET \`wristSizePriceRules\` = ${JSON.stringify(rules)}
+        WHERE \`id\` = ${id}
+          AND \`wristSizePriceRules\` IS NULL
+      `);
+    }
   } catch {
   }
   try {
@@ -5847,6 +6204,7 @@ function toFrontendProduct(p) {
     showFitPreference: p.showFitPreference,
     wristSizeMin: p.wristSizeMin ?? 13,
     wristSizeMax: p.wristSizeMax ?? 19,
+    wristSizePriceRules: p.wristSizePriceRules ?? void 0,
     scheduledPublishAt: p.scheduledPublishAt ?? void 0,
     crystalType: p.crystalType ?? "",
     color: p.color ?? ""
@@ -5858,6 +6216,10 @@ var scheduledPublishAtSchema = z6.preprocess(
 );
 var wristSizeSchema = z6.number().min(0).max(99).refine((value) => Number.isInteger(value * 2), {
   message: "\u624B\u570D\u5C3A\u5BF8\u9700\u4EE5 0.5 cm \u70BA\u55AE\u4F4D"
+});
+var WristSizePriceRuleSchema = z6.object({
+  maxWristSize: wristSizeSchema,
+  price: z6.number().int().min(0)
 });
 var ProductInputSchema = z6.object({
   name: z6.string().min(1),
@@ -5889,6 +6251,7 @@ var ProductInputSchema = z6.object({
   showFitPreference: z6.boolean().default(true),
   wristSizeMin: wristSizeSchema.default(13),
   wristSizeMax: wristSizeSchema.default(19),
+  wristSizePriceRules: z6.array(WristSizePriceRuleSchema).default([]),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z6.number().int().default(0)
 }).refine((value) => value.wristSizeMin <= value.wristSizeMax, {
