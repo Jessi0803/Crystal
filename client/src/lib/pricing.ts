@@ -3,6 +3,7 @@ type ProductPricingFields = {
   price: number;
   originalPrice?: number | null;
   howToUse?: string[];
+  wristSizePriceRules?: { maxWristSize: number; price: number }[] | null;
 };
 
 type TieredBraceletPrices = {
@@ -24,9 +25,9 @@ const TIERED_BRACELET_PRICES_BY_PRODUCT_ID: Record<string, TieredBraceletPrices>
     large: 1900,
   },
   "d005-moon-clear-heart": {
-    small: 1400,
-    medium: 1500,
-    large: 1600,
+    small: 1480,
+    medium: 1580,
+    large: 1680,
   },
 };
 
@@ -35,11 +36,22 @@ function formatPrice(price: number) {
 }
 
 export function usesTieredBraceletPricing(product: ProductPricingFields) {
-  return product.id !== "d003-venus" && Boolean(product.howToUse?.some((line) => line.includes("手圍")));
+  return product.id !== "d003-venus" && (
+    Boolean(product.wristSizePriceRules?.length) ||
+    Boolean(product.howToUse?.some((line) => line.includes("手圍")))
+  );
 }
 
 export function getTieredBraceletPrices(productId: string) {
   return TIERED_BRACELET_PRICES_BY_PRODUCT_ID[productId] ?? DEFAULT_TIERED_BRACELET_PRICES;
+}
+
+export function getWristSizeRulePrice(product: ProductPricingFields, wristSize: number) {
+  const rules = product.wristSizePriceRules
+    ?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price))
+    .sort((a, b) => a.maxWristSize - b.maxWristSize);
+  if (!rules?.length) return null;
+  return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
 }
 
 export function getSaleRate(product: ProductPricingFields) {
@@ -61,18 +73,26 @@ export function applySaleRate(price: number, saleRate: number | null) {
   return saleRate ? Math.round(price * saleRate) : price;
 }
 
-export function getTieredBraceletBasePrice(productId: string, wristSize: number) {
-  const prices = getTieredBraceletPrices(productId);
+export function getTieredBraceletBasePrice(product: ProductPricingFields, wristSize: number) {
+  const rulePrice = getWristSizeRulePrice(product, wristSize);
+  if (rulePrice !== null) return rulePrice;
+  const prices = getTieredBraceletPrices(product.id);
   if (wristSize <= 13.5) return prices.small;
   if (wristSize <= 17) return prices.medium;
   return prices.large;
 }
 
 export function getTieredBraceletDisplay(product: ProductPricingFields) {
+  const rulePrices = product.wristSizePriceRules
+    ?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price))
+    .sort((a, b) => a.maxWristSize - b.maxWristSize)
+    .map((rule) => rule.price);
   const prices = getTieredBraceletPrices(product.id);
+  const small = rulePrices?.[0] ?? prices.small;
+  const large = rulePrices?.[rulePrices.length - 1] ?? prices.large;
   const saleRate = getSaleRate(product);
-  const originalRange = `${formatPrice(prices.small)} ~ ${prices.large.toLocaleString()}`;
-  const saleRange = `${formatPrice(applySaleRate(prices.small, saleRate))} ~ ${applySaleRate(prices.large, saleRate).toLocaleString()}`;
+  const originalRange = `${formatPrice(small)} ~ ${large.toLocaleString()}`;
+  const saleRange = `${formatPrice(applySaleRate(small, saleRate))} ~ ${applySaleRate(large, saleRate).toLocaleString()}`;
 
   return {
     hasSale: saleRate !== null,

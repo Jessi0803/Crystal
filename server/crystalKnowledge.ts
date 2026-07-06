@@ -730,7 +730,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "product-d005-moon-clear-heart",
     question: "月映淨心手鍊適合什麼需求？",
     answer:
-      "「月映淨心手鍊」水晶包含粉晶、白月光、珍珠、白水晶與藍月光。適合想吸引愛情與好人緣、安撫情緒、修復關係能量、柔化心性、提升直覺並回到穩定安全感的人。價格 NT$1,500，商品連結：https://goodaytarot.com/products/d005-moon-clear-heart",
+      "「月映淨心手鍊」水晶包含粉晶、白月光、珍珠、白水晶與藍月光。適合想吸引愛情與好人緣、安撫情緒、修復關係能量、柔化心性、提升直覺並回到穩定安全感的人。價格依手圍為 NT$1,480／NT$1,580／NT$1,680，商品連結：https://goodaytarot.com/products/d005-moon-clear-heart",
     embedText:
       "月映淨心 月映淨心手鍊 映淨心 d005 D005 愛情 桃花 人緣 關係修復 情緒 安撫 療癒 安全感 溫柔 淨化 正向能量 直覺 粉晶 白月光 藍月光 白水晶 珍珠",
     keywords: ["月映淨心", "映淨心", "d005", "D005", "愛情", "桃花", "人緣", "關係", "情緒", "安撫", "療癒", "安全感", "粉晶", "白月光", "藍月光", "白水晶"],

@@ -72,7 +72,7 @@ test("storefront chatbot renders exactly the product cards returned with the ans
           {
             id: "d005-moon-clear-heart",
             name: "月映淨心手鍊",
-            price: 1500,
+            price: 1580,
             image: "/images/d-design/d005.jpg",
             href: "/products/d005-moon-clear-heart",
           },

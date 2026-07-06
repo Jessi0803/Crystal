@@ -113,3 +113,51 @@ test("admin can set a product wrist size range shown on storefront", async ({ pa
   await expect(wristSelect.locator('option[value="13.5"]')).toHaveCount(0);
   await expect(wristSelect.locator('option[value="16.5"]')).toHaveCount(0);
 });
+
+test("admin can set wrist size price rules used on storefront", async ({ page }) => {
+  const productName = `E2E 手圍價格商品 ${Date.now()}`;
+
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+
+  await page.goto("/admin/products");
+  await expect(page.locator("body")).toContainText("商品管理");
+  await page.getByRole("button", { name: "新增商品" }).click();
+
+  await page.locator('input[placeholder="或貼上圖片網址"]').fill("/images/d-design/d005.jpg");
+  await page.getByRole("button", { name: "加入" }).click();
+  await expect(page.locator('img[src="/images/d-design/d005.jpg"]')).toBeVisible();
+  await page.locator('input[placeholder="例：紫水晶手鍊"]').fill(productName);
+  await page.locator('input[placeholder="1200"]').fill("1580");
+  await page.locator('input[placeholder="紫水晶, 愛情"]').fill("E2E, 手圍價格");
+  await page.locator('input[type="number"]').last().fill("2");
+  await page.locator("textarea").first().fill("後台手圍價格測試");
+  await page.locator("textarea").last().fill("白水晶");
+
+  const addRule = page.getByRole("button", { name: "新增手圍價格" });
+  await addRule.click();
+  await page.getByLabel("手圍價格 1 最大手圍").fill("13.5");
+  await page.getByLabel("手圍價格 1 價格").fill("1480");
+  await addRule.click();
+  await page.getByLabel("手圍價格 2 最大手圍").fill("17");
+  await page.getByLabel("手圍價格 2 價格").fill("1580");
+  await addRule.click();
+  await page.getByLabel("手圍價格 3 最大手圍").fill("19");
+  await page.getByLabel("手圍價格 3 價格").fill("1680");
+
+  await page.getByRole("button", { name: "新增商品" }).last().click();
+  await expect(page.locator("body")).toContainText(productName);
+
+  await page.goto("/products");
+  const productLink = page.locator('a[href^="/products/"]').filter({ hasText: productName }).first();
+  await expect(productLink).toBeVisible();
+  await productLink.click();
+
+  await expect(page.getByRole("heading", { name: productName })).toBeVisible();
+  const wristSelect = page.getByRole("combobox").first();
+  await expect(page.locator("body")).toContainText("NT$ 1,580");
+  await wristSelect.selectOption("13.5");
+  await expect(page.locator("body")).toContainText("NT$ 1,480");
+  await wristSelect.selectOption("18");
+  await expect(page.locator("body")).toContainText("NT$ 1,680");
+});

@@ -265,7 +265,7 @@ export default function ProductDetail() {
   const discountLabel = getDiscountLabel(product);
   const hasProductDiscount = Boolean(product.originalPrice && product.originalPrice > product.price);
   const originalBasePrice = hasTieredBraceletPricing
-    ? getTieredBraceletBasePrice(product.id, wristSizeNumber)
+    ? getTieredBraceletBasePrice(product, wristSizeNumber)
     : product.price;
   const basePrice = hasTieredBraceletPricing
     ? applySaleRate(originalBasePrice, saleRate)
