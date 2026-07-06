@@ -242,6 +242,11 @@ export const products: Product[] = [
     categoryLabels: ["愛情桃花", "療癒系列", "能量防護"],
     price: 1800,
     originalPrice: 2100,
+    wristSizePriceRules: [
+      { maxWristSize: 13.5, price: 1700 },
+      { maxWristSize: 17, price: 1800 },
+      { maxWristSize: 19, price: 1900 },
+    ],
     image: "/images/d-design/d004.jpg",
     tags: ["人緣", "平衡"],
     description: "由白幽靈、紅兔毛、藍月光、白兔毛、粉碧璽等晶石構成，層次柔和且氣場飽滿。",

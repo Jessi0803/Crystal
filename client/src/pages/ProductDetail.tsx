@@ -264,11 +264,12 @@ export default function ProductDetail() {
   const saleRate = getSaleRate(product);
   const discountLabel = getDiscountLabel(product);
   const hasProductDiscount = Boolean(product.originalPrice && product.originalPrice > product.price);
+  const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
   const originalBasePrice = hasTieredBraceletPricing
     ? getTieredBraceletBasePrice(product, wristSizeNumber)
     : product.price;
   const basePrice = hasTieredBraceletPricing
-    ? applySaleRate(originalBasePrice, saleRate)
+    ? hasWristSizePriceRules ? originalBasePrice : applySaleRate(originalBasePrice, saleRate)
     : product.price;
   const claspExtra = hasClaspOption && effectiveSelectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;

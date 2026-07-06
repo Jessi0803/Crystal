@@ -4935,6 +4935,11 @@ var products = [
     categoryLabels: ["\u611B\u60C5\u6843\u82B1", "\u7642\u7652\u7CFB\u5217", "\u80FD\u91CF\u9632\u8B77"],
     price: 1800,
     originalPrice: 2100,
+    wristSizePriceRules: [
+      { maxWristSize: 13.5, price: 1700 },
+      { maxWristSize: 17, price: 1800 },
+      { maxWristSize: 19, price: 1900 }
+    ],
     image: "/images/d-design/d004.jpg",
     tags: ["\u4EBA\u7DE3", "\u5E73\u8861"],
     description: "\u7531\u767D\u5E7D\u9748\u3001\u7D05\u5154\u6BDB\u3001\u85CD\u6708\u5149\u3001\u767D\u5154\u6BDB\u3001\u7C89\u78A7\u74BD\u7B49\u6676\u77F3\u69CB\u6210\uFF0C\u5C64\u6B21\u67D4\u548C\u4E14\u6C23\u5834\u98FD\u6EFF\u3002",
@@ -6072,16 +6077,26 @@ async function ensureProductsTable() {
   } catch {
   }
   try {
-    await db.execute(sql6`
-      UPDATE \`products\`
-      SET \`wristSizePriceRules\` = ${JSON.stringify([
-      { maxWristSize: 13.5, price: 1480 },
-      { maxWristSize: 17, price: 1580 },
-      { maxWristSize: 19, price: 1680 }
-    ])}
-      WHERE \`id\` = 'd005-moon-clear-heart'
-        AND \`wristSizePriceRules\` IS NULL
-    `);
+    const existingProductRules = {
+      "d004-morning-whisper": [
+        { maxWristSize: 13.5, price: 1700 },
+        { maxWristSize: 17, price: 1800 },
+        { maxWristSize: 19, price: 1900 }
+      ],
+      "d005-moon-clear-heart": [
+        { maxWristSize: 13.5, price: 1480 },
+        { maxWristSize: 17, price: 1580 },
+        { maxWristSize: 19, price: 1680 }
+      ]
+    };
+    for (const [id, rules] of Object.entries(existingProductRules)) {
+      await db.execute(sql6`
+        UPDATE \`products\`
+        SET \`wristSizePriceRules\` = ${JSON.stringify(rules)}
+        WHERE \`id\` = ${id}
+          AND \`wristSizePriceRules\` IS NULL
+      `);
+    }
   } catch {
   }
   try {

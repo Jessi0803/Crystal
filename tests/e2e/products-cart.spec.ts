@@ -175,6 +175,20 @@ test("moon clear heart wrist size rules update price and cart line", async ({ pa
   await expect(drawer).toContainText("NT$ 1,680");
 });
 
+test("morning whisper uses wrist size price rules without discounting them", async ({ page }) => {
+  await page.goto("/products/d004-morning-whisper");
+  await expect(page.getByRole("heading", { name: "晨光輕語手鍊" })).toBeVisible();
+
+  const wristSelect = page.getByRole("combobox").first();
+  await expect(page.locator("body")).toContainText("NT$ 1,800");
+
+  await wristSelect.selectOption("13.5");
+  await expect(page.locator("body")).toContainText("NT$ 1,700");
+
+  await wristSelect.selectOption("18");
+  await expect(page.locator("body")).toContainText("NT$ 1,900");
+});
+
 test("monthly limited bracelet products keep wrist size and clasp through checkout", async ({ page }) => {
   await page.goto("/products/e2e-monthly-in-stock");
 

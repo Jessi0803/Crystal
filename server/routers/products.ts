@@ -147,17 +147,27 @@ async function ensureProductsTable() {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizePriceRules\` json DEFAULT NULL`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
-    await db.execute(sql`
-      UPDATE \`products\`
-      SET \`wristSizePriceRules\` = ${JSON.stringify([
+    const existingProductRules: Record<string, { maxWristSize: number; price: number }[]> = {
+      "d004-morning-whisper": [
+        { maxWristSize: 13.5, price: 1700 },
+        { maxWristSize: 17, price: 1800 },
+        { maxWristSize: 19, price: 1900 },
+      ],
+      "d005-moon-clear-heart": [
         { maxWristSize: 13.5, price: 1480 },
         { maxWristSize: 17, price: 1580 },
         { maxWristSize: 19, price: 1680 },
-      ])}
-      WHERE \`id\` = 'd005-moon-clear-heart'
-        AND \`wristSizePriceRules\` IS NULL
-    `);
-  } catch { /* 補月映淨心手圍價格失敗不影響商品列表 */ }
+      ],
+    };
+    for (const [id, rules] of Object.entries(existingProductRules)) {
+      await db.execute(sql`
+        UPDATE \`products\`
+        SET \`wristSizePriceRules\` = ${JSON.stringify(rules)}
+        WHERE \`id\` = ${id}
+          AND \`wristSizePriceRules\` IS NULL
+      `);
+    }
+  } catch { /* 補既有手圍價格失敗不影響商品列表 */ }
   try {
     for (const [id, categories] of Object.entries(PRODUCT_CATEGORY_OVERRIDES)) {
       await db.execute(sql`
