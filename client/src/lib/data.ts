@@ -27,6 +27,7 @@ export interface Product {
   isMonthlyLimited?: boolean;
   twoItemFreeShippingEligible?: boolean;
   claspOptions?: ("elastic" | "lobster" | "magnetic")[];
+  showWristSize?: boolean;
   showFitPreference?: boolean;
   wristSizeMin?: number;
   wristSizeMax?: number;

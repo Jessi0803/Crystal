@@ -358,6 +358,7 @@ var init_schema = __esm({
       isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
       twoItemFreeShippingEligible: boolean("twoItemFreeShippingEligible").notNull().default(true),
       claspOptions: json("claspOptions").$type(),
+      showWristSize: boolean("showWristSize").notNull().default(true),
       showFitPreference: boolean("showFitPreference").notNull().default(true),
       wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
       wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
@@ -6017,6 +6018,7 @@ async function ensureProductsTable() {
       \`isMonthlyLimited\` boolean NOT NULL DEFAULT false,
       \`twoItemFreeShippingEligible\` boolean NOT NULL DEFAULT true,
       \`claspOptions\` json DEFAULT NULL,
+      \`showWristSize\` boolean NOT NULL DEFAULT true,
       \`showFitPreference\` boolean NOT NULL DEFAULT true,
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
       \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
@@ -6058,6 +6060,10 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`claspOptions\` json DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`showWristSize\` boolean NOT NULL DEFAULT true`);
   } catch {
   }
   try {
@@ -6201,6 +6207,7 @@ function toFrontendProduct(p) {
     isMonthlyLimited: p.isMonthlyLimited,
     twoItemFreeShippingEligible: p.twoItemFreeShippingEligible,
     claspOptions: p.claspOptions ?? void 0,
+    showWristSize: p.showWristSize,
     showFitPreference: p.showFitPreference,
     wristSizeMin: p.wristSizeMin ?? 13,
     wristSizeMax: p.wristSizeMax ?? 19,
@@ -6248,6 +6255,7 @@ var ProductInputSchema = z6.object({
   isMonthlyLimited: z6.boolean().default(false),
   twoItemFreeShippingEligible: z6.boolean().default(true),
   claspOptions: z6.array(z6.enum(["elastic", "lobster", "magnetic"])).default([]),
+  showWristSize: z6.boolean().default(true),
   showFitPreference: z6.boolean().default(true),
   wristSizeMin: wristSizeSchema.default(13),
   wristSizeMax: wristSizeSchema.default(19),

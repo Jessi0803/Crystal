@@ -51,6 +51,7 @@ type FormState = {
   isMonthlyLimited: boolean;
   twoItemFreeShippingEligible: boolean;
   claspOptions: ("elastic" | "lobster" | "magnetic")[];
+  showWristSize: boolean;
   showFitPreference: boolean;
   wristSizeMin: string;
   wristSizeMax: string;
@@ -78,6 +79,7 @@ const DEFAULT_FORM: FormState = {
   isMonthlyLimited: false,
   twoItemFreeShippingEligible: true,
   claspOptions: [...DEFAULT_CLASP_OPTIONS],
+  showWristSize: true,
   showFitPreference: true,
   wristSizeMin: DEFAULT_WRIST_SIZE_MIN,
   wristSizeMax: DEFAULT_WRIST_SIZE_MAX,
@@ -477,6 +479,7 @@ function ProductModal({
           isMonthlyLimited: editing.isMonthlyLimited,
           twoItemFreeShippingEligible: editing.twoItemFreeShippingEligible ?? true,
           claspOptions: editing.claspOptions ?? [...DEFAULT_CLASP_OPTIONS],
+          showWristSize: editing.showWristSize ?? true,
           showFitPreference: editing.showFitPreference ?? true,
           wristSizeMin: String(editing.wristSizeMin ?? DEFAULT_WRIST_SIZE_MIN),
           wristSizeMax: String(editing.wristSizeMax ?? DEFAULT_WRIST_SIZE_MAX),
@@ -683,6 +686,7 @@ function ProductModal({
       isMonthlyLimited: form.isMonthlyLimited,
       twoItemFreeShippingEligible: form.twoItemFreeShippingEligible,
       claspOptions: form.claspOptions,
+      showWristSize: form.showWristSize,
       showFitPreference: form.showFitPreference,
       wristSizeMin,
       wristSizeMax,
@@ -946,6 +950,24 @@ function ProductModal({
                 </label>
               ))}
             </div>
+          </fieldset>
+
+          <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">
+            <legend className="px-1 text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">手圍選擇</legend>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.showWristSize}
+                onChange={(e) => setForm((p) => ({ ...p, showWristSize: e.target.checked }))}
+                className="mt-0.5 w-4 h-4"
+              />
+              <span className="text-xs font-body leading-relaxed text-[oklch(0.35_0_0)]">
+                前台顯示「手圍尺寸」選項
+                <span className="block text-[0.65rem] text-[oklch(0.58_0_0)]">
+                  關閉後，顧客下單此商品時不會選擇或儲存手圍。
+                </span>
+              </span>
+            </label>
           </fieldset>
 
           <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">

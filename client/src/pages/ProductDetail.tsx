@@ -246,10 +246,10 @@ export default function ProductDetail() {
     );
   }
 
-  const hasTieredBraceletPricing = usesTieredBraceletPricing(product);
   const productClaspOptions = product.claspOptions ?? [...DEFAULT_CLASP_OPTIONS];
   const claspChoices = ALL_CLASP_CHOICES.filter((choice) => productClaspOptions.includes(choice.id));
-  const hasWristSizeOption = product.category !== "custom" && hasProductWristSize(product);
+  const hasWristSizeOption = product.category !== "custom" && product.showWristSize !== false && hasProductWristSize(product);
+  const hasTieredBraceletPricing = hasWristSizeOption && usesTieredBraceletPricing(product);
   const hasClaspOption = product.category !== "custom" && claspChoices.length > 0;
   const hasFitPreferenceOption = product.category !== "custom" && product.showFitPreference !== false;
   const effectiveSelectedClaspType = claspChoices.some((choice) => choice.id === selectedClaspType)
@@ -348,7 +348,7 @@ export default function ProductDetail() {
       ? [{ id: "notices" as const, label: "注意事項" }]
       : []),
     ...(product.category !== "custom" ? [{ id: "warranty" as const, label: "保固與維修" }] : []),
-    { id: "wrist" as const, label: "手圍測量" },
+    ...(hasWristSizeOption ? [{ id: "wrist" as const, label: "手圍測量" }] : []),
   ];
   const contentItems = product.crystalType.includes("｜")
     ? product.crystalType.split("｜")
@@ -855,7 +855,7 @@ export default function ProductDetail() {
                   ))}
                 </ul>
               )}
-              {activeTab === "wrist" && (
+              {hasWristSizeOption && activeTab === "wrist" && (
                 <ul className="space-y-2">
                   {[
                     "拿皮尺平貼在想戴手鍊的位置上，計算出「淨手圍」",

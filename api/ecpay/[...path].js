@@ -549,6 +549,7 @@ var dbProducts = mysqlTable("products", {
   isMonthlyLimited: boolean("isMonthlyLimited").notNull().default(false),
   twoItemFreeShippingEligible: boolean("twoItemFreeShippingEligible").notNull().default(true),
   claspOptions: json("claspOptions").$type(),
+  showWristSize: boolean("showWristSize").notNull().default(true),
   showFitPreference: boolean("showFitPreference").notNull().default(true),
   wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
   wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
