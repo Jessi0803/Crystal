@@ -1322,7 +1322,7 @@ async function getOrderStats() {
     completed: sql2`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('picked_up', 'completed') THEN 1 ELSE 0 END), 0) AS SIGNED)`,
     totalRevenue: sql2`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
     monthRevenue: sql2`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`
-  }).from(orders);
+  }).from(orders).where(visibleOrdersOnlyWhere());
   const n = (v) => Number(v ?? 0);
   return {
     totalOrders: n(row?.totalOrders),
