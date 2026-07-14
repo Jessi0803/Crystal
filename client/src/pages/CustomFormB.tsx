@@ -50,9 +50,6 @@ const TOPIC_CONTENT: Record<string, { desc?: string; items: string[] }> = {
   "守護神":    { desc: "你的守護神是誰？它想提醒你甚麼…讓能量帶領你與守護神進行連結，帶你認識自己的守護神。", items: ["我的守護星", "我的守護神", "守護神的過去與故事", "守護神與你之間的連結", "守護神想提醒你的事", "要如何與守護神有更深刻的感應"] },
 };
 
-const BASE_TOTAL = 2399;
-const BASE_DEPOSIT = 1399;
-
 // 各主題相對於基本方案的價格調整（訂金同步調整）
 const TOPIC_PRICE_ADJUST: Record<string, number> = {
   "前世今生1": 260,
@@ -212,6 +209,8 @@ export default function CustomFormB() {
   const { addToCart } = useCart();
 
   const depositProduct = products.find((p) => p.id === "tarot-crystal-deposit-product");
+  const selectedPriceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
+  const displayedAmount = depositProduct ? depositProduct.price + selectedPriceAdjust : 0;
 
   // ── 塔羅資料欄位（依主題動態產生）────────────────────────────────────────
 
@@ -620,8 +619,7 @@ export default function CustomFormB() {
     if (!validateBraceletData()) return;
     const customConsultationNote = buildNote(tarot, bracelet);
     sessionStorage.setItem("customConsultationNote", customConsultationNote);
-    const priceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
-    const unitPrice = depositProduct.price + priceAdjust;
+    const unitPrice = depositProduct.price + selectedPriceAdjust;
     addToCart(depositProduct, { unitPrice, customConsultationNote });
     toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
   }
@@ -660,7 +658,7 @@ export default function CustomFormB() {
               <div className="mb-5 flex items-baseline gap-2">
                 <span className="text-sm font-body text-[oklch(0.5_0_0)]">手鍊訂金＋占卜金額：</span>
                 <span className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                  NT$ {(BASE_TOTAL + (TOPIC_PRICE_ADJUST[tarot.topic] ?? 0)).toLocaleString()}
+                  NT$ {displayedAmount.toLocaleString()}
                 </span>
               </div>
             )}
