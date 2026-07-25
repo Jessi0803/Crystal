@@ -998,7 +998,7 @@ function ProductModal({
           stock: option.stock === "" ? null : Number(option.stock),
           active: option.active,
           image: normalizeImageUrl(option.image) || undefined,
-          wristSizePriceRules: optionWristSizePriceRules,
+          wristSizePriceRules: option.type === "combo" ? [] : optionWristSizePriceRules,
           wristSizeGroups: option.type === "combo" ? wristSizeGroups : [],
         };
       })
@@ -1019,19 +1019,19 @@ function ProductModal({
       toast.error("購買方案庫存請填 -1 或 0 以上整數");
       return;
     }
-    if (purchaseOptions.some((option) =>
+    if (purchaseOptions.some((option) => option.type !== "combo" &&
       option.wristSizePriceRules.some((rule) => !isValidWristSize(rule.maxWristSize) || !Number.isInteger(rule.price) || rule.price < 0)
     )) {
       toast.error("方案手圍價格請填 0.5 cm 為單位的手圍，以及 0 以上整數價格");
       return;
     }
-    if (purchaseOptions.some((option) =>
+    if (purchaseOptions.some((option) => option.type !== "combo" &&
       option.wristSizePriceRules.some((rule) => rule.maxWristSize < wristSizeMin || rule.maxWristSize > wristSizeMax)
     )) {
       toast.error("方案手圍價格的上限需落在手圍範圍內");
       return;
     }
-    if (purchaseOptions.some((option) =>
+    if (purchaseOptions.some((option) => option.type !== "combo" &&
       option.wristSizePriceRules.some((rule, index) =>
         index > 0 && rule.maxWristSize === option.wristSizePriceRules[index - 1].maxWristSize
       )
@@ -1396,6 +1396,7 @@ function ProductModal({
 	                        className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
 	                      />
 	                    </label>
+	                    {option.type !== "combo" && (
 	                    <div className="border border-[oklch(0.93_0_0)] bg-[oklch(0.985_0_0)] p-3">
 	                      <div className="mb-2 flex items-center justify-between gap-2">
 	                        <div>
@@ -1452,6 +1453,7 @@ function ProductModal({
 	                        </div>
 	                      )}
 	                    </div>
+	                    )}
 	                    {option.type === "combo" && (
 	                      <div className="border border-[oklch(0.9_0_0)] bg-white p-3">
 	                        <div className="mb-3 flex items-start justify-between gap-2">
