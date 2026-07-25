@@ -130,13 +130,119 @@ const mergeableOrderStatuses = new Set([
 const CartItemSchema = z.object({
   id: z.string(),
   baseProductId: z.string().optional(),
+  purchaseOptionId: z.string().optional(),
+  purchaseOptionLabel: z.string().optional(),
+  wristSize: z.string().optional(),
+  wristSizeSelections: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    value: z.string(),
+  })).optional(),
   name: z.string(),
   price: z.number(),
   quantity: z.number(),
   image: z.string().optional(),
   isPreorder: z.boolean().optional(),
   twoItemFreeShippingEligible: z.boolean().optional(),
+  purchaseOptionUsesOwnStock: z.boolean().optional(),
 });
+
+type CheckoutItem = z.infer<typeof CartItemSchema>;
+
+function getWristSizeRulePrice(
+  product: { wristSizePriceRules?: { maxWristSize: number; price: number }[] | null },
+  wristSize: number
+) {
+  const rules = product.wristSizePriceRules
+    ?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price))
+    .sort((a, b) => a.maxWristSize - b.maxWristSize);
+  if (!rules?.length) return null;
+  return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
+}
+
+async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
+  const db = await getDb();
+  if (!db) return items;
+
+  const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
+  if (productIds.length === 0) return items;
+
+  const products = await db
+    .select({
+      id: dbProducts.id,
+      name: dbProducts.name,
+      price: dbProducts.price,
+      image: dbProducts.image,
+      wristSizePriceRules: dbProducts.wristSizePriceRules,
+      purchaseOptions: dbProducts.purchaseOptions,
+    })
+    .from(dbProducts)
+    .where(inArray(dbProducts.id, productIds));
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const requestedOptionQuantity = new Map<string, number>();
+  for (const item of items) {
+    if (!item.purchaseOptionId) continue;
+    const productId = item.baseProductId ?? item.id;
+    const key = `${productId}:${item.purchaseOptionId}`;
+    requestedOptionQuantity.set(key, (requestedOptionQuantity.get(key) ?? 0) + item.quantity);
+  }
+
+  return items.map((item) => {
+    if (!item.purchaseOptionId) return item;
+    const productId = item.baseProductId ?? item.id;
+    const product = productById.get(productId);
+    const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
+    if (!product || !option || option.active === false) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `「${item.name}」的購買方案已不可購買。` });
+    }
+    const requestedQuantity = requestedOptionQuantity.get(`${productId}:${item.purchaseOptionId}`) ?? item.quantity;
+    if (option.stock != null && option.stock !== -1 && option.stock < requestedQuantity) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `「${product.name}（${option.label}）」庫存不足。` });
+    }
+    const optionProductName = `${product.name}（${option.label}）`;
+    if (option.type === "combo") {
+      const groups = option.wristSizeGroups ?? [];
+      if (groups.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `「${optionProductName}」尚未設定組合手圍價格。` });
+      }
+      const selections = item.wristSizeSelections ?? [];
+      const price = groups.reduce((sum, group) => {
+        const selected = selections.find((selection) => selection.id === group.id);
+        const wristSize = selected == null ? NaN : Number(selected.value);
+        const groupPrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(group, wristSize) : null;
+        if (groupPrice == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `「${optionProductName}」缺少 ${group.label} 的價格。` });
+        }
+        return sum + groupPrice;
+      }, 0);
+      return {
+        ...item,
+        name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+        price,
+        image: item.image || product.image,
+        purchaseOptionLabel: option.label,
+        purchaseOptionUsesOwnStock: option.stock != null,
+      };
+    }
+    const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
+    const optionWristSizeRulePrice = Number.isFinite(wristSize)
+      ? getWristSizeRulePrice(option, wristSize)
+      : null;
+    const productWristSizeRulePrice = Number.isFinite(wristSize)
+      ? getWristSizeRulePrice(product, wristSize)
+      : null;
+    const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
+    const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
+    return {
+      ...item,
+      name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+      price: optionWristSizeRulePrice ?? option.price + wristSizePriceDelta,
+      image: item.image || product.image,
+      purchaseOptionLabel: option.label,
+      purchaseOptionUsesOwnStock: option.stock != null,
+    };
+  });
+}
 
 function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
@@ -285,10 +391,11 @@ export const orderRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await ensureOrdersColumns();
-      const submittedItems = input.items.filter((item) => {
+      let submittedItems = input.items.filter((item) => {
         const productId = item.baseProductId ?? item.id;
         return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
       });
+      submittedItems = await normalizePurchaseOptionItems(submittedItems);
       if (submittedItems.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "購物車沒有可結帳商品" });
       }
@@ -298,6 +405,7 @@ export const orderRouter = router({
       const shippingMethod = isCustomOrder ? ("home" as const) : isOverseas ? ("home" as const) : input.shippingMethod;
       const paymentMethod = isOverseas ? ("paypal" as const) : input.paymentMethod;
       for (const item of submittedItems) {
+        if (item.purchaseOptionUsesOwnStock) continue;
         const productId = item.baseProductId ?? item.id;
         const availability = await getProductAvailability(productId);
         if (
@@ -432,6 +540,7 @@ export const orderRouter = router({
           quantity: item.quantity,
           unitPrice: item.price,
           subtotal: item.price * item.quantity,
+          purchaseOptionId: item.purchaseOptionId ?? null,
           isPreorder: item.isPreorder ?? false,
         }))
       );

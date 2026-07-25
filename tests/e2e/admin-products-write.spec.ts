@@ -1,13 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-test("admin can create a product and edit its inline stock", async ({ page }) => {
-  const productName = `E2E 後台新增商品 ${Date.now()}`;
+function uniqueProductName(prefix: string, projectName: string) {
+  return `${prefix} ${projectName} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
+}
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+test("admin can create a product and edit its inline stock", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 後台新增商品", testInfo.project.name);
+
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -37,11 +40,10 @@ test("admin can create a product and edit its inline stock", async ({ page }) =>
   await expect(page.getByRole("button", { name: `編輯 ${productName} 庫存` })).toHaveText("4");
 });
 
-test("admin can choose which clasp options a product shows", async ({ page }) => {
-  const productName = `E2E 扣具選項商品 ${Date.now()}`;
+test("admin can choose which clasp options a product shows", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 扣具選項商品", testInfo.project.name);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -77,11 +79,10 @@ test("admin can choose which clasp options a product shows", async ({ page }) =>
   await expect(drawer).toContainText("NT$ 1,088");
 });
 
-test("admin can set a product wrist size range shown on storefront", async ({ page }) => {
-  const productName = `E2E 手圍範圍商品 ${Date.now()}`;
+test("admin can set a product wrist size range shown on storefront", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 手圍範圍商品", testInfo.project.name);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -114,11 +115,10 @@ test("admin can set a product wrist size range shown on storefront", async ({ pa
   await expect(wristSelect.locator('option[value="16.5"]')).toHaveCount(0);
 });
 
-test("admin can set wrist size price rules used on storefront", async ({ page }) => {
-  const productName = `E2E 手圍價格商品 ${Date.now()}`;
+test("admin can set wrist size price rules used on storefront", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 手圍價格商品", testInfo.project.name);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -160,4 +160,69 @@ test("admin can set wrist size price rules used on storefront", async ({ page })
   await expect(page.locator("body")).toContainText("NT$ 1,480");
   await wristSelect.selectOption("18");
   await expect(page.locator("body")).toContainText("NT$ 1,680");
+});
+
+test("admin can set a purchase option image shown on storefront and in cart", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 方案圖片商品", testInfo.project.name);
+  const galleryImage = "/images/d-design/d001.jpg";
+  const optionImage = "/images/d-design/d003.jpg";
+
+  await loginAsAdminByCookie(page);
+
+  await page.goto("/admin/products");
+  await expect(page.locator("body")).toContainText("商品管理");
+  await page.getByRole("button", { name: "新增商品" }).click();
+
+  await page.locator('input[placeholder="或貼上圖片網址"]').fill(galleryImage);
+  await page.getByRole("button", { name: "加入" }).click();
+  await expect(page.locator(`img[src="${galleryImage}"]`)).toBeVisible();
+  await page.locator('input[placeholder="例：紫水晶手鍊"]').fill(productName);
+  await page.locator('input[placeholder="1200"]').fill("990");
+  await page.locator('input[placeholder="紫水晶, 愛情"]').fill("E2E, 方案圖片");
+  await page.locator('input[type="number"]').last().fill("5");
+  await page.locator("textarea").first().fill("後台方案圖片測試");
+  await page.locator("textarea").last().fill("白水晶");
+
+  // 方案一沒有圖片，方案二帶自己的圖片
+  const addOption = page.getByTestId("add-purchase-option");
+  await addOption.click();
+  await page.locator('input[placeholder="男款"]').nth(0).fill("女款");
+  await addOption.click();
+  await page.locator('input[placeholder="男款"]').nth(1).fill("男款");
+  await page.locator('input[placeholder="或貼上方案圖片網址"]').nth(1).fill(optionImage);
+
+  await page.getByRole("button", { name: "新增商品" }).last().click();
+  await expect(page.locator("body")).toContainText(productName);
+
+  // 重開編輯視窗，確認方案圖片有存下來
+  await page.locator('input[placeholder="搜尋商品名稱或分類"]').fill(productName);
+  await page.getByRole("button", { name: "編輯", exact: true }).click();
+  await expect(page.locator('input[placeholder="或貼上方案圖片網址"]').nth(1)).toHaveValue(optionImage);
+  await page.getByRole("button", { name: "取消" }).click();
+
+  await page.goto("/products");
+  const productLink = page.locator('a[href^="/products/"]').filter({ hasText: productName }).first();
+  await expect(productLink).toBeVisible();
+  await productLink.click();
+
+  await expect(page.getByRole("heading", { name: productName })).toBeVisible();
+  const mainImage = page.getByAltText(productName, { exact: true });
+
+  // 預設方案沒設圖，顯示商品主圖
+  await expect(mainImage).toHaveAttribute("src", galleryImage);
+
+  // 選有圖的方案，主圖換成方案圖
+  await page.getByRole("button", { name: /男款/ }).click();
+  await expect(mainImage).toHaveAttribute("src", optionImage);
+
+  // 換回沒設圖的方案，主圖回到商品主圖
+  await page.getByRole("button", { name: /女款/ }).click();
+  await expect(mainImage).toHaveAttribute("src", galleryImage);
+
+  // 購物袋顯示所選方案的圖片
+  await page.getByRole("button", { name: /男款/ }).click();
+  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
+  await expect(drawer).toContainText("男款");
+  await expect(drawer.locator(`img[src="${optionImage}"]`)).toBeVisible();
 });

@@ -213,6 +213,7 @@ var init_schema = __esm({
       quantity: int("quantity").notNull(),
       unitPrice: int("unitPrice").notNull(),
       subtotal: int("subtotal").notNull(),
+      purchaseOptionId: varchar("purchaseOptionId", { length: 64 }),
       // 是否為預購商品
       isPreorder: boolean("isPreorder").default(false).notNull()
     }, (table) => [
@@ -363,6 +364,7 @@ var init_schema = __esm({
       wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
       wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
       wristSizePriceRules: json("wristSizePriceRules").$type(),
+      purchaseOptions: json("purchaseOptions").$type(),
       scheduledPublishAt: timestamp("scheduledPublishAt"),
       sortOrder: int("sortOrder").notNull().default(0),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1289,6 +1291,7 @@ async function getAdminOrderDetail(orderId) {
       productId: orderItems.productId,
       productName: orderItems.productName,
       productImage: sql2`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`,
+      purchaseOptionId: orderItems.purchaseOptionId,
       quantity: orderItems.quantity,
       unitPrice: orderItems.unitPrice,
       subtotal: orderItems.subtotal,
@@ -1568,6 +1571,10 @@ async function ensureOrdersColumns() {
     await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`freeShippingOverride\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch {
   }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orderItems\` ADD COLUMN \`purchaseOptionId\` varchar(64) NULL`);
+  } catch {
+  }
   ordersColumnsEnsured = true;
 }
 var NO_EXPIRY_LOCK_DATE = /* @__PURE__ */ new Date("2038-01-01T00:00:00.000Z");
@@ -1580,6 +1587,21 @@ async function isMonthlyLimitedProduct(productId) {
   if (!db) return false;
   const [product] = await db.select({ isMonthlyLimited: dbProducts.isMonthlyLimited }).from(dbProducts).where(eq3(dbProducts.id, productId)).limit(1);
   return product?.isMonthlyLimited === true;
+}
+async function adjustPurchaseOptionStock(productId, purchaseOptionId, quantityDelta) {
+  if (!purchaseOptionId) return false;
+  const db = await getDb();
+  if (!db) return false;
+  const [product] = await db.select({ purchaseOptions: dbProducts.purchaseOptions }).from(dbProducts).where(eq3(dbProducts.id, productId)).limit(1);
+  const options = product?.purchaseOptions;
+  const option = options?.find((candidate) => candidate.id === purchaseOptionId);
+  if (!options || !option || option.stock == null) return false;
+  if (option.stock === -1) return true;
+  const nextOptions = options.map(
+    (candidate) => candidate.id === purchaseOptionId ? { ...candidate, stock: Math.max(0, (candidate.stock ?? 0) + quantityDelta) } : candidate
+  );
+  await db.update(dbProducts).set({ purchaseOptions: nextOptions }).where(eq3(dbProducts.id, productId));
+  return true;
 }
 async function getDefaultAllowPreorder(productId) {
   if (shouldSkipInventory(productId)) return false;
@@ -1669,9 +1691,11 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
   await ensureOrdersColumns();
   const [order] = await db.select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!order || order.inventoryDeducted) return;
-  const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
+  const items = await db.select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, -item.quantity);
+    if (handledByPurchaseOption) continue;
     await db.update(productInventory).set({ stock: sql3`GREATEST(0, ${productInventory.stock} - ${item.quantity})` }).where(
       and3(
         eq3(productInventory.productId, item.productId),
@@ -1697,9 +1721,11 @@ async function restoreInventoryOnCancel(merchantTradeNo) {
   await ensureOrdersColumns();
   const [order] = await db.select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!order || !order.inventoryDeducted) return;
-  const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
+  const items = await db.select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, item.quantity);
+    if (handledByPurchaseOption) continue;
     await db.update(productInventory).set({ stock: sql3`${productInventory.stock} + ${item.quantity}` }).where(
       and3(
         eq3(productInventory.productId, item.productId),
@@ -2920,13 +2946,100 @@ var mergeableOrderStatuses = /* @__PURE__ */ new Set([
 var CartItemSchema = z2.object({
   id: z2.string(),
   baseProductId: z2.string().optional(),
+  purchaseOptionId: z2.string().optional(),
+  purchaseOptionLabel: z2.string().optional(),
+  wristSize: z2.string().optional(),
+  wristSizeSelections: z2.array(z2.object({
+    id: z2.string(),
+    label: z2.string(),
+    value: z2.string()
+  })).optional(),
   name: z2.string(),
   price: z2.number(),
   quantity: z2.number(),
   image: z2.string().optional(),
   isPreorder: z2.boolean().optional(),
-  twoItemFreeShippingEligible: z2.boolean().optional()
+  twoItemFreeShippingEligible: z2.boolean().optional(),
+  purchaseOptionUsesOwnStock: z2.boolean().optional()
 });
+function getWristSizeRulePrice(product, wristSize) {
+  const rules = product.wristSizePriceRules?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price)).sort((a, b) => a.maxWristSize - b.maxWristSize);
+  if (!rules?.length) return null;
+  return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
+}
+async function normalizePurchaseOptionItems(items) {
+  const db = await getDb();
+  if (!db) return items;
+  const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
+  if (productIds.length === 0) return items;
+  const products2 = await db.select({
+    id: dbProducts.id,
+    name: dbProducts.name,
+    price: dbProducts.price,
+    image: dbProducts.image,
+    wristSizePriceRules: dbProducts.wristSizePriceRules,
+    purchaseOptions: dbProducts.purchaseOptions
+  }).from(dbProducts).where(inArray2(dbProducts.id, productIds));
+  const productById = new Map(products2.map((product) => [product.id, product]));
+  const requestedOptionQuantity = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    if (!item.purchaseOptionId) continue;
+    const productId = item.baseProductId ?? item.id;
+    const key = `${productId}:${item.purchaseOptionId}`;
+    requestedOptionQuantity.set(key, (requestedOptionQuantity.get(key) ?? 0) + item.quantity);
+  }
+  return items.map((item) => {
+    if (!item.purchaseOptionId) return item;
+    const productId = item.baseProductId ?? item.id;
+    const product = productById.get(productId);
+    const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
+    if (!product || !option || option.active === false) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u7684\u8CFC\u8CB7\u65B9\u6848\u5DF2\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
+    }
+    const requestedQuantity = requestedOptionQuantity.get(`${productId}:${item.purchaseOptionId}`) ?? item.quantity;
+    if (option.stock != null && option.stock !== -1 && option.stock < requestedQuantity) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${product.name}\uFF08${option.label}\uFF09\u300D\u5EAB\u5B58\u4E0D\u8DB3\u3002` });
+    }
+    const optionProductName = `${product.name}\uFF08${option.label}\uFF09`;
+    if (option.type === "combo") {
+      const groups = option.wristSizeGroups ?? [];
+      if (groups.length === 0) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u5C1A\u672A\u8A2D\u5B9A\u7D44\u5408\u624B\u570D\u50F9\u683C\u3002` });
+      }
+      const selections = item.wristSizeSelections ?? [];
+      const price = groups.reduce((sum, group) => {
+        const selected = selections.find((selection) => selection.id === group.id);
+        const wristSize2 = selected == null ? NaN : Number(selected.value);
+        const groupPrice = Number.isFinite(wristSize2) ? getWristSizeRulePrice(group, wristSize2) : null;
+        if (groupPrice == null) {
+          throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u7F3A\u5C11 ${group.label} \u7684\u50F9\u683C\u3002` });
+        }
+        return sum + groupPrice;
+      }, 0);
+      return {
+        ...item,
+        name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+        price,
+        image: item.image || product.image,
+        purchaseOptionLabel: option.label,
+        purchaseOptionUsesOwnStock: option.stock != null
+      };
+    }
+    const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
+    const optionWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(option, wristSize) : null;
+    const productWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(product, wristSize) : null;
+    const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
+    const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
+    return {
+      ...item,
+      name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+      price: optionWristSizeRulePrice ?? option.price + wristSizePriceDelta,
+      image: item.image || product.image,
+      purchaseOptionLabel: option.label,
+      purchaseOptionUsesOwnStock: option.stock != null
+    };
+  });
+}
 function isCustomCheckoutItem(item) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
@@ -3055,10 +3168,11 @@ var orderRouter = router({
     })
   ).mutation(async ({ input, ctx }) => {
     await ensureOrdersColumns();
-    const submittedItems = input.items.filter((item) => {
+    let submittedItems = input.items.filter((item) => {
       const productId = item.baseProductId ?? item.id;
       return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
     });
+    submittedItems = await normalizePurchaseOptionItems(submittedItems);
     if (submittedItems.length === 0) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8CFC\u7269\u8ECA\u6C92\u6709\u53EF\u7D50\u5E33\u5546\u54C1" });
     }
@@ -3068,6 +3182,7 @@ var orderRouter = router({
     const shippingMethod = isCustomOrder ? "home" : isOverseas ? "home" : input.shippingMethod;
     const paymentMethod = isOverseas ? "paypal" : input.paymentMethod;
     for (const item of submittedItems) {
+      if (item.purchaseOptionUsesOwnStock) continue;
       const productId = item.baseProductId ?? item.id;
       const availability = await getProductAvailability(productId);
       if (availability.isMonthlyLimited && (!availability.available || availability.stock !== -1 && availability.stock < item.quantity)) {
@@ -3182,6 +3297,7 @@ var orderRouter = router({
         quantity: item.quantity,
         unitPrice: item.price,
         subtotal: item.price * item.quantity,
+        purchaseOptionId: item.purchaseOptionId ?? null,
         isPreorder: item.isPreorder ?? false
       }))
     );
@@ -6023,6 +6139,7 @@ async function ensureProductsTable() {
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
       \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
       \`wristSizePriceRules\` json DEFAULT NULL,
+      \`purchaseOptions\` json DEFAULT NULL,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -6080,6 +6197,10 @@ async function ensureProductsTable() {
   }
   try {
     await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`wristSizePriceRules\` json DEFAULT NULL`);
+  } catch {
+  }
+  try {
+    await db.execute(sql6`ALTER TABLE \`products\` ADD COLUMN \`purchaseOptions\` json DEFAULT NULL`);
   } catch {
   }
   try {
@@ -6212,6 +6333,7 @@ function toFrontendProduct(p) {
     wristSizeMin: p.wristSizeMin ?? 13,
     wristSizeMax: p.wristSizeMax ?? 19,
     wristSizePriceRules: p.wristSizePriceRules ?? void 0,
+    purchaseOptions: p.purchaseOptions?.filter((option) => option.active !== false) ?? void 0,
     scheduledPublishAt: p.scheduledPublishAt ?? void 0,
     crystalType: p.crystalType ?? "",
     color: p.color ?? ""
@@ -6227,6 +6349,23 @@ var wristSizeSchema = z6.number().min(0).max(99).refine((value) => Number.isInte
 var WristSizePriceRuleSchema = z6.object({
   maxWristSize: wristSizeSchema,
   price: z6.number().int().min(0)
+});
+var PurchaseOptionSchema = z6.object({
+  id: z6.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+  label: z6.string().trim().min(1).max(40),
+  type: z6.enum(["single", "combo"]).default("single"),
+  price: z6.number().int().min(0),
+  originalPrice: z6.number().int().min(0).nullable().optional(),
+  description: z6.string().trim().max(120).optional(),
+  stock: z6.number().int().min(-1).nullable().optional(),
+  active: z6.boolean().default(true),
+  image: z6.string().trim().nullable().optional(),
+  wristSizePriceRules: z6.array(WristSizePriceRuleSchema).default([]),
+  wristSizeGroups: z6.array(z6.object({
+    id: z6.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+    label: z6.string().trim().min(1).max(40),
+    wristSizePriceRules: z6.array(WristSizePriceRuleSchema).min(1)
+  })).default([])
 });
 var ProductInputSchema = z6.object({
   name: z6.string().min(1),
@@ -6260,11 +6399,15 @@ var ProductInputSchema = z6.object({
   wristSizeMin: wristSizeSchema.default(13),
   wristSizeMax: wristSizeSchema.default(19),
   wristSizePriceRules: z6.array(WristSizePriceRuleSchema).default([]),
+  purchaseOptions: z6.array(PurchaseOptionSchema).default([]),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z6.number().int().default(0)
 }).refine((value) => value.wristSizeMin <= value.wristSizeMax, {
   message: "\u624B\u570D\u6700\u5C0F\u503C\u4E0D\u53EF\u5927\u65BC\u6700\u5927\u503C",
   path: ["wristSizeMax"]
+}).refine((value) => new Set(value.purchaseOptions.map((option) => option.id)).size === value.purchaseOptions.length, {
+  message: "\u65B9\u6848\u4EE3\u78BC\u4E0D\u53EF\u91CD\u8907",
+  path: ["purchaseOptions"]
 });
 var BulkDiscountInputSchema = z6.object({
   productIds: z6.array(z6.string().min(1)).min(1),

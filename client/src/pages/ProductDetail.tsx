@@ -20,8 +20,10 @@ import {
   getDiscountLabel,
   getSaleRate,
   getTieredBraceletBasePrice,
+  getWristSizeRulePrice,
   usesTieredBraceletPricing,
 } from "@/lib/pricing";
+import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
 import {
   Dialog,
@@ -133,15 +135,6 @@ function CustomPriceTile({
   );
 }
 
-function normalizeImageUrl(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed.includes("drive.google.com")) return trimmed;
-  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
-  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
-  const id = fileMatch?.[1] ?? idMatch?.[1];
-  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
-}
-
 function getProductImages(product: { image: string; images?: string[] }) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
@@ -184,6 +177,8 @@ export default function ProductDetail() {
   );
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
+  const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState("");
+  const [selectedWristSizeSelections, setSelectedWristSizeSelections] = useState<Record<string, string>>({});
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
   const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
   const [showClaspGuide, setShowClaspGuide] = useState(false);
@@ -206,13 +201,33 @@ export default function ProductDetail() {
     setHasSelectedClasp(false);
     setShowWristMeasureGuide(false);
     setShowClaspGuide(false);
-    setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
+    // 清空而非填入第一張，讓預設方案的圖片能在載入時就顯示
+    setSelectedGalleryImage("");
+    setSelectedPurchaseOptionId(product?.purchaseOptions?.find((option) => option.active !== false)?.id ?? "");
   }, [id, product?.id]);
   useEffect(() => {
     if (!wristSizes.includes(selectedWristSize)) {
       setSelectedWristSize(wristSizes.includes("14") ? "14" : wristSizes[0]);
     }
   }, [wristSizes, selectedWristSize]);
+  useEffect(() => {
+    const option = product?.purchaseOptions?.find((item) => item.id === selectedPurchaseOptionId);
+    const groups = option?.type === "combo" ? option.wristSizeGroups ?? [] : [];
+    if (groups.length === 0) {
+      setSelectedWristSizeSelections({});
+      return;
+    }
+    setSelectedWristSizeSelections((current) => {
+      const next: Record<string, string> = {};
+      for (const group of groups) {
+        const currentValue = current[group.id];
+        next[group.id] = currentValue && wristSizes.includes(currentValue)
+          ? currentValue
+          : wristSizes.includes("14") ? "14" : wristSizes[0];
+      }
+      return next;
+    });
+  }, [product?.purchaseOptions, selectedPurchaseOptionId, wristSizes]);
 
   if (isLoading && !product) {
     return (
@@ -256,25 +271,68 @@ export default function ProductDetail() {
     ? selectedClaspType
     : claspChoices[0]?.id ?? "elastic";
   const visibleTags = product.tags;
+  const purchaseOptions = product.purchaseOptions?.filter((option) => option.active !== false) ?? [];
+  const selectedPurchaseOption =
+    purchaseOptions.find((option) => option.id === selectedPurchaseOptionId) ?? purchaseOptions[0];
+  const selectedWristSizeGroups = selectedPurchaseOption?.type === "combo"
+    ? selectedPurchaseOption.wristSizeGroups ?? []
+    : [];
+  const isComboPurchaseOption = selectedWristSizeGroups.length > 0;
+  const hasSelectedOptionWristSizePricing = Boolean(
+    selectedPurchaseOption?.wristSizePriceRules?.length || selectedWristSizeGroups.length
+  );
   const galleryImages = getProductImages(product);
+  const selectedOptionImage = selectedPurchaseOption?.image?.trim()
+    ? normalizeImageUrl(selectedPurchaseOption.image)
+    : "";
+  // selectedGalleryImage 只代表「使用者手動點過的相簿縮圖」；為空時才讓方案圖接手
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
     ? selectedGalleryImage
-    : galleryImages[0] ?? product.image;
+    : selectedOptionImage || galleryImages[0] || product.image;
   const wristSizeNumber = Number(selectedWristSize);
+  const selectedComboWristSizeNumbers = selectedWristSizeGroups.map((group) =>
+    Number(selectedWristSizeSelections[group.id] ?? wristSizes[0])
+  );
   const saleRate = getSaleRate(product);
   const discountLabel = getDiscountLabel(product);
-  const hasProductDiscount = Boolean(product.originalPrice && product.originalPrice > product.price);
+  const hasProductDiscount = Boolean(
+    selectedPurchaseOption
+      ? selectedPurchaseOption.originalPrice && selectedPurchaseOption.originalPrice > selectedPurchaseOption.price
+      : product.originalPrice && product.originalPrice > product.price
+  );
   const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
-  const originalBasePrice = hasTieredBraceletPricing
-    ? getTieredBraceletBasePrice(product, wristSizeNumber)
-    : product.price;
-  const basePrice = hasTieredBraceletPricing
+  const optionPrice = selectedPurchaseOption?.price;
+  const optionOriginalPrice = selectedPurchaseOption?.originalPrice ?? undefined;
+  const comboWristSizePrice = isComboPurchaseOption
+    ? selectedWristSizeGroups.reduce((sum, group, index) => {
+        const groupPrice = getWristSizeRulePrice(group, selectedComboWristSizeNumbers[index]);
+        return sum + (groupPrice ?? 0);
+      }, 0)
+    : null;
+  const optionWristSizePrice = selectedPurchaseOption && !isComboPurchaseOption
+    ? getWristSizeRulePrice(selectedPurchaseOption, wristSizeNumber)
+    : null;
+  const wristSizeBasePrice = optionWristSizePrice ?? (
+    hasTieredBraceletPricing
+      ? getTieredBraceletBasePrice(product, wristSizeNumber)
+      : product.price
+  );
+  const wristSizePriceDelta = hasTieredBraceletPricing ? wristSizeBasePrice - product.price : 0;
+  const optionBasePrice = comboWristSizePrice ?? optionWristSizePrice ?? (optionPrice == null ? null : optionPrice + wristSizePriceDelta);
+  const optionOriginalBasePrice = optionOriginalPrice == null
+    ? null
+    : optionWristSizePrice ?? optionOriginalPrice + wristSizePriceDelta;
+  const originalBasePrice = optionOriginalBasePrice && optionOriginalBasePrice > (optionBasePrice ?? 0)
+    ? optionOriginalBasePrice
+    : wristSizeBasePrice;
+  const basePrice = optionBasePrice ?? (hasTieredBraceletPricing
     ? hasWristSizePriceRules ? originalBasePrice : applySaleRate(originalBasePrice, saleRate)
-    : product.price;
+    : product.price);
   const claspExtra = hasClaspOption && effectiveSelectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
   const originalCurrentPrice = originalBasePrice + claspExtra;
-  const hasCurrentPriceSale = hasTieredBraceletPricing && currentPrice < originalCurrentPrice;
+  const hasCurrentPriceSale = currentPrice < originalCurrentPrice;
+  const shouldShowCurrentPrice = hasTieredBraceletPricing || hasSelectedOptionWristSizePricing;
   const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
@@ -296,8 +354,8 @@ export default function ProductDetail() {
     (availability?.isPreorder === true || (availability?.stock ?? 1) <= 0);
   const isSoldOutItem =
     product.category !== "custom" &&
-    availability?.isMonthlyLimited === true &&
-    availability.available === false;
+    ((selectedPurchaseOption?.stock != null && selectedPurchaseOption.stock !== -1 && selectedPurchaseOption.stock <= 0) ||
+      (availability?.isMonthlyLimited === true && availability.available === false));
   const fulfillmentNote = isSoldOutItem
       ? "本月限量商品已售完"
       : IN_STOCK_FULFILLMENT_NOTE;
@@ -308,25 +366,37 @@ export default function ProductDetail() {
       return;
     }
     for (let i = 0; i < qty; i++) {
+      const wristSizeSelections = isComboPurchaseOption
+        ? selectedWristSizeGroups.map((group) => ({
+            id: group.id,
+            label: group.label,
+            value: selectedWristSizeSelections[group.id] ?? wristSizes[0],
+          }))
+        : undefined;
       addToCart(
         product,
         hasWristSizeOption
           ? {
               unitPrice: currentPrice,
-              wristSize: selectedWristSize,
+              purchaseOptionId: selectedPurchaseOption?.id,
+              purchaseOptionLabel: selectedPurchaseOption?.label,
+              wristSize: isComboPurchaseOption ? undefined : selectedWristSize,
+              wristSizeSelections,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
             }
           : {
               unitPrice: currentPrice,
+              purchaseOptionId: selectedPurchaseOption?.id,
+              purchaseOptionLabel: selectedPurchaseOption?.label,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
           }
       );
     }
-    toast.success(`已加入購物袋：${product.name} × ${qty}`);
+    toast.success(`已加入購物袋：${product.name}${selectedPurchaseOption ? `（${selectedPurchaseOption.label}）` : ""} × ${qty}`);
     setIsOpen(true);
   };
 
@@ -450,7 +520,7 @@ export default function ProductDetail() {
 
             {/* Price */}
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
-              {hasTieredBraceletPricing ? (
+              {shouldShowCurrentPrice ? (
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                     NT$ {currentPrice.toLocaleString()}
@@ -581,11 +651,6 @@ export default function ProductDetail() {
                           {getCustomPriceDisplay(product.id, product.priceRange)}
                         </span>
                       </div>
-                      <p className="text-sm font-body text-[oklch(0.5_0_0)]">
-                        {product.depositRange
-                          ? `下單先支付訂金 ${product.depositRange}（依占卜主題調整），尾款由老闆確認後另行通知`
-                          : `下單先支付訂金 NT$ ${currentPrice.toLocaleString()}，尾款由老闆確認後另行通知`}
-                      </p>
                     </>
                   )}
                 </>
@@ -599,14 +664,14 @@ export default function ProductDetail() {
                   此為訂金價格
                 </span>
               )}
-              {hasProductDiscount && product.originalPrice && (
+              {hasProductDiscount && (selectedPurchaseOption?.originalPrice || product.originalPrice) && (
                 <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
-                  NT$ {product.originalPrice.toLocaleString()}
+                  NT$ {(selectedPurchaseOption?.originalPrice ?? product.originalPrice ?? 0).toLocaleString()}
                 </span>
               )}
-              {hasProductDiscount && product.originalPrice && (
+              {hasProductDiscount && (selectedPurchaseOption?.originalPrice || product.originalPrice) && (
                 <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
-                  {discountLabel ?? `省 NT$ ${(product.originalPrice - product.price).toLocaleString()}`}
+                  {discountLabel ?? `省 NT$ ${((selectedPurchaseOption?.originalPrice ?? product.originalPrice ?? 0) - currentPrice).toLocaleString()}`}
                 </span>
               )}
             </div>
@@ -615,10 +680,50 @@ export default function ProductDetail() {
 
             {product.category !== "custom" && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
+                {purchaseOptions.length > 0 && (
+                  <div>
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">選擇方案</p>
+                    <div className={`grid gap-2 ${purchaseOptions.length === 1 ? "grid-cols-1" : purchaseOptions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                      {purchaseOptions.map((option) => {
+                        const optionSoldOut = option.stock != null && option.stock !== -1 && option.stock <= 0;
+                        const isActive = selectedPurchaseOption?.id === option.id;
+                        return (
+                          <button
+                            type="button"
+                            key={option.id}
+                            disabled={optionSoldOut}
+                            onClick={() => {
+                              setSelectedPurchaseOptionId(option.id);
+                              // 交還主圖控制權給方案圖，直到使用者再次點選相簿縮圖
+                              setSelectedGalleryImage("");
+                            }}
+                            className={`px-3 py-3 text-xs font-body border transition-colors text-left disabled:cursor-not-allowed disabled:opacity-45 ${
+                              isActive
+                                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                                : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                            }`}
+                          >
+                            <span className="block font-medium">{option.label}</span>
+                            {option.description && (
+                              <span className="block text-[0.6rem] mt-1 leading-relaxed opacity-70">
+                                {option.description}
+                              </span>
+                            )}
+                            {optionSoldOut && (
+                              <span className="block text-[0.6rem] mt-1 text-red-600">售完</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {hasWristSizeOption && (
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">手圍尺寸</p>
+                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">
+                        {isComboPurchaseOption ? "組合手圍" : "手圍尺寸"}
+                      </p>
                       <button
                         type="button"
                         onClick={() => setShowWristMeasureGuide((current) => !current)}
@@ -627,17 +732,43 @@ export default function ProductDetail() {
                         手圍怎麼測量？
                       </button>
                     </div>
-                    <select
-                      value={selectedWristSize}
-                      onChange={(e) => setSelectedWristSize(e.target.value)}
-                      className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
-                    >
-                      {wristSizes.map((size) => (
-                        <option key={size} value={size}>
-                          {size} cm
-                        </option>
-                      ))}
-                    </select>
+                    {isComboPurchaseOption ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {selectedWristSizeGroups.map((group) => (
+                          <label key={group.id} className="block">
+                            <span className="block text-[0.65rem] font-body text-[oklch(0.48_0_0)] mb-1">
+                              {group.label}
+                            </span>
+                            <select
+                              value={selectedWristSizeSelections[group.id] ?? wristSizes[0]}
+                              onChange={(e) => setSelectedWristSizeSelections((current) => ({
+                                ...current,
+                                [group.id]: e.target.value,
+                              }))}
+                              className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                            >
+                              {wristSizes.map((size) => (
+                                <option key={size} value={size}>
+                                  {size} cm
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedWristSize}
+                        onChange={(e) => setSelectedWristSize(e.target.value)}
+                        className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                      >
+                        {wristSizes.map((size) => (
+                          <option key={size} value={size}>
+                            {size} cm
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     {showWristMeasureGuide && (
                       <div className="mt-3 bg-[oklch(0.98_0_0)] border border-[oklch(0.92_0_0)] px-3 py-2.5">
                         <p className="text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">

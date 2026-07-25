@@ -6,6 +6,10 @@ type ProductPricingFields = {
   wristSizePriceRules?: { maxWristSize: number; price: number }[] | null;
 };
 
+type WristSizeRuleSource = {
+  wristSizePriceRules?: { maxWristSize: number; price: number }[] | null;
+};
+
 type TieredBraceletPrices = {
   small: number;
   medium: number;
@@ -46,7 +50,7 @@ export function getTieredBraceletPrices(productId: string) {
   return TIERED_BRACELET_PRICES_BY_PRODUCT_ID[productId] ?? DEFAULT_TIERED_BRACELET_PRICES;
 }
 
-export function getWristSizeRulePrice(product: ProductPricingFields, wristSize: number) {
+export function getWristSizeRulePrice(product: WristSizeRuleSource, wristSize: number) {
   const rules = product.wristSizePriceRules
     ?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price))
     .sort((a, b) => a.maxWristSize - b.maxWristSize);

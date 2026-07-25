@@ -103,6 +103,7 @@ async function ensureProductsTable() {
       \`wristSizeMin\` decimal(4,1) NOT NULL DEFAULT 13.0,
       \`wristSizeMax\` decimal(4,1) NOT NULL DEFAULT 19.0,
       \`wristSizePriceRules\` json DEFAULT NULL,
+      \`purchaseOptions\` json DEFAULT NULL,
       \`scheduledPublishAt\` timestamp DEFAULT NULL,
       \`sortOrder\` int NOT NULL DEFAULT 0,
       \`createdAt\` timestamp NOT NULL DEFAULT (now()),
@@ -149,6 +150,9 @@ async function ensureProductsTable() {
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`wristSizePriceRules\` json DEFAULT NULL`);
+  } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`products\` ADD COLUMN \`purchaseOptions\` json DEFAULT NULL`);
   } catch { /* 欄位已存在或其他無害錯誤，略過 */ }
   try {
     const existingProductRules: Record<string, { maxWristSize: number; price: number }[]> = {
@@ -283,6 +287,7 @@ function toFrontendProduct(p: DbProduct) {
     wristSizeMin: p.wristSizeMin ?? 13,
     wristSizeMax: p.wristSizeMax ?? 19,
     wristSizePriceRules: p.wristSizePriceRules ?? undefined,
+    purchaseOptions: p.purchaseOptions?.filter((option) => option.active !== false) ?? undefined,
     scheduledPublishAt: p.scheduledPublishAt ?? undefined,
     crystalType: p.crystalType ?? "",
     color: p.color ?? "",
@@ -301,6 +306,24 @@ const wristSizeSchema = z.number().min(0).max(99).refine((value) => Number.isInt
 const WristSizePriceRuleSchema = z.object({
   maxWristSize: wristSizeSchema,
   price: z.number().int().min(0),
+});
+
+const PurchaseOptionSchema = z.object({
+  id: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+  label: z.string().trim().min(1).max(40),
+  type: z.enum(["single", "combo"]).default("single"),
+  price: z.number().int().min(0),
+  originalPrice: z.number().int().min(0).nullable().optional(),
+  description: z.string().trim().max(120).optional(),
+  stock: z.number().int().min(-1).nullable().optional(),
+  active: z.boolean().default(true),
+  image: z.string().trim().nullable().optional(),
+  wristSizePriceRules: z.array(WristSizePriceRuleSchema).default([]),
+  wristSizeGroups: z.array(z.object({
+    id: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+    label: z.string().trim().min(1).max(40),
+    wristSizePriceRules: z.array(WristSizePriceRuleSchema).min(1),
+  })).default([]),
 });
 
 const ProductInputSchema = z.object({
@@ -335,11 +358,15 @@ const ProductInputSchema = z.object({
   wristSizeMin: wristSizeSchema.default(13),
   wristSizeMax: wristSizeSchema.default(19),
   wristSizePriceRules: z.array(WristSizePriceRuleSchema).default([]),
+  purchaseOptions: z.array(PurchaseOptionSchema).default([]),
   scheduledPublishAt: scheduledPublishAtSchema.default(null),
   sortOrder: z.number().int().default(0),
 }).refine((value) => value.wristSizeMin <= value.wristSizeMax, {
   message: "手圍最小值不可大於最大值",
   path: ["wristSizeMax"],
+}).refine((value) => new Set(value.purchaseOptions.map((option) => option.id)).size === value.purchaseOptions.length, {
+  message: "方案代碼不可重複",
+  path: ["purchaseOptions"],
 });
 
 const BulkDiscountInputSchema = z.object({
