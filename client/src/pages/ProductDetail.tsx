@@ -705,14 +705,6 @@ export default function ProductDetail() {
                             }`}
                           >
                             <span className="block font-medium">{option.label}</span>
-                            <span className="block text-[0.68rem] mt-1 text-[oklch(0.2_0_0)]">
-                              NT$ {option.price.toLocaleString()}
-                            </span>
-                            {option.originalPrice && option.originalPrice > option.price && (
-                              <span className="block text-[0.6rem] mt-0.5 line-through opacity-60">
-                                NT$ {option.originalPrice.toLocaleString()}
-                              </span>
-                            )}
                             {option.description && (
                               <span className="block text-[0.6rem] mt-1 leading-relaxed opacity-70">
                                 {option.description}
