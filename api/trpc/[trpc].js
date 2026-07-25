@@ -2948,6 +2948,7 @@ var CartItemSchema = z2.object({
   baseProductId: z2.string().optional(),
   purchaseOptionId: z2.string().optional(),
   purchaseOptionLabel: z2.string().optional(),
+  wristSize: z2.string().optional(),
   name: z2.string(),
   price: z2.number(),
   quantity: z2.number(),
@@ -2956,6 +2957,11 @@ var CartItemSchema = z2.object({
   twoItemFreeShippingEligible: z2.boolean().optional(),
   purchaseOptionUsesOwnStock: z2.boolean().optional()
 });
+function getWristSizeRulePrice(product, wristSize) {
+  const rules = product.wristSizePriceRules?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price)).sort((a, b) => a.maxWristSize - b.maxWristSize);
+  if (!rules?.length) return null;
+  return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
+}
 async function normalizePurchaseOptionItems(items) {
   const db = await getDb();
   if (!db) return items;
@@ -2964,7 +2970,9 @@ async function normalizePurchaseOptionItems(items) {
   const products2 = await db.select({
     id: dbProducts.id,
     name: dbProducts.name,
+    price: dbProducts.price,
     image: dbProducts.image,
+    wristSizePriceRules: dbProducts.wristSizePriceRules,
     purchaseOptions: dbProducts.purchaseOptions
   }).from(dbProducts).where(inArray2(dbProducts.id, productIds));
   const productById = new Map(products2.map((product) => [product.id, product]));
@@ -2988,10 +2996,13 @@ async function normalizePurchaseOptionItems(items) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${product.name}\uFF08${option.label}\uFF09\u300D\u5EAB\u5B58\u4E0D\u8DB3\u3002` });
     }
     const optionProductName = `${product.name}\uFF08${option.label}\uFF09`;
+    const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
+    const wristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(product, wristSize) : null;
+    const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
     return {
       ...item,
       name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-      price: option.price,
+      price: option.price + wristSizePriceDelta,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null

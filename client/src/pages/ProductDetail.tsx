@@ -273,12 +273,16 @@ export default function ProductDetail() {
   const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
   const optionPrice = selectedPurchaseOption?.price;
   const optionOriginalPrice = selectedPurchaseOption?.originalPrice ?? undefined;
-  const originalBasePrice = optionOriginalPrice && optionOriginalPrice > (optionPrice ?? 0)
-    ? optionOriginalPrice
-    : hasTieredBraceletPricing
+  const wristSizeBasePrice = hasTieredBraceletPricing
     ? getTieredBraceletBasePrice(product, wristSizeNumber)
     : product.price;
-  const basePrice = optionPrice ?? (hasTieredBraceletPricing
+  const wristSizePriceDelta = hasTieredBraceletPricing ? wristSizeBasePrice - product.price : 0;
+  const optionBasePrice = optionPrice == null ? null : optionPrice + wristSizePriceDelta;
+  const optionOriginalBasePrice = optionOriginalPrice == null ? null : optionOriginalPrice + wristSizePriceDelta;
+  const originalBasePrice = optionOriginalBasePrice && optionOriginalBasePrice > (optionBasePrice ?? 0)
+    ? optionOriginalBasePrice
+    : wristSizeBasePrice;
+  const basePrice = optionBasePrice ?? (hasTieredBraceletPricing
     ? hasWristSizePriceRules ? originalBasePrice : applySaleRate(originalBasePrice, saleRate)
     : product.price);
   const claspExtra = hasClaspOption && effectiveSelectedClaspType !== "elastic" ? 200 : 0;

@@ -132,6 +132,7 @@ const CartItemSchema = z.object({
   baseProductId: z.string().optional(),
   purchaseOptionId: z.string().optional(),
   purchaseOptionLabel: z.string().optional(),
+  wristSize: z.string().optional(),
   name: z.string(),
   price: z.number(),
   quantity: z.number(),
@@ -142,6 +143,17 @@ const CartItemSchema = z.object({
 });
 
 type CheckoutItem = z.infer<typeof CartItemSchema>;
+
+function getWristSizeRulePrice(
+  product: { wristSizePriceRules?: { maxWristSize: number; price: number }[] | null },
+  wristSize: number
+) {
+  const rules = product.wristSizePriceRules
+    ?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price))
+    .sort((a, b) => a.maxWristSize - b.maxWristSize);
+  if (!rules?.length) return null;
+  return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
+}
 
 async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
   const db = await getDb();
@@ -154,7 +166,9 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
     .select({
       id: dbProducts.id,
       name: dbProducts.name,
+      price: dbProducts.price,
       image: dbProducts.image,
+      wristSizePriceRules: dbProducts.wristSizePriceRules,
       purchaseOptions: dbProducts.purchaseOptions,
     })
     .from(dbProducts)
@@ -181,10 +195,15 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `「${product.name}（${option.label}）」庫存不足。` });
     }
     const optionProductName = `${product.name}（${option.label}）`;
+    const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
+    const wristSizeRulePrice = Number.isFinite(wristSize)
+      ? getWristSizeRulePrice(product, wristSize)
+      : null;
+    const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
     return {
       ...item,
       name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-      price: option.price,
+      price: option.price + wristSizePriceDelta,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null,
