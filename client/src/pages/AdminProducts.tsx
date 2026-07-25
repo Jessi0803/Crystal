@@ -1252,7 +1252,7 @@ function ProductModal({
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">原價（NT$）</span>
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">原價（NT$，顯示在商品縮圖的價格）</span>
                 <input
                   type="number"
                   min={0}
@@ -1263,7 +1263,7 @@ function ProductModal({
                 />
               </label>
               <label className="block">
-                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">售價（NT$）*</span>
+                <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">售價（NT$，顯示在商品縮圖的價格）*</span>
                 <input
                   type="number"
                   min={0}
