@@ -184,6 +184,7 @@ export default function ProductDetail() {
   );
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
+  const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState("");
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
   const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
   const [showClaspGuide, setShowClaspGuide] = useState(false);
@@ -207,6 +208,7 @@ export default function ProductDetail() {
     setShowWristMeasureGuide(false);
     setShowClaspGuide(false);
     setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
+    setSelectedPurchaseOptionId(product?.purchaseOptions?.find((option) => option.active !== false)?.id ?? "");
   }, [id, product?.id]);
   useEffect(() => {
     if (!wristSizes.includes(selectedWristSize)) {
@@ -256,6 +258,9 @@ export default function ProductDetail() {
     ? selectedClaspType
     : claspChoices[0]?.id ?? "elastic";
   const visibleTags = product.tags;
+  const purchaseOptions = product.purchaseOptions?.filter((option) => option.active !== false) ?? [];
+  const selectedPurchaseOption =
+    purchaseOptions.find((option) => option.id === selectedPurchaseOptionId) ?? purchaseOptions[0];
   const galleryImages = getProductImages(product);
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
     ? selectedGalleryImage
@@ -263,18 +268,26 @@ export default function ProductDetail() {
   const wristSizeNumber = Number(selectedWristSize);
   const saleRate = getSaleRate(product);
   const discountLabel = getDiscountLabel(product);
-  const hasProductDiscount = Boolean(product.originalPrice && product.originalPrice > product.price);
+  const hasProductDiscount = Boolean(
+    selectedPurchaseOption
+      ? selectedPurchaseOption.originalPrice && selectedPurchaseOption.originalPrice > selectedPurchaseOption.price
+      : product.originalPrice && product.originalPrice > product.price
+  );
   const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
-  const originalBasePrice = hasTieredBraceletPricing
+  const optionPrice = selectedPurchaseOption?.price;
+  const optionOriginalPrice = selectedPurchaseOption?.originalPrice ?? undefined;
+  const originalBasePrice = optionOriginalPrice && optionOriginalPrice > (optionPrice ?? 0)
+    ? optionOriginalPrice
+    : hasTieredBraceletPricing
     ? getTieredBraceletBasePrice(product, wristSizeNumber)
     : product.price;
-  const basePrice = hasTieredBraceletPricing
+  const basePrice = optionPrice ?? (hasTieredBraceletPricing
     ? hasWristSizePriceRules ? originalBasePrice : applySaleRate(originalBasePrice, saleRate)
-    : product.price;
+    : product.price);
   const claspExtra = hasClaspOption && effectiveSelectedClaspType !== "elastic" ? 200 : 0;
   const currentPrice = basePrice + claspExtra;
   const originalCurrentPrice = originalBasePrice + claspExtra;
-  const hasCurrentPriceSale = hasTieredBraceletPricing && currentPrice < originalCurrentPrice;
+  const hasCurrentPriceSale = currentPrice < originalCurrentPrice;
   const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
@@ -296,8 +309,8 @@ export default function ProductDetail() {
     (availability?.isPreorder === true || (availability?.stock ?? 1) <= 0);
   const isSoldOutItem =
     product.category !== "custom" &&
-    availability?.isMonthlyLimited === true &&
-    availability.available === false;
+    ((selectedPurchaseOption?.stock != null && selectedPurchaseOption.stock !== -1 && selectedPurchaseOption.stock <= 0) ||
+      (availability?.isMonthlyLimited === true && availability.available === false));
   const fulfillmentNote = isSoldOutItem
       ? "本月限量商品已售完"
       : IN_STOCK_FULFILLMENT_NOTE;
@@ -313,6 +326,8 @@ export default function ProductDetail() {
         hasWristSizeOption
           ? {
               unitPrice: currentPrice,
+              purchaseOptionId: selectedPurchaseOption?.id,
+              purchaseOptionLabel: selectedPurchaseOption?.label,
               wristSize: selectedWristSize,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
@@ -320,13 +335,15 @@ export default function ProductDetail() {
             }
           : {
               unitPrice: currentPrice,
+              purchaseOptionId: selectedPurchaseOption?.id,
+              purchaseOptionLabel: selectedPurchaseOption?.label,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
           }
       );
     }
-    toast.success(`已加入購物袋：${product.name} × ${qty}`);
+    toast.success(`已加入購物袋：${product.name}${selectedPurchaseOption ? `（${selectedPurchaseOption.label}）` : ""} × ${qty}`);
     setIsOpen(true);
   };
 
@@ -599,14 +616,14 @@ export default function ProductDetail() {
                   此為訂金價格
                 </span>
               )}
-              {hasProductDiscount && product.originalPrice && (
+              {hasProductDiscount && (selectedPurchaseOption?.originalPrice || product.originalPrice) && (
                 <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
-                  NT$ {product.originalPrice.toLocaleString()}
+                  NT$ {(selectedPurchaseOption?.originalPrice ?? product.originalPrice ?? 0).toLocaleString()}
                 </span>
               )}
-              {hasProductDiscount && product.originalPrice && (
+              {hasProductDiscount && (selectedPurchaseOption?.originalPrice || product.originalPrice) && (
                 <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
-                  {discountLabel ?? `省 NT$ ${(product.originalPrice - product.price).toLocaleString()}`}
+                  {discountLabel ?? `省 NT$ ${((selectedPurchaseOption?.originalPrice ?? product.originalPrice ?? 0) - currentPrice).toLocaleString()}`}
                 </span>
               )}
             </div>
@@ -615,6 +632,48 @@ export default function ProductDetail() {
 
             {product.category !== "custom" && (
               <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
+                {purchaseOptions.length > 0 && (
+                  <div>
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">選擇方案</p>
+                    <div className={`grid gap-2 ${purchaseOptions.length === 1 ? "grid-cols-1" : purchaseOptions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                      {purchaseOptions.map((option) => {
+                        const optionSoldOut = option.stock != null && option.stock !== -1 && option.stock <= 0;
+                        const isActive = selectedPurchaseOption?.id === option.id;
+                        return (
+                          <button
+                            type="button"
+                            key={option.id}
+                            disabled={optionSoldOut}
+                            onClick={() => setSelectedPurchaseOptionId(option.id)}
+                            className={`px-3 py-3 text-xs font-body border transition-colors text-left disabled:cursor-not-allowed disabled:opacity-45 ${
+                              isActive
+                                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
+                                : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                            }`}
+                          >
+                            <span className="block font-medium">{option.label}</span>
+                            <span className="block text-[0.68rem] mt-1 text-[oklch(0.2_0_0)]">
+                              NT$ {option.price.toLocaleString()}
+                            </span>
+                            {option.originalPrice && option.originalPrice > option.price && (
+                              <span className="block text-[0.6rem] mt-0.5 line-through opacity-60">
+                                NT$ {option.originalPrice.toLocaleString()}
+                              </span>
+                            )}
+                            {option.description && (
+                              <span className="block text-[0.6rem] mt-1 leading-relaxed opacity-70">
+                                {option.description}
+                              </span>
+                            )}
+                            {optionSoldOut && (
+                              <span className="block text-[0.6rem] mt-1 text-red-600">售完</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {hasWristSizeOption && (
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">

@@ -404,6 +404,7 @@ var orderItems = mysqlTable("orderItems", {
   quantity: int("quantity").notNull(),
   unitPrice: int("unitPrice").notNull(),
   subtotal: int("subtotal").notNull(),
+  purchaseOptionId: varchar("purchaseOptionId", { length: 64 }),
   // 是否為預購商品
   isPreorder: boolean("isPreorder").default(false).notNull()
 }, (table) => [
@@ -554,6 +555,7 @@ var dbProducts = mysqlTable("products", {
   wristSizeMin: decimal("wristSizeMin", { precision: 4, scale: 1, mode: "number" }).notNull().default(13),
   wristSizeMax: decimal("wristSizeMax", { precision: 4, scale: 1, mode: "number" }).notNull().default(19),
   wristSizePriceRules: json("wristSizePriceRules").$type(),
+  purchaseOptions: json("purchaseOptions").$type(),
   scheduledPublishAt: timestamp("scheduledPublishAt"),
   sortOrder: int("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -738,11 +740,30 @@ async function ensureOrdersColumns() {
     await db.execute(sql3`ALTER TABLE \`orders\` ADD COLUMN \`freeShippingOverride\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch {
   }
+  try {
+    await db.execute(sql3`ALTER TABLE \`orderItems\` ADD COLUMN \`purchaseOptionId\` varchar(64) NULL`);
+  } catch {
+  }
   ordersColumnsEnsured = true;
 }
 var NON_INVENTORY_PRODUCT_IDS = /* @__PURE__ */ new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
 function shouldSkipInventory(productId) {
   return NON_INVENTORY_PRODUCT_IDS.has(productId);
+}
+async function adjustPurchaseOptionStock(productId, purchaseOptionId, quantityDelta) {
+  if (!purchaseOptionId) return false;
+  const db = await getDb();
+  if (!db) return false;
+  const [product] = await db.select({ purchaseOptions: dbProducts.purchaseOptions }).from(dbProducts).where(eq3(dbProducts.id, productId)).limit(1);
+  const options = product?.purchaseOptions;
+  const option = options?.find((candidate) => candidate.id === purchaseOptionId);
+  if (!options || !option || option.stock == null) return false;
+  if (option.stock === -1) return true;
+  const nextOptions = options.map(
+    (candidate) => candidate.id === purchaseOptionId ? { ...candidate, stock: Math.max(0, (candidate.stock ?? 0) + quantityDelta) } : candidate
+  );
+  await db.update(dbProducts).set({ purchaseOptions: nextOptions }).where(eq3(dbProducts.id, productId));
+  return true;
 }
 async function deductInventoryAfterPayment(merchantTradeNo) {
   const db = await getDb();
@@ -750,9 +771,11 @@ async function deductInventoryAfterPayment(merchantTradeNo) {
   await ensureOrdersColumns();
   const [order] = await db.select({ id: orders.id, inventoryDeducted: orders.inventoryDeducted }).from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!order || order.inventoryDeducted) return;
-  const items = await db.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
+  const items = await db.select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity }).from(orderItems).where(eq3(orderItems.orderId, order.id));
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, -item.quantity);
+    if (handledByPurchaseOption) continue;
     await db.update(productInventory).set({ stock: sql3`GREATEST(0, ${productInventory.stock} - ${item.quantity})` }).where(
       and3(
         eq3(productInventory.productId, item.productId),

@@ -24,6 +24,8 @@ export interface CartItem {
   product: Product;
   quantity: number;
   unitPrice: number;
+  purchaseOptionId?: string;
+  purchaseOptionLabel?: string;
   wristSize?: string;
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
@@ -33,6 +35,8 @@ export interface CartItem {
 
 type AddToCartOptions = {
   unitPrice?: number;
+  purchaseOptionId?: string;
+  purchaseOptionLabel?: string;
   wristSize?: string;
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
@@ -75,7 +79,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const consultationKey = options?.customConsultationNote
       ? (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
       : "default";
-    const itemId = `${product.id}-${options?.wristSize ?? "default"}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
+    const itemId = `${product.id}-${options?.purchaseOptionId ?? "default"}-${options?.wristSize ?? "default"}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
     setItems(prev => {
       const existing = prev.find(item => item.id === itemId);
       if (existing) {
@@ -92,6 +96,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           product,
           quantity: 1,
           unitPrice,
+          purchaseOptionId: options?.purchaseOptionId,
+          purchaseOptionLabel: options?.purchaseOptionLabel,
           wristSize: options?.wristSize,
           claspType: options?.claspType,
           fitPreference: options?.fitPreference,

@@ -32,6 +32,9 @@ export async function ensureOrdersColumns() {
   try {
     await db.execute(sql`ALTER TABLE \`orders\` ADD COLUMN \`freeShippingOverride\` BOOLEAN NOT NULL DEFAULT FALSE`);
   } catch { /* column already exists */ }
+  try {
+    await db.execute(sql`ALTER TABLE \`orderItems\` ADD COLUMN \`purchaseOptionId\` varchar(64) NULL`);
+  } catch { /* column already exists */ }
   ordersColumnsEnsured = true;
 }
 
@@ -51,6 +54,30 @@ async function isMonthlyLimitedProduct(productId: string) {
     .where(eq(dbProducts.id, productId))
     .limit(1);
   return product?.isMonthlyLimited === true;
+}
+
+async function adjustPurchaseOptionStock(productId: string, purchaseOptionId: string | null | undefined, quantityDelta: number) {
+  if (!purchaseOptionId) return false;
+  const db = await getDb();
+  if (!db) return false;
+
+  const [product] = await db
+    .select({ purchaseOptions: dbProducts.purchaseOptions })
+    .from(dbProducts)
+    .where(eq(dbProducts.id, productId))
+    .limit(1);
+  const options = product?.purchaseOptions;
+  const option = options?.find((candidate) => candidate.id === purchaseOptionId);
+  if (!options || !option || option.stock == null) return false;
+  if (option.stock === -1) return true;
+
+  const nextOptions = options.map((candidate) =>
+    candidate.id === purchaseOptionId
+      ? { ...candidate, stock: Math.max(0, (candidate.stock ?? 0) + quantityDelta) }
+      : candidate
+  );
+  await db.update(dbProducts).set({ purchaseOptions: nextOptions }).where(eq(dbProducts.id, productId));
+  return true;
 }
 
 export async function getDefaultAllowPreorder(productId: string) {
@@ -213,12 +240,14 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
   if (!order || order.inventoryDeducted) return;
 
   const items = await db
-    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity })
     .from(orderItems)
     .where(eq(orderItems.orderId, order.id));
 
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, -item.quantity);
+    if (handledByPurchaseOption) continue;
     await db
       .update(productInventory)
       .set({ stock: sql`GREATEST(0, ${productInventory.stock} - ${item.quantity})` })
@@ -276,12 +305,14 @@ export async function restoreInventoryOnCancel(merchantTradeNo: string) {
   if (!order || !order.inventoryDeducted) return;
 
   const items = await db
-    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity })
     .from(orderItems)
     .where(eq(orderItems.orderId, order.id));
 
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, item.quantity);
+    if (handledByPurchaseOption) continue;
     await db
       .update(productInventory)
       .set({ stock: sql`${productInventory.stock} + ${item.quantity}` })
@@ -317,7 +348,7 @@ export async function acquireInventoryLocksForOrder(
   if (!order) return { success: false, reason: "找不到訂單" };
 
   const items = await db
-    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity })
     .from(orderItems)
     .where(eq(orderItems.orderId, order.id));
 
@@ -325,6 +356,8 @@ export async function acquireInventoryLocksForOrder(
 
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, 0);
+    if (handledByPurchaseOption) continue;
     const result = await acquireInventoryLock(item.productId, item.quantity, merchantTradeNo, ttlMs);
     if (!result.success) {
       await releaseSessionLocks(merchantTradeNo);

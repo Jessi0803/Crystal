@@ -56,6 +56,15 @@ type FormState = {
   wristSizeMin: string;
   wristSizeMax: string;
   wristSizePriceRules: { maxWristSize: string; price: string }[];
+  purchaseOptions: {
+    id: string;
+    label: string;
+    price: string;
+    originalPrice: string;
+    description: string;
+    stock: string;
+    active: boolean;
+  }[];
   scheduledPublishAt: string;
   initialStock: string;
 };
@@ -84,6 +93,7 @@ const DEFAULT_FORM: FormState = {
   wristSizeMin: DEFAULT_WRIST_SIZE_MIN,
   wristSizeMax: DEFAULT_WRIST_SIZE_MAX,
   wristSizePriceRules: [],
+  purchaseOptions: [],
   scheduledPublishAt: "",
   initialStock: "5",
 };
@@ -140,6 +150,38 @@ function toFormWristSizePriceRules(rules?: { maxWristSize: number; price: number
       maxWristSize: formatRuleNumber(rule.maxWristSize),
       price: String(rule.price),
     }));
+}
+
+function toFormPurchaseOptions(options?: DbProduct["purchaseOptions"] | null): FormState["purchaseOptions"] {
+  return (options ?? []).map((option) => ({
+    id: option.id,
+    label: option.label,
+    price: String(option.price),
+    originalPrice: option.originalPrice ? String(option.originalPrice) : "",
+    description: option.description ?? "",
+    stock: option.stock == null ? "" : String(option.stock),
+    active: option.active !== false,
+  }));
+}
+
+function slugifyOptionId(value: string) {
+  const normalized = value.trim().toLowerCase();
+  const preset: Record<string, string> = {
+    男款: "male",
+    女款: "female",
+    兩條組合: "couple-set",
+    双條組合: "couple-set",
+    情侶組: "couple-set",
+  };
+  if (preset[value.trim()]) return preset[value.trim()];
+  const ascii = normalized
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "");
+  if (ascii) return ascii;
+  const encoded = Array.from(normalized)
+    .map((char) => char.charCodeAt(0).toString(36))
+    .join("-");
+  return encoded ? `option-${encoded.slice(0, 48)}` : "option";
 }
 
 function formatPriceRange(value: string) {
@@ -484,6 +526,7 @@ function ProductModal({
           wristSizeMin: String(editing.wristSizeMin ?? DEFAULT_WRIST_SIZE_MIN),
           wristSizeMax: String(editing.wristSizeMax ?? DEFAULT_WRIST_SIZE_MAX),
           wristSizePriceRules: toFormWristSizePriceRules(editing.wristSizePriceRules),
+          purchaseOptions: toFormPurchaseOptions(editing.purchaseOptions),
           scheduledPublishAt: formatDateTimeLocal(editing.scheduledPublishAt),
           initialStock: "5",
         }
@@ -526,6 +569,45 @@ function ProductModal({
     setForm((current) => ({
       ...current,
       wristSizePriceRules: current.wristSizePriceRules.filter((_, ruleIndex) => ruleIndex !== index),
+    }));
+  };
+  const addPurchaseOption = () => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: [
+        ...current.purchaseOptions,
+        {
+          id: `option-${current.purchaseOptions.length + 1}`,
+          label: "",
+          price: current.price,
+          originalPrice: "",
+          description: "",
+          stock: "",
+          active: true,
+        },
+      ],
+    }));
+  };
+  const updatePurchaseOption = (
+    index: number,
+    field: keyof FormState["purchaseOptions"][number],
+    value: string | boolean
+  ) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, optionIndex) => {
+        if (optionIndex !== index) return option;
+        const next = { ...option, [field]: value };
+        if (field === "label" && !option.id.startsWith("option-")) return next;
+        if (field === "label") next.id = slugifyOptionId(String(value));
+        return next;
+      }),
+    }));
+  };
+  const removePurchaseOption = (index: number) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.filter((_, optionIndex) => optionIndex !== index),
     }));
   };
 
@@ -658,6 +740,37 @@ function ProductModal({
       toast.error("手圍價格上限不可重複");
       return;
     }
+    const purchaseOptions = form.purchaseOptions
+      .map((option) => ({
+        id: slugifyOptionId(option.id || option.label),
+        label: option.label.trim(),
+        price: Number(option.price),
+        originalPrice: option.originalPrice ? Number(option.originalPrice) : null,
+        description: option.description.trim(),
+        stock: option.stock === "" ? null : Number(option.stock),
+        active: option.active,
+      }))
+      .filter((option) => option.label || option.price || option.description || option.stock != null);
+    if (purchaseOptions.some((option) => !option.label || !option.id)) {
+      toast.error("購買方案請填寫方案名稱");
+      return;
+    }
+    if (purchaseOptions.some((option) => !Number.isInteger(option.price) || option.price < 0)) {
+      toast.error("購買方案價格請填 0 以上整數");
+      return;
+    }
+    if (purchaseOptions.some((option) => option.originalPrice != null && (!Number.isInteger(option.originalPrice) || option.originalPrice < 0))) {
+      toast.error("購買方案原價請填 0 以上整數");
+      return;
+    }
+    if (purchaseOptions.some((option) => option.stock != null && (!Number.isInteger(option.stock) || option.stock < -1))) {
+      toast.error("購買方案庫存請填 -1 或 0 以上整數");
+      return;
+    }
+    if (new Set(purchaseOptions.map((option) => option.id)).size !== purchaseOptions.length) {
+      toast.error("購買方案代碼不可重複");
+      return;
+    }
 
     const formattedPriceRange = formatPriceRange(form.priceRange);
     const originalPrice = form.originalPrice ? parseInt(form.originalPrice, 10) : null;
@@ -691,6 +804,7 @@ function ProductModal({
       wristSizeMin,
       wristSizeMax,
       wristSizePriceRules: sortedWristSizePriceRules,
+      purchaseOptions,
       active: scheduledPublishAt ? false : form.active,
       scheduledPublishAt,
       sortOrder: editing?.sortOrder ?? 0,
@@ -882,6 +996,102 @@ function ProductModal({
               </label>
             )}
           </div>
+
+          <fieldset className="border border-[oklch(0.9_0_0)] px-3 py-3">
+            <legend className="px-1 text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">購買方案</legend>
+            <div className="space-y-3">
+              {form.purchaseOptions.length === 0 ? (
+                <p className="text-xs font-body text-[oklch(0.55_0_0)] leading-relaxed">
+                  未設定時使用商品售價。可用於七夕情侶款的男款、女款、兩條組合等不同方案。
+                </p>
+              ) : (
+                form.purchaseOptions.map((option, index) => (
+                  <div key={index} className="space-y-2 border border-[oklch(0.92_0_0)] p-3">
+                    <div className="grid grid-cols-[minmax(0,1fr)_32px] gap-2 items-end">
+                      <label className="block">
+                        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">方案名稱</span>
+                        <input
+                          value={option.label}
+                          onChange={(e) => updatePurchaseOption(index, "label", e.target.value)}
+                          placeholder="男款"
+                          className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removePurchaseOption(index)}
+                        aria-label={`刪除購買方案 ${index + 1}`}
+                        className="h-9 w-8 border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="block">
+                        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">售價</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={option.price}
+                          onChange={(e) => updatePurchaseOption(index, "price", e.target.value)}
+                          placeholder="1680"
+                          className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">原價</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={option.originalPrice}
+                          onChange={(e) => updatePurchaseOption(index, "originalPrice", e.target.value)}
+                          placeholder="選填"
+                          className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">庫存</span>
+                        <input
+                          type="number"
+                          min={-1}
+                          value={option.stock}
+                          onChange={(e) => updatePurchaseOption(index, "stock", e.target.value)}
+                          placeholder="空白沿用商品"
+                          className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                        />
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">說明</span>
+                      <input
+                        value={option.description}
+                        onChange={(e) => updatePurchaseOption(index, "description", e.target.value)}
+                        placeholder="例：單條男款手鍊"
+                        className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-body text-[oklch(0.35_0_0)]">
+                      <input
+                        type="checkbox"
+                        checked={option.active}
+                        onChange={(e) => updatePurchaseOption(index, "active", e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      啟用此方案
+                    </label>
+                  </div>
+                ))
+              )}
+              <button
+                type="button"
+                onClick={addPurchaseOption}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                新增購買方案
+              </button>
+            </div>
+          </fieldset>
 
           {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}
           {primaryCategory !== "custom" ? (

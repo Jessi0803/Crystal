@@ -1,13 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-test("admin can create a product and edit its inline stock", async ({ page }) => {
-  const productName = `E2E 後台新增商品 ${Date.now()}`;
+function uniqueProductName(prefix: string, projectName: string) {
+  return `${prefix} ${projectName} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
+}
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+test("admin can create a product and edit its inline stock", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 後台新增商品", testInfo.project.name);
+
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -37,11 +40,10 @@ test("admin can create a product and edit its inline stock", async ({ page }) =>
   await expect(page.getByRole("button", { name: `編輯 ${productName} 庫存` })).toHaveText("4");
 });
 
-test("admin can choose which clasp options a product shows", async ({ page }) => {
-  const productName = `E2E 扣具選項商品 ${Date.now()}`;
+test("admin can choose which clasp options a product shows", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 扣具選項商品", testInfo.project.name);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -77,11 +79,10 @@ test("admin can choose which clasp options a product shows", async ({ page }) =>
   await expect(drawer).toContainText("NT$ 1,088");
 });
 
-test("admin can set a product wrist size range shown on storefront", async ({ page }) => {
-  const productName = `E2E 手圍範圍商品 ${Date.now()}`;
+test("admin can set a product wrist size range shown on storefront", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 手圍範圍商品", testInfo.project.name);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -114,11 +115,10 @@ test("admin can set a product wrist size range shown on storefront", async ({ pa
   await expect(wristSelect.locator('option[value="16.5"]')).toHaveCount(0);
 });
 
-test("admin can set wrist size price rules used on storefront", async ({ page }) => {
-  const productName = `E2E 手圍價格商品 ${Date.now()}`;
+test("admin can set wrist size price rules used on storefront", async ({ page }, testInfo) => {
+  const productName = uniqueProductName("E2E 手圍價格商品", testInfo.project.name);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");

@@ -32,6 +32,15 @@ export interface Product {
   wristSizeMin?: number;
   wristSizeMax?: number;
   wristSizePriceRules?: { maxWristSize: number; price: number }[];
+  purchaseOptions?: {
+    id: string;
+    label: string;
+    price: number;
+    originalPrice?: number | null;
+    description?: string;
+    stock?: number | null;
+    active?: boolean;
+  }[];
   crystalType: string;
   color: string;
 }

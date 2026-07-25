@@ -1,10 +1,40 @@
 import { expect, type Page } from "@playwright/test";
+import { SignJWT } from "jose";
+import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const";
+
+const E2E_JWT_SECRET = process.env.JWT_SECRET ?? "e2e-local-jwt-secret-min-32-chars";
+const E2E_BASE_URL = `http://127.0.0.1:${process.env.E2E_PORT || 3100}`;
 
 export async function login(page: Page, email: string) {
   await page.goto("/login");
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill("Test123456");
   await page.locator('button[type="submit"]').click();
+}
+
+async function createE2eSessionToken(openId: string, name: string) {
+  const expiresAt = Math.floor((Date.now() + ONE_YEAR_MS) / 1000);
+  return new SignJWT({ openId, appId: "", name })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setExpirationTime(expiresAt)
+    .sign(new TextEncoder().encode(E2E_JWT_SECRET));
+}
+
+export async function loginAsAdminByCookie(page: Page) {
+  const token = await createE2eSessionToken("e2e-admin-openid", "E2E Admin");
+  await page.context().addCookies([
+    {
+      name: COOKIE_NAME,
+      value: token,
+      url: E2E_BASE_URL,
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: false,
+      expires: Math.floor((Date.now() + ONE_YEAR_MS) / 1000),
+    },
+  ]);
+  await page.goto("/admin/orders");
+  await expect(page).toHaveURL(/\/admin\/orders/);
 }
 
 export async function addSeededBraceletToCart(page: Page) {

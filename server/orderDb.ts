@@ -715,6 +715,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
         productId: orderItems.productId,
         productName: orderItems.productName,
         productImage: sql<string | null>`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`,
+        purchaseOptionId: orderItems.purchaseOptionId,
         quantity: orderItems.quantity,
         unitPrice: orderItems.unitPrice,
         subtotal: orderItems.subtotal,
