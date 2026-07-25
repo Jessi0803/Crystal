@@ -187,6 +187,18 @@ function slugifyOptionId(value: string) {
   return encoded ? `option-${encoded.slice(0, 48)}` : "option";
 }
 
+function makeUniqueOptionId(baseId: string, usedIds: Set<string>) {
+  let id = baseId;
+  let suffix = 2;
+  while (usedIds.has(id)) {
+    const suffixText = `-${suffix}`;
+    id = `${baseId.slice(0, 64 - suffixText.length)}${suffixText}`;
+    suffix += 1;
+  }
+  usedIds.add(id);
+  return id;
+}
+
 function formatPriceRange(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -761,17 +773,22 @@ function ProductModal({
       toast.error("手圍價格上限不可重複");
       return;
     }
+    const usedPurchaseOptionIds = new Set<string>();
     const purchaseOptions = form.purchaseOptions
-      .map((option) => ({
-        id: slugifyOptionId(option.id || option.label),
-        label: option.label.trim(),
-        price: Number(option.price),
-        originalPrice: option.originalPrice ? Number(option.originalPrice) : null,
-        description: option.description.trim(),
-        stock: option.stock === "" ? null : Number(option.stock),
-        active: option.active,
-        image: normalizeImageUrl(option.image) || undefined,
-      }))
+      .map((option) => {
+        const label = option.label.trim();
+        const baseId = slugifyOptionId(label || option.id);
+        return {
+          id: makeUniqueOptionId(baseId, usedPurchaseOptionIds),
+          label,
+          price: Number(option.price),
+          originalPrice: option.originalPrice ? Number(option.originalPrice) : null,
+          description: option.description.trim(),
+          stock: option.stock === "" ? null : Number(option.stock),
+          active: option.active,
+          image: normalizeImageUrl(option.image) || undefined,
+        };
+      })
       .filter((option) => option.label || option.price || option.description || option.stock != null);
     if (purchaseOptions.some((option) => !option.label || !option.id)) {
       toast.error("購買方案請填寫方案名稱");
@@ -787,10 +804,6 @@ function ProductModal({
     }
     if (purchaseOptions.some((option) => option.stock != null && (!Number.isInteger(option.stock) || option.stock < -1))) {
       toast.error("購買方案庫存請填 -1 或 0 以上整數");
-      return;
-    }
-    if (new Set(purchaseOptions.map((option) => option.id)).size !== purchaseOptions.length) {
-      toast.error("購買方案代碼不可重複");
       return;
     }
 
