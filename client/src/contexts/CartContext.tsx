@@ -27,6 +27,7 @@ export interface CartItem {
   purchaseOptionId?: string;
   purchaseOptionLabel?: string;
   wristSize?: string;
+  wristSizeSelections?: { id: string; label: string; value: string }[];
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
   isPreorder?: boolean;
@@ -38,6 +39,7 @@ type AddToCartOptions = {
   purchaseOptionId?: string;
   purchaseOptionLabel?: string;
   wristSize?: string;
+  wristSizeSelections?: { id: string; label: string; value: string }[];
   claspType?: "elastic" | "lobster" | "magnetic";
   fitPreference?: "just-right" | "loose";
   isPreorder?: boolean;
@@ -79,7 +81,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const consultationKey = options?.customConsultationNote
       ? (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
       : "default";
-    const itemId = `${product.id}-${options?.purchaseOptionId ?? "default"}-${options?.wristSize ?? "default"}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
+    const wristSelectionKey = options?.wristSizeSelections?.map((selection) => `${selection.id}:${selection.value}`).join("|") ?? "default";
+    const itemId = `${product.id}-${options?.purchaseOptionId ?? "default"}-${options?.wristSize ?? "default"}-${wristSelectionKey}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
     setItems(prev => {
       const existing = prev.find(item => item.id === itemId);
       if (existing) {
@@ -99,6 +102,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           purchaseOptionId: options?.purchaseOptionId,
           purchaseOptionLabel: options?.purchaseOptionLabel,
           wristSize: options?.wristSize,
+          wristSizeSelections: options?.wristSizeSelections,
           claspType: options?.claspType,
           fitPreference: options?.fitPreference,
           isPreorder: options?.isPreorder,

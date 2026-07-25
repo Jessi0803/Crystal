@@ -133,6 +133,11 @@ const CartItemSchema = z.object({
   purchaseOptionId: z.string().optional(),
   purchaseOptionLabel: z.string().optional(),
   wristSize: z.string().optional(),
+  wristSizeSelections: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    value: z.string(),
+  })).optional(),
   name: z.string(),
   price: z.number(),
   quantity: z.number(),
@@ -195,6 +200,30 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `「${product.name}（${option.label}）」庫存不足。` });
     }
     const optionProductName = `${product.name}（${option.label}）`;
+    if (option.type === "combo") {
+      const groups = option.wristSizeGroups ?? [];
+      if (groups.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `「${optionProductName}」尚未設定組合手圍價格。` });
+      }
+      const selections = item.wristSizeSelections ?? [];
+      const price = groups.reduce((sum, group) => {
+        const selected = selections.find((selection) => selection.id === group.id);
+        const wristSize = selected == null ? NaN : Number(selected.value);
+        const groupPrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(group, wristSize) : null;
+        if (groupPrice == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `「${optionProductName}」缺少 ${group.label} 的價格。` });
+        }
+        return sum + groupPrice;
+      }, 0);
+      return {
+        ...item,
+        name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+        price,
+        image: item.image || product.image,
+        purchaseOptionLabel: option.label,
+        purchaseOptionUsesOwnStock: option.stock != null,
+      };
+    }
     const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
     const optionWristSizeRulePrice = Number.isFinite(wristSize)
       ? getWristSizeRulePrice(option, wristSize)

@@ -321,7 +321,8 @@ export default function Checkout() {
           purchaseOptionId: i.purchaseOptionId,
           purchaseOptionLabel: i.purchaseOptionLabel,
           wristSize: i.wristSize,
-          name: `${i.product.name}${i.purchaseOptionLabel ? `（${i.purchaseOptionLabel}）` : ""}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}${i.fitPreference === "just-right" ? "（剛好）" : i.fitPreference === "loose" ? "（微鬆）" : ""}`,
+          wristSizeSelections: i.wristSizeSelections,
+          name: `${i.product.name}${i.purchaseOptionLabel ? `（${i.purchaseOptionLabel}）` : ""}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.wristSizeSelections?.map((selection) => `（${selection.label} ${selection.value}cm）`).join("") ?? ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}${i.fitPreference === "just-right" ? "（剛好）" : i.fitPreference === "loose" ? "（微鬆）" : ""}`,
           price: i.unitPrice,
           quantity: i.quantity,
           image: getPurchaseOptionImage(i.product, i.purchaseOptionId),
@@ -1105,14 +1106,15 @@ export default function Checkout() {
                         {item.isPreorder && <span className="text-[oklch(0.58_0_0)]">（預購）</span>}
                       </p>
                       <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">x {item.quantity}</p>
-                      {(item.purchaseOptionLabel || item.wristSize || item.claspType || item.fitPreference) && (
+                      {(item.purchaseOptionLabel || item.wristSize || item.wristSizeSelections?.length || item.claspType || item.fitPreference) && (
                         <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mt-0.5">
                           {item.purchaseOptionLabel ? `方案 ${item.purchaseOptionLabel}` : ""}
-                          {item.purchaseOptionLabel && (item.wristSize || item.claspType || item.fitPreference) ? " · " : ""}
+                          {item.purchaseOptionLabel && (item.wristSize || item.wristSizeSelections?.length || item.claspType || item.fitPreference) ? " · " : ""}
                           {item.wristSize ? `手圍 ${item.wristSize} cm` : ""}
-                          {item.wristSize && item.claspType ? " · " : ""}
+                          {item.wristSizeSelections?.map((selection) => `${selection.label} ${selection.value} cm`).join(" · ") ?? ""}
+                          {(item.wristSize || item.wristSizeSelections?.length) && item.claspType ? " · " : ""}
                           {item.claspType === "elastic" ? "彈力繩" : item.claspType === "lobster" ? "龍蝦扣" : item.claspType === "magnetic" ? "磁扣" : ""}
-                          {(item.wristSize || item.claspType) && item.fitPreference ? " · " : ""}
+                          {(item.wristSize || item.wristSizeSelections?.length || item.claspType) && item.fitPreference ? " · " : ""}
                           {item.fitPreference === "just-right" ? "剛好" : item.fitPreference === "loose" ? "微鬆" : ""}
                         </p>
                       )}

@@ -336,6 +336,7 @@ export type WristSizePriceRule = {
 export type ProductPurchaseOption = {
   id: string;
   label: string;
+  type?: "single" | "combo";
   price: number;
   originalPrice?: number | null;
   description?: string;
@@ -344,6 +345,11 @@ export type ProductPurchaseOption = {
   // 方案專屬圖片（data URL 或網址）；未設定時沿用商品主圖
   image?: string | null;
   wristSizePriceRules?: WristSizePriceRule[] | null;
+  wristSizeGroups?: {
+    id: string;
+    label: string;
+    wristSizePriceRules: WristSizePriceRule[];
+  }[] | null;
 };
 
 // ─── 商品表 ───────────────────────────────────────────────────────────────────

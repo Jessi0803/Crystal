@@ -178,6 +178,7 @@ export default function ProductDetail() {
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState("");
+  const [selectedWristSizeSelections, setSelectedWristSizeSelections] = useState<Record<string, string>>({});
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
   const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
   const [showClaspGuide, setShowClaspGuide] = useState(false);
@@ -209,6 +210,24 @@ export default function ProductDetail() {
       setSelectedWristSize(wristSizes.includes("14") ? "14" : wristSizes[0]);
     }
   }, [wristSizes, selectedWristSize]);
+  useEffect(() => {
+    const option = product?.purchaseOptions?.find((item) => item.id === selectedPurchaseOptionId);
+    const groups = option?.type === "combo" ? option.wristSizeGroups ?? [] : [];
+    if (groups.length === 0) {
+      setSelectedWristSizeSelections({});
+      return;
+    }
+    setSelectedWristSizeSelections((current) => {
+      const next: Record<string, string> = {};
+      for (const group of groups) {
+        const currentValue = current[group.id];
+        next[group.id] = currentValue && wristSizes.includes(currentValue)
+          ? currentValue
+          : wristSizes.includes("14") ? "14" : wristSizes[0];
+      }
+      return next;
+    });
+  }, [product?.purchaseOptions, selectedPurchaseOptionId, wristSizes]);
 
   if (isLoading && !product) {
     return (
@@ -255,6 +274,10 @@ export default function ProductDetail() {
   const purchaseOptions = product.purchaseOptions?.filter((option) => option.active !== false) ?? [];
   const selectedPurchaseOption =
     purchaseOptions.find((option) => option.id === selectedPurchaseOptionId) ?? purchaseOptions[0];
+  const selectedWristSizeGroups = selectedPurchaseOption?.type === "combo"
+    ? selectedPurchaseOption.wristSizeGroups ?? []
+    : [];
+  const isComboPurchaseOption = selectedWristSizeGroups.length > 0;
   const galleryImages = getProductImages(product);
   const selectedOptionImage = selectedPurchaseOption?.image?.trim()
     ? normalizeImageUrl(selectedPurchaseOption.image)
@@ -264,6 +287,9 @@ export default function ProductDetail() {
     ? selectedGalleryImage
     : selectedOptionImage || galleryImages[0] || product.image;
   const wristSizeNumber = Number(selectedWristSize);
+  const selectedComboWristSizeNumbers = selectedWristSizeGroups.map((group) =>
+    Number(selectedWristSizeSelections[group.id] ?? wristSizes[0])
+  );
   const saleRate = getSaleRate(product);
   const discountLabel = getDiscountLabel(product);
   const hasProductDiscount = Boolean(
@@ -274,7 +300,13 @@ export default function ProductDetail() {
   const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
   const optionPrice = selectedPurchaseOption?.price;
   const optionOriginalPrice = selectedPurchaseOption?.originalPrice ?? undefined;
-  const optionWristSizePrice = selectedPurchaseOption
+  const comboWristSizePrice = isComboPurchaseOption
+    ? selectedWristSizeGroups.reduce((sum, group, index) => {
+        const groupPrice = getWristSizeRulePrice(group, selectedComboWristSizeNumbers[index]);
+        return sum + (groupPrice ?? 0);
+      }, 0)
+    : null;
+  const optionWristSizePrice = selectedPurchaseOption && !isComboPurchaseOption
     ? getWristSizeRulePrice(selectedPurchaseOption, wristSizeNumber)
     : null;
   const wristSizeBasePrice = optionWristSizePrice ?? (
@@ -283,7 +315,7 @@ export default function ProductDetail() {
       : product.price
   );
   const wristSizePriceDelta = hasTieredBraceletPricing ? wristSizeBasePrice - product.price : 0;
-  const optionBasePrice = optionWristSizePrice ?? (optionPrice == null ? null : optionPrice + wristSizePriceDelta);
+  const optionBasePrice = comboWristSizePrice ?? optionWristSizePrice ?? (optionPrice == null ? null : optionPrice + wristSizePriceDelta);
   const optionOriginalBasePrice = optionOriginalPrice == null
     ? null
     : optionWristSizePrice ?? optionOriginalPrice + wristSizePriceDelta;
@@ -330,6 +362,13 @@ export default function ProductDetail() {
       return;
     }
     for (let i = 0; i < qty; i++) {
+      const wristSizeSelections = isComboPurchaseOption
+        ? selectedWristSizeGroups.map((group) => ({
+            id: group.id,
+            label: group.label,
+            value: selectedWristSizeSelections[group.id] ?? wristSizes[0],
+          }))
+        : undefined;
       addToCart(
         product,
         hasWristSizeOption
@@ -337,7 +376,8 @@ export default function ProductDetail() {
               unitPrice: currentPrice,
               purchaseOptionId: selectedPurchaseOption?.id,
               purchaseOptionLabel: selectedPurchaseOption?.label,
-              wristSize: selectedWristSize,
+              wristSize: isComboPurchaseOption ? undefined : selectedWristSize,
+              wristSizeSelections,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
@@ -690,7 +730,9 @@ export default function ProductDetail() {
                 {hasWristSizeOption && (
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">手圍尺寸</p>
+                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">
+                        {isComboPurchaseOption ? "組合手圍" : "手圍尺寸"}
+                      </p>
                       <button
                         type="button"
                         onClick={() => setShowWristMeasureGuide((current) => !current)}
@@ -699,17 +741,43 @@ export default function ProductDetail() {
                         手圍怎麼測量？
                       </button>
                     </div>
-                    <select
-                      value={selectedWristSize}
-                      onChange={(e) => setSelectedWristSize(e.target.value)}
-                      className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
-                    >
-                      {wristSizes.map((size) => (
-                        <option key={size} value={size}>
-                          {size} cm
-                        </option>
-                      ))}
-                    </select>
+                    {isComboPurchaseOption ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {selectedWristSizeGroups.map((group) => (
+                          <label key={group.id} className="block">
+                            <span className="block text-[0.65rem] font-body text-[oklch(0.48_0_0)] mb-1">
+                              {group.label}
+                            </span>
+                            <select
+                              value={selectedWristSizeSelections[group.id] ?? wristSizes[0]}
+                              onChange={(e) => setSelectedWristSizeSelections((current) => ({
+                                ...current,
+                                [group.id]: e.target.value,
+                              }))}
+                              className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                            >
+                              {wristSizes.map((size) => (
+                                <option key={size} value={size}>
+                                  {size} cm
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedWristSize}
+                        onChange={(e) => setSelectedWristSize(e.target.value)}
+                        className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                      >
+                        {wristSizes.map((size) => (
+                          <option key={size} value={size}>
+                            {size} cm
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     {showWristMeasureGuide && (
                       <div className="mt-3 bg-[oklch(0.98_0_0)] border border-[oklch(0.92_0_0)] px-3 py-2.5">
                         <p className="text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">

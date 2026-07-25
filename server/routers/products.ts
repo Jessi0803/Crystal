@@ -311,6 +311,7 @@ const WristSizePriceRuleSchema = z.object({
 const PurchaseOptionSchema = z.object({
   id: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
   label: z.string().trim().min(1).max(40),
+  type: z.enum(["single", "combo"]).default("single"),
   price: z.number().int().min(0),
   originalPrice: z.number().int().min(0).nullable().optional(),
   description: z.string().trim().max(120).optional(),
@@ -318,6 +319,11 @@ const PurchaseOptionSchema = z.object({
   active: z.boolean().default(true),
   image: z.string().trim().nullable().optional(),
   wristSizePriceRules: z.array(WristSizePriceRuleSchema).default([]),
+  wristSizeGroups: z.array(z.object({
+    id: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+    label: z.string().trim().min(1).max(40),
+    wristSizePriceRules: z.array(WristSizePriceRuleSchema).min(1),
+  })).default([]),
 });
 
 const ProductInputSchema = z.object({

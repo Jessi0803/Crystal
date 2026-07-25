@@ -60,6 +60,7 @@ type FormState = {
   purchaseOptions: {
     id: string;
     label: string;
+    type: "single" | "combo";
     price: string;
     originalPrice: string;
     description: string;
@@ -67,6 +68,11 @@ type FormState = {
     active: boolean;
     image: string;
     wristSizePriceRules: { maxWristSize: string; price: string }[];
+    wristSizeGroups: {
+      id: string;
+      label: string;
+      wristSizePriceRules: { maxWristSize: string; price: string }[];
+    }[];
   }[];
   scheduledPublishAt: string;
   initialStock: string;
@@ -159,6 +165,7 @@ function toFormPurchaseOptions(options?: DbProduct["purchaseOptions"] | null): F
   return (options ?? []).map((option) => ({
     id: option.id,
     label: option.label,
+    type: option.type ?? "single",
     price: String(option.price),
     originalPrice: option.originalPrice ? String(option.originalPrice) : "",
     description: option.description ?? "",
@@ -166,6 +173,11 @@ function toFormPurchaseOptions(options?: DbProduct["purchaseOptions"] | null): F
     active: option.active !== false,
     image: option.image ?? "",
     wristSizePriceRules: toFormWristSizePriceRules(option.wristSizePriceRules),
+    wristSizeGroups: (option.wristSizeGroups ?? []).map((group) => ({
+      id: group.id,
+      label: group.label,
+      wristSizePriceRules: toFormWristSizePriceRules(group.wristSizePriceRules),
+    })),
   }));
 }
 
@@ -597,6 +609,8 @@ function ProductModal({
           active: true,
           image: "",
           wristSizePriceRules: [],
+          type: "single",
+          wristSizeGroups: [],
         },
       ],
     }));
@@ -667,6 +681,131 @@ function ProductModal({
           ? {
               ...option,
               wristSizePriceRules: option.wristSizePriceRules.filter((_, currentRuleIndex) => currentRuleIndex !== ruleIndex),
+            }
+          : option
+      ),
+    }));
+  };
+  const addPurchaseOptionWristSizeGroup = (optionIndex: number) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, index) =>
+        index === optionIndex
+          ? {
+              ...option,
+              type: "combo",
+              wristSizeGroups: [
+                ...option.wristSizeGroups,
+                {
+                  id: `group-${option.wristSizeGroups.length + 1}`,
+                  label: option.wristSizeGroups.length === 0 ? "男款手圍" : option.wristSizeGroups.length === 1 ? "女款手圍" : `第 ${option.wristSizeGroups.length + 1} 條手圍`,
+                  wristSizePriceRules: [],
+                },
+              ],
+            }
+          : option
+      ),
+    }));
+  };
+  const updatePurchaseOptionWristSizeGroup = (
+    optionIndex: number,
+    groupIndex: number,
+    field: "label",
+    value: string
+  ) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, index) =>
+        index === optionIndex
+          ? {
+              ...option,
+              wristSizeGroups: option.wristSizeGroups.map((group, currentGroupIndex) =>
+                currentGroupIndex === groupIndex ? { ...group, [field]: value } : group
+              ),
+            }
+          : option
+      ),
+    }));
+  };
+  const removePurchaseOptionWristSizeGroup = (optionIndex: number, groupIndex: number) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, index) =>
+        index === optionIndex
+          ? {
+              ...option,
+              wristSizeGroups: option.wristSizeGroups.filter((_, currentGroupIndex) => currentGroupIndex !== groupIndex),
+            }
+          : option
+      ),
+    }));
+  };
+  const addPurchaseOptionGroupPriceRule = (optionIndex: number, groupIndex: number) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, index) =>
+        index === optionIndex
+          ? {
+              ...option,
+              wristSizeGroups: option.wristSizeGroups.map((group, currentGroupIndex) =>
+                currentGroupIndex === groupIndex
+                  ? {
+                      ...group,
+                      wristSizePriceRules: [
+                        ...group.wristSizePriceRules,
+                        { maxWristSize: "", price: option.price || current.price },
+                      ],
+                    }
+                  : group
+              ),
+            }
+          : option
+      ),
+    }));
+  };
+  const updatePurchaseOptionGroupPriceRule = (
+    optionIndex: number,
+    groupIndex: number,
+    ruleIndex: number,
+    field: "maxWristSize" | "price",
+    value: string
+  ) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, index) =>
+        index === optionIndex
+          ? {
+              ...option,
+              wristSizeGroups: option.wristSizeGroups.map((group, currentGroupIndex) =>
+                currentGroupIndex === groupIndex
+                  ? {
+                      ...group,
+                      wristSizePriceRules: group.wristSizePriceRules.map((rule, currentRuleIndex) =>
+                        currentRuleIndex === ruleIndex ? { ...rule, [field]: value } : rule
+                      ),
+                    }
+                  : group
+              ),
+            }
+          : option
+      ),
+    }));
+  };
+  const removePurchaseOptionGroupPriceRule = (optionIndex: number, groupIndex: number, ruleIndex: number) => {
+    setForm((current) => ({
+      ...current,
+      purchaseOptions: current.purchaseOptions.map((option, index) =>
+        index === optionIndex
+          ? {
+              ...option,
+              wristSizeGroups: option.wristSizeGroups.map((group, currentGroupIndex) =>
+                currentGroupIndex === groupIndex
+                  ? {
+                      ...group,
+                      wristSizePriceRules: group.wristSizePriceRules.filter((_, currentRuleIndex) => currentRuleIndex !== ruleIndex),
+                    }
+                  : group
+              ),
             }
           : option
       ),
@@ -837,9 +976,22 @@ function ProductModal({
           }))
           .filter((rule) => !(Number.isNaN(rule.maxWristSize) && !Number.isFinite(rule.price)))
           .sort((a, b) => a.maxWristSize - b.maxWristSize);
+        const usedGroupIds = new Set<string>();
+        const wristSizeGroups = option.wristSizeGroups.map((group) => ({
+          id: makeUniqueOptionId(slugifyOptionId(group.label || group.id), usedGroupIds),
+          label: group.label.trim(),
+          wristSizePriceRules: group.wristSizePriceRules
+            .map((rule) => ({
+              maxWristSize: parseWristSize(rule.maxWristSize),
+              price: Number(rule.price),
+            }))
+            .filter((rule) => !(Number.isNaN(rule.maxWristSize) && !Number.isFinite(rule.price)))
+            .sort((a, b) => a.maxWristSize - b.maxWristSize),
+        }));
         return {
           id: makeUniqueOptionId(baseId, usedPurchaseOptionIds),
           label,
+          type: option.type,
           price: Number(option.price),
           originalPrice: option.originalPrice ? Number(option.originalPrice) : null,
           description: option.description.trim(),
@@ -847,6 +999,7 @@ function ProductModal({
           active: option.active,
           image: normalizeImageUrl(option.image) || undefined,
           wristSizePriceRules: optionWristSizePriceRules,
+          wristSizeGroups: option.type === "combo" ? wristSizeGroups : [],
         };
       })
       .filter((option) => option.label || option.price || option.description || option.stock != null);
@@ -884,6 +1037,42 @@ function ProductModal({
       )
     )) {
       toast.error("同一方案的手圍價格上限不可重複");
+      return;
+    }
+    if (purchaseOptions.some((option) => option.type === "combo" && option.wristSizeGroups.length < 2)) {
+      toast.error("組合方案請至少設定兩個手圍欄位");
+      return;
+    }
+    if (purchaseOptions.some((option) =>
+      option.wristSizeGroups.some((group) => !group.label || group.wristSizePriceRules.length === 0)
+    )) {
+      toast.error("組合方案的每個手圍欄位都需要名稱與價格規則");
+      return;
+    }
+    if (purchaseOptions.some((option) =>
+      option.wristSizeGroups.some((group) =>
+        group.wristSizePriceRules.some((rule) => !isValidWristSize(rule.maxWristSize) || !Number.isInteger(rule.price) || rule.price < 0)
+      )
+    )) {
+      toast.error("組合手圍價格請填 0.5 cm 為單位的手圍，以及 0 以上整數價格");
+      return;
+    }
+    if (purchaseOptions.some((option) =>
+      option.wristSizeGroups.some((group) =>
+        group.wristSizePriceRules.some((rule) => rule.maxWristSize < wristSizeMin || rule.maxWristSize > wristSizeMax)
+      )
+    )) {
+      toast.error("組合手圍價格的上限需落在手圍範圍內");
+      return;
+    }
+    if (purchaseOptions.some((option) =>
+      option.wristSizeGroups.some((group) =>
+        group.wristSizePriceRules.some((rule, index) =>
+          index > 0 && rule.maxWristSize === group.wristSizePriceRules[index - 1].maxWristSize
+        )
+      )
+    )) {
+      toast.error("同一組合手圍欄位的價格上限不可重複");
       return;
     }
 
@@ -1141,7 +1330,7 @@ function ProductModal({
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+	                    <div className="grid grid-cols-3 gap-2">
                       <label className="block">
                         <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">售價</span>
                         <input
@@ -1174,8 +1363,30 @@ function ProductModal({
                           placeholder="空白沿用商品"
                           className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                         />
-                      </label>
-                    </div>
+	                      </label>
+	                    </div>
+	                    <div>
+	                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">方案類型</span>
+	                      <div className="grid grid-cols-2 gap-2">
+	                        {[
+	                          { id: "single" as const, label: "單件" },
+	                          { id: "combo" as const, label: "組合" },
+	                        ].map((typeOption) => (
+	                          <button
+	                            key={typeOption.id}
+	                            type="button"
+	                            onClick={() => updatePurchaseOption(index, "type", typeOption.id)}
+	                            className={`border px-3 py-2 text-xs font-body transition-colors ${
+	                              option.type === typeOption.id
+	                                ? "border-[oklch(0.15_0_0)] bg-[oklch(0.15_0_0)] text-white"
+	                                : "border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
+	                            }`}
+	                          >
+	                            {typeOption.label}
+	                          </button>
+	                        ))}
+	                      </div>
+	                    </div>
 	                    <label className="block">
 	                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">說明</span>
                       <input
@@ -1241,6 +1452,101 @@ function ProductModal({
 	                        </div>
 	                      )}
 	                    </div>
+	                    {option.type === "combo" && (
+	                      <div className="border border-[oklch(0.9_0_0)] bg-white p-3">
+	                        <div className="mb-3 flex items-start justify-between gap-2">
+	                          <div>
+	                            <p className="text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">組合手圍欄位</p>
+	                            <p className="mt-1 text-[11px] font-body text-[oklch(0.58_0_0)]">
+	                              每個欄位設定完整價格，前台會依各自手圍查價後加總。
+	                            </p>
+	                          </div>
+	                          <button
+	                            type="button"
+	                            onClick={() => addPurchaseOptionWristSizeGroup(index)}
+	                            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
+	                          >
+	                            <Plus className="w-3 h-3" />
+	                            新增欄位
+	                          </button>
+	                        </div>
+	                        {option.wristSizeGroups.length === 0 ? (
+	                          <p className="text-xs font-body text-[oklch(0.55_0_0)]">
+	                            建議新增「男款手圍」與「女款手圍」兩個欄位。
+	                          </p>
+	                        ) : (
+	                          <div className="space-y-3">
+	                            {option.wristSizeGroups.map((group, groupIndex) => (
+	                              <div key={groupIndex} className="border border-[oklch(0.93_0_0)] bg-[oklch(0.985_0_0)] p-3">
+	                                <div className="grid grid-cols-[minmax(0,1fr)_32px] gap-2 items-end">
+	                                  <label className="block">
+	                                    <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">欄位名稱</span>
+	                                    <input
+	                                      value={group.label}
+	                                      onChange={(e) => updatePurchaseOptionWristSizeGroup(index, groupIndex, "label", e.target.value)}
+	                                      placeholder="男款手圍"
+	                                      className="w-full border border-[oklch(0.86_0_0)] bg-white px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+	                                    />
+	                                  </label>
+	                                  <button
+	                                    type="button"
+	                                    onClick={() => removePurchaseOptionWristSizeGroup(index, groupIndex)}
+	                                    aria-label={`刪除方案 ${index + 1} 手圍欄位 ${groupIndex + 1}`}
+	                                    className="h-9 w-8 border border-red-200 bg-white text-red-600 flex items-center justify-center hover:bg-red-50"
+	                                  >
+	                                    <Trash2 className="w-3.5 h-3.5" />
+	                                  </button>
+	                                </div>
+	                                <div className="mt-2 space-y-2">
+	                                  {group.wristSizePriceRules.map((rule, ruleIndex) => (
+	                                    <div key={ruleIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-2 items-end">
+	                                      <label className="block">
+	                                        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">最大手圍</span>
+	                                        <input
+	                                          type="text"
+	                                          inputMode="decimal"
+	                                          value={rule.maxWristSize}
+	                                          onChange={(e) => updatePurchaseOptionGroupPriceRule(index, groupIndex, ruleIndex, "maxWristSize", e.target.value)}
+	                                          placeholder="13.5"
+	                                          className="w-full border border-[oklch(0.86_0_0)] bg-white px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+	                                        />
+	                                      </label>
+	                                      <label className="block">
+	                                        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">完整價格</span>
+	                                        <input
+	                                          type="number"
+	                                          min={0}
+	                                          value={rule.price}
+	                                          onChange={(e) => updatePurchaseOptionGroupPriceRule(index, groupIndex, ruleIndex, "price", e.target.value)}
+	                                          placeholder={option.price || "1680"}
+	                                          className="w-full border border-[oklch(0.86_0_0)] bg-white px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+	                                        />
+	                                      </label>
+	                                      <button
+	                                        type="button"
+	                                        onClick={() => removePurchaseOptionGroupPriceRule(index, groupIndex, ruleIndex)}
+	                                        aria-label={`刪除方案 ${index + 1} 欄位 ${groupIndex + 1} 價格 ${ruleIndex + 1}`}
+	                                        className="h-9 w-8 border border-red-200 bg-white text-red-600 flex items-center justify-center hover:bg-red-50"
+	                                      >
+	                                        <Trash2 className="w-3.5 h-3.5" />
+	                                      </button>
+	                                    </div>
+	                                  ))}
+	                                  <button
+	                                    type="button"
+	                                    onClick={() => addPurchaseOptionGroupPriceRule(index, groupIndex)}
+	                                    className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] bg-white"
+	                                  >
+	                                    <Plus className="w-3 h-3" />
+	                                    新增價格
+	                                  </button>
+	                                </div>
+	                              </div>
+	                            ))}
+	                          </div>
+	                        )}
+	                      </div>
+	                    )}
 	                    <div>
 	                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">方案圖片</span>
                       <div className="flex gap-2">
@@ -1673,6 +1979,10 @@ export default function AdminProducts() {
         purchaseOptions: purchaseOptions?.map((option) => ({
           ...option,
           wristSizePriceRules: option.wristSizePriceRules ?? [],
+          wristSizeGroups: option.wristSizeGroups?.map((group) => ({
+            ...group,
+            wristSizePriceRules: group.wristSizePriceRules ?? [],
+          })) ?? [],
         })),
         active: inStock,
         sortOrder: 0,

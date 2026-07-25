@@ -2949,6 +2949,11 @@ var CartItemSchema = z2.object({
   purchaseOptionId: z2.string().optional(),
   purchaseOptionLabel: z2.string().optional(),
   wristSize: z2.string().optional(),
+  wristSizeSelections: z2.array(z2.object({
+    id: z2.string(),
+    label: z2.string(),
+    value: z2.string()
+  })).optional(),
   name: z2.string(),
   price: z2.number(),
   quantity: z2.number(),
@@ -2996,6 +3001,30 @@ async function normalizePurchaseOptionItems(items) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${product.name}\uFF08${option.label}\uFF09\u300D\u5EAB\u5B58\u4E0D\u8DB3\u3002` });
     }
     const optionProductName = `${product.name}\uFF08${option.label}\uFF09`;
+    if (option.type === "combo") {
+      const groups = option.wristSizeGroups ?? [];
+      if (groups.length === 0) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u5C1A\u672A\u8A2D\u5B9A\u7D44\u5408\u624B\u570D\u50F9\u683C\u3002` });
+      }
+      const selections = item.wristSizeSelections ?? [];
+      const price = groups.reduce((sum, group) => {
+        const selected = selections.find((selection) => selection.id === group.id);
+        const wristSize2 = selected == null ? NaN : Number(selected.value);
+        const groupPrice = Number.isFinite(wristSize2) ? getWristSizeRulePrice(group, wristSize2) : null;
+        if (groupPrice == null) {
+          throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u7F3A\u5C11 ${group.label} \u7684\u50F9\u683C\u3002` });
+        }
+        return sum + groupPrice;
+      }, 0);
+      return {
+        ...item,
+        name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+        price,
+        image: item.image || product.image,
+        purchaseOptionLabel: option.label,
+        purchaseOptionUsesOwnStock: option.stock != null
+      };
+    }
     const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
     const optionWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(option, wristSize) : null;
     const productWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(product, wristSize) : null;
@@ -6324,13 +6353,19 @@ var WristSizePriceRuleSchema = z6.object({
 var PurchaseOptionSchema = z6.object({
   id: z6.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
   label: z6.string().trim().min(1).max(40),
+  type: z6.enum(["single", "combo"]).default("single"),
   price: z6.number().int().min(0),
   originalPrice: z6.number().int().min(0).nullable().optional(),
   description: z6.string().trim().max(120).optional(),
   stock: z6.number().int().min(-1).nullable().optional(),
   active: z6.boolean().default(true),
   image: z6.string().trim().nullable().optional(),
-  wristSizePriceRules: z6.array(WristSizePriceRuleSchema).default([])
+  wristSizePriceRules: z6.array(WristSizePriceRuleSchema).default([]),
+  wristSizeGroups: z6.array(z6.object({
+    id: z6.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+    label: z6.string().trim().min(1).max(40),
+    wristSizePriceRules: z6.array(WristSizePriceRuleSchema).min(1)
+  })).default([])
 });
 var ProductInputSchema = z6.object({
   name: z6.string().min(1),
