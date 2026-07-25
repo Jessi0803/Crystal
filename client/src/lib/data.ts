@@ -41,6 +41,7 @@ export interface Product {
     stock?: number | null;
     active?: boolean;
     image?: string | null;
+    wristSizePriceRules?: { maxWristSize: number; price: number }[] | null;
   }[];
   crystalType: string;
   color: string;

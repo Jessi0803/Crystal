@@ -343,6 +343,7 @@ export type ProductPurchaseOption = {
   active?: boolean;
   // 方案專屬圖片（data URL 或網址）；未設定時沿用商品主圖
   image?: string | null;
+  wristSizePriceRules?: WristSizePriceRule[] | null;
 };
 
 // ─── 商品表 ───────────────────────────────────────────────────────────────────

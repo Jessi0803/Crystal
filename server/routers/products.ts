@@ -317,6 +317,7 @@ const PurchaseOptionSchema = z.object({
   stock: z.number().int().min(-1).nullable().optional(),
   active: z.boolean().default(true),
   image: z.string().trim().nullable().optional(),
+  wristSizePriceRules: z.array(WristSizePriceRuleSchema).default([]),
 });
 
 const ProductInputSchema = z.object({

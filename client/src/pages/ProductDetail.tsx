@@ -20,6 +20,7 @@ import {
   getDiscountLabel,
   getSaleRate,
   getTieredBraceletBasePrice,
+  getWristSizeRulePrice,
   usesTieredBraceletPricing,
 } from "@/lib/pricing";
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
@@ -273,12 +274,19 @@ export default function ProductDetail() {
   const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
   const optionPrice = selectedPurchaseOption?.price;
   const optionOriginalPrice = selectedPurchaseOption?.originalPrice ?? undefined;
-  const wristSizeBasePrice = hasTieredBraceletPricing
-    ? getTieredBraceletBasePrice(product, wristSizeNumber)
-    : product.price;
+  const optionWristSizePrice = selectedPurchaseOption
+    ? getWristSizeRulePrice(selectedPurchaseOption, wristSizeNumber)
+    : null;
+  const wristSizeBasePrice = optionWristSizePrice ?? (
+    hasTieredBraceletPricing
+      ? getTieredBraceletBasePrice(product, wristSizeNumber)
+      : product.price
+  );
   const wristSizePriceDelta = hasTieredBraceletPricing ? wristSizeBasePrice - product.price : 0;
-  const optionBasePrice = optionPrice == null ? null : optionPrice + wristSizePriceDelta;
-  const optionOriginalBasePrice = optionOriginalPrice == null ? null : optionOriginalPrice + wristSizePriceDelta;
+  const optionBasePrice = optionWristSizePrice ?? (optionPrice == null ? null : optionPrice + wristSizePriceDelta);
+  const optionOriginalBasePrice = optionOriginalPrice == null
+    ? null
+    : optionWristSizePrice ?? optionOriginalPrice + wristSizePriceDelta;
   const originalBasePrice = optionOriginalBasePrice && optionOriginalBasePrice > (optionBasePrice ?? 0)
     ? optionOriginalBasePrice
     : wristSizeBasePrice;

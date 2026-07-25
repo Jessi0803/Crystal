@@ -2997,12 +2997,14 @@ async function normalizePurchaseOptionItems(items) {
     }
     const optionProductName = `${product.name}\uFF08${option.label}\uFF09`;
     const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
-    const wristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(product, wristSize) : null;
+    const optionWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(option, wristSize) : null;
+    const productWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(product, wristSize) : null;
+    const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
     const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
     return {
       ...item,
       name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-      price: option.price + wristSizePriceDelta,
+      price: optionWristSizeRulePrice ?? option.price + wristSizePriceDelta,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null
@@ -6327,7 +6329,8 @@ var PurchaseOptionSchema = z6.object({
   description: z6.string().trim().max(120).optional(),
   stock: z6.number().int().min(-1).nullable().optional(),
   active: z6.boolean().default(true),
-  image: z6.string().trim().nullable().optional()
+  image: z6.string().trim().nullable().optional(),
+  wristSizePriceRules: z6.array(WristSizePriceRuleSchema).default([])
 });
 var ProductInputSchema = z6.object({
   name: z6.string().min(1),

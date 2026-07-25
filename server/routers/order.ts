@@ -196,14 +196,18 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
     }
     const optionProductName = `${product.name}（${option.label}）`;
     const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
-    const wristSizeRulePrice = Number.isFinite(wristSize)
+    const optionWristSizeRulePrice = Number.isFinite(wristSize)
+      ? getWristSizeRulePrice(option, wristSize)
+      : null;
+    const productWristSizeRulePrice = Number.isFinite(wristSize)
       ? getWristSizeRulePrice(product, wristSize)
       : null;
+    const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
     const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
     return {
       ...item,
       name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-      price: option.price + wristSizePriceDelta,
+      price: optionWristSizeRulePrice ?? option.price + wristSizePriceDelta,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null,
