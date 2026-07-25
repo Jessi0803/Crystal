@@ -316,6 +316,7 @@ const PurchaseOptionSchema = z.object({
   description: z.string().trim().max(120).optional(),
   stock: z.number().int().min(-1).nullable().optional(),
   active: z.boolean().default(true),
+  image: z.string().trim().nullable().optional(),
 });
 
 const ProductInputSchema = z.object({

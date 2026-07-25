@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc";
 import { products as staticProducts } from "@/lib/data";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import type { DbProduct } from "../../../drizzle/schema";
 
 const CATEGORY_OPTIONS = [
@@ -64,6 +65,7 @@ type FormState = {
     description: string;
     stock: string;
     active: boolean;
+    image: string;
   }[];
   scheduledPublishAt: string;
   initialStock: string;
@@ -161,6 +163,7 @@ function toFormPurchaseOptions(options?: DbProduct["purchaseOptions"] | null): F
     description: option.description ?? "",
     stock: option.stock == null ? "" : String(option.stock),
     active: option.active !== false,
+    image: option.image ?? "",
   }));
 }
 
@@ -212,15 +215,6 @@ function getCategoryLabel(category: string) {
 
 function getProductCategoryLabels(product: DbProduct) {
   return product.categoryLabels?.length ? product.categoryLabels : [product.categoryLabel];
-}
-
-function normalizeImageUrl(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed.includes("drive.google.com")) return trimmed;
-  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
-  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
-  const id = fileMatch?.[1] ?? idMatch?.[1];
-  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
 }
 
 function getProductImages(product: Pick<DbProduct, "image" | "images">) {
@@ -534,6 +528,9 @@ function ProductModal({
   );
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [compressing, setCompressing] = useState(false);
+  // 所有方案共用一個檔案選擇器，用索引記住上傳目標
+  const optionImageInputRef = useRef<HTMLInputElement>(null);
+  const [pendingOptionIndex, setPendingOptionIndex] = useState<number | null>(null);
   const [showMoreFields, setShowMoreFields] = useState(false);
 
   const selectedCategories = form.categories;
@@ -584,6 +581,7 @@ function ProductModal({
           description: "",
           stock: "",
           active: true,
+          image: "",
         },
       ],
     }));
@@ -609,6 +607,29 @@ function ProductModal({
       ...current,
       purchaseOptions: current.purchaseOptions.filter((_, optionIndex) => optionIndex !== index),
     }));
+  };
+  const pickPurchaseOptionImage = (index: number) => {
+    setPendingOptionIndex(index);
+    optionImageInputRef.current?.click();
+  };
+  const handleOptionImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const targetIndex = pendingOptionIndex;
+    e.target.value = "";
+    setPendingOptionIndex(null);
+    if (!file || targetIndex == null) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("每張圖片請小於 10MB");
+      return;
+    }
+    setCompressing(true);
+    try {
+      const dataUrl = await compressImage(file);
+      updatePurchaseOption(targetIndex, "image", dataUrl);
+    } catch {
+      toast.error("圖片讀取失敗，請改用圖片網址");
+    }
+    setCompressing(false);
   };
 
   const setInventory = trpc.inventory.setInventory.useMutation();
@@ -749,6 +770,7 @@ function ProductModal({
         description: option.description.trim(),
         stock: option.stock === "" ? null : Number(option.stock),
         active: option.active,
+        image: normalizeImageUrl(option.image) || undefined,
       }))
       .filter((option) => option.label || option.price || option.description || option.stock != null);
     if (purchaseOptions.some((option) => !option.label || !option.id)) {
@@ -1070,6 +1092,55 @@ function ProductModal({
                         className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                       />
                     </label>
+                    <div>
+                      <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">方案圖片</span>
+                      <div className="flex gap-2">
+                        <div className="relative w-16 h-16 shrink-0 border border-[oklch(0.88_0_0)] bg-[oklch(0.96_0_0)] overflow-hidden">
+                          {option.image ? (
+                            <>
+                              <img src={option.image} alt="" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => updatePurchaseOption(index, "image", "")}
+                                aria-label={`移除方案 ${index + 1} 的圖片`}
+                                className="absolute right-0.5 top-0.5 bg-white/95 p-0.5 text-red-600 hover:bg-white"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[oklch(0.7_0_0)]">
+                              <ImageIcon className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => pickPurchaseOptionImage(index)}
+                            className="flex items-center justify-center gap-1.5 w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            上傳圖片
+                          </button>
+                          {option.image.startsWith("data:") ? (
+                            <p className="px-3 py-2 text-xs font-body text-[oklch(0.45_0_0)] border border-dashed border-[oklch(0.88_0_0)]">
+                              已上傳圖片
+                            </p>
+                          ) : (
+                            <input
+                              value={option.image}
+                              onChange={(e) => updatePurchaseOption(index, "image", e.target.value)}
+                              placeholder="或貼上方案圖片網址"
+                              className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <p className="mt-1 text-[11px] font-body text-[oklch(0.55_0_0)]">
+                        未設定時，選擇此方案仍顯示商品主圖。
+                      </p>
+                    </div>
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-body text-[oklch(0.35_0_0)]">
                       <input
                         type="checkbox"
@@ -1085,12 +1156,20 @@ function ProductModal({
               <button
                 type="button"
                 onClick={addPurchaseOption}
+                data-testid="add-purchase-option"
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)]"
               >
                 <Plus className="w-3.5 h-3.5" />
                 新增購買方案
               </button>
             </div>
+            <input
+              ref={optionImageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleOptionImageFileChange}
+            />
           </fieldset>
 
           {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}

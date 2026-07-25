@@ -22,6 +22,7 @@ import {
   getTieredBraceletBasePrice,
   usesTieredBraceletPricing,
 } from "@/lib/pricing";
+import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
 import {
   Dialog,
@@ -133,15 +134,6 @@ function CustomPriceTile({
   );
 }
 
-function normalizeImageUrl(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed.includes("drive.google.com")) return trimmed;
-  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
-  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
-  const id = fileMatch?.[1] ?? idMatch?.[1];
-  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
-}
-
 function getProductImages(product: { image: string; images?: string[] }) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
@@ -207,7 +199,8 @@ export default function ProductDetail() {
     setHasSelectedClasp(false);
     setShowWristMeasureGuide(false);
     setShowClaspGuide(false);
-    setSelectedGalleryImage(product ? getProductImages(product)[0] ?? "" : "");
+    // 清空而非填入第一張，讓預設方案的圖片能在載入時就顯示
+    setSelectedGalleryImage("");
     setSelectedPurchaseOptionId(product?.purchaseOptions?.find((option) => option.active !== false)?.id ?? "");
   }, [id, product?.id]);
   useEffect(() => {
@@ -262,9 +255,13 @@ export default function ProductDetail() {
   const selectedPurchaseOption =
     purchaseOptions.find((option) => option.id === selectedPurchaseOptionId) ?? purchaseOptions[0];
   const galleryImages = getProductImages(product);
+  const selectedOptionImage = selectedPurchaseOption?.image?.trim()
+    ? normalizeImageUrl(selectedPurchaseOption.image)
+    : "";
+  // selectedGalleryImage 只代表「使用者手動點過的相簿縮圖」；為空時才讓方案圖接手
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
     ? selectedGalleryImage
-    : galleryImages[0] ?? product.image;
+    : selectedOptionImage || galleryImages[0] || product.image;
   const wristSizeNumber = Number(selectedWristSize);
   const saleRate = getSaleRate(product);
   const discountLabel = getDiscountLabel(product);
@@ -644,7 +641,11 @@ export default function ProductDetail() {
                             type="button"
                             key={option.id}
                             disabled={optionSoldOut}
-                            onClick={() => setSelectedPurchaseOptionId(option.id)}
+                            onClick={() => {
+                              setSelectedPurchaseOptionId(option.id);
+                              // 交還主圖控制權給方案圖，直到使用者再次點選相簿縮圖
+                              setSelectedGalleryImage("");
+                            }}
                             className={`px-3 py-3 text-xs font-body border transition-colors text-left disabled:cursor-not-allowed disabled:opacity-45 ${
                               isActive
                                 ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"

@@ -6315,7 +6315,8 @@ var PurchaseOptionSchema = z6.object({
   originalPrice: z6.number().int().min(0).nullable().optional(),
   description: z6.string().trim().max(120).optional(),
   stock: z6.number().int().min(-1).nullable().optional(),
-  active: z6.boolean().default(true)
+  active: z6.boolean().default(true),
+  image: z6.string().trim().nullable().optional()
 });
 var ProductInputSchema = z6.object({
   name: z6.string().min(1),

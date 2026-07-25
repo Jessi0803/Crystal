@@ -40,6 +40,7 @@ export interface Product {
     description?: string;
     stock?: number | null;
     active?: boolean;
+    image?: string | null;
   }[];
   crystalType: string;
   color: string;

@@ -5,6 +5,7 @@ import { useCart } from "@/contexts/CartContext";
 import { Link } from "wouter";
 import { toast } from "sonner"; // still used for remove toast
 import { trpc } from "@/lib/trpc";
+import { getPurchaseOptionImage } from "@/lib/purchaseOptions";
 import {
   CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
   useClearQuartzChipsProduct,
@@ -84,12 +85,12 @@ export default function CartDrawer() {
             </div>
           ) : (
             <div className="divide-y divide-[oklch(0.95_0_0)]">
-              {items.map(({ id, product, quantity, unitPrice, purchaseOptionLabel, wristSize, claspType, fitPreference, isPreorder }) => (
+              {items.map(({ id, product, quantity, unitPrice, purchaseOptionId, purchaseOptionLabel, wristSize, claspType, fitPreference, isPreorder }) => (
                 <div key={id} className="flex gap-4 px-6 py-5">
                   {/* Image */}
                   <div className="w-20 h-24 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
                     <img
-                      src={product.image}
+                      src={getPurchaseOptionImage(product, purchaseOptionId)}
                       alt={product.name}
                       className="w-full h-full object-cover"
                     />

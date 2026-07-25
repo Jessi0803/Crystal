@@ -24,6 +24,7 @@ import {
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
+import { getPurchaseOptionImage } from "@/lib/purchaseOptions";
 
 type PaymentMethod = "credit" | "atm";
 type ShippingMethod = "cvs_711" | "home";
@@ -322,7 +323,7 @@ export default function Checkout() {
           name: `${i.product.name}${i.purchaseOptionLabel ? `（${i.purchaseOptionLabel}）` : ""}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}${i.fitPreference === "just-right" ? "（剛好）" : i.fitPreference === "loose" ? "（微鬆）" : ""}`,
           price: i.unitPrice,
           quantity: i.quantity,
-          image: i.product.image,
+          image: getPurchaseOptionImage(i.product, i.purchaseOptionId),
           isPreorder: i.isPreorder,
           twoItemFreeShippingEligible: getTwoItemFreeShippingEligibility(i.product.id, i.product.twoItemFreeShippingEligible),
         })),
@@ -1091,7 +1092,7 @@ export default function Checkout() {
                     <div className="w-16 h-16 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
                       {item.product.image && (
                         <img
-                          src={item.product.image}
+                          src={getPurchaseOptionImage(item.product, item.purchaseOptionId)}
                           alt={item.product.name}
                           className="w-full h-full object-cover"
                         />

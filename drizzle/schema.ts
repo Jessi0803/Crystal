@@ -341,6 +341,8 @@ export type ProductPurchaseOption = {
   description?: string;
   stock?: number | null;
   active?: boolean;
+  // 方案專屬圖片（data URL 或網址）；未設定時沿用商品主圖
+  image?: string | null;
 };
 
 // ─── 商品表 ───────────────────────────────────────────────────────────────────
