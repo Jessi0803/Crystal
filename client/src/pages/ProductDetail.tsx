@@ -647,11 +647,6 @@ export default function ProductDetail() {
                           {getCustomPriceDisplay(product.id, product.priceRange)}
                         </span>
                       </div>
-                      <p className="text-sm font-body text-[oklch(0.5_0_0)]">
-                        {product.depositRange
-                          ? `下單先支付訂金 ${product.depositRange}（依占卜主題調整），尾款由老闆確認後另行通知`
-                          : `下單先支付訂金 NT$ ${currentPrice.toLocaleString()}，尾款由老闆確認後另行通知`}
-                      </p>
                     </>
                   )}
                 </>
