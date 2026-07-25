@@ -278,6 +278,9 @@ export default function ProductDetail() {
     ? selectedPurchaseOption.wristSizeGroups ?? []
     : [];
   const isComboPurchaseOption = selectedWristSizeGroups.length > 0;
+  const hasSelectedOptionWristSizePricing = Boolean(
+    selectedPurchaseOption?.wristSizePriceRules?.length || selectedWristSizeGroups.length
+  );
   const galleryImages = getProductImages(product);
   const selectedOptionImage = selectedPurchaseOption?.image?.trim()
     ? normalizeImageUrl(selectedPurchaseOption.image)
@@ -329,6 +332,7 @@ export default function ProductDetail() {
   const currentPrice = basePrice + claspExtra;
   const originalCurrentPrice = originalBasePrice + claspExtra;
   const hasCurrentPriceSale = currentPrice < originalCurrentPrice;
+  const shouldShowCurrentPrice = hasTieredBraceletPricing || hasSelectedOptionWristSizePricing;
   const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
@@ -516,7 +520,7 @@ export default function ProductDetail() {
 
             {/* Price */}
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
-              {hasTieredBraceletPricing ? (
+              {shouldShowCurrentPrice ? (
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                     NT$ {currentPrice.toLocaleString()}
