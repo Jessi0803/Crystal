@@ -6,9 +6,18 @@ import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
+import CustomFormAddonSelector, {
+  type CustomAddonId,
+  formatCustomAddonNote,
+} from "@/components/CustomFormAddonSelector";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
-import { CUSTOM_WRIST_SIZE_MAX, CUSTOM_WRIST_SIZE_MIN, CUSTOM_WRIST_SIZE_STEP, isValidCustomWristSize } from "@/lib/customOrderingContent";
+import {
+  CUSTOM_WRIST_SIZE_MAX,
+  CUSTOM_WRIST_SIZE_MIN,
+  CUSTOM_WRIST_SIZE_STEP,
+  isValidCustomWristSize,
+} from "@/lib/customOrderingContent";
 
 interface FormData {
   effect: string;
@@ -38,39 +47,43 @@ const EMPTY_FORM: FormData = {
   igHandle: "",
 };
 
-function buildNote(form: FormData): string {
-  return [
-    "【純客製水晶手鍊諮詢表單】",
-    "",
-    `想要的功效：${form.effect || "（未填）"}`,
-    `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
-    `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
-    `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
-    `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
-    `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
-    `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
-    `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
-    `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
-    `其餘特殊需求：${form.specialRequests || "無"}`,
-    `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
-  ].join("\n");
+function buildNote(form: FormData, selectedAddons: CustomAddonId[]): string {
+  return (
+    [
+      "【純客製水晶手鍊諮詢表單】",
+      "",
+      `想要的功效：${form.effect || "（未填）"}`,
+      `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
+      `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
+      `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
+      `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
+      `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
+      `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
+      `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
+      `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
+      `其餘特殊需求：${form.specialRequests || "無"}`,
+      `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
+    ].join("\n") + formatCustomAddonNote(selectedAddons)
+  );
 }
 
 export default function CustomForm() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
+  const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
   const { addToCart } = useCart();
 
-  const depositProduct = products.find((p) => p.id === "custom-deposit-product");
+  const depositProduct = products.find(p => p.id === "custom-deposit-product");
 
   const steps = [
     {
       title: "您想要什麼功效？",
-      subtitle: "例如：提升自信、招財、愛情、療癒、保護氣場……可以自由描述，越詳細越好",
+      subtitle:
+        "例如：提升自信、招財、愛情、療癒、保護氣場……可以自由描述，越詳細越好",
       required: true,
       field: (
         <textarea
           value={form.effect}
-          onChange={(e) => setForm({ ...form, effect: e.target.value })}
+          onChange={e => setForm({ ...form, effect: e.target.value })}
           placeholder="寫下您想要的功效或願望，也可以描述目前的困境或期待的改變"
           rows={6}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
@@ -79,7 +92,8 @@ export default function CustomForm() {
     },
     {
       title: "手圍尺寸是多少？",
-      subtitle: "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減，我們會幫您調整鬆緊",
+      subtitle:
+        "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減，我們會幫您調整鬆緊",
       required: true,
       field: (
         <div className="space-y-4">
@@ -87,7 +101,7 @@ export default function CustomForm() {
             <input
               type="number"
               value={form.wristSize}
-              onChange={(e) => setForm({ ...form, wristSize: e.target.value })}
+              onChange={e => setForm({ ...form, wristSize: e.target.value })}
               placeholder="例如：15.5"
               step={CUSTOM_WRIST_SIZE_STEP}
               min={CUSTOM_WRIST_SIZE_MIN}
@@ -109,9 +123,17 @@ export default function CustomForm() {
       field: (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { id: "just-right" as const, label: "剛好", desc: "會有水晶壓痕但不掐肉，手鍊緊貼手腕" },
-            { id: "loose" as const, label: "微鬆", desc: "可輕微滑動，戴起來較為舒適寬鬆" },
-          ].map((opt) => (
+            {
+              id: "just-right" as const,
+              label: "剛好",
+              desc: "會有水晶壓痕但不掐肉，手鍊緊貼手腕",
+            },
+            {
+              id: "loose" as const,
+              label: "微鬆",
+              desc: "可輕微滑動，戴起來較為舒適寬鬆",
+            },
+          ].map(opt => (
             <button
               key={opt.id}
               type="button"
@@ -122,8 +144,12 @@ export default function CustomForm() {
                   : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
               }`}
             >
-              <span className="block font-semibold text-base mb-1">{opt.label}</span>
-              <span className="block text-xs leading-relaxed opacity-80">{opt.desc}</span>
+              <span className="block font-semibold text-base mb-1">
+                {opt.label}
+              </span>
+              <span className="block text-xs leading-relaxed opacity-80">
+                {opt.desc}
+              </span>
             </button>
           ))}
         </div>
@@ -139,7 +165,7 @@ export default function CustomForm() {
             {[
               { id: "gold" as const, label: "金飾", img: "/golden.jpg" },
               { id: "silver" as const, label: "銀飾", img: "/silver.jpg" },
-            ].map((opt) => (
+            ].map(opt => (
               <button
                 key={opt.id}
                 type="button"
@@ -150,12 +176,18 @@ export default function CustomForm() {
                     : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
                 }`}
               >
-                <img src={opt.img} alt={opt.label} className="w-full h-44 object-cover" />
-                <p className={`text-sm font-body text-center py-2.5 ${
-                  form.metalPreference === opt.id
-                    ? "bg-[oklch(0.97_0_0)] font-semibold"
-                    : "text-[oklch(0.45_0_0)]"
-                }`}>
+                <img
+                  src={opt.img}
+                  alt={opt.label}
+                  className="w-full h-44 object-cover"
+                />
+                <p
+                  className={`text-sm font-body text-center py-2.5 ${
+                    form.metalPreference === opt.id
+                      ? "bg-[oklch(0.97_0_0)] font-semibold"
+                      : "text-[oklch(0.45_0_0)]"
+                  }`}
+                >
                   {opt.label}
                 </p>
               </button>
@@ -182,28 +214,58 @@ export default function CustomForm() {
       field: (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
-            <img src="/bead-frame-1.jpg" alt="珠框銀管參考1" className="w-full h-56 object-cover rounded-sm" />
-            <img src="/bead-frame-2.jpg" alt="珠框銀管參考2" className="w-full h-56 object-cover rounded-sm" />
+            <img
+              src="/bead-frame-1.jpg"
+              alt="珠框銀管參考1"
+              className="w-full h-56 object-cover rounded-sm"
+            />
+            <img
+              src="/bead-frame-2.jpg"
+              alt="珠框銀管參考2"
+              className="w-full h-56 object-cover rounded-sm"
+            />
           </div>
           <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">銀管</p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">穿在水晶珠之間的小金屬管，可增加層次感與精緻度</p>
+            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
+              銀管
+            </p>
+            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
+              穿在水晶珠之間的小金屬管，可增加層次感與精緻度
+            </p>
             <div className="grid grid-cols-2 gap-3">
-              {[{ id: "yes" as const, label: "要" }, { id: "no" as const, label: "不要" }].map((opt) => (
-                <button key={opt.id} type="button" onClick={() => setForm({ ...form, silverTube: opt.id })}
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.silverTube === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
+              {[
+                { id: "yes" as const, label: "要" },
+                { id: "no" as const, label: "不要" },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, silverTube: opt.id })}
+                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.silverTube === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
+                >
                   {opt.label}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">珠框</p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">套在主石外的金屬框，可突顯主石、增加立體感</p>
+            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
+              珠框
+            </p>
+            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
+              套在主石外的金屬框，可突顯主石、增加立體感
+            </p>
             <div className="grid grid-cols-2 gap-3">
-              {[{ id: "yes" as const, label: "要" }, { id: "no" as const, label: "不要" }].map((opt) => (
-                <button key={opt.id} type="button" onClick={() => setForm({ ...form, beadFrame: opt.id })}
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.beadFrame === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}>
+              {[
+                { id: "yes" as const, label: "要" },
+                { id: "no" as const, label: "不要" },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, beadFrame: opt.id })}
+                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.beadFrame === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
+                >
                   {opt.label}
                 </button>
               ))}
@@ -220,10 +282,25 @@ export default function CustomForm() {
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
             {[
-              { id: "lobster" as const, label: "龍蝦扣", sub: "+200元", img: "/lobster-clasp.jpg" },
-              { id: "magnet" as const, label: "磁扣", sub: "+200元", img: "/magnet-clasp.png" },
-              { id: "elastic" as const, label: "彈力繩", sub: "免費", img: "/elastic-cord.jpg" },
-            ].map((opt) => (
+              {
+                id: "lobster" as const,
+                label: "龍蝦扣",
+                sub: "+200元",
+                img: "/lobster-clasp.jpg",
+              },
+              {
+                id: "magnet" as const,
+                label: "磁扣",
+                sub: "+200元",
+                img: "/magnet-clasp.png",
+              },
+              {
+                id: "elastic" as const,
+                label: "彈力繩",
+                sub: "免費",
+                img: "/elastic-cord.jpg",
+              },
+            ].map(opt => (
               <button
                 key={opt.id}
                 type="button"
@@ -235,10 +312,20 @@ export default function CustomForm() {
                 }`}
               >
                 <div className="flex aspect-square items-center justify-center bg-[oklch(0.97_0_0)] p-1">
-                  <img src={opt.img} alt={opt.label} className="h-full w-full object-contain" />
+                  <img
+                    src={opt.img}
+                    alt={opt.label}
+                    className="h-full w-full object-contain"
+                  />
                 </div>
-                <p className={`text-xs font-body py-2 ${form.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}>
-                  {opt.label}<br /><span className="text-[0.6rem] text-[oklch(0.55_0_0)]">（{opt.sub}）</span>
+                <p
+                  className={`text-xs font-body py-2 ${form.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}
+                >
+                  {opt.label}
+                  <br />
+                  <span className="text-[0.6rem] text-[oklch(0.55_0_0)]">
+                    （{opt.sub}）
+                  </span>
                 </p>
               </button>
             ))}
@@ -254,7 +341,7 @@ export default function CustomForm() {
       field: (
         <CustomFormPendantCharmField
           value={form.pendantCharm}
-          onChange={(pendantCharm) => setForm({ ...form, pendantCharm })}
+          onChange={pendantCharm => setForm({ ...form, pendantCharm })}
         />
       ),
     },
@@ -265,7 +352,7 @@ export default function CustomForm() {
       field: (
         <textarea
           value={form.colorPreference}
-          onChange={(e) => setForm({ ...form, colorPreference: e.target.value })}
+          onChange={e => setForm({ ...form, colorPreference: e.target.value })}
           placeholder="寫下喜歡的顏色或色系，沒有指定可以留空"
           rows={5}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
@@ -274,12 +361,13 @@ export default function CustomForm() {
     },
     {
       title: "還有其他特殊需求嗎？",
-      subtitle: "任何其他想告訴老闆的事情，例如過敏材質、特別風格、紀念意義……沒有的話留空即可",
+      subtitle:
+        "任何其他想告訴老闆的事情，例如過敏材質、特別風格、紀念意義……沒有的話留空即可",
       required: false,
       field: (
         <textarea
           value={form.specialRequests}
-          onChange={(e) => setForm({ ...form, specialRequests: e.target.value })}
+          onChange={e => setForm({ ...form, specialRequests: e.target.value })}
           placeholder="有任何其他想說的都可以寫在這裡"
           rows={5}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
@@ -292,9 +380,16 @@ export default function CustomForm() {
       required: false,
       field: (
         <div className="space-y-6">
-          <div className="p-5 rounded-sm" style={{ backgroundColor: "oklch(0.97 0.03 145)", border: "1px solid oklch(0.85 0.06 145)" }}>
+          <div
+            className="p-5 rounded-sm"
+            style={{
+              backgroundColor: "oklch(0.97 0.03 145)",
+              border: "1px solid oklch(0.85 0.06 145)",
+            }}
+          >
             <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
-              付完訂金後，請加入官方 LINE 並傳送<br />
+              付完訂金後，請加入官方 LINE 並傳送
+              <br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
               設計師才能將客製化水晶的<strong>初版及成品圖</strong>傳送給您！
             </p>
@@ -312,14 +407,17 @@ export default function CustomForm() {
             </a>
           </div>
           <div>
-            <label htmlFor="custom-contact-handle" className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label
+              htmlFor="custom-contact-handle"
+              className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5"
+            >
               Instagram 帳號 / LINE ID
             </label>
             <input
               id="custom-contact-handle"
               type="text"
               value={form.igHandle}
-              onChange={(e) => setForm({ ...form, igHandle: e.target.value })}
+              onChange={e => setForm({ ...form, igHandle: e.target.value })}
               placeholder="例如：@your_ig_handle 或 LINE ID"
               className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
             />
@@ -333,22 +431,52 @@ export default function CustomForm() {
   ];
 
   const validateForm = () => {
-    if (!form.effect.trim()) { toast.error("請填寫想要的功效"); return false; }
-    if (!form.wristSize) { toast.error("請填寫手圍尺寸"); return false; }
-    if (!isValidCustomWristSize(form.wristSize)) { toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）"); return false; }
-    if (!form.fitPreference) { toast.error("請選擇鬆緊偏好"); return false; }
-    if (!form.metalPreference) { toast.error("請選擇金飾 / 銀飾偏好"); return false; }
-    if (!form.silverTube || !form.beadFrame) { toast.error("請選擇銀管和珠框的偏好"); return false; }
-    if (!form.claspType) { toast.error("請選擇扣具"); return false; }
-    if (!form.pendantCharm) { toast.error("請選擇是否要加吊飾"); return false; }
-    if (!form.igHandle.trim()) { toast.error("請填寫 IG 帳號；若沒有 IG，請填寫 LINE ID"); return false; }
+    if (!form.effect.trim()) {
+      toast.error("請填寫想要的功效");
+      return false;
+    }
+    if (!form.wristSize) {
+      toast.error("請填寫手圍尺寸");
+      return false;
+    }
+    if (!isValidCustomWristSize(form.wristSize)) {
+      toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
+      return false;
+    }
+    if (!form.fitPreference) {
+      toast.error("請選擇鬆緊偏好");
+      return false;
+    }
+    if (!form.metalPreference) {
+      toast.error("請選擇金飾 / 銀飾偏好");
+      return false;
+    }
+    if (!form.silverTube || !form.beadFrame) {
+      toast.error("請選擇銀管和珠框的偏好");
+      return false;
+    }
+    if (!form.claspType) {
+      toast.error("請選擇扣具");
+      return false;
+    }
+    if (!form.pendantCharm) {
+      toast.error("請選擇是否要加吊飾");
+      return false;
+    }
+    if (!form.igHandle.trim()) {
+      toast.error("請填寫 IG 帳號；若沒有 IG，請填寫 LINE ID");
+      return false;
+    }
     return true;
   };
 
   const handleSubmit = () => {
-    if (!depositProduct) { toast.error("找不到訂金商品，請聯繫客服"); return; }
+    if (!depositProduct) {
+      toast.error("找不到訂金商品，請聯繫客服");
+      return;
+    }
     if (!validateForm()) return;
-    const customConsultationNote = buildNote(form);
+    const customConsultationNote = buildNote(form, selectedAddons);
     sessionStorage.setItem("customConsultationNote", customConsultationNote);
     addToCart(depositProduct, { customConsultationNote });
     toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
@@ -366,8 +494,12 @@ export default function CustomForm() {
             </button>
           </Link>
           <div>
-            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">純客製水晶手鍊</p>
-            <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">報名表單</p>
+            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">
+              純客製水晶手鍊
+            </p>
+            <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+              報名表單
+            </p>
           </div>
         </div>
       </div>
@@ -376,7 +508,10 @@ export default function CustomForm() {
         <div className="space-y-5 mb-8">
           <CustomFormOrderingIntro />
           {steps.map((item, index) => (
-            <section key={item.title} className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
+            <section
+              key={item.title}
+              className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
+            >
               <div className="flex items-start justify-between gap-4 mb-2">
                 <h2
                   className="text-lg font-medium text-[oklch(0.1_0_0)]"
@@ -384,9 +519,12 @@ export default function CustomForm() {
                 >
                   {index + 1}. {item.title}
                 </h2>
-                {!item.required && item.title !== "完成！付完訂金後記得加入 LINE" && (
-                  <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">選填</span>
-                )}
+                {!item.required &&
+                  item.title !== "完成！付完訂金後記得加入 LINE" && (
+                    <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
+                      選填
+                    </span>
+                  )}
               </div>
               {item.subtitle && (
                 <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
@@ -396,6 +534,14 @@ export default function CustomForm() {
               {item.field}
             </section>
           ))}
+        </div>
+
+        <div className="mb-8">
+          <CustomFormAddonSelector
+            currentAddonId="pure"
+            selectedAddonIds={selectedAddons}
+            onChange={setSelectedAddons}
+          />
         </div>
 
         <div className="flex items-center justify-between">

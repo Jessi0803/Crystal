@@ -8,7 +8,10 @@ import {
   submitAtmCustomDepositCheckout,
 } from "./helpers";
 
-async function getWristInput(page: import("@playwright/test").Page, path: string) {
+async function getWristInput(
+  page: import("@playwright/test").Page,
+  path: string
+) {
   await page.goto(path);
   if (path === "/custom/form-b") {
     await page.getByRole("button", { name: /財富密碼/ }).click();
@@ -16,7 +19,9 @@ async function getWristInput(page: import("@playwright/test").Page, path: string
   return page.locator('input[type="number"]').first();
 }
 
-async function expectDepositCheckoutWithoutShipping(page: import("@playwright/test").Page) {
+async function expectDepositCheckoutWithoutShipping(
+  page: import("@playwright/test").Page
+) {
   await expect(page.locator("body")).toContainText("購買人資訊");
   await expect(page.locator("body")).toContainText("付款方式");
   await expect(page.locator("body")).not.toContainText("配送地區");
@@ -25,18 +30,32 @@ async function expectDepositCheckoutWithoutShipping(page: import("@playwright/te
   await expect(page.locator("body")).not.toContainText("運費");
 }
 
-test("custom service page links to every consultation form", async ({ page }) => {
+test("custom service page links to every consultation form", async ({
+  page,
+}) => {
   await page.goto("/custom");
 
-  for (const path of ["/custom/form", "/custom/form-b", "/custom/form-c", "/custom/form-d"]) {
+  for (const path of [
+    "/custom/form",
+    "/custom/form-b",
+    "/custom/form-c",
+    "/custom/form-d",
+  ]) {
     await page.goto(path);
     await expect(page.locator("body")).toContainText(/報名表單|付完訂金/);
     await expect(page.locator("body")).toContainText("確認");
   }
 });
 
-test("all four custom forms constrain wrist size to 13 through 19 cm", async ({ page }) => {
-  for (const path of ["/custom/form", "/custom/form-b", "/custom/form-c", "/custom/form-d"]) {
+test("all four custom forms constrain wrist size to 13 through 19 cm", async ({
+  page,
+}) => {
+  for (const path of [
+    "/custom/form",
+    "/custom/form-b",
+    "/custom/form-c",
+    "/custom/form-d",
+  ]) {
     const wristInput = await getWristInput(page, path);
     await expect(wristInput).toHaveAttribute("min", "13");
     await expect(wristInput).toHaveAttribute("max", "19");
@@ -44,21 +63,72 @@ test("all four custom forms constrain wrist size to 13 through 19 cm", async ({ 
   }
 });
 
-test("pure custom form blocks a legacy wrist size below 13 cm", async ({ page }) => {
+test("custom forms offer add-ons for the other three custom services", async ({
+  page,
+}) => {
+  const cases = [
+    { path: "/custom/form", current: "純客製水晶手鍊" },
+    {
+      path: "/custom/form-b",
+      current: "塔羅 × 水晶手鍊",
+      setup: async () => page.getByRole("button", { name: /財富密碼/ }).click(),
+    },
+    { path: "/custom/form-c", current: "脈輪檢測 × 水晶手鍊" },
+    { path: "/custom/form-d", current: "生命靈數 × 水晶手鍊" },
+  ];
+
+  for (const item of cases) {
+    await page.goto(item.path);
+    await item.setup?.();
+
+    const addonSection = page
+      .locator("section")
+      .filter({
+        has: page.getByRole("heading", { name: "想一起加購其他客製化嗎？" }),
+      });
+
+    await expect(addonSection).toBeVisible();
+    await expect(addonSection).not.toContainText(item.current);
+
+    for (const option of [
+      "純客製水晶手鍊",
+      "塔羅 × 水晶手鍊",
+      "脈輪檢測 × 水晶手鍊",
+      "生命靈數 × 水晶手鍊",
+    ]) {
+      if (option !== item.current) {
+        await expect(addonSection).toContainText(option);
+      }
+    }
+
+    await addonSection.getByRole("button").first().click();
+    await expect(addonSection).toContainText("已選擇 1 項加購服務");
+  }
+});
+
+test("pure custom form blocks a legacy wrist size below 13 cm", async ({
+  page,
+}) => {
   await page.goto("/custom/form");
   await page.locator("textarea").first().fill("E2E 手圍邊界驗證");
   await page.locator('input[type="number"]').fill("12.5");
   await page.getByRole("button", { name: /確認，加入購物車/ }).click();
 
-  await expect(page.locator("body")).toContainText("手圍尺寸請輸入 13 至 19 cm");
+  await expect(page.locator("body")).toContainText(
+    "手圍尺寸請輸入 13 至 19 cm"
+  );
   await expect(page).toHaveURL(/\/custom\/form$/);
 });
 
-test("pure custom form adds consultation note to cart before checkout", async ({ page }) => {
+test("pure custom form adds consultation note to cart before checkout", async ({
+  page,
+}) => {
   await fillPureCustomDepositForm(page, { proceedToCheckout: false });
   await expect(page).toHaveURL(/\/custom\/form$/);
   await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
-  await expect(page.locator("body")).toContainText("購買 2 件商品享國內免運，目前還差 1 件");
+  await expect(page.locator("body")).toContainText(
+    "購買 2 件商品享國內免運，目前還差 1 件"
+  );
   await proceedToCheckoutFromCart(page);
   await expect(page.locator("body")).toContainText("客製化商品");
   await expectDepositCheckoutWithoutShipping(page);
@@ -66,7 +136,11 @@ test("pure custom form adds consultation note to cart before checkout", async ({
   await expect(page.locator("body")).toContainText("NT$ 500");
 });
 
-async function expectConsultationNoteInAdmin(page: import("@playwright/test").Page, orderNo: string, expectedText: string) {
+async function expectConsultationNoteInAdmin(
+  page: import("@playwright/test").Page,
+  orderNo: string,
+  expectedText: string
+) {
   await login(page, "e2e-admin@example.com");
   await expect(page).toHaveURL(/\/admin\/orders/);
   await page.getByText(orderNo).click();
@@ -74,46 +148,71 @@ async function expectConsultationNoteInAdmin(page: import("@playwright/test").Pa
   await expect(page.locator("body")).toContainText(expectedText);
 }
 
-test("tarot custom form creates an ATM deposit order with its consultation note", async ({ page }) => {
+test("tarot custom form creates an ATM deposit order with its consultation note", async ({
+  page,
+}) => {
   await fillTarotCustomDepositForm(page);
   await expectDepositCheckoutWithoutShipping(page);
-  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-tarot-${Date.now()}@example.com`);
+  const orderNo = await submitAtmCustomDepositCheckout(
+    page,
+    `e2e-tarot-${Date.now()}@example.com`
+  );
 
   await expectConsultationNoteInAdmin(page, orderNo, "占卜主題：財富密碼");
   await expect(page.locator("body")).toContainText("E2E 塔羅客戶");
 });
 
-test("chakra custom form creates an ATM deposit order with its consultation note", async ({ page }) => {
+test("chakra custom form creates an ATM deposit order with its consultation note", async ({
+  page,
+}) => {
   await fillProfileCustomDepositForm(
     page,
     "/custom/form-c",
     "脈輪檢測 × 水晶手鍊客製化商品",
     "E2E 脈輪客戶",
-    "19",
+    "19"
   );
   await expectDepositCheckoutWithoutShipping(page);
-  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-chakra-${Date.now()}@example.com`);
+  const orderNo = await submitAtmCustomDepositCheckout(
+    page,
+    `e2e-chakra-${Date.now()}@example.com`
+  );
 
-  await expectConsultationNoteInAdmin(page, orderNo, "【脈輪檢測 × 水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(
+    page,
+    orderNo,
+    "【脈輪檢測 × 水晶手鍊諮詢表單】"
+  );
   await expect(page.locator("body")).toContainText("E2E 脈輪客戶");
 });
 
-test("numerology custom form creates an ATM deposit order with its consultation note", async ({ page }) => {
+test("numerology custom form creates an ATM deposit order with its consultation note", async ({
+  page,
+}) => {
   await fillProfileCustomDepositForm(
     page,
     "/custom/form-d",
     "生命靈數 × 水晶手鍊客製化商品",
     "E2E 靈數客戶",
-    "13",
+    "13"
   );
   await expectDepositCheckoutWithoutShipping(page);
-  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-numerology-${Date.now()}@example.com`);
+  const orderNo = await submitAtmCustomDepositCheckout(
+    page,
+    `e2e-numerology-${Date.now()}@example.com`
+  );
 
-  await expectConsultationNoteInAdmin(page, orderNo, "【生命靈數 × 水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(
+    page,
+    orderNo,
+    "【生命靈數 × 水晶手鍊諮詢表單】"
+  );
   await expect(page.locator("body")).toContainText("E2E 靈數客戶");
 });
 
-test("multiple custom products in one order keep every consultation note", async ({ page }) => {
+test("multiple custom products in one order keep every consultation note", async ({
+  page,
+}) => {
   await fillPureCustomDepositForm(page, { proceedToCheckout: false });
   await fillProfileCustomDepositForm(
     page,
@@ -121,17 +220,30 @@ test("multiple custom products in one order keep every consultation note", async
     "生命靈數 × 水晶手鍊客製化商品",
     "E2E 多客製靈數客戶",
     "14",
-    { proceedToCheckout: false },
+    { proceedToCheckout: false }
   );
   await proceedToCheckoutFromCart(page);
   await expectDepositCheckoutWithoutShipping(page);
   await expect(page.locator("body")).toContainText("客製化商品");
-  await expect(page.locator("body")).toContainText("生命靈數 × 水晶手鍊客製化商品");
+  await expect(page.locator("body")).toContainText(
+    "生命靈數 × 水晶手鍊客製化商品"
+  );
 
-  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-multi-custom-${Date.now()}@example.com`);
+  const orderNo = await submitAtmCustomDepositCheckout(
+    page,
+    `e2e-multi-custom-${Date.now()}@example.com`
+  );
 
-  await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶手鍊諮詢表單】");
-  await expect(page.locator("body")).toContainText("E2E 測試：希望提升專注力與穩定情緒");
-  await expect(page.locator("body")).toContainText("【生命靈數 × 水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(
+    page,
+    orderNo,
+    "【純客製水晶手鍊諮詢表單】"
+  );
+  await expect(page.locator("body")).toContainText(
+    "E2E 測試：希望提升專注力與穩定情緒"
+  );
+  await expect(page.locator("body")).toContainText(
+    "【生命靈數 × 水晶手鍊諮詢表單】"
+  );
   await expect(page.locator("body")).toContainText("E2E 多客製靈數客戶");
 });
