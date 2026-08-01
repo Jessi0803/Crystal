@@ -180,16 +180,13 @@ test("pure custom form adds selected custom option products in one submit", asyn
     .click();
 
   const tarotSupplement = page.getByTestId("custom-addon-full-form-tarot");
-  await tarotSupplement
-    .getByPlaceholder("例如：財富密碼、戀愛指南、職涯探索……")
-    .fill("財富密碼");
+  await tarotSupplement.getByRole("button", { name: /財富密碼/ }).click();
+  await expect(tarotSupplement).toContainText("財富密碼 ── 占卜內容");
+  await expect(tarotSupplement).toContainText("求財面對的阻礙");
   await tarotSupplement
     .getByPlaceholder("請填寫真實姓名")
     .fill("E2E 塔羅一併客戶");
   await tarotSupplement.getByPlaceholder("例如：1995/08/22").fill("1995/08/22");
-  await tarotSupplement
-    .getByPlaceholder("簡單描述目前情況與想詢問的方向")
-    .fill("想了解近期財運方向");
   await fillAddonBraceletFields(tarotSupplement, "15", "e2e_tarot_addon_line");
 
   const chakraSupplement = page.getByTestId("custom-addon-full-form-chakra");
