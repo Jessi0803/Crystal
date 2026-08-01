@@ -44,8 +44,8 @@ export function formatCustomAddonNote(
 
   return [
     "",
-    "── 加購其他客製化方案 ──",
-    selectedLabels.length > 0 ? selectedLabels.join("、") : "未加購",
+    "── 一併選擇其他客製化方案 ──",
+    selectedLabels.length > 0 ? selectedLabels.join("、") : "未選擇其他方案",
   ].join("\n");
 }
 
@@ -74,14 +74,14 @@ export default function CustomFormAddonSelector({
           className="text-lg font-medium text-[oklch(0.1_0_0)]"
           style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
         >
-          想一起加購其他客製化嗎？
+          想一併選擇其他客製化嗎？
         </h2>
         <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
           選填
         </span>
       </div>
       <p className="text-sm text-[oklch(0.55_0_0)] mb-5 font-body leading-relaxed">
-        可同時搭配其他客製服務，我們會一起評估與報價。
+        可同時搭配其他客製服務，我們會一起確認需求。
       </p>
 
       <div className="space-y-3">
@@ -118,7 +118,7 @@ export default function CustomFormAddonSelector({
                     {option.description}
                   </span>
                   <span className="mt-2 block text-[0.7rem] font-body text-[oklch(0.62_0_0)]">
-                    加購價另報
+                    一併安排
                   </span>
                 </span>
               </span>
@@ -129,7 +129,7 @@ export default function CustomFormAddonSelector({
 
       {selectedAddonIds.length > 0 && (
         <p className="mt-4 text-xs font-body text-[oklch(0.45_0_0)]">
-          已選擇 {selectedAddonIds.length} 項加購服務
+          已選擇 {selectedAddonIds.length} 項其他客製服務
         </p>
       )}
     </section>

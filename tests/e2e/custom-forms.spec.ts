@@ -84,7 +84,7 @@ test("custom forms offer add-ons for the other three custom services", async ({
     const addonSection = page
       .locator("section")
       .filter({
-        has: page.getByRole("heading", { name: "想一起加購其他客製化嗎？" }),
+        has: page.getByRole("heading", { name: "想一併選擇其他客製化嗎？" }),
       });
 
     await expect(addonSection).toBeVisible();
@@ -102,7 +102,7 @@ test("custom forms offer add-ons for the other three custom services", async ({
     }
 
     await addonSection.getByRole("button").first().click();
-    await expect(addonSection).toContainText("已選擇 1 項加購服務");
+    await expect(addonSection).toContainText("已選擇 1 項其他客製服務");
   }
 });
 
