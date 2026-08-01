@@ -5,6 +5,8 @@ import {
   CUSTOM_WRIST_SIZE_STEP,
   isValidCustomWristSize,
 } from "@/lib/customOrderingContent";
+import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
+import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 
 export type CustomAddonId = "pure" | "tarot" | "chakra" | "numerology";
 
@@ -517,81 +519,27 @@ function CommonBraceletForm({
           })
         }
       />
-      <OptionButtons
-        label="喜歡金飾還是銀飾"
+      <MetalPreferenceField
         value={value.metalPreference}
-        options={[
-          { id: "gold", label: "金飾" },
-          { id: "silver", label: "銀飾" },
-          { id: "either", label: "都可以" },
-        ]}
-        onChange={metalPreference =>
-          onChange({
-            ...value,
-            metalPreference:
-              metalPreference as CommonBraceletFields["metalPreference"],
-          })
-        }
+        onChange={metalPreference => onChange({ ...value, metalPreference })}
       />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <OptionButtons
-          label="銀管"
-          value={value.silverTube}
-          options={[
-            { id: "yes", label: "要" },
-            { id: "no", label: "不要" },
-          ]}
-          onChange={silverTube =>
-            onChange({
-              ...value,
-              silverTube: silverTube as CommonBraceletFields["silverTube"],
-            })
-          }
-        />
-        <OptionButtons
-          label="珠框"
-          value={value.beadFrame}
-          options={[
-            { id: "yes", label: "要" },
-            { id: "no", label: "不要" },
-          ]}
-          onChange={beadFrame =>
-            onChange({
-              ...value,
-              beadFrame: beadFrame as CommonBraceletFields["beadFrame"],
-            })
-          }
+      <BeadFrameField
+        silverTube={value.silverTube}
+        beadFrame={value.beadFrame}
+        onSilverTubeChange={silverTube => onChange({ ...value, silverTube })}
+        onBeadFrameChange={beadFrame => onChange({ ...value, beadFrame })}
+      />
+      <ClaspTypeField
+        value={value.claspType}
+        onChange={claspType => onChange({ ...value, claspType })}
+      />
+      <div>
+        <p className="mb-2 text-xs font-body text-[oklch(0.5_0_0)]">吊飾</p>
+        <CustomFormPendantCharmField
+          value={value.pendantCharm}
+          onChange={pendantCharm => onChange({ ...value, pendantCharm })}
         />
       </div>
-      <OptionButtons
-        label="扣具"
-        value={value.claspType}
-        options={[
-          { id: "lobster", label: "龍蝦扣（+200元）" },
-          { id: "magnet", label: "磁扣（+200元）" },
-          { id: "elastic", label: "彈力繩" },
-        ]}
-        onChange={claspType =>
-          onChange({
-            ...value,
-            claspType: claspType as CommonBraceletFields["claspType"],
-          })
-        }
-      />
-      <OptionButtons
-        label="吊飾"
-        value={value.pendantCharm}
-        options={[
-          { id: "yes", label: "要加" },
-          { id: "no", label: "不要" },
-        ]}
-        onChange={pendantCharm =>
-          onChange({
-            ...value,
-            pendantCharm: pendantCharm as CommonBraceletFields["pendantCharm"],
-          })
-        }
-      />
       <TextAreaField
         label="想要的水晶顏色"
         value={value.colorPreference}
@@ -610,6 +558,228 @@ function CommonBraceletForm({
         onChange={igHandle => onChange({ ...value, igHandle })}
         placeholder="例如：@your_ig_handle 或 LINE ID"
       />
+    </div>
+  );
+}
+
+function MetalPreferenceField({
+  value,
+  onChange,
+}: {
+  value: CommonBraceletFields["metalPreference"];
+  onChange: (value: CommonBraceletFields["metalPreference"]) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-body text-[oklch(0.5_0_0)]">
+        喜歡金飾還是銀飾
+      </p>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { id: "gold" as const, label: "金飾", img: "/golden.jpg" },
+            { id: "silver" as const, label: "銀飾", img: "/silver.jpg" },
+          ].map(option => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onChange(option.id)}
+              className={`overflow-hidden rounded-sm border-2 text-left transition-colors ${
+                value === option.id
+                  ? "border-[oklch(0.1_0_0)]"
+                  : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
+              }`}
+            >
+              <img
+                src={option.img}
+                alt={option.label}
+                className="h-32 w-full object-cover sm:h-40"
+              />
+              <p
+                className={`py-2.5 text-center text-sm font-body ${
+                  value === option.id
+                    ? "bg-[oklch(0.97_0_0)] font-semibold"
+                    : "text-[oklch(0.45_0_0)]"
+                }`}
+              >
+                {option.label}
+              </p>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange("either")}
+          className={`w-full rounded-sm border-2 px-4 py-3 text-sm font-body transition-colors ${
+            value === "either"
+              ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
+              : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+          }`}
+        >
+          都可以
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BeadFrameField({
+  silverTube,
+  beadFrame,
+  onSilverTubeChange,
+  onBeadFrameChange,
+}: {
+  silverTube: CommonBraceletFields["silverTube"];
+  beadFrame: CommonBraceletFields["beadFrame"];
+  onSilverTubeChange: (value: CommonBraceletFields["silverTube"]) => void;
+  onBeadFrameChange: (value: CommonBraceletFields["beadFrame"]) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-body text-[oklch(0.5_0_0)]">
+        要加銀管或珠框嗎？
+      </p>
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 gap-3">
+          <img
+            src="/bead-frame-1.jpg"
+            alt="珠框銀管參考1"
+            className="h-40 w-full rounded-sm object-cover sm:h-56"
+          />
+          <img
+            src="/bead-frame-2.jpg"
+            alt="珠框銀管參考2"
+            className="h-40 w-full rounded-sm object-cover sm:h-56"
+          />
+        </div>
+        <ChoicePair
+          label="銀管"
+          description="穿在水晶珠之間的小金屬管，可增加層次感與精緻度"
+          value={silverTube}
+          onChange={onSilverTubeChange}
+        />
+        <ChoicePair
+          label="珠框"
+          description="套在主石外的金屬框，可突顯主石、增加立體感"
+          value={beadFrame}
+          onChange={onBeadFrameChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ChoicePair({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  value: "" | "yes" | "no";
+  onChange: (value: "yes" | "no") => void;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-sm font-body font-medium text-[oklch(0.15_0_0)]">
+        {label}
+      </p>
+      <p className="mb-3 text-xs font-body leading-relaxed text-[oklch(0.55_0_0)]">
+        {description}
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { id: "yes" as const, label: "要" },
+          { id: "no" as const, label: "不要" },
+        ].map(option => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            className={`rounded-sm border-2 px-4 py-4 text-base font-body transition-colors ${
+              value === option.id
+                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
+                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ClaspTypeField({
+  value,
+  onChange,
+}: {
+  value: CommonBraceletFields["claspType"];
+  onChange: (value: CommonBraceletFields["claspType"]) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-body text-[oklch(0.5_0_0)]">
+        要換龍蝦扣或磁扣嗎？
+      </p>
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            {
+              id: "lobster" as const,
+              label: "龍蝦扣",
+              sub: "+200元",
+              img: "/lobster-clasp.jpg",
+            },
+            {
+              id: "magnet" as const,
+              label: "磁扣",
+              sub: "+200元",
+              img: "/magnet-clasp.png",
+            },
+            {
+              id: "elastic" as const,
+              label: "彈力繩",
+              sub: "免費",
+              img: "/elastic-cord.jpg",
+            },
+          ].map(option => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onChange(option.id)}
+              className={`overflow-hidden rounded-sm border-2 text-center transition-colors ${
+                value === option.id
+                  ? "border-[oklch(0.1_0_0)]"
+                  : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
+              }`}
+            >
+              <div className="flex aspect-square items-center justify-center bg-[oklch(0.97_0_0)] p-1">
+                <img
+                  src={option.img}
+                  alt={option.label}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <p
+                className={`py-2 text-xs font-body ${
+                  value === option.id
+                    ? "bg-[oklch(0.97_0_0)] font-semibold"
+                    : "text-[oklch(0.45_0_0)]"
+                }`}
+              >
+                {option.label}
+                <br />
+                <span className="text-[0.6rem] text-[oklch(0.55_0_0)]">
+                  （{option.sub}）
+                </span>
+              </p>
+            </button>
+          ))}
+        </div>
+        <ClaspDurabilityNotice />
+      </div>
     </div>
   );
 }

@@ -103,6 +103,20 @@ test("custom forms offer add-ons for the other three custom services", async ({
     await expect(addonSection).toContainText(
       "已選擇 1 項其他客製服務，請填寫以下完整表單。"
     );
+    for (const imageName of [
+      "金飾",
+      "銀飾",
+      "珠框銀管參考1",
+      "珠框銀管參考2",
+      "龍蝦扣",
+      "磁扣",
+      "彈力繩",
+      "吊飾加掛示意",
+    ]) {
+      await expect(
+        addonSection.getByRole("img", { name: imageName })
+      ).toBeVisible();
+    }
   }
 });
 
