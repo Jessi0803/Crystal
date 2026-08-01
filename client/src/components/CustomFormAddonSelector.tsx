@@ -1,4 +1,5 @@
-import { Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
+import { Link } from "wouter";
 
 export type CustomAddonId = "pure" | "tarot" | "chakra" | "numerology";
 
@@ -6,26 +7,31 @@ export const CUSTOM_ADDON_OPTIONS: {
   id: CustomAddonId;
   label: string;
   description: string;
+  formPath: string;
 }[] = [
   {
     id: "pure",
     label: "純客製水晶手鍊",
     description: "依想要的功效、色系與風格，單純為您搭配專屬水晶手鍊。",
+    formPath: "/custom/form",
   },
   {
     id: "tarot",
     label: "塔羅 × 水晶手鍊",
     description: "先透過塔羅解析需求與能量狀態，再延伸成水晶搭配方向。",
+    formPath: "/custom/form-b",
   },
   {
     id: "chakra",
     label: "脈輪檢測 × 水晶手鍊",
     description: "加做七脈輪能量檢測，依檢測結果補足需要加強的能量。",
+    formPath: "/custom/form-c",
   },
   {
     id: "numerology",
     label: "生命靈數 × 水晶手鍊",
     description: "以生日與生命靈數分析能量特質，再搭配對應的水晶設計。",
+    formPath: "/custom/form-d",
   },
 ];
 
@@ -56,6 +62,9 @@ export default function CustomFormAddonSelector({
 }: CustomFormAddonSelectorProps) {
   const addonOptions = CUSTOM_ADDON_OPTIONS.filter(
     option => option.id !== currentAddonId
+  );
+  const selectedOptions = CUSTOM_ADDON_OPTIONS.filter(option =>
+    selectedAddonIds.includes(option.id)
   );
 
   const toggleAddon = (addonId: CustomAddonId) => {
@@ -127,10 +136,25 @@ export default function CustomFormAddonSelector({
         })}
       </div>
 
-      {selectedAddonIds.length > 0 && (
-        <p className="mt-4 text-xs font-body text-[oklch(0.45_0_0)]">
-          已選擇 {selectedAddonIds.length} 項其他客製服務
-        </p>
+      {selectedOptions.length > 0 && (
+        <div className="mt-5 rounded-sm border border-[oklch(0.9_0_0)] bg-[oklch(0.98_0_0)] p-4">
+          <p className="text-xs font-body text-[oklch(0.45_0_0)]">
+            已選擇 {selectedOptions.length} 項其他客製服務，請再填寫以下表單。
+          </p>
+          <div className="mt-3 space-y-2">
+            {selectedOptions.map(option => (
+              <Link key={option.id} href={option.formPath}>
+                <a className="flex items-center justify-between gap-3 rounded-sm border border-[oklch(0.86_0_0)] bg-white px-3 py-2.5 text-sm font-body text-[oklch(0.16_0_0)] transition-colors hover:border-[oklch(0.45_0_0)]">
+                  <span>{option.label}</span>
+                  <span className="flex shrink-0 items-center gap-1 text-xs text-[oklch(0.45_0_0)]">
+                    前往填寫
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </a>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
     </section>
   );

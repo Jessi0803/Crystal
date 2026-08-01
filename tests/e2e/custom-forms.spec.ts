@@ -67,14 +67,15 @@ test("custom forms offer add-ons for the other three custom services", async ({
   page,
 }) => {
   const cases = [
-    { path: "/custom/form", current: "純客製水晶手鍊" },
+    { path: "/custom/form", current: "純客製水晶手鍊", firstSelectedPath: "/custom/form-b" },
     {
       path: "/custom/form-b",
       current: "塔羅 × 水晶手鍊",
+      firstSelectedPath: "/custom/form",
       setup: async () => page.getByRole("button", { name: /財富密碼/ }).click(),
     },
-    { path: "/custom/form-c", current: "脈輪檢測 × 水晶手鍊" },
-    { path: "/custom/form-d", current: "生命靈數 × 水晶手鍊" },
+    { path: "/custom/form-c", current: "脈輪檢測 × 水晶手鍊", firstSelectedPath: "/custom/form" },
+    { path: "/custom/form-d", current: "生命靈數 × 水晶手鍊", firstSelectedPath: "/custom/form" },
   ];
 
   for (const item of cases) {
@@ -102,7 +103,13 @@ test("custom forms offer add-ons for the other three custom services", async ({
     }
 
     await addonSection.getByRole("button").first().click();
-    await expect(addonSection).toContainText("已選擇 1 項其他客製服務");
+    await expect(addonSection).toContainText(
+      "已選擇 1 項其他客製服務，請再填寫以下表單。"
+    );
+    await expect(addonSection.getByRole("link", { name: /前往填寫/ })).toHaveAttribute(
+      "href",
+      item.firstSelectedPath
+    );
   }
 });
 
