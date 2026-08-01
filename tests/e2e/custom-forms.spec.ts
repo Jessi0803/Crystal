@@ -101,10 +101,30 @@ test("custom forms offer add-ons for the other three custom services", async ({
 
     await addonSection.getByRole("button").first().click();
     await expect(addonSection).toContainText(
-      "已選擇 1 項其他客製服務，請補充以下資料。"
+      "已選擇 1 項其他客製服務，請填寫以下完整表單。"
     );
   }
 });
+
+async function fillAddonBraceletFields(
+  addonForm: import("@playwright/test").Locator,
+  wristSize: string,
+  lineId: string
+) {
+  await addonForm
+    .getByPlaceholder("例如：招財、愛情、療癒、保護氣場……")
+    .fill("E2E 一併方案功效");
+  await addonForm.locator('input[type="number"]').fill(wristSize);
+  await addonForm.getByRole("button", { name: "剛好" }).click();
+  await addonForm.getByRole("button", { name: "都可以" }).click();
+  await addonForm.getByRole("button", { name: "不要" }).first().click();
+  await addonForm.getByRole("button", { name: "不要" }).nth(1).click();
+  await addonForm.getByRole("button", { name: "彈力繩" }).click();
+  await addonForm.getByRole("button", { name: "不要" }).nth(2).click();
+  await addonForm
+    .getByPlaceholder("例如：@your_ig_handle 或 LINE ID")
+    .fill(lineId);
+}
 
 test("pure custom form adds selected custom option products in one submit", async ({
   page,
@@ -145,10 +165,7 @@ test("pure custom form adds selected custom option products in one submit", asyn
     .getByRole("button", { name: /脈輪檢測 × 水晶手鍊/ })
     .click();
 
-  const tarotSupplement = addonSection
-    .locator("div")
-    .filter({ hasText: "塔羅 × 水晶手鍊" })
-    .last();
+  const tarotSupplement = page.getByTestId("custom-addon-full-form-tarot");
   await tarotSupplement
     .getByPlaceholder("例如：財富密碼、戀愛指南、職涯探索……")
     .fill("財富密碼");
@@ -159,17 +176,20 @@ test("pure custom form adds selected custom option products in one submit", asyn
   await tarotSupplement
     .getByPlaceholder("簡單描述目前情況與想詢問的方向")
     .fill("想了解近期財運方向");
+  await fillAddonBraceletFields(tarotSupplement, "15", "e2e_tarot_addon_line");
 
-  const chakraSupplement = addonSection
-    .locator("div")
-    .filter({ hasText: "脈輪檢測 × 水晶手鍊" })
-    .last();
+  const chakraSupplement = page.getByTestId("custom-addon-full-form-chakra");
   await chakraSupplement
     .getByPlaceholder("請填寫真實姓名")
     .fill("E2E 脈輪一併客戶");
   await chakraSupplement
     .getByPlaceholder("例如：1995/08/22")
     .fill("1994/06/18");
+  await fillAddonBraceletFields(
+    chakraSupplement,
+    "16",
+    "e2e_chakra_addon_line"
+  );
 
   await page.getByRole("button", { name: /確認，加入購物車/ }).click();
 
