@@ -7,8 +7,14 @@ import { products } from "@/lib/data";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import CustomFormAddonSelector, {
+  CUSTOM_ADDON_OPTIONS,
+  CUSTOM_ADDON_PRODUCT_IDS,
+  EMPTY_CUSTOM_ADDON_SUPPLEMENTS,
   type CustomAddonId,
+  type CustomAddonSupplementData,
   formatCustomAddonNote,
+  formatCustomAddonSupplementNote,
+  validateCustomAddonSupplements,
 } from "@/components/CustomFormAddonSelector";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
@@ -70,6 +76,8 @@ function buildNote(form: FormData, selectedAddons: CustomAddonId[]): string {
 export default function CustomForm() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
+  const [addonSupplements, setAddonSupplements] =
+    useState<CustomAddonSupplementData>(EMPTY_CUSTOM_ADDON_SUPPLEMENTS);
   const { addToCart } = useCart();
 
   const depositProduct = products.find(p => p.id === "custom-deposit-product");
@@ -476,9 +484,35 @@ export default function CustomForm() {
       return;
     }
     if (!validateForm()) return;
+    const addonValidationError = validateCustomAddonSupplements(
+      selectedAddons,
+      addonSupplements
+    );
+    if (addonValidationError) {
+      toast.error(addonValidationError);
+      return;
+    }
     const customConsultationNote = buildNote(form, selectedAddons);
     sessionStorage.setItem("customConsultationNote", customConsultationNote);
     addToCart(depositProduct, { customConsultationNote });
+    selectedAddons.forEach(addonId => {
+      const addonProduct = products.find(
+        product => product.id === CUSTOM_ADDON_PRODUCT_IDS[addonId]
+      );
+      const addonOption = CUSTOM_ADDON_OPTIONS.find(
+        option => option.id === addonId
+      );
+      if (!addonProduct || !addonOption) return;
+
+      addToCart(addonProduct, {
+        customConsultationNote: [
+          customConsultationNote,
+          "",
+          `【一併選擇方案補充資料：${addonOption.label}】`,
+          formatCustomAddonSupplementNote(addonId, addonSupplements),
+        ].join("\n"),
+      });
+    });
     toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
   };
 
@@ -541,6 +575,8 @@ export default function CustomForm() {
             currentAddonId="pure"
             selectedAddonIds={selectedAddons}
             onChange={setSelectedAddons}
+            supplements={addonSupplements}
+            onSupplementsChange={setAddonSupplements}
           />
         </div>
 

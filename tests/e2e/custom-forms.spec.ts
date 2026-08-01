@@ -67,26 +67,23 @@ test("custom forms offer add-ons for the other three custom services", async ({
   page,
 }) => {
   const cases = [
-    { path: "/custom/form", current: "純客製水晶手鍊", firstSelectedPath: "/custom/form-b" },
+    { path: "/custom/form", current: "純客製水晶手鍊" },
     {
       path: "/custom/form-b",
       current: "塔羅 × 水晶手鍊",
-      firstSelectedPath: "/custom/form",
       setup: async () => page.getByRole("button", { name: /財富密碼/ }).click(),
     },
-    { path: "/custom/form-c", current: "脈輪檢測 × 水晶手鍊", firstSelectedPath: "/custom/form" },
-    { path: "/custom/form-d", current: "生命靈數 × 水晶手鍊", firstSelectedPath: "/custom/form" },
+    { path: "/custom/form-c", current: "脈輪檢測 × 水晶手鍊" },
+    { path: "/custom/form-d", current: "生命靈數 × 水晶手鍊" },
   ];
 
   for (const item of cases) {
     await page.goto(item.path);
     await item.setup?.();
 
-    const addonSection = page
-      .locator("section")
-      .filter({
-        has: page.getByRole("heading", { name: "想一併選擇其他客製化嗎？" }),
-      });
+    const addonSection = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "想一併選擇其他客製化嗎？" }),
+    });
 
     await expect(addonSection).toBeVisible();
     await expect(addonSection).not.toContainText(item.current);
@@ -104,13 +101,84 @@ test("custom forms offer add-ons for the other three custom services", async ({
 
     await addonSection.getByRole("button").first().click();
     await expect(addonSection).toContainText(
-      "已選擇 1 項其他客製服務，請再填寫以下表單。"
-    );
-    await expect(addonSection.getByRole("link", { name: /前往填寫/ })).toHaveAttribute(
-      "href",
-      item.firstSelectedPath
+      "已選擇 1 項其他客製服務，請補充以下資料。"
     );
   }
+});
+
+test("pure custom form adds selected custom option products in one submit", async ({
+  page,
+}) => {
+  await page.goto("/custom/form");
+  await page
+    .locator("textarea")
+    .first()
+    .fill("E2E 測試：希望提升專注力與穩定情緒");
+  await page.locator('input[type="number"]').fill("13");
+  await page.getByRole("button", { name: /剛好/ }).click();
+  await page.getByRole("button", { name: "都可以" }).click();
+  await page
+    .locator("section")
+    .filter({ hasText: "銀管" })
+    .getByRole("button", { name: "不要" })
+    .first()
+    .click();
+  await page
+    .locator("section")
+    .filter({ hasText: "珠框" })
+    .getByRole("button", { name: "不要" })
+    .last()
+    .click();
+  await page.getByRole("button", { name: /彈力繩/ }).click();
+  await page
+    .locator("section")
+    .filter({ hasText: "要加吊飾嗎" })
+    .getByRole("button", { name: "不要" })
+    .click();
+  await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_line_id");
+
+  const addonSection = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "想一併選擇其他客製化嗎？" }),
+  });
+  await addonSection.getByRole("button", { name: /塔羅 × 水晶手鍊/ }).click();
+  await addonSection
+    .getByRole("button", { name: /脈輪檢測 × 水晶手鍊/ })
+    .click();
+
+  const tarotSupplement = addonSection
+    .locator("div")
+    .filter({ hasText: "塔羅 × 水晶手鍊" })
+    .last();
+  await tarotSupplement
+    .getByPlaceholder("例如：財富密碼、戀愛指南、職涯探索……")
+    .fill("財富密碼");
+  await tarotSupplement
+    .getByPlaceholder("請填寫真實姓名")
+    .fill("E2E 塔羅一併客戶");
+  await tarotSupplement.getByPlaceholder("例如：1995/08/22").fill("1995/08/22");
+  await tarotSupplement
+    .getByPlaceholder("簡單描述目前情況與想詢問的方向")
+    .fill("想了解近期財運方向");
+
+  const chakraSupplement = addonSection
+    .locator("div")
+    .filter({ hasText: "脈輪檢測 × 水晶手鍊" })
+    .last();
+  await chakraSupplement
+    .getByPlaceholder("請填寫真實姓名")
+    .fill("E2E 脈輪一併客戶");
+  await chakraSupplement
+    .getByPlaceholder("例如：1995/08/22")
+    .fill("1994/06/18");
+
+  await page.getByRole("button", { name: /確認，加入購物車/ }).click();
+
+  await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
+  await expect(page.locator("body")).toContainText("客製化商品");
+  await expect(page.locator("body")).toContainText("塔羅 × 水晶手鍊客製化商品");
+  await expect(page.locator("body")).toContainText(
+    "脈輪檢測 × 水晶手鍊客製化商品"
+  );
 });
 
 test("pure custom form blocks a legacy wrist size below 13 cm", async ({
