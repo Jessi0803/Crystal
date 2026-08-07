@@ -89,6 +89,7 @@ import {
   createOrder,
   getAdminOrderSummaries,
   getOrderWithItems,
+  getBalancePaymentDetail,
 } from "./orderDb";
 import { getDb } from "./db";
 import { appRouter } from "./appRouter";
@@ -103,6 +104,7 @@ import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
 const getAdminOrderSummariesMock = vi.mocked(getAdminOrderSummaries);
 const createOrderMock = vi.mocked(createOrder);
 const getOrderWithItemsMock = vi.mocked(getOrderWithItems);
+const getBalancePaymentDetailMock = vi.mocked(getBalancePaymentDetail);
 const getDbMock = vi.mocked(getDb);
 const getProductAvailabilityMock = vi.mocked(getProductAvailability);
 const verifyPayPalOrderBelongsToMerchantMock = vi.mocked(verifyPayPalOrderBelongsToMerchant);
@@ -153,13 +155,18 @@ function createMutationMockDb(selectResults: unknown[]) {
     set: vi.fn(() => updateChain),
     where: vi.fn().mockResolvedValue(undefined),
   };
+  const deleteChain = {
+    where: vi.fn().mockResolvedValue(undefined),
+  };
 
   return {
     select: vi.fn(() => createQueryChain(queue.shift() ?? [])),
     insert: vi.fn(() => insertChain),
     update: vi.fn(() => updateChain),
+    delete: vi.fn(() => deleteChain),
     insertChain,
     updateChain,
+    deleteChain,
   };
 }
 
@@ -512,5 +519,158 @@ describe("order.updateFreeShippingOverride (admin procedure)", () => {
       code: "BAD_REQUEST",
     });
     expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("order.getBalancePaymentCheckout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("waives balance-payment shipping when the original order already qualifies for domestic free shipping", async () => {
+    getBalancePaymentDetailMock.mockResolvedValue({
+      id: 1,
+      orderId: 99,
+      merchantTradeNo: "CBALANCE001",
+      amount: 1300,
+      shippingFee: 60,
+      paymentFee: 0,
+      totalAmount: 1360,
+      paymentMethod: "credit",
+      paymentStatus: "pending",
+      transferLastFive: null,
+      transferReceiptUrl: null,
+      tradeNo: null,
+      ecpayNotifyData: null,
+      paidAt: null,
+      createdAt: new Date("2026-08-01T00:00:00Z"),
+      updatedAt: new Date("2026-08-01T00:00:00Z"),
+      clearQuartzChipsItem: null,
+      orderMergeInfo: null,
+      order: {
+        id: 99,
+        merchantTradeNo: "CORDER001",
+        buyerEmail: "customer@example.com",
+        freeShippingOverride: false,
+        totalAmount: 4020,
+      },
+    } as any);
+    const db = createMutationMockDb([
+      [
+        { id: "d002-honey-realm", name: "蜜光之境手鍊", price: 1580, quantity: 1 },
+        { id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶手鍊客製化商品", price: 1000, quantity: 1 },
+      ],
+      [
+        { id: "d002-honey-realm", twoItemFreeShippingEligible: true },
+        { id: "chakra-crystal-deposit-product", twoItemFreeShippingEligible: true },
+      ],
+      [],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createPublicCaller();
+    const result = await caller.order.getBalancePaymentCheckout({
+      merchantTradeNo: "CBALANCE001",
+      paymentMethod: "credit",
+      checkoutRegion: "domestic",
+      shippingMethod: "cvs_711",
+      cvsStoreId: "123456",
+      cvsStoreName: "測試門市",
+      cvsType: "UNIMART",
+      origin: "https://example.test",
+    });
+
+    expect(result).toMatchObject({
+      kind: "credit",
+      amount: 1300,
+      shippingFee: 0,
+      paymentFee: 0,
+    });
+    expect(db.updateChain.set).toHaveBeenNthCalledWith(1, {
+      paymentMethod: "credit",
+      shippingFee: 0,
+      paymentFee: 0,
+      totalAmount: 1300,
+    });
+    expect(db.updateChain.set).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      totalAmount: 3960,
+    }));
+  });
+
+  it("keeps an original clear-quartz chips item when balance checkout does not add another one", async () => {
+    getBalancePaymentDetailMock.mockResolvedValue({
+      id: 1,
+      orderId: 99,
+      merchantTradeNo: "CBALANCE001",
+      amount: 1300,
+      shippingFee: 60,
+      paymentFee: 0,
+      totalAmount: 1360,
+      paymentMethod: "credit",
+      paymentStatus: "pending",
+      transferLastFive: null,
+      transferReceiptUrl: null,
+      tradeNo: null,
+      ecpayNotifyData: null,
+      paidAt: null,
+      createdAt: new Date("2026-08-01T00:00:00Z"),
+      updatedAt: new Date("2026-08-01T00:00:00Z"),
+      clearQuartzChipsItem: {
+        id: 10,
+        orderId: 99,
+        productId: "prod-1781070485343",
+        productName: "白水晶碎石｜淨化能量首選",
+        quantity: 1,
+        unitPrice: 80,
+        subtotal: 80,
+      },
+      orderMergeInfo: null,
+      order: {
+        id: 99,
+        merchantTradeNo: "CORDER001",
+        buyerEmail: "customer@example.com",
+        freeShippingOverride: false,
+        totalAmount: 4020,
+      },
+    } as any);
+    const db = createMutationMockDb([
+      [
+        { id: "d002-honey-realm", name: "蜜光之境手鍊", price: 1580, quantity: 1 },
+        { id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶手鍊客製化商品", price: 1000, quantity: 1 },
+        { id: "prod-1781070485343", name: "白水晶碎石｜淨化能量首選", price: 80, quantity: 1 },
+      ],
+      [
+        { id: "d002-honey-realm", twoItemFreeShippingEligible: true },
+        { id: "chakra-crystal-deposit-product", twoItemFreeShippingEligible: true },
+        { id: "prod-1781070485343", twoItemFreeShippingEligible: true },
+      ],
+      [
+        {
+          id: 10,
+          orderId: 99,
+          productId: "prod-1781070485343",
+          productName: "白水晶碎石｜淨化能量首選",
+          quantity: 1,
+          unitPrice: 80,
+          subtotal: 80,
+        },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const caller = createPublicCaller();
+    await caller.order.getBalancePaymentCheckout({
+      merchantTradeNo: "CBALANCE001",
+      paymentMethod: "credit",
+      checkoutRegion: "domestic",
+      shippingMethod: "cvs_711",
+      cvsStoreId: "123456",
+      cvsStoreName: "測試門市",
+      cvsType: "UNIMART",
+      includeClearQuartzChips: false,
+      origin: "https://example.test",
+    });
+
+    expect(db.delete).not.toHaveBeenCalled();
   });
 });

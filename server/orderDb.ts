@@ -90,6 +90,9 @@ const balancePaymentLegacySelect = {
   orderId: orderBalancePayments.orderId,
   merchantTradeNo: orderBalancePayments.merchantTradeNo,
   amount: orderBalancePayments.amount,
+  shippingFee: orderBalancePayments.shippingFee,
+  paymentFee: orderBalancePayments.paymentFee,
+  totalAmount: orderBalancePayments.totalAmount,
   paymentMethod: orderBalancePayments.paymentMethod,
   paymentStatus: orderBalancePayments.paymentStatus,
   transferLastFive: orderBalancePayments.transferLastFive,
@@ -103,13 +106,15 @@ const balancePaymentLegacySelect = {
 
 type BalancePaymentLegacyRow = Omit<BalancePaymentRow, "shippingFee" | "paymentFee" | "totalAmount">;
 
-function hydrateBalancePayment(row: BalancePaymentLegacyRow | undefined): BalancePaymentRow | null {
+function hydrateBalancePayment(
+  row: (BalancePaymentLegacyRow & Partial<Pick<BalancePaymentRow, "shippingFee" | "paymentFee" | "totalAmount">>) | undefined
+): BalancePaymentRow | null {
   if (!row) return null;
   return {
     ...row,
-    shippingFee: 0,
-    paymentFee: 0,
-    totalAmount: row.amount,
+    shippingFee: row.shippingFee ?? 0,
+    paymentFee: row.paymentFee ?? 0,
+    totalAmount: row.totalAmount ?? row.amount,
   };
 }
 
@@ -932,7 +937,7 @@ export async function createOrReplaceBalancePayment(opts: {
   }
 
   const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
-  const previousBalanceTotal = existing?.amount ?? 0;
+  const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
   const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
 
   await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq(orders.id, opts.orderId));

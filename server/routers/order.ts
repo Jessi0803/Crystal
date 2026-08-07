@@ -275,6 +275,31 @@ async function attachTwoItemFreeShippingEligibility<
   });
 }
 
+async function originalOrderHasDomesticFreeShipping(orderId: number) {
+  const db = await getDb();
+  if (!db) return false;
+
+  const items = await db
+    .select({
+      id: orderItems.productId,
+      name: orderItems.productName,
+      price: orderItems.unitPrice,
+      quantity: orderItems.quantity,
+    })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+  const productItems = items.filter((item) => !["shipping", "shipping-fee", "payment-fee"].includes(item.id));
+  if (productItems.length === 0) return false;
+
+  const feeItems = await attachTwoItemFreeShippingEligibility(productItems);
+  return calcCheckoutFees({
+    items: feeItems,
+    checkoutRegion: "domestic",
+    shippingMethod: "cvs_711",
+    paymentMethod: "credit",
+  }).domesticFreeShipping;
+}
+
 export const orderRouter = router({
   /**
    * 建立訂單並取得付款資訊
@@ -1427,6 +1452,12 @@ export const orderRouter = router({
         });
       }
 
+      const originalDomesticFreeShipping =
+        input.checkoutRegion === "domestic"
+          ? await originalOrderHasDomesticFreeShipping(balancePayment.orderId)
+          : false;
+      const forceBalanceFreeShipping = balancePayment.order.freeShippingOverride || originalDomesticFreeShipping;
+
       const feeSummary = calcCheckoutFees({
         items: balanceItems,
         checkoutRegion: input.checkoutRegion,
@@ -1434,8 +1465,8 @@ export const orderRouter = router({
         paymentMethod: input.paymentMethod,
         overseasCountry,
         buyerEmail: balancePayment.order.buyerEmail,
-        forceFreeShipping: balancePayment.order.freeShippingOverride,
-        forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !balancePayment.order.freeShippingOverride),
+        forceFreeShipping: forceBalanceFreeShipping,
+        forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !forceBalanceFreeShipping),
       });
       const totalAmount = feeSummary.total;
 
@@ -1477,12 +1508,6 @@ export const orderRouter = router({
             ...itemValues,
           });
         }
-      } else if (existingClearQuartzItem) {
-        await db.delete(orderItems)
-          .where(and(
-            eq(orderItems.orderId, balancePayment.orderId),
-            eq(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID),
-          ));
       }
 
       await db.update(orders)
