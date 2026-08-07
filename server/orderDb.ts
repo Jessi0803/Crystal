@@ -18,6 +18,7 @@ import {
   InsertLogisticsOrder,
 } from "../drizzle/schema";
 import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "../shared/const";
+import { calcCheckoutFees } from "../shared/checkoutFees";
 
 type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type OrderRow = typeof orders.$inferSelect;
@@ -51,6 +52,34 @@ export type OrderWithItemsAndLogistics = OrderRow & {
   balancePayment?: BalancePaymentRow | null;
   mergeInfo?: OrderMergeDetail | null;
 };
+
+async function orderHasDomesticFreeShipping(db: DbInstance, orderId: number) {
+  const items = await db
+    .select({
+      id: orderItems.productId,
+      name: orderItems.productName,
+      price: orderItems.unitPrice,
+      quantity: orderItems.quantity,
+      twoItemFreeShippingEligible: dbProducts.twoItemFreeShippingEligible,
+    })
+    .from(orderItems)
+    .leftJoin(dbProducts, eq(orderItems.productId, dbProducts.id))
+    .where(eq(orderItems.orderId, orderId));
+  const productItems = items
+    .filter((item) => !["shipping", "shipping-fee", "payment-fee"].includes(item.id))
+    .map((item) => ({
+      ...item,
+      twoItemFreeShippingEligible: item.twoItemFreeShippingEligible ?? true,
+    }));
+  if (productItems.length === 0) return false;
+
+  return calcCheckoutFees({
+    items: productItems,
+    checkoutRegion: "domestic",
+    shippingMethod: "cvs_711",
+    paymentMethod: "credit",
+  }).domesticFreeShipping;
+}
 
 export type AdminOrderListItem = Pick<
   OrderRow,
@@ -1029,7 +1058,15 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     ))
     .limit(1);
 
-  return { ...balancePayment, order, orderMergeInfo, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
+  const originalDomesticFreeShipping = await orderHasDomesticFreeShipping(db, order.id);
+
+  return {
+    ...balancePayment,
+    order,
+    orderMergeInfo,
+    clearQuartzChipsItem: clearQuartzChipsItem ?? null,
+    originalDomesticFreeShipping,
+  };
 }
 
 export async function updateBalancePaymentStatus(
