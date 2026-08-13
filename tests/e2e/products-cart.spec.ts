@@ -23,7 +23,7 @@ function json(value: unknown) {
 
 async function expectStoredCartToBeEmpty(page: Page) {
   const storedCart = await page.evaluate(() => sessionStorage.getItem("cart_items"));
-  expect(storedCart == null ? [] : JSON.parse(storedCart)).toEqual([]);
+  expect(storedCart ? JSON.parse(storedCart) : []).toEqual([]);
 }
 
 async function ensureTwoItemFreeShippingColumn(connection: mysql.Connection) {
@@ -31,6 +31,114 @@ async function ensureTwoItemFreeShippingColumn(connection: mysql.Connection) {
     await connection.execute("ALTER TABLE products ADD COLUMN twoItemFreeShippingEligible boolean NOT NULL DEFAULT true");
   } catch {
     /* Column already exists. */
+  }
+}
+
+async function ensureCustomDepositProducts() {
+  const products = [
+    {
+      id: "custom-deposit-product",
+      name: "客製化商品",
+      subtitle: "客製化服務訂金下單專用",
+      price: 500,
+      priceRange: "NT$1,500 ± NT$300",
+      image: "/images/custom3.jpg",
+      tags: [],
+      crystalType: "可提供想要的功效、色系、款式，或是也可以跟我討論",
+      color: "訂金",
+      sortOrder: 11,
+    },
+    {
+      id: "tarot-crystal-deposit-product",
+      name: "塔羅 × 水晶手鍊客製化商品",
+      subtitle: "塔羅 × 水晶手鍊客製化服務訂金下單專用",
+      price: 1399,
+      priceRange: "手鍊 NT$1,500 ± NT$300｜塔羅依價目表 9 折",
+      image: "/images/custom-tarot2.jpg",
+      tags: ["塔羅"],
+      crystalType: "提供塔羅解析，透過解析分析出缺失的能量",
+      color: "訂金",
+      sortOrder: 12,
+    },
+    {
+      id: "chakra-crystal-deposit-product",
+      name: "脈輪檢測 × 水晶手鍊客製化商品",
+      subtitle: "脈輪檢測 × 水晶手鍊客製化服務訂金下單專用",
+      price: 1000,
+      priceRange: "手鍊 NT$1,500 ± NT$300｜脈輪檢測 NT$500",
+      image: "/images/custom-chakra2.jpg",
+      tags: ["脈輪"],
+      crystalType: "以靈擺與塔羅測出您的七脈輪能量狀況",
+      color: "訂金",
+      sortOrder: 13,
+    },
+    {
+      id: "numerology-crystal-deposit-product",
+      name: "生命靈數 × 水晶手鍊客製化商品",
+      subtitle: "生命靈數 × 水晶手鍊客製化服務訂金下單專用",
+      price: 1000,
+      priceRange: "手鍊 NT$1,500 ± NT$300｜生命靈數解析 NT$500",
+      image: "/images/custom-numerology3.jpg",
+      tags: ["生命靈數"],
+      crystalType: "透過西元出生年月日找出天賦數、生命數、先天數、星座數",
+      color: "訂金",
+      sortOrder: 14,
+    },
+  ];
+
+  const connection = await connectTestDb();
+  try {
+    for (const product of products) {
+      await connection.execute(
+        `INSERT INTO products
+          (id, name, subtitle, category, categoryLabel, categories, categoryLabels, price, originalPrice,
+           priceRange, depositRange, image, tags, description, story, benefits, suitableFor, howToUse,
+           disclaimer, crystalType, color, featured, active, isMonthlyLimited, scheduledPublishAt, sortOrder)
+         VALUES (?, ?, ?, 'custom', '客製化', ?, ?, ?, NULL,
+           ?, NULL, ?, ?, '客製化服務訂金。', '', ?, ?, ?,
+           '此商品為客製化服務訂金，實際尾款金額由老闆確認後另行通知。', ?, ?, false, true, false, NULL, ?)
+         ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          subtitle = VALUES(subtitle),
+          category = 'custom',
+          categoryLabel = '客製化',
+          categories = VALUES(categories),
+          categoryLabels = VALUES(categoryLabels),
+          price = VALUES(price),
+          priceRange = VALUES(priceRange),
+          image = VALUES(image),
+          tags = VALUES(tags),
+          description = VALUES(description),
+          benefits = VALUES(benefits),
+          suitableFor = VALUES(suitableFor),
+          howToUse = VALUES(howToUse),
+          disclaimer = VALUES(disclaimer),
+          crystalType = VALUES(crystalType),
+          color = VALUES(color),
+          active = true,
+          isMonthlyLimited = false,
+          sortOrder = VALUES(sortOrder)`,
+        [
+          product.id,
+          product.name,
+          product.subtitle,
+          json(["custom"]),
+          json(["客製化"]),
+          product.price,
+          product.priceRange,
+          product.image,
+          json(product.tags),
+          json(["填寫表單"]),
+          json(["已決定預約客製化服務的顧客"]),
+          json(["此商品為訂金專用", "填寫客製表單", "支付訂金"]),
+          product.crystalType,
+          product.color,
+          product.sortOrder,
+        ]
+      );
+    }
+  } finally {
+    await connection.end();
   }
 }
 
@@ -160,6 +268,30 @@ test("quiz result quick action sends adjustable bracelets to detail before cart"
   await expect(page).toHaveURL(/\/products\/d005-moon-clear-heart/);
   await expect(page.getByRole("heading", { name: "月映淨心手鍊" })).toBeVisible();
   await expectStoredCartToBeEmpty(page);
+});
+
+test("product grid quick action sends custom deposits to detail before cart", async ({ page }) => {
+  await ensureCustomDepositProducts();
+  const customProducts = [
+    { id: "custom-deposit-product", name: "客製化商品" },
+    { id: "tarot-crystal-deposit-product", name: "塔羅 × 水晶手鍊客製化商品" },
+    { id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶手鍊客製化商品" },
+    { id: "numerology-crystal-deposit-product", name: "生命靈數 × 水晶手鍊客製化商品" },
+  ];
+
+  for (const product of customProducts) {
+    await page.goto("/products");
+    const card = page.locator(`a[href="/products/${product.id}"]`).first();
+    await expect(card).toContainText(product.name);
+
+    await card.scrollIntoViewIfNeeded();
+    await card.getByRole("button", { name: "填寫表單" }).click({ force: true });
+
+    await expect(page).toHaveURL(new RegExp(`/products/${product.id}$`));
+    await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
+    await expect(page.getByRole("button", { name: "填寫諮詢表單並下訂" })).toBeVisible();
+    await expectStoredCartToBeEmpty(page);
+  }
 });
 
 test("empty checkout shows empty cart state", async ({ page }) => {

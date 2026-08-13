@@ -1,4 +1,5 @@
 import type { Product } from "@/lib/data";
+import { isCustomDepositProduct } from "@/lib/customOrderingContent";
 
 const WRIST_SIZE_CATEGORIES = new Set(["love", "wealth", "protect", "healing"]);
 
@@ -22,8 +23,23 @@ export function hasClaspOption(product: Pick<Product, "category" | "claspOptions
   return product.category !== "custom" && (product.claspOptions == null || product.claspOptions.length > 0);
 }
 
+export function requiresCustomFormBeforeCart(product: Pick<Product, "id" | "category">) {
+  return product.category === "custom" && isCustomDepositProduct(product.id);
+}
+
 export function requiresDetailSelectionBeforeCart(
-  product: Pick<Product, "category" | "categories" | "showWristSize" | "showFitPreference" | "claspOptions">
+  product: Pick<Product, "id" | "category" | "categories" | "showWristSize" | "showFitPreference" | "claspOptions">
 ) {
-  return hasWristSizeOption(product) && hasFitPreferenceOption(product) && hasClaspOption(product);
+  return (
+    requiresCustomFormBeforeCart(product) ||
+    (hasWristSizeOption(product) && hasFitPreferenceOption(product) && hasClaspOption(product))
+  );
+}
+
+export function getQuickCartActionLabel(
+  product: Pick<Product, "id" | "category" | "categories" | "showWristSize" | "showFitPreference" | "claspOptions">
+) {
+  if (requiresCustomFormBeforeCart(product)) return "填寫表單";
+  if (requiresDetailSelectionBeforeCart(product)) return "選擇規格";
+  return null;
 }

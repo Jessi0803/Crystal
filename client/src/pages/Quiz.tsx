@@ -5,7 +5,7 @@ import { Link, useLocation } from "wouter";
 import { ArrowRight, RotateCcw, ShoppingBag } from "lucide-react";
 import { quizQuestions, categoryResultMap, products } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
-import { requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
+import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { toast } from "sonner";
 
 export default function Quiz() {
@@ -42,7 +42,11 @@ export default function Quiz() {
   const handleAddToCart = () => {
     if (resultProduct) {
       if (requiresDetailSelectionBeforeCart(resultProduct)) {
-        toast.message("請先選擇手圍、鬆緊度與扣件類型");
+        toast.message(
+          requiresCustomFormBeforeCart(resultProduct)
+            ? "請先填寫客製化諮詢表單"
+            : "請先選擇手圍、鬆緊度與扣件類型"
+        );
         setLocation(`/products/${resultProduct.id}`);
         return;
       }
@@ -176,7 +180,7 @@ export default function Quiz() {
                     </Link>
                     <button onClick={handleAddToCart} className="btn-primary text-xs py-2.5 px-4">
                       <ShoppingBag className="w-3.5 h-3.5" />
-                      {requiresDetailSelectionBeforeCart(resultProduct) ? "選擇規格" : "加入購物袋"}
+                      {getQuickCartActionLabel(resultProduct) ?? "加入購物袋"}
                     </button>
                   </div>
                 </div>

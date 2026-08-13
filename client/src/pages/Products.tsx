@@ -7,7 +7,7 @@ import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { getDiscountLabel } from "@/lib/pricing";
-import { requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
+import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -54,14 +54,14 @@ export default function Products() {
 
   const products = useMemo(() => {
     if (!dbProducts) {
-      return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
+      return staticProducts.filter((p) => p.category !== "test");
     }
     if (dbProducts.length === 0) {
-      return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
+      return staticProducts.filter((p) => p.category !== "test");
     }
     const dbIds = new Set(dbProducts.map((p) => p.id));
     const staticExtras = staticProducts.filter(
-      (p) => !dbIds.has(p.id) && p.category !== "test" && p.category !== "custom"
+      (p) => !dbIds.has(p.id) && p.category !== "test"
     );
     return [...dbProducts, ...staticExtras];
   }, [dbProducts]);
@@ -104,7 +104,11 @@ export default function Products() {
       return;
     }
     if (requiresDetailSelectionBeforeCart(product)) {
-      toast.message("請先選擇手圍、鬆緊度與扣件類型");
+      toast.message(
+        requiresCustomFormBeforeCart(product)
+          ? "請先填寫客製化諮詢表單"
+          : "請先選擇手圍、鬆緊度與扣件類型"
+      );
       setLocation(`/products/${product.id}`);
       return;
     }
@@ -208,7 +212,7 @@ export default function Products() {
                         onClick={(e) => handleAddToCart(product, e)}
                         className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                       >
-                        {requiresDetailSelectionBeforeCart(product) ? "選擇規格" : "加入購物袋"}
+                        {getQuickCartActionLabel(product) ?? "加入購物袋"}
                       </button>
                     )}
                     {/* Sale Badge */}

@@ -15,7 +15,7 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { products as staticProducts } from "@/lib/data";
-import { requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
+import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -163,7 +163,11 @@ export default function Home() {
     e.preventDefault();
     e.stopPropagation();
     if (requiresDetailSelectionBeforeCart(product)) {
-      toast.message("請先選擇手圍、鬆緊度與扣件類型");
+      toast.message(
+        requiresCustomFormBeforeCart(product)
+          ? "請先填寫客製化諮詢表單"
+          : "請先選擇手圍、鬆緊度與扣件類型"
+      );
       setLocation(`/products/${product.id}`);
       return;
     }
@@ -380,7 +384,7 @@ export default function Home() {
                         className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
                         style={{ transition: "opacity 0.2s" }}
                       >
-                        {requiresDetailSelectionBeforeCart(product) ? "選擇規格" : "加入購物車"}
+                        {getQuickCartActionLabel(product) ?? "加入購物車"}
                       </button>
                     </div>
                     <div className="product-card-info">
