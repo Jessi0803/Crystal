@@ -627,6 +627,9 @@ var balancePaymentLegacySelect = {
   orderId: orderBalancePayments.orderId,
   merchantTradeNo: orderBalancePayments.merchantTradeNo,
   amount: orderBalancePayments.amount,
+  shippingFee: orderBalancePayments.shippingFee,
+  paymentFee: orderBalancePayments.paymentFee,
+  totalAmount: orderBalancePayments.totalAmount,
   paymentMethod: orderBalancePayments.paymentMethod,
   paymentStatus: orderBalancePayments.paymentStatus,
   transferLastFive: orderBalancePayments.transferLastFive,
@@ -641,9 +644,9 @@ function hydrateBalancePayment(row) {
   if (!row) return null;
   return {
     ...row,
-    shippingFee: 0,
-    paymentFee: 0,
-    totalAmount: row.amount
+    shippingFee: row.shippingFee ?? 0,
+    paymentFee: row.paymentFee ?? 0,
+    totalAmount: row.totalAmount ?? row.amount
   };
 }
 var balancePaymentColumnsEnsured = false;

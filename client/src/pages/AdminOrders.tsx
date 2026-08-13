@@ -25,6 +25,7 @@ import {
   Users,
   Trash2,
   GitMerge,
+  ImageOff,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -92,6 +93,39 @@ function StatusBadge({ status }: { status: string }) {
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
+  );
+}
+
+function ProductThumbnail({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div
+        className={`flex items-center justify-center border border-[oklch(0.9_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.65_0_0)] ${className}`}
+        aria-label={`${alt} 圖片無法載入`}
+      >
+        <ImageOff className="h-5 w-5" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`border border-[oklch(0.9_0_0)] object-cover bg-white ${className}`}
+      loading="lazy"
+      onError={() => setHasError(true)}
+    />
   );
 }
 
@@ -231,7 +265,7 @@ function OrderRowCard({
           </label>
         )}
         <button
-          className="flex-1 text-left px-5 py-4 flex items-center gap-4 hover:bg-[oklch(0.98_0_0)] transition-colors"
+          className="relative flex flex-1 flex-col items-stretch gap-3 px-4 py-4 pr-10 text-left transition-colors hover:bg-[oklch(0.98_0_0)] sm:flex-row sm:items-center sm:gap-4 sm:px-5"
           onClick={onToggle}
         >
           <div className="flex-1 min-w-0">
@@ -262,26 +296,25 @@ function OrderRowCard({
               <span>{getShippingLabel(order.shippingMethod ?? "")}</span>
             </div>
             {order.productThumbnails.length > 0 && (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {order.productThumbnails.map((item) => (
-                  <img
+                  <ProductThumbnail
                     key={item.id}
                     src={item.productImage}
                     alt={item.productName}
-                    className="h-20 w-20 border border-[oklch(0.9_0_0)] object-cover bg-white"
-                    loading="lazy"
+                    className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
                   />
                 ))}
               </div>
             )}
           </div>
-          <div className="text-right shrink-0">
+          <div className="flex shrink-0 items-end justify-between gap-3 border-t border-[oklch(0.93_0_0)] pt-3 text-right sm:block sm:border-t-0 sm:pt-0">
             <div className="text-base font-medium text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
               NT$ {order.totalAmount.toLocaleString()}
             </div>
             <div className="text-xs font-body text-[oklch(0.6_0_0)]">{getPaymentLabel(order.paymentMethod)}</div>
           </div>
-          <div className="shrink-0 text-[oklch(0.6_0_0)]">
+          <div className="absolute right-4 top-4 shrink-0 text-[oklch(0.6_0_0)] sm:static">
             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </button>
@@ -329,11 +362,10 @@ function OrderRowCard({
                           <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
                         </div>
                         {item.productImage && (
-                          <img
+                          <ProductThumbnail
                             src={item.productImage}
                             alt={item.productName}
-                            className="mt-3 h-48 w-48 max-w-full border border-[oklch(0.9_0_0)] object-cover bg-white"
-                            loading="lazy"
+                            className="mt-3 h-48 w-48 max-w-full"
                           />
                         )}
                       </div>

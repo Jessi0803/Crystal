@@ -953,11 +953,90 @@ async function markEmailVerified(userId) {
 
 // server/orderDb.ts
 init_schema();
+
+// shared/checkoutFees.ts
+var DOMESTIC_SHIPPING_FEES = {
+  home: 130,
+  cvs_711: 60,
+  cvs_family: 60
+};
+var OVERSEAS_SHIPPING_FEES = {
+  MY: 334,
+  HK: 350,
+  SG: 350,
+  US: 771,
+  GB: 644,
+  AU: 552
+};
+var FREE_SHIPPING_EMAILS = ["baby90522@gmail.com"];
+function isCheckoutFeeExemptProduct(item) {
+  const productId = item.baseProductId ?? item.id;
+  return CUSTOM_PRODUCT_IDS.includes(productId) || productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
+}
+function isTestProduct(item) {
+  const productId = item.baseProductId ?? item.id;
+  return productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
+}
+function calcFreeShippingQuantity(items) {
+  return items.filter((item) => !isTestProduct(item) && item.twoItemFreeShippingEligible !== false).reduce((sum, item) => sum + item.quantity, 0);
+}
+function isFreeShippingEmail(email) {
+  return email ? FREE_SHIPPING_EMAILS.includes(email.trim().toLowerCase()) : false;
+}
+function calcCheckoutFees(params) {
+  const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const chargeableSubtotal = params.items.filter((item) => !isCheckoutFeeExemptProduct(item)).reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const appliesFees = chargeableSubtotal > 0;
+  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
+  const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
+  const forcedFreeShipping = params.forceFreeShipping === true;
+  const forcedPaidShipping = params.forcePaidShipping === true;
+  const shippingFee = !appliesFees ? 0 : forcedFreeShipping ? 0 : forcedPaidShipping ? params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod] : emailFreeShipping ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
+  const paymentFee = 0;
+  const total = subtotal + shippingFee + paymentFee;
+  return {
+    subtotal,
+    chargeableSubtotal,
+    shippingFee,
+    paymentFee,
+    total,
+    appliesFees,
+    domesticFreeShipping,
+    emailFreeShipping,
+    forcedFreeShipping,
+    forcedPaidShipping
+  };
+}
+
+// server/orderDb.ts
+async function orderHasDomesticFreeShipping(db, orderId) {
+  const items = await db.select({
+    id: orderItems.productId,
+    name: orderItems.productName,
+    price: orderItems.unitPrice,
+    quantity: orderItems.quantity,
+    twoItemFreeShippingEligible: dbProducts.twoItemFreeShippingEligible
+  }).from(orderItems).leftJoin(dbProducts, eq2(orderItems.productId, dbProducts.id)).where(eq2(orderItems.orderId, orderId));
+  const productItems = items.filter((item) => !["shipping", "shipping-fee", "payment-fee"].includes(item.id)).map((item) => ({
+    ...item,
+    twoItemFreeShippingEligible: item.twoItemFreeShippingEligible ?? true
+  }));
+  if (productItems.length === 0) return false;
+  return calcCheckoutFees({
+    items: productItems,
+    checkoutRegion: "domestic",
+    shippingMethod: "cvs_711",
+    paymentMethod: "credit"
+  }).domesticFreeShipping;
+}
 var balancePaymentLegacySelect = {
   id: orderBalancePayments.id,
   orderId: orderBalancePayments.orderId,
   merchantTradeNo: orderBalancePayments.merchantTradeNo,
   amount: orderBalancePayments.amount,
+  shippingFee: orderBalancePayments.shippingFee,
+  paymentFee: orderBalancePayments.paymentFee,
+  totalAmount: orderBalancePayments.totalAmount,
   paymentMethod: orderBalancePayments.paymentMethod,
   paymentStatus: orderBalancePayments.paymentStatus,
   transferLastFive: orderBalancePayments.transferLastFive,
@@ -972,9 +1051,9 @@ function hydrateBalancePayment(row) {
   if (!row) return null;
   return {
     ...row,
-    shippingFee: 0,
-    paymentFee: 0,
-    totalAmount: row.amount
+    shippingFee: row.shippingFee ?? 0,
+    paymentFee: row.paymentFee ?? 0,
+    totalAmount: row.totalAmount ?? row.amount
   };
 }
 var balancePaymentColumnsEnsured = false;
@@ -1419,7 +1498,7 @@ async function createOrReplaceBalancePayment(opts) {
     throw new Error("Balance already paid");
   }
   const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
-  const previousBalanceTotal = existing?.amount ?? 0;
+  const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
   const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
   await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq2(orders.id, opts.orderId));
   if (existing) {
@@ -1464,7 +1543,14 @@ async function getBalancePaymentDetail(merchantTradeNo) {
     eq2(orderItems.orderId, row.orderId),
     eq2(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
   )).limit(1);
-  return { ...balancePayment, order, orderMergeInfo, clearQuartzChipsItem: clearQuartzChipsItem ?? null };
+  const originalDomesticFreeShipping = await orderHasDomesticFreeShipping(db, order.id);
+  return {
+    ...balancePayment,
+    order,
+    orderMergeInfo,
+    clearQuartzChipsItem: clearQuartzChipsItem ?? null,
+    originalDomesticFreeShipping
+  };
 }
 async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive, transferReceiptUrl) {
   const db = await getDb();
@@ -2839,60 +2925,6 @@ function formatOverseasShippingAddress(p) {
   return { shippingAddress: lines.join("\n"), receiverZipCode };
 }
 
-// shared/checkoutFees.ts
-var DOMESTIC_SHIPPING_FEES = {
-  home: 130,
-  cvs_711: 60,
-  cvs_family: 60
-};
-var OVERSEAS_SHIPPING_FEES = {
-  MY: 334,
-  HK: 350,
-  SG: 350,
-  US: 771,
-  GB: 644,
-  AU: 552
-};
-var FREE_SHIPPING_EMAILS = ["baby90522@gmail.com"];
-function isCheckoutFeeExemptProduct(item) {
-  const productId = item.baseProductId ?? item.id;
-  return CUSTOM_PRODUCT_IDS.includes(productId) || productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
-}
-function isTestProduct(item) {
-  const productId = item.baseProductId ?? item.id;
-  return productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
-}
-function calcFreeShippingQuantity(items) {
-  return items.filter((item) => !isTestProduct(item) && item.twoItemFreeShippingEligible !== false).reduce((sum, item) => sum + item.quantity, 0);
-}
-function isFreeShippingEmail(email) {
-  return email ? FREE_SHIPPING_EMAILS.includes(email.trim().toLowerCase()) : false;
-}
-function calcCheckoutFees(params) {
-  const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const chargeableSubtotal = params.items.filter((item) => !isCheckoutFeeExemptProduct(item)).reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const appliesFees = chargeableSubtotal > 0;
-  const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
-  const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
-  const forcedFreeShipping = params.forceFreeShipping === true;
-  const forcedPaidShipping = params.forcePaidShipping === true;
-  const shippingFee = !appliesFees ? 0 : forcedFreeShipping ? 0 : forcedPaidShipping ? params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod] : emailFreeShipping ? 0 : domesticFreeShipping ? 0 : params.checkoutRegion === "overseas" ? params.overseasCountry ? OVERSEAS_SHIPPING_FEES[params.overseasCountry] : 0 : DOMESTIC_SHIPPING_FEES[params.shippingMethod];
-  const paymentFee = 0;
-  const total = subtotal + shippingFee + paymentFee;
-  return {
-    subtotal,
-    chargeableSubtotal,
-    shippingFee,
-    paymentFee,
-    total,
-    appliesFees,
-    domesticFreeShipping,
-    emailFreeShipping,
-    forcedFreeShipping,
-    forcedPaidShipping
-  };
-}
-
 // shared/bankAccount.ts
 var STORE_BANK_INFO = {
   bankName: "\u9023\u7DDA\u9280\u884C\uFF08824\uFF09",
@@ -3060,6 +3092,25 @@ async function attachTwoItemFreeShippingEligibility(items) {
       twoItemFreeShippingEligible: eligibilityById.get(productId) ?? item.twoItemFreeShippingEligible ?? true
     };
   });
+}
+async function originalOrderHasDomesticFreeShipping(orderId) {
+  const db = await getDb();
+  if (!db) return false;
+  const items = await db.select({
+    id: orderItems.productId,
+    name: orderItems.productName,
+    price: orderItems.unitPrice,
+    quantity: orderItems.quantity
+  }).from(orderItems).where(eq6(orderItems.orderId, orderId));
+  const productItems = items.filter((item) => !["shipping", "shipping-fee", "payment-fee"].includes(item.id));
+  if (productItems.length === 0) return false;
+  const feeItems = await attachTwoItemFreeShippingEligibility(productItems);
+  return calcCheckoutFees({
+    items: feeItems,
+    checkoutRegion: "domestic",
+    shippingMethod: "cvs_711",
+    paymentMethod: "credit"
+  }).domesticFreeShipping;
 }
 var orderRouter = router({
   /**
@@ -3949,6 +4000,8 @@ var orderRouter = router({
         twoItemFreeShippingEligible: clearQuartzChipsAddOn.twoItemFreeShippingEligible
       });
     }
+    const originalDomesticFreeShipping = input.checkoutRegion === "domestic" ? await originalOrderHasDomesticFreeShipping(balancePayment.orderId) : false;
+    const forceBalanceFreeShipping = balancePayment.order.freeShippingOverride || originalDomesticFreeShipping;
     const feeSummary = calcCheckoutFees({
       items: balanceItems,
       checkoutRegion: input.checkoutRegion,
@@ -3956,8 +4009,8 @@ var orderRouter = router({
       paymentMethod: input.paymentMethod,
       overseasCountry,
       buyerEmail: balancePayment.order.buyerEmail,
-      forceFreeShipping: balancePayment.order.freeShippingOverride,
-      forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !balancePayment.order.freeShippingOverride)
+      forceFreeShipping: forceBalanceFreeShipping,
+      forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !forceBalanceFreeShipping)
     });
     const totalAmount = feeSummary.total;
     await db.update(orderBalancePayments).set({
@@ -3988,11 +4041,6 @@ var orderRouter = router({
           ...itemValues
         });
       }
-    } else if (existingClearQuartzItem) {
-      await db.delete(orderItems).where(and4(
-        eq6(orderItems.orderId, balancePayment.orderId),
-        eq6(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
-      ));
     }
     await db.update(orders).set({
       deliveryRegion: isOverseas ? "overseas" : "domestic",
