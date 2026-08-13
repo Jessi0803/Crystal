@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql from "mysql2/promise";
@@ -19,6 +19,11 @@ async function connectTestDb() {
 
 function json(value: unknown) {
   return JSON.stringify(value ?? []);
+}
+
+async function expectStoredCartToBeEmpty(page: Page) {
+  const storedCart = await page.evaluate(() => sessionStorage.getItem("cart_items"));
+  expect(storedCart == null ? [] : JSON.parse(storedCart)).toEqual([]);
 }
 
 async function ensureTwoItemFreeShippingColumn(connection: mysql.Connection) {
@@ -111,6 +116,50 @@ test("product detail can add seeded product to cart and continue to checkout", a
   await proceedThroughCheckoutGate(page);
   await expect(page.getByRole("heading", { name: "訂單摘要" })).toBeVisible();
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
+});
+
+test("product grid quick action sends adjustable bracelets to detail before cart", async ({ page }) => {
+  await page.goto("/products");
+  const card = page.locator('a[href="/products/d001-moon-secret"]').first();
+  await expect(card).toContainText("月下密語手鍊");
+
+  await card.scrollIntoViewIfNeeded();
+  await card.getByRole("button", { name: "選擇規格" }).click({ force: true });
+
+  await expect(page).toHaveURL(/\/products\/d001-moon-secret/);
+  await expect(page.getByRole("heading", { name: "月下密語手鍊" })).toBeVisible();
+  await expectStoredCartToBeEmpty(page);
+});
+
+test("home featured quick action sends adjustable bracelets to detail before cart", async ({ page }) => {
+  await page.goto("/");
+  const featuredCard = page.locator('a[href="/products/d001-moon-secret"]').first();
+  await expect(featuredCard).toContainText("月下密語手鍊");
+
+  await featuredCard.scrollIntoViewIfNeeded();
+  await featuredCard.getByRole("button", { name: "選擇規格" }).click({ force: true });
+
+  await expect(page).toHaveURL(/\/products\/d001-moon-secret/);
+  await expect(page.getByRole("heading", { name: "月下密語手鍊" })).toBeVisible();
+  await expectStoredCartToBeEmpty(page);
+});
+
+test("quiz result quick action sends adjustable bracelets to detail before cart", async ({ page }) => {
+  await page.goto("/quiz");
+  await page.getByRole("button", { name: /開始測驗/ }).click();
+  await page.getByRole("button", { name: /情緒不穩定/ }).click();
+  await page.getByRole("button", { name: /下一題/ }).click();
+  await page.getByRole("button", { name: /更深的平靜/ }).click();
+  await page.getByRole("button", { name: /下一題/ }).click();
+  await page.getByRole("button", { name: /紫色/ }).click();
+  await page.getByRole("button", { name: /查看結果/ }).click();
+
+  await expect(page.getByRole("button", { name: /選擇規格/ })).toBeVisible();
+  await page.getByRole("button", { name: /選擇規格/ }).click();
+
+  await expect(page).toHaveURL(/\/products\/d005-moon-clear-heart/);
+  await expect(page.getByRole("heading", { name: "月映淨心手鍊" })).toBeVisible();
+  await expectStoredCartToBeEmpty(page);
 });
 
 test("empty checkout shows empty cart state", async ({ page }) => {

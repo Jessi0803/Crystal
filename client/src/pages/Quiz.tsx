@@ -1,10 +1,11 @@
 // 日日好日 — Energy Quiz Page
 // Design: Vacanza-inspired minimal quiz
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ArrowRight, RotateCcw, ShoppingBag } from "lucide-react";
 import { quizQuestions, categoryResultMap, products } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
+import { requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { toast } from "sonner";
 
 export default function Quiz() {
@@ -12,6 +13,7 @@ export default function Quiz() {
   const [answers, setAnswers] = useState<string[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const { addToCart } = useCart();
+  const [, setLocation] = useLocation();
 
   const totalSteps = quizQuestions.length;
 
@@ -39,6 +41,11 @@ export default function Quiz() {
 
   const handleAddToCart = () => {
     if (resultProduct) {
+      if (requiresDetailSelectionBeforeCart(resultProduct)) {
+        toast.message("請先選擇手圍、鬆緊度與扣件類型");
+        setLocation(`/products/${resultProduct.id}`);
+        return;
+      }
       addToCart(resultProduct);
       toast.success(`已加入購物袋：${resultProduct.name}`);
     }
@@ -169,7 +176,7 @@ export default function Quiz() {
                     </Link>
                     <button onClick={handleAddToCart} className="btn-primary text-xs py-2.5 px-4">
                       <ShoppingBag className="w-3.5 h-3.5" />
-                      加入購物袋
+                      {requiresDetailSelectionBeforeCart(resultProduct) ? "選擇規格" : "加入購物袋"}
                     </button>
                   </div>
                 </div>

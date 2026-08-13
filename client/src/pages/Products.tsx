@@ -1,12 +1,13 @@
 // 日日好日 — Products Page
 // Design: Vacanza-inspired minimal grid layout
 import { useState, useEffect, useMemo } from "react";
-import { Link, useSearch } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { getDiscountLabel } from "@/lib/pricing";
+import { requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ export default function Products() {
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState(initialSort);
   const [showFilter, setShowFilter] = useState(false);
+  const [, setLocation] = useLocation();
   const { addToCart } = useCart();
   const { data: productSalesTotals = [] } = trpc.order.getProductSalesTotals.useQuery();
   const { data: dbProducts, isLoading: productsLoading } = trpc.product.list.useQuery();
@@ -51,7 +53,9 @@ export default function Products() {
   );
 
   const products = useMemo(() => {
-    if (!dbProducts) return [];
+    if (!dbProducts) {
+      return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
+    }
     if (dbProducts.length === 0) {
       return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
     }
@@ -97,6 +101,11 @@ export default function Products() {
     const availability = availabilityByProductId.get(product.id);
     if (availability?.isMonthlyLimited === true && availability.available === false) {
       toast.error("此每月限量商品已售完，無法預購");
+      return;
+    }
+    if (requiresDetailSelectionBeforeCart(product)) {
+      toast.message("請先選擇手圍、鬆緊度與扣件類型");
+      setLocation(`/products/${product.id}`);
       return;
     }
     addToCart(product, { isPreorder: availability?.isPreorder === true });
@@ -157,7 +166,7 @@ export default function Products() {
         </div>
 
         {/* Product Grid */}
-        {productsLoading ? (
+        {productsLoading && products.length === 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="animate-pulse">
@@ -199,7 +208,7 @@ export default function Products() {
                         onClick={(e) => handleAddToCart(product, e)}
                         className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                       >
-                        加入購物袋
+                        {requiresDetailSelectionBeforeCart(product) ? "選擇規格" : "加入購物袋"}
                       </button>
                     )}
                     {/* Sale Badge */}
