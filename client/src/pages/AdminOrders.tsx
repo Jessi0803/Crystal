@@ -358,7 +358,7 @@ function OrderRowCard({
                     {detail.items.map((item) => (
                       <div key={item.id}>
                         <div className="min-w-0">
-                          <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">{item.productName}</p>
+                          <p className="text-sm font-body text-[oklch(0.1_0_0)] break-words">{item.productName}</p>
                           <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
                         </div>
                         {item.productImage && (
