@@ -126,7 +126,7 @@ export default function CustomFormD() {
       ),
     },
     {
-      title: "這次有想要額外指定其他功效嗎？",
+      title: "除了這次搭配的能量主題外，這次最想為自己調整的是？",
       subtitle:
         "老闆會以生命靈數分析結果為主，你也可以許願想加強的能量；沒有想法就交給設計師",
       required: true,
@@ -491,7 +491,7 @@ export default function CustomFormD() {
     const focusError = validateCustomFocus(
       form.focus,
       form.focusStory,
-      "是否要額外指定其他功效"
+      "除了這次搭配的能量主題外，這次最想為自己調整的面向"
     );
     if (focusError) {
       toast.error(focusError);

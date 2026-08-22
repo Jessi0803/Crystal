@@ -659,7 +659,7 @@ export default function CustomFormB() {
 
   const braceletSteps = [
     {
-      title: "這次有想要額外指定其他功效嗎？",
+      title: "除了這次搭配的能量主題外，這次最想為自己調整的是？",
       subtitle:
         "老闆會以塔羅解讀結果為主，你也可以許願想加強的能量；沒有想法就交給設計師",
       required: true,
@@ -1068,7 +1068,7 @@ export default function CustomFormB() {
     const focusError = validateCustomFocus(
       bracelet.focus,
       bracelet.focusStory,
-      "是否要額外指定其他功效"
+      "除了這次搭配的能量主題外，這次最想為自己調整的面向"
     );
     if (focusError) {
       toast.error(focusError);

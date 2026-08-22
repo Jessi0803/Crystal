@@ -33,7 +33,6 @@ import {
 interface FormData {
   focus: CustomFocusChoice;
   focusStory: string;
-  effect: string;
   wristSize: string;
   fitPreference: "" | "just-right" | "loose";
   metalPreference: "" | "gold" | "silver" | "either";
@@ -49,7 +48,6 @@ interface FormData {
 const EMPTY_FORM: FormData = {
   focus: "",
   focusStory: "",
-  effect: "",
   wristSize: "",
   fitPreference: "",
   metalPreference: "",
@@ -68,7 +66,6 @@ function buildNote(form: FormData, selectedAddons: CustomAddonId[]): string {
       "【純客製水晶手鍊諮詢表單】",
       "",
       `這次最想為自己調整的是：${formatCustomFocusNote(form.focus, form.focusStory)}`,
-      `想要的功效：${form.effect || "（未填）"}`,
       `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
       `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
       `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
@@ -101,21 +98,6 @@ export default function CustomForm() {
           otherStory={form.focusStory}
           onChange={focus => setForm({ ...form, focus })}
           onOtherStoryChange={focusStory => setForm({ ...form, focusStory })}
-        />
-      ),
-    },
-    {
-      title: "您想要什麼功效？",
-      subtitle:
-        "例如：提升自信、招財、愛情、療癒、保護氣場……可以自由描述，越詳細越好",
-      required: true,
-      field: (
-        <textarea
-          value={form.effect}
-          onChange={e => setForm({ ...form, effect: e.target.value })}
-          placeholder="寫下您想要的功效或願望，也可以描述目前的困境或期待的改變"
-          rows={6}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
         />
       ),
     },
@@ -467,10 +449,6 @@ export default function CustomForm() {
     );
     if (focusError) {
       toast.error(focusError);
-      return false;
-    }
-    if (!form.effect.trim()) {
-      toast.error("請填寫想要的功效");
       return false;
     }
     if (!form.wristSize) {
