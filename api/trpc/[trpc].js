@@ -1013,6 +1013,28 @@ function calcCheckoutFees(params) {
 }
 
 // server/orderDb.ts
+function normalizeInsertValue(value) {
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return JSON.stringify(value);
+  }
+  return value;
+}
+async function insertOrderCompat(db, orderData) {
+  const entries = Object.entries(orderData).filter(([, value]) => value !== void 0).map(([key, value]) => [key, normalizeInsertValue(value)]);
+  if (entries.length === 0) {
+    throw new Error("Order data is empty");
+  }
+  await db.execute(sql2`
+    INSERT INTO \`orders\` (${sql2.join(
+    entries.map(([key]) => sql2.raw(`\`${key}\``)),
+    sql2`, `
+  )})
+    VALUES (${sql2.join(
+    entries.map(([, value]) => sql2`${value}`),
+    sql2`, `
+  )})
+  `);
+}
 async function orderHasDomesticFreeShipping(db, orderId) {
   const items = await db.select({
     id: orderItems.productId,
@@ -1196,7 +1218,7 @@ function normalizeProductImageUrl(image) {
 async function createOrder(orderData, items) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(orders).values(orderData);
+  await insertOrderCompat(db, orderData);
   const [created] = await db.select().from(orders).where(eq2(orders.merchantTradeNo, orderData.merchantTradeNo)).limit(1);
   if (!created) throw new Error("Failed to create order");
   const itemsWithOrderId = items.map((item) => ({

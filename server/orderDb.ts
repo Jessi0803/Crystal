@@ -34,6 +34,34 @@ export type OrderMergeInfo = {
   role: "main" | "member";
 };
 
+function normalizeInsertValue(value: unknown) {
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return JSON.stringify(value);
+  }
+  return value;
+}
+
+async function insertOrderCompat(db: DbInstance, orderData: InsertOrder) {
+  const entries = Object.entries(orderData)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => [key, normalizeInsertValue(value)] as const);
+
+  if (entries.length === 0) {
+    throw new Error("Order data is empty");
+  }
+
+  await db.execute(sql`
+    INSERT INTO \`orders\` (${sql.join(
+      entries.map(([key]) => sql.raw(`\`${key}\``)),
+      sql`, `
+    )})
+    VALUES (${sql.join(
+      entries.map(([, value]) => sql`${value}`),
+      sql`, `
+    )})
+  `);
+}
+
 export type OrderMergeDetail = OrderMergeInfo & {
   members: {
     orderId: number;
@@ -337,7 +365,7 @@ export async function createOrder(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.insert(orders).values(orderData);
+  await insertOrderCompat(db, orderData);
 
   const [created] = await db
     .select()
