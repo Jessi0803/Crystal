@@ -306,7 +306,7 @@ export default function OrderResult() {
               下一步：填寫客製需求
             </DialogTitle>
             <DialogDescription className="text-base font-body leading-relaxed text-rose-700">
-              請填寫手圍、配件偏好與設計需求，送出後會自動綁定到這筆訂單。
+              請填寫手圍、配件偏好與設計需求。
             </DialogDescription>
             <div className="mt-3 space-y-3">
               {customDepositItems.map((item: any) => {
