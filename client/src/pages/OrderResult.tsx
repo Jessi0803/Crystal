@@ -187,17 +187,21 @@ export default function OrderResult() {
   };
   const customDepositItems =
     order?.items?.filter((item: any) => CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)) ?? [];
+  const pendingCustomDepositItems = customDepositItems.filter(
+    (item: any) => !order?.customerNote?.includes(`【客製需求開始：${item.productId}】`)
+  );
   const canFillCustomForm =
     customDepositItems.length > 0 &&
     (order?.paymentStatus === "paid" ||
       order?.paymentStatus === "confirmed" ||
       order?.paymentStatus === "transfer_pending");
+  const shouldPromptForCustomForm = canFillCustomForm && pendingCustomDepositItems.length > 0;
 
   useEffect(() => {
     const orderNo = order?.merchantTradeNo ?? "";
-    if (!canFillCustomForm || !orderNo || dismissedCustomReminderOrderNo === orderNo) return;
+    if (!shouldPromptForCustomForm || !orderNo || dismissedCustomReminderOrderNo === orderNo) return;
     setIsCustomReminderOpen(true);
-  }, [canFillCustomForm, dismissedCustomReminderOrderNo, order?.merchantTradeNo]);
+  }, [shouldPromptForCustomForm, dismissedCustomReminderOrderNo, order?.merchantTradeNo]);
 
   const handleCustomReminderOpenChange = (open: boolean) => {
     setIsCustomReminderOpen(open);
@@ -300,7 +304,7 @@ export default function OrderResult() {
           )}
         </div>
 
-        <Dialog open={isCustomReminderOpen && canFillCustomForm} onOpenChange={handleCustomReminderOpenChange}>
+        <Dialog open={isCustomReminderOpen && shouldPromptForCustomForm} onOpenChange={handleCustomReminderOpenChange}>
           <DialogContent className="max-w-2xl border-rose-200 bg-rose-50 p-6 sm:p-8">
             <DialogTitle className="text-xl font-body font-semibold tracking-wide text-rose-800">
               接下來，告訴我們你的故事。
@@ -309,11 +313,8 @@ export default function OrderResult() {
               大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
             </DialogDescription>
             <div className="mt-3 space-y-3">
-              {customDepositItems.map((item: any) => {
+              {pendingCustomDepositItems.map((item: any) => {
                 const customFormPath = getCustomFormPath(item.productId);
-                const hasCustomConsultationNote = Boolean(
-                  order.customerNote?.includes(`【客製需求開始：${item.productId}】`)
-                );
                 if (!customFormPath) return null;
                 return (
                   <button
@@ -323,7 +324,7 @@ export default function OrderResult() {
                       setLocation(`${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}`)
                     }
                   >
-                    {hasCustomConsultationNote ? "修改" : "填寫"}{item.productName}需求
+                    填寫{item.productName}需求
                   </button>
                 );
               })}
