@@ -16,6 +16,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS,
+  getRecentCustomFormSubmissionKey,
+} from "@/lib/customFormSubmission";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -45,6 +49,41 @@ function getCustomConsultationStartMarker(item: CustomDepositItemInstance) {
 function hasCustomConsultationNote(customerNote: string | null | undefined, item: CustomDepositItemInstance) {
   if (customerNote?.includes(getCustomConsultationStartMarker(item))) return true;
   return item.itemIndex === 1 && Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`));
+}
+
+function wasCustomFormRecentlySubmitted(
+  merchantTradeNo: string | undefined,
+  item: CustomDepositItemInstance
+) {
+  if (!merchantTradeNo || typeof window === "undefined") return false;
+
+  const keys = [
+    getRecentCustomFormSubmissionKey({
+      merchantTradeNo,
+      productId: item.productId,
+      orderItemId: item.id,
+      itemIndex: item.itemIndex,
+    }),
+  ];
+  if (item.itemIndex === 1) {
+    keys.push(
+      getRecentCustomFormSubmissionKey({
+        merchantTradeNo,
+        productId: item.productId,
+      })
+    );
+  }
+
+  const now = Date.now();
+  return keys.some((key) => {
+    const submittedAt = Number(sessionStorage.getItem(key) ?? "");
+    if (!submittedAt) return false;
+    if (now - submittedAt > RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return false;
+    }
+    return true;
+  });
 }
 
 function expandCustomDepositItemInstances(items: any[]): CustomDepositItemInstance[] {
@@ -218,7 +257,9 @@ export default function OrderResult() {
     order?.items?.filter((item: any) => CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)) ?? [];
   const customDepositItemInstances = expandCustomDepositItemInstances(customDepositItems);
   const pendingCustomDepositItems = customDepositItemInstances.filter(
-    (item) => !hasCustomConsultationNote(order?.customerNote, item)
+    (item) =>
+      !hasCustomConsultationNote(order?.customerNote, item) &&
+      !wasCustomFormRecentlySubmitted(order?.merchantTradeNo, item)
   );
   const canFillCustomForm =
     customDepositItems.length > 0 &&

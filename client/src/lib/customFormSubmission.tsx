@@ -5,6 +5,27 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import type { CustomDepositProductId } from "@/lib/customOrderingContent";
 
+export const RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS = 2 * 60 * 1000;
+
+export function getRecentCustomFormSubmissionKey({
+  merchantTradeNo,
+  productId,
+  orderItemId,
+  itemIndex,
+}: {
+  merchantTradeNo: string;
+  productId: string;
+  orderItemId?: number;
+  itemIndex?: number;
+}) {
+  return [
+    "custom-form-submitted",
+    merchantTradeNo,
+    productId,
+    orderItemId && itemIndex ? `${orderItemId}:${itemIndex}` : "legacy",
+  ].join(":");
+}
+
 export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const search = useSearch();
   const [, setLocation] = useLocation();
@@ -44,6 +65,18 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
       ...(hasItemInstance ? { orderItemId, itemIndex } : {}),
       customerNote,
     });
+    try {
+      sessionStorage.setItem(
+        getRecentCustomFormSubmissionKey({
+          merchantTradeNo,
+          productId,
+          ...(hasItemInstance ? { orderItemId, itemIndex } : {}),
+        }),
+        String(Date.now())
+      );
+    } catch {
+      /* ignore */
+    }
     toast.success("客製需求已送出");
     setLocation(`/order/${merchantTradeNo}`);
   };
