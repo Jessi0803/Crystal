@@ -334,7 +334,7 @@ export const orderRouter = router({
         .object({
           buyerName: z.string().min(1),
           buyerEmail: z.string().email(),
-          buyerPhone: z.string().min(8),
+          buyerPhone: z.string().min(1).max(64),
           checkoutRegion: z.enum(["domestic", "overseas"]),
           paymentMethod: z.enum(["credit", "atm"]),
           shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
@@ -389,7 +389,16 @@ export const orderRouter = router({
             }
           }
 
-          if (isCustomDepositCheckout) return;
+          if (isCustomDepositCheckout) {
+            if (!data.buyerPhone.trim()) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請填寫 LINE",
+                path: ["buyerPhone"],
+              });
+            }
+            return;
+          }
 
           if (data.checkoutRegion === "domestic") {
             const phone = data.buyerPhone.replace(/\s/g, "");
@@ -1409,6 +1418,7 @@ export const orderRouter = router({
           paymentMethod: z.enum(["credit", "atm"]),
           includeClearQuartzChips: z.boolean().optional(),
           checkoutRegion: z.enum(["domestic", "overseas"]),
+          receiverPhone: z.string().min(1).max(32),
           shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
           cvsStoreId: z.string().optional(),
           cvsStoreName: z.string().optional(),
@@ -1424,7 +1434,15 @@ export const orderRouter = router({
           origin: z.string().url(),
         })
         .superRefine((data, ctx) => {
+          const receiverPhone = data.receiverPhone.trim();
           if (data.checkoutRegion === "domestic") {
+            if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請輸入台灣手機格式（09 開頭共 10 碼）",
+                path: ["receiverPhone"],
+              });
+            }
             if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
               if (!data.cvsStoreId?.trim()) {
                 ctx.addIssue({ code: "custom", message: "請選擇超商門市", path: ["cvsStoreId"] });
@@ -1440,6 +1458,9 @@ export const orderRouter = router({
               }
             }
           } else {
+            if (receiverPhone.length < 8) {
+              ctx.addIssue({ code: "custom", message: "請填寫聯絡電話", path: ["receiverPhone"] });
+            }
             const payload = {
               intlCountry: data.intlCountry ?? "",
               intlAddrLine1: data.intlAddrLine1 ?? "",
@@ -1587,6 +1608,7 @@ export const orderRouter = router({
 
       await db.update(orders)
         .set({
+          buyerPhone: input.receiverPhone.trim(),
           deliveryRegion: isOverseas ? "overseas" : "domestic",
           shippingMethod,
           cvsStoreId: cvsStoreId ?? null,

@@ -67,6 +67,7 @@ export default function BalancePayment() {
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("home");
   const [includeClearQuartzChips, setIncludeClearQuartzChips] = useState(false);
   const [form, setForm] = useState({
+    receiverPhone: "",
     shippingZip: "",
     shippingCity: "",
     shippingDistrict: "",
@@ -341,7 +342,11 @@ export default function BalancePayment() {
 
   const validateShipping = () => {
     const nextErrors: Record<string, string> = {};
+    const receiverPhone = form.receiverPhone.trim();
     if (checkoutRegion === "domestic") {
+      if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
+        nextErrors.receiverPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
+      }
       if (shippingMethod === "cvs_711" && !cvsStore) nextErrors.cvsStore = "請選擇超商門市";
       if (shippingMethod === "home") {
         if (!form.shippingZip.trim() || !/^\d{3,6}$/.test(form.shippingZip)) nextErrors.shippingZip = "請輸入有效郵遞區號";
@@ -350,6 +355,7 @@ export default function BalancePayment() {
         if (!form.shippingDetail.trim()) nextErrors.shippingDetail = "請輸入詳細地址（路名門牌）";
       }
     } else {
+      if (receiverPhone.length < 8) nextErrors.receiverPhone = "請輸入聯絡電話（至少 8 碼）";
       for (const it of validateOverseasAddress({
         intlCountry: form.intlCountry,
         intlAddrLine1: form.intlAddrLine1,
@@ -390,6 +396,7 @@ export default function BalancePayment() {
       paymentMethod,
       includeClearQuartzChips: includeClearQuartzChips && hasLiveClearQuartzChipsProduct,
       checkoutRegion,
+      receiverPhone: form.receiverPhone,
       shippingMethod: checkoutRegion === "overseas" ? "home" : shippingMethod,
       cvsStoreId: checkoutRegion === "domestic" ? cvsStore?.storeId : undefined,
       cvsStoreName: checkoutRegion === "domestic" ? cvsStore?.storeName : undefined,
@@ -534,6 +541,20 @@ export default function BalancePayment() {
                     <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">國際宅配</p>
                   </div>
                 </button>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
+                  {checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder={checkoutRegion === "domestic" ? "09xxxxxxxx" : "含國碼或當地號碼"}
+                  value={form.receiverPhone}
+                  onChange={(e) => setForm((f) => ({ ...f, receiverPhone: e.target.value }))}
+                  className={inputClass("receiverPhone")}
+                />
+                {errors.receiverPhone && <p className="text-xs text-red-400 mt-1">{errors.receiverPhone}</p>}
               </div>
 
               <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送方式</p>
