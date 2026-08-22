@@ -250,7 +250,7 @@ export default function Checkout() {
     }
 
     if (isCustomDepositCheckout) {
-      if (!form.buyerPhone.trim()) errs.buyerPhone = "請填寫 LINE";
+      if (!form.buyerPhone.trim()) errs.buyerPhone = "請填寫 IG";
     } else if (checkoutRegion === "domestic") {
       if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
         errs.buyerPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
@@ -566,13 +566,13 @@ export default function Checkout() {
                 </div>
                 <div>
                   <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                    {isCustomDepositCheckout ? "LINE" : checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
+                    {isCustomDepositCheckout ? "IG" : checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
                   </label>
                   <input
                     type={isCustomDepositCheckout ? "text" : "tel"}
                     placeholder={
                       isCustomDepositCheckout
-                        ? "請輸入 LINE ID"
+                        ? "請輸入 IG 帳號"
                         : checkoutRegion === "domestic"
                         ? "09xxxxxxxx"
                         : "含國碼或當地號碼"

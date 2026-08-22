@@ -393,7 +393,7 @@ export const orderRouter = router({
             if (!data.buyerPhone.trim()) {
               ctx.addIssue({
                 code: "custom",
-                message: "請填寫 LINE",
+                message: "請填寫 IG",
                 path: ["buyerPhone"],
               });
             }
