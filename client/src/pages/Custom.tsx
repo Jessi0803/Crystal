@@ -247,7 +247,7 @@ export default function Custom() {
                     onClick={() => handleStartPayment(plan.productId)}
                     className="w-full py-4 rounded-xl bg-[#8E735B] text-white text-sm tracking-[0.35em] border border-[#7a634e] shadow-md shadow-[#8E735B]/15 hover:bg-[#7a634e] hover:shadow-lg hover:shadow-[#8E735B]/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
                   >
-                    先付款預約
+                    支付訂金，開始客製
                     <ArrowRight
                       size={16}
                       className="opacity-90 group-hover/btn:translate-x-1 transition-transform"
