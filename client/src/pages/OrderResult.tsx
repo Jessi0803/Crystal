@@ -3,13 +3,19 @@
  * 路由：/order/:merchantTradeNo
  * 顯示訂單狀態：待付款 / 轉帳待確認 / 已付款 / 付款失敗
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 import { CUSTOM_DEPOSIT_PRODUCT_IDS, getCustomFormPath } from "@/lib/customOrderingContent";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -29,6 +35,8 @@ export default function OrderResult() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const paypalCaptureStarted = useRef(false);
+  const [isCustomReminderOpen, setIsCustomReminderOpen] = useState(false);
+  const [dismissedCustomReminderOrderNo, setDismissedCustomReminderOrderNo] = useState("");
 
   const { data: order, isLoading, isError, refetch } = trpc.order.getOrder.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
@@ -185,6 +193,19 @@ export default function OrderResult() {
       order?.paymentStatus === "confirmed" ||
       order?.paymentStatus === "transfer_pending");
 
+  useEffect(() => {
+    const orderNo = order?.merchantTradeNo ?? "";
+    if (!canFillCustomForm || !orderNo || dismissedCustomReminderOrderNo === orderNo) return;
+    setIsCustomReminderOpen(true);
+  }, [canFillCustomForm, dismissedCustomReminderOrderNo, order?.merchantTradeNo]);
+
+  const handleCustomReminderOpenChange = (open: boolean) => {
+    setIsCustomReminderOpen(open);
+    if (!open && order?.merchantTradeNo) {
+      setDismissedCustomReminderOrderNo(order.merchantTradeNo);
+    }
+  };
+
   const getShippingMethodLabel = () => {
     if (!order) return "";
     if (order.shippingMethod === "cvs_711") return `7-11 超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
@@ -279,15 +300,15 @@ export default function OrderResult() {
           )}
         </div>
 
-        {canFillCustomForm && (
-          <div className="mb-6 border border-rose-200 bg-rose-50 p-5">
-            <p className="mb-1 text-sm font-body font-medium text-rose-800">
+        <Dialog open={isCustomReminderOpen && canFillCustomForm} onOpenChange={handleCustomReminderOpenChange}>
+          <DialogContent className="max-w-2xl border-rose-200 bg-rose-50 p-6 sm:p-8">
+            <DialogTitle className="text-xl font-body font-semibold tracking-wide text-rose-800">
               下一步：填寫客製需求
-            </p>
-            <p className="mb-4 text-sm font-body leading-relaxed text-rose-700">
+            </DialogTitle>
+            <DialogDescription className="text-base font-body leading-relaxed text-rose-700">
               請填寫手圍、配件偏好與設計需求，送出後會自動綁定到這筆訂單。
-            </p>
-            <div className="space-y-2">
+            </DialogDescription>
+            <div className="mt-3 space-y-3">
               {customDepositItems.map((item: any) => {
                 const customFormPath = getCustomFormPath(item.productId);
                 const hasCustomConsultationNote = Boolean(
@@ -297,7 +318,7 @@ export default function OrderResult() {
                 return (
                   <button
                     key={item.id}
-                    className="btn-primary w-full"
+                    className="w-full bg-black px-5 py-4 text-left text-sm font-body tracking-[0.12em] text-white transition-opacity hover:opacity-85"
                     onClick={() =>
                       setLocation(`${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}`)
                     }
@@ -307,8 +328,8 @@ export default function OrderResult() {
                 );
               })}
             </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
         {/* 轉帳資訊 */}
         {order.paymentMethod === "atm" && order.paymentStatus === "transfer_pending" && (
