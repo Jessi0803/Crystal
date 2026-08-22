@@ -331,6 +331,22 @@ export default function BalancePayment() {
         : "border-[oklch(0.88_0_0)] focus:border-[oklch(0.1_0_0)]"
     }`;
 
+  const receiverPhoneField = (
+    <div className="mb-5">
+      <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
+        {checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
+      </label>
+      <input
+        type="tel"
+        placeholder={checkoutRegion === "domestic" ? "09xxxxxxxx" : "含國碼或當地號碼"}
+        value={form.receiverPhone}
+        onChange={(e) => setForm((f) => ({ ...f, receiverPhone: e.target.value }))}
+        className={inputClass("receiverPhone")}
+      />
+      {errors.receiverPhone && <p className="text-xs text-red-400 mt-1">{errors.receiverPhone}</p>}
+    </div>
+  );
+
   const setRegion = (region: CheckoutRegion) => {
     setCheckoutRegion(region);
     setErrors({});
@@ -543,20 +559,6 @@ export default function BalancePayment() {
                 </button>
               </div>
 
-              <div className="mb-5">
-                <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                  {checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder={checkoutRegion === "domestic" ? "09xxxxxxxx" : "含國碼或當地號碼"}
-                  value={form.receiverPhone}
-                  onChange={(e) => setForm((f) => ({ ...f, receiverPhone: e.target.value }))}
-                  className={inputClass("receiverPhone")}
-                />
-                {errors.receiverPhone && <p className="text-xs text-red-400 mt-1">{errors.receiverPhone}</p>}
-              </div>
-
               <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送方式</p>
               {checkoutRegion === "domestic" ? (
                 <>
@@ -583,6 +585,7 @@ export default function BalancePayment() {
                       </button>
                     ))}
                   </div>
+                  {receiverPhoneField}
 
                   {shippingMethod === "cvs_711" ? (
                     <div className="mb-5">
@@ -656,6 +659,7 @@ export default function BalancePayment() {
                 </>
               ) : (
                 <div className="mb-5 space-y-3">
+                  {receiverPhoneField}
                   <select
                     value={form.intlCountry}
                     onChange={(e) => setForm((f) => ({ ...f, intlCountry: e.target.value, intlState: "", intlPostalCode: "" }))}
