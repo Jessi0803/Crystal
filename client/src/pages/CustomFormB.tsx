@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import CustomFormBraceletPreferenceFields, {
   type CustomFormBraceletPreferences,
   formatCustomBraceletPreferenceLines,
-  validateCustomBraceletPreferences,
 } from "@/components/CustomFormBraceletPreferenceFields";
 import CustomFormDesignStyleField, {
   type CustomDesignStyleChoice,
@@ -720,7 +719,7 @@ export default function CustomFormB() {
     {
       title: "配件與佩戴偏好",
       subtitle: "請選擇鬆緊、金銀飾、銀管珠框、扣具與吊飾偏好",
-      required: true,
+      required: false,
       field: (
         <CustomFormBraceletPreferenceFields
           value={bracelet}
@@ -883,11 +882,6 @@ export default function CustomFormB() {
     }
     if (!isValidCustomWristSize(bracelet.wristSize)) {
       toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
-      return false;
-    }
-    const preferenceError = validateCustomBraceletPreferences(bracelet);
-    if (preferenceError) {
-      toast.error(preferenceError);
       return false;
     }
     if (!bracelet.igHandle.trim()) {

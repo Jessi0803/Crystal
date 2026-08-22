@@ -28,17 +28,6 @@ export function formatCustomBraceletPreferenceLines(
   ];
 }
 
-export function validateCustomBraceletPreferences(
-  value: CustomFormBraceletPreferences
-): string | null {
-  if (!value.fitPreference) return "請選擇鬆緊偏好";
-  if (!value.metalPreference) return "請選擇金飾 / 銀飾偏好";
-  if (!value.silverTube || !value.beadFrame) return "請選擇銀管和珠框的偏好";
-  if (!value.claspType) return "請選擇扣具";
-  if (!value.pendantCharm) return "請選擇是否要加吊飾";
-  return null;
-}
-
 export default function CustomFormBraceletPreferenceFields({
   value,
   onChange,
