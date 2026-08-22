@@ -3109,9 +3109,14 @@ async function normalizePurchaseOptionItems(items) {
 function isCustomCheckoutItem(item) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
-function upsertCustomConsultationNote(existingNote, productId, customerNote) {
-  const startMarker = `\u3010\u5BA2\u88FD\u9700\u6C42\u958B\u59CB\uFF1A${productId}\u3011`;
-  const endMarker = `\u3010\u5BA2\u88FD\u9700\u6C42\u7D50\u675F\uFF1A${productId}\u3011`;
+function getCustomConsultationKey(productId, orderItemId, itemIndex) {
+  if (orderItemId && itemIndex) return `${productId}:${orderItemId}:${itemIndex}`;
+  return productId;
+}
+function upsertCustomConsultationNote(existingNote, productId, customerNote, orderItemId, itemIndex) {
+  const key = getCustomConsultationKey(productId, orderItemId, itemIndex);
+  const startMarker = `\u3010\u5BA2\u88FD\u9700\u6C42\u958B\u59CB\uFF1A${key}\u3011`;
+  const endMarker = `\u3010\u5BA2\u88FD\u9700\u6C42\u7D50\u675F\uFF1A${key}\u3011`;
   const noteBlock = [startMarker, customerNote.trim(), endMarker].join("\n");
   const current = existingNote?.trim() ?? "";
   if (!current) return noteBlock;
@@ -3538,6 +3543,8 @@ var orderRouter = router({
         "chakra-crystal-deposit-product",
         "numerology-crystal-deposit-product"
       ]),
+      orderItemId: z2.number().int().positive().optional(),
+      itemIndex: z2.number().int().positive().optional(),
       customerNote: z2.string().min(1).max(1e4)
     })
   ).mutation(async ({ input }) => {
@@ -3554,6 +3561,14 @@ var orderRouter = router({
     if (!hasMatchingProduct) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8868\u55AE\u65B9\u6848\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
     }
+    const targetItem = input.orderItemId ? order.items.find((item) => item.id === input.orderItemId && item.productId === input.productId) : order.items.find((item) => item.productId === input.productId);
+    if (!targetItem) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u9019\u4E00\u7B46\u5BA2\u88FD\u8A02\u91D1\u5546\u54C1" });
+    }
+    const itemIndex = input.itemIndex ?? 1;
+    if (itemIndex < 1 || itemIndex > targetItem.quantity) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8868\u55AE\u4EF6\u6578\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
+    }
     const canSubmit = order.paymentStatus === "paid" || order.paymentStatus === "confirmed" || order.paymentStatus === "transfer_pending";
     if (!canSubmit) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u5148\u5B8C\u6210\u4ED8\u6B3E\u5F8C\u518D\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
@@ -3564,7 +3579,9 @@ var orderRouter = router({
     const customerNote = upsertCustomConsultationNote(
       order.customerNote,
       input.productId,
-      input.customerNote
+      input.customerNote,
+      input.orderItemId,
+      input.itemIndex
     );
     await db.update(orders).set({ customerNote }).where(eq6(orders.merchantTradeNo, input.merchantTradeNo));
     return { success: true };

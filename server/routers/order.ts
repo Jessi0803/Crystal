@@ -248,9 +248,25 @@ function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
 
-function upsertCustomConsultationNote(existingNote: string | null, productId: string, customerNote: string) {
-  const startMarker = `【客製需求開始：${productId}】`;
-  const endMarker = `【客製需求結束：${productId}】`;
+function getCustomConsultationKey(productId: string, orderItemId?: number, itemIndex?: number) {
+  if (orderItemId && itemIndex) return `${productId}:${orderItemId}:${itemIndex}`;
+  return productId;
+}
+
+function getCustomConsultationStartMarker(productId: string, orderItemId?: number, itemIndex?: number) {
+  return `【客製需求開始：${getCustomConsultationKey(productId, orderItemId, itemIndex)}】`;
+}
+
+function upsertCustomConsultationNote(
+  existingNote: string | null,
+  productId: string,
+  customerNote: string,
+  orderItemId?: number,
+  itemIndex?: number
+) {
+  const key = getCustomConsultationKey(productId, orderItemId, itemIndex);
+  const startMarker = `【客製需求開始：${key}】`;
+  const endMarker = `【客製需求結束：${key}】`;
   const noteBlock = [startMarker, customerNote.trim(), endMarker].join("\n");
   const current = existingNote?.trim() ?? "";
   if (!current) return noteBlock;
@@ -749,6 +765,8 @@ export const orderRouter = router({
           "chakra-crystal-deposit-product",
           "numerology-crystal-deposit-product",
         ]),
+        orderItemId: z.number().int().positive().optional(),
+        itemIndex: z.number().int().positive().optional(),
         customerNote: z.string().min(1).max(10000),
       })
     )
@@ -767,6 +785,16 @@ export const orderRouter = router({
       if (!hasMatchingProduct) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "表單方案與訂單商品不符" });
       }
+      const targetItem = input.orderItemId
+        ? order.items.find((item) => item.id === input.orderItemId && item.productId === input.productId)
+        : order.items.find((item) => item.productId === input.productId);
+      if (!targetItem) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "找不到這一筆客製訂金商品" });
+      }
+      const itemIndex = input.itemIndex ?? 1;
+      if (itemIndex < 1 || itemIndex > targetItem.quantity) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "客製表單件數與訂單商品不符" });
+      }
       const canSubmit =
         order.paymentStatus === "paid" ||
         order.paymentStatus === "confirmed" ||
@@ -781,7 +809,9 @@ export const orderRouter = router({
       const customerNote = upsertCustomConsultationNote(
         order.customerNote,
         input.productId,
-        input.customerNote
+        input.customerNote,
+        input.orderItemId,
+        input.itemIndex
       );
 
       await db

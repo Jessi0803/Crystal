@@ -1,5 +1,13 @@
 // server/customFormReminders.ts
-import { sql as sql2 } from "drizzle-orm";
+import { sql as sql3 } from "drizzle-orm";
+
+// shared/const.ts
+var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+var CUSTOM_PRODUCT_ID = "custom-deposit-product";
+var CUSTOM_TAROT_PRODUCT_ID = "tarot-crystal-deposit-product";
+var CUSTOM_CHAKRA_PRODUCT_ID = "chakra-crystal-deposit-product";
+var CUSTOM_NUMEROLOGY_PRODUCT_ID = "numerology-crystal-deposit-product";
+var CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID, CUSTOM_CHAKRA_PRODUCT_ID, CUSTOM_NUMEROLOGY_PRODUCT_ID];
 
 // server/db.ts
 import { eq, and, gt, sql } from "drizzle-orm";
@@ -570,8 +578,57 @@ async function notifyLineCustomFormReminder(orderId, reminderStage) {
   return pushLineTextMessage(lineUserId, text2);
 }
 
+// server/orderDb.ts
+import { eq as eq3, desc, and as and2, gte, sql as sql2, inArray, or } from "drizzle-orm";
+var balancePaymentLegacySelect = {
+  id: orderBalancePayments.id,
+  orderId: orderBalancePayments.orderId,
+  merchantTradeNo: orderBalancePayments.merchantTradeNo,
+  amount: orderBalancePayments.amount,
+  shippingFee: orderBalancePayments.shippingFee,
+  paymentFee: orderBalancePayments.paymentFee,
+  totalAmount: orderBalancePayments.totalAmount,
+  paymentMethod: orderBalancePayments.paymentMethod,
+  paymentStatus: orderBalancePayments.paymentStatus,
+  transferLastFive: orderBalancePayments.transferLastFive,
+  transferReceiptUrl: orderBalancePayments.transferReceiptUrl,
+  tradeNo: orderBalancePayments.tradeNo,
+  ecpayNotifyData: orderBalancePayments.ecpayNotifyData,
+  paidAt: orderBalancePayments.paidAt,
+  createdAt: orderBalancePayments.createdAt,
+  updatedAt: orderBalancePayments.updatedAt
+};
+function hydrateBalancePayment(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    shippingFee: row.shippingFee ?? 0,
+    paymentFee: row.paymentFee ?? 0,
+    totalAmount: row.totalAmount ?? row.amount
+  };
+}
+var balancePaymentColumnsEnsured = false;
+async function ensureBalancePaymentColumns(db) {
+  if (balancePaymentColumnsEnsured) return;
+  try {
+    await db.execute(sql2`ALTER TABLE \`orderBalancePayments\` ADD COLUMN \`transferReceiptUrl\` longtext NULL`);
+  } catch {
+  }
+  balancePaymentColumnsEnsured = true;
+}
+async function getOrderWithItems(merchantTradeNo) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
+  const [order] = await db.select().from(orders).where(eq3(orders.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!order) return null;
+  const items = await db.select().from(orderItems).where(eq3(orderItems.orderId, order.id));
+  const [logistics] = await db.select().from(logisticsOrders).where(eq3(logisticsOrders.orderId, order.id)).limit(1);
+  const [balancePayment] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq3(orderBalancePayments.orderId, order.id)).limit(1);
+  return { ...order, items, logistics: logistics ?? null, balancePayment: hydrateBalancePayment(balancePayment) };
+}
+
 // server/customFormReminders.ts
-var CUSTOMER_NOTE_MARKER = "\u3010\u5BA2\u88FD\u9700\u6C42\u958B\u59CB\uFF1A";
 function getSiteUrl2() {
   return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
 }
@@ -617,7 +674,7 @@ async function executeRows(query) {
   return rowsFromExecuteResult(await db.execute(query));
 }
 async function hasReminderColumns() {
-  const rows = await executeRows(sql2`
+  const rows = await executeRows(sql3`
     SELECT COLUMN_NAME AS columnName
     FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
@@ -630,11 +687,31 @@ async function hasReminderColumns() {
   `);
   return rows.length === 3;
 }
+function getCustomConsultationStartMarker(productId, orderItemId, itemIndex) {
+  return `\u3010\u5BA2\u88FD\u9700\u6C42\u958B\u59CB\uFF1A${productId}:${orderItemId}:${itemIndex}\u3011`;
+}
+function hasCustomConsultationNote(customerNote, productId, orderItemId, itemIndex) {
+  if (customerNote?.includes(getCustomConsultationStartMarker(productId, orderItemId, itemIndex))) return true;
+  return itemIndex === 1 && Boolean(customerNote?.includes(`\u3010\u5BA2\u88FD\u9700\u6C42\u958B\u59CB\uFF1A${productId}\u3011`));
+}
+async function hasPendingCustomConsultation(merchantTradeNo) {
+  const order = await getOrderWithItems(merchantTradeNo);
+  if (!order) return false;
+  for (const item of order.items) {
+    if (!CUSTOM_PRODUCT_IDS.includes(item.productId)) continue;
+    for (let itemIndex = 1; itemIndex <= item.quantity; itemIndex += 1) {
+      if (!hasCustomConsultationNote(order.customerNote, item.productId, item.id, itemIndex)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 async function markReminderSent(orderId, reminderStage) {
   const column = getReminderColumn(reminderStage);
-  await executeRows(sql2`
+  await executeRows(sql3`
     UPDATE \`orders\`
-    SET ${sql2.raw(`\`${column}\``)} = NOW()
+    SET ${sql3.raw(`\`${column}\``)} = NOW()
     WHERE \`id\` = ${orderId}
   `);
 }
@@ -661,7 +738,7 @@ async function runCustomFormReminderJob() {
   if (!await hasReminderColumns()) {
     return { scanned: 0, sent3m: 0, sent24h: 0, sent72h: 0, skipped: 0, failed: 0 };
   }
-  const candidates = await executeRows(sql2`
+  const candidates = await executeRows(sql3`
     SELECT
       \`id\`,
       \`merchantTradeNo\`,
@@ -676,11 +753,6 @@ async function runCustomFormReminderJob() {
       AND \`orderStatus\` = 'deposit_paid'
       AND \`paymentStatus\` IN ('paid', 'confirmed')
       AND \`paidAt\` <= ${minutesAgo(3)}
-      AND (
-        \`customerNote\` IS NULL
-        OR TRIM(\`customerNote\`) = ''
-        OR \`customerNote\` NOT LIKE ${`%${CUSTOMER_NOTE_MARKER}%`}
-      )
       AND (
         \`customFormReminder3mSentAt\` IS NULL
         OR \`customFormReminder24hSentAt\` IS NULL
@@ -697,6 +769,10 @@ async function runCustomFormReminderJob() {
     failed: 0
   };
   for (const candidate of candidates) {
+    if (!await hasPendingCustomConsultation(candidate.merchantTradeNo)) {
+      result.skipped += 1;
+      continue;
+    }
     const reminderStage = getReminderStage(candidate);
     if (!reminderStage) {
       result.skipped += 1;

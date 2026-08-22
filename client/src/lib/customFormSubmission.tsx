@@ -8,7 +8,11 @@ import type { CustomDepositProductId } from "@/lib/customOrderingContent";
 export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const search = useSearch();
   const [, setLocation] = useLocation();
-  const merchantTradeNo = new URLSearchParams(search).get("order")?.trim() ?? "";
+  const params = new URLSearchParams(search);
+  const merchantTradeNo = params.get("order")?.trim() ?? "";
+  const orderItemId = Number(params.get("orderItemId") ?? "");
+  const itemIndex = Number(params.get("itemIndex") ?? "");
+  const hasItemInstance = Number.isInteger(orderItemId) && orderItemId > 0 && Number.isInteger(itemIndex) && itemIndex > 0;
 
   const orderQuery = trpc.order.getOrder.useQuery(
     { merchantTradeNo },
@@ -17,7 +21,12 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const submitMutation = trpc.order.submitCustomConsultation.useMutation();
 
   const order = orderQuery.data;
-  const hasMatchingProduct = Boolean(order?.items?.some((item: any) => item.productId === productId));
+  const hasMatchingProduct = Boolean(
+    order?.items?.some((item: any) =>
+      item.productId === productId &&
+      (!hasItemInstance || (item.id === orderItemId && itemIndex <= item.quantity))
+    )
+  );
   const isPaymentReady =
     order?.paymentStatus === "paid" ||
     order?.paymentStatus === "confirmed" ||
@@ -32,6 +41,7 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     await submitMutation.mutateAsync({
       merchantTradeNo,
       productId,
+      ...(hasItemInstance ? { orderItemId, itemIndex } : {}),
       customerNote,
     });
     toast.success("客製需求已送出");
@@ -44,7 +54,14 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     isLoading: orderQuery.isLoading,
     isError: orderQuery.isError,
     canFillForm,
-    hasExistingNote: Boolean(order?.customerNote?.includes(`【客製需求開始：${productId}】`)),
+    hasExistingNote: Boolean(
+      order?.customerNote?.includes(
+        hasItemInstance
+          ? `【客製需求開始：${productId}:${orderItemId}:${itemIndex}】`
+          : `【客製需求開始：${productId}】`
+      ) ||
+        (hasItemInstance && itemIndex === 1 && order?.customerNote?.includes(`【客製需求開始：${productId}】`))
+    ),
     submitCustomNote,
     isSubmitting: submitMutation.isPending,
   };

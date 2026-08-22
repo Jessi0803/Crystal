@@ -12,14 +12,20 @@ vi.mock("./lineMessage", () => ({
   notifyLineCustomFormReminder: vi.fn(),
 }));
 
+vi.mock("./orderDb", () => ({
+  getOrderWithItems: vi.fn(),
+}));
+
 import { getDb } from "./db";
 import { sendCustomFormReminderEmail } from "./email";
 import { notifyLineCustomFormReminder } from "./lineMessage";
+import { getOrderWithItems } from "./orderDb";
 import { runCustomFormReminderJob } from "./customFormReminders";
 
 const getDbMock = vi.mocked(getDb);
 const sendCustomFormReminderEmailMock = vi.mocked(sendCustomFormReminderEmail);
 const notifyLineCustomFormReminderMock = vi.mocked(notifyLineCustomFormReminder);
+const getOrderWithItemsMock = vi.mocked(getOrderWithItems);
 const now = new Date("2026-08-22T12:00:00Z");
 
 function createCandidate(overrides: Partial<{
@@ -46,22 +52,26 @@ function createCandidate(overrides: Partial<{
 }
 
 function createMockDb(candidates: unknown[]) {
-  const updateSet = vi.fn(() => ({
-    where: vi.fn(async () => undefined),
-  }));
-
+  const execute = vi
+    .fn()
+    .mockResolvedValueOnce([[{ columnName: "customFormReminder3mSentAt" }, { columnName: "customFormReminder24hSentAt" }, { columnName: "customFormReminder72hSentAt" }]])
+    .mockResolvedValueOnce([candidates])
+    .mockResolvedValue([[]]);
   return {
-    updateSet,
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => candidates),
-        })),
-      })),
-    })),
-    update: vi.fn(() => ({
-      set: updateSet,
-    })),
+    execute,
+  };
+}
+
+function createOrderWithPendingCustomNote(customerNote: string | null = null) {
+  return {
+    customerNote,
+    items: [
+      {
+        id: 501,
+        productId: "custom-deposit-product",
+        quantity: 1,
+      },
+    ],
   };
 }
 
@@ -71,6 +81,7 @@ describe("custom form reminders", () => {
     vi.setSystemTime(now);
     vi.clearAllMocks();
     process.env.SITE_URL = "https://lafleur.test/";
+    getOrderWithItemsMock.mockResolvedValue(createOrderWithPendingCustomNote() as Awaited<ReturnType<typeof getOrderWithItems>>);
   });
 
   afterEach(() => {
@@ -88,9 +99,7 @@ describe("custom form reminders", () => {
     expect(result).toEqual({ scanned: 1, sent3m: 0, sent24h: 1, sent72h: 0, skipped: 0, failed: 0 });
     expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "24h");
     expect(sendCustomFormReminderEmailMock).not.toHaveBeenCalled();
-    expect(db.updateSet).toHaveBeenCalledWith({
-      customFormReminder24hSentAt: expect.any(Date),
-    });
+    expect(db.execute).toHaveBeenCalledTimes(3);
   });
 
   it("falls back to email when the order is not linked to a LINE user", async () => {
@@ -123,9 +132,49 @@ describe("custom form reminders", () => {
 
     expect(result).toEqual({ scanned: 1, sent3m: 1, sent24h: 0, sent72h: 0, skipped: 0, failed: 0 });
     expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "3m");
-    expect(db.updateSet).toHaveBeenCalledWith({
-      customFormReminder3mSentAt: expect.any(Date),
-    });
+    expect(db.execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("still reminds when only one of two identical custom items has been submitted", async () => {
+    const db = createMockDb([createCandidate()]);
+    getDbMock.mockResolvedValue(db as Awaited<ReturnType<typeof getDb>>);
+    notifyLineCustomFormReminderMock.mockResolvedValue({ sent: true });
+    getOrderWithItemsMock.mockResolvedValue({
+      customerNote: "【客製需求開始：custom-deposit-product:501:1】\n第一件\n【客製需求結束：custom-deposit-product:501:1】",
+      items: [
+        {
+          id: 501,
+          productId: "custom-deposit-product",
+          quantity: 2,
+        },
+      ],
+    } as Awaited<ReturnType<typeof getOrderWithItems>>);
+
+    const result = await runCustomFormReminderJob();
+
+    expect(result.sent24h).toBe(1);
+    expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "24h");
+  });
+
+  it("treats a legacy product-level note as the first submitted item only", async () => {
+    const db = createMockDb([createCandidate()]);
+    getDbMock.mockResolvedValue(db as Awaited<ReturnType<typeof getDb>>);
+    notifyLineCustomFormReminderMock.mockResolvedValue({ sent: true });
+    getOrderWithItemsMock.mockResolvedValue({
+      customerNote: "【客製需求開始：custom-deposit-product】\n舊版需求\n【客製需求結束：custom-deposit-product】",
+      items: [
+        {
+          id: 501,
+          productId: "custom-deposit-product",
+          quantity: 2,
+        },
+      ],
+    } as Awaited<ReturnType<typeof getOrderWithItems>>);
+
+    const result = await runCustomFormReminderJob();
+
+    expect(result.sent24h).toBe(1);
+    expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "24h");
   });
 
   it("sends the 72-hour reminder only after the 24-hour reminder was already sent", async () => {
@@ -142,8 +191,6 @@ describe("custom form reminders", () => {
 
     expect(result).toEqual({ scanned: 1, sent3m: 0, sent24h: 0, sent72h: 1, skipped: 0, failed: 0 });
     expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "72h");
-    expect(db.updateSet).toHaveBeenCalledWith({
-      customFormReminder72hSentAt: expect.any(Date),
-    });
+    expect(db.execute).toHaveBeenCalledTimes(3);
   });
 });

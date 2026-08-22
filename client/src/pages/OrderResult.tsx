@@ -30,6 +30,35 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   cancelled: "已取消",
 };
 
+type CustomDepositItemInstance = {
+  id: number;
+  productId: string;
+  productName: string;
+  itemIndex: number;
+  quantity: number;
+};
+
+function getCustomConsultationStartMarker(item: CustomDepositItemInstance) {
+  return `【客製需求開始：${item.productId}:${item.id}:${item.itemIndex}】`;
+}
+
+function hasCustomConsultationNote(customerNote: string | null | undefined, item: CustomDepositItemInstance) {
+  if (customerNote?.includes(getCustomConsultationStartMarker(item))) return true;
+  return item.itemIndex === 1 && Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`));
+}
+
+function expandCustomDepositItemInstances(items: any[]): CustomDepositItemInstance[] {
+  return items.flatMap((item: any) =>
+    Array.from({ length: Math.max(1, Number(item.quantity) || 1) }, (_, index) => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      itemIndex: index + 1,
+      quantity: Math.max(1, Number(item.quantity) || 1),
+    }))
+  );
+}
+
 export default function OrderResult() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
@@ -187,8 +216,9 @@ export default function OrderResult() {
   };
   const customDepositItems =
     order?.items?.filter((item: any) => CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)) ?? [];
-  const pendingCustomDepositItems = customDepositItems.filter(
-    (item: any) => !order?.customerNote?.includes(`【客製需求開始：${item.productId}】`)
+  const customDepositItemInstances = expandCustomDepositItemInstances(customDepositItems);
+  const pendingCustomDepositItems = customDepositItemInstances.filter(
+    (item) => !hasCustomConsultationNote(order?.customerNote, item)
   );
   const canFillCustomForm =
     customDepositItems.length > 0 &&
@@ -313,18 +343,20 @@ export default function OrderResult() {
               大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
             </DialogDescription>
             <div className="mt-3 space-y-3">
-              {pendingCustomDepositItems.map((item: any) => {
+              {pendingCustomDepositItems.map((item) => {
                 const customFormPath = getCustomFormPath(item.productId);
                 if (!customFormPath) return null;
                 return (
                   <button
-                    key={item.id}
+                    key={`${item.id}-${item.itemIndex}`}
                     className="w-full bg-black px-5 py-4 text-left text-sm font-body tracking-[0.12em] text-white transition-opacity hover:opacity-85"
                     onClick={() =>
-                      setLocation(`${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}`)
+                      setLocation(
+                        `${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}&orderItemId=${item.id}&itemIndex=${item.itemIndex}`
+                      )
                     }
                   >
-                    填寫{item.productName}需求
+                    填寫{item.productName}{item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}需求
                   </button>
                 );
               })}

@@ -1,9 +1,9 @@
 import { sql, type SQL } from "drizzle-orm";
+import { CUSTOM_PRODUCT_IDS } from "../shared/const";
 import { getDb } from "./db";
 import { sendCustomFormReminderEmail } from "./email";
 import { notifyLineCustomFormReminder } from "./lineMessage";
-
-const CUSTOMER_NOTE_MARKER = "【客製需求開始：";
+import { getOrderWithItems } from "./orderDb";
 
 type ReminderStage = "3m" | "24h" | "72h";
 
@@ -93,6 +93,36 @@ async function hasReminderColumns() {
   return rows.length === 3;
 }
 
+function getCustomConsultationStartMarker(productId: string, orderItemId: number, itemIndex: number) {
+  return `【客製需求開始：${productId}:${orderItemId}:${itemIndex}】`;
+}
+
+function hasCustomConsultationNote(
+  customerNote: string | null | undefined,
+  productId: string,
+  orderItemId: number,
+  itemIndex: number
+) {
+  if (customerNote?.includes(getCustomConsultationStartMarker(productId, orderItemId, itemIndex))) return true;
+  return itemIndex === 1 && Boolean(customerNote?.includes(`【客製需求開始：${productId}】`));
+}
+
+async function hasPendingCustomConsultation(merchantTradeNo: string) {
+  const order = await getOrderWithItems(merchantTradeNo);
+  if (!order) return false;
+
+  for (const item of order.items) {
+    if (!CUSTOM_PRODUCT_IDS.includes(item.productId)) continue;
+    for (let itemIndex = 1; itemIndex <= item.quantity; itemIndex += 1) {
+      if (!hasCustomConsultationNote(order.customerNote, item.productId, item.id, itemIndex)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 async function markReminderSent(orderId: number, reminderStage: ReminderStage) {
   const column = getReminderColumn(reminderStage);
   await executeRows(sql`
@@ -144,11 +174,6 @@ export async function runCustomFormReminderJob(): Promise<ReminderResult> {
       AND \`paymentStatus\` IN ('paid', 'confirmed')
       AND \`paidAt\` <= ${minutesAgo(3)}
       AND (
-        \`customerNote\` IS NULL
-        OR TRIM(\`customerNote\`) = ''
-        OR \`customerNote\` NOT LIKE ${`%${CUSTOMER_NOTE_MARKER}%`}
-      )
-      AND (
         \`customFormReminder3mSentAt\` IS NULL
         OR \`customFormReminder24hSentAt\` IS NULL
         OR (\`paidAt\` <= ${hoursAgo(72)} AND \`customFormReminder72hSentAt\` IS NULL)
@@ -166,6 +191,11 @@ export async function runCustomFormReminderJob(): Promise<ReminderResult> {
   };
 
   for (const candidate of candidates) {
+    if (!(await hasPendingCustomConsultation(candidate.merchantTradeNo))) {
+      result.skipped += 1;
+      continue;
+    }
+
     const reminderStage = getReminderStage(candidate);
     if (!reminderStage) {
       result.skipped += 1;
