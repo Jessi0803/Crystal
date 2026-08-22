@@ -122,6 +122,95 @@ describe("admin order product thumbnails", () => {
     expect(result.items[0].productThumbnails).toEqual([]);
   });
 
+  it("normalizes Google Drive share links in admin order summaries", async () => {
+    const order = {
+      id: 1,
+      merchantTradeNo: "TEST001",
+      paymentStatus: "paid",
+      paymentMethod: "credit",
+      shippingMethod: "home",
+      orderStatus: "paid",
+      isPreorder: false,
+      isCustomOrder: false,
+      freeShippingOverride: false,
+      totalAmount: 1280,
+      buyerName: "Test User",
+      createdAt: new Date("2026-06-01T08:00:00Z"),
+    };
+    const mockDb = createMockDb([
+      [order],
+      [{ count: 1 }],
+      [],
+      [{ orderId: 1, itemCount: 1 }],
+      [],
+      [
+        {
+          id: 11,
+          orderId: 1,
+          productName: "Drive 圖片商品",
+          productImage: "https://drive.google.com/file/d/abc123/view?usp=sharing",
+        },
+      ],
+      [],
+    ]);
+    getDb.mockResolvedValue(mockDb);
+
+    const { getAdminOrderSummaries } = await import("./orderDb");
+    const result = await getAdminOrderSummaries(50, 0, "all");
+
+    expect(result.items[0].productThumbnails).toEqual([
+      {
+        id: 11,
+        productName: "Drive 圖片商品",
+        productImage: "https://drive.google.com/thumbnail?id=abc123&sz=w1600",
+      },
+    ]);
+  });
+
+  it("normalizes Google Drive share links in expanded admin order details", async () => {
+    const order = {
+      id: 1,
+      merchantTradeNo: "TEST001",
+      paymentStatus: "paid",
+      paymentMethod: "credit",
+      shippingMethod: "home",
+      orderStatus: "paid",
+      isPreorder: false,
+      isCustomOrder: false,
+      freeShippingOverride: false,
+      totalAmount: 1280,
+      buyerName: "Test User",
+      buyerEmail: "test@example.com",
+      buyerPhone: "0912345678",
+      createdAt: new Date("2026-06-01T08:00:00Z"),
+      updatedAt: new Date("2026-06-01T08:00:00Z"),
+    };
+    const item = {
+      id: 11,
+      orderId: 1,
+      productId: "drive-product",
+      productName: "Drive 圖片商品",
+      productImage: "https://drive.google.com/open?id=xyz789",
+      quantity: 1,
+      unitPrice: 1280,
+      subtotal: 1280,
+      isPreorder: false,
+    };
+    const mockDb = createMockDb([
+      [order],
+      [],
+      [item],
+      [],
+      [],
+    ]);
+    getDb.mockResolvedValue(mockDb);
+
+    const { getAdminOrderDetail } = await import("./orderDb");
+    const result = await getAdminOrderDetail(1);
+
+    expect(result?.items[0].productImage).toBe("https://drive.google.com/thumbnail?id=xyz789&sz=w1600");
+  });
+
   it("combines merged member totals and thumbnails into the main admin order summary", async () => {
     const order = {
       id: 1,

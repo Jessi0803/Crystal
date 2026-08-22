@@ -315,9 +315,19 @@ async function attachItemsAndLogisticsForOrders(
 const MAX_PRODUCT_IMAGE_LEN = 60000;
 function sanitizeProductImage(image: string | null | undefined): string | null {
   if (!image) return null;
-  if (image.startsWith("data:")) return null;
-  if (image.length > MAX_PRODUCT_IMAGE_LEN) return null;
-  return image;
+  const normalized = normalizeProductImageUrl(image);
+  if (normalized.startsWith("data:")) return null;
+  if (normalized.length > MAX_PRODUCT_IMAGE_LEN) return null;
+  return normalized;
+}
+
+function normalizeProductImageUrl(image: string) {
+  const trimmed = image.trim();
+  if (!trimmed.includes("drive.google.com")) return trimmed;
+  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+  const id = fileMatch?.[1] ?? idMatch?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
 }
 
 export async function createOrder(
@@ -696,7 +706,7 @@ export async function getAdminOrderSummaries(
     current.push({
       id: row.id,
       productName: row.productName,
-      productImage: image,
+      productImage: normalizeProductImageUrl(image),
     });
     thumbnailsByOrderId.set(row.orderId, current);
   }
@@ -765,7 +775,10 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
   return {
     ...order,
     totalAmount: displayTotalAmount,
-    items,
+    items: items.map((item) => ({
+      ...item,
+      productImage: item.productImage ? normalizeProductImageUrl(item.productImage) : item.productImage,
+    })),
     logistics: logistics[0] ?? null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
     mergeInfo,

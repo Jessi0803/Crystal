@@ -35,6 +35,37 @@ function getProductCategories(product: { category: string; categories?: string[]
   return product.categories?.length ? product.categories : [product.category];
 }
 
+function ProductCardImage({
+  src,
+  alt,
+  priority = false,
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return <div className="h-full w-full bg-[oklch(0.96_0_0)]" aria-hidden="true" />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      fetchPriority={priority ? "high" : "auto"}
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 export default function Products() {
   const search = useSearch();
   const params = new URLSearchParams(search);
@@ -196,7 +227,7 @@ export default function Products() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
-            {filtered.map((product) => {
+            {filtered.map((product, index) => {
               const availability = availabilityByProductId.get(product.id);
               const soldOut = availability?.isMonthlyLimited === true && availability.available === false;
               const discountLabel = getDiscountLabel(product);
@@ -204,7 +235,7 @@ export default function Products() {
               <Link key={product.id} href={`/products/${product.id}`}>
                 <div className="product-card group">
                   <div className="product-card-image">
-                    <img src={product.image} alt={product.name} loading="lazy" />
+                    <ProductCardImage src={product.image} alt={product.name} priority={index < 8} />
                     {soldOut && <span className="sold-out-card">已售完</span>}
                     {/* Hover Add to Cart */}
                     {!soldOut && (
