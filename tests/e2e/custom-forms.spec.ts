@@ -63,153 +63,24 @@ test("all four custom forms constrain wrist size to 13 through 19 cm", async ({
   }
 });
 
-test("custom forms offer add-ons for the other three custom services", async ({
+test("custom forms do not show the optional add-on selector", async ({
   page,
 }) => {
-  const cases = [
-    { path: "/custom/form", current: "純客製水晶手鍊" },
-    {
-      path: "/custom/form-b",
-      current: "塔羅 × 水晶手鍊",
-      setup: async () => page.getByRole("button", { name: /財富密碼/ }).click(),
-    },
-    { path: "/custom/form-c", current: "脈輪檢測 × 水晶手鍊" },
-    { path: "/custom/form-d", current: "生命靈數 × 水晶手鍊" },
-  ];
-
-  for (const item of cases) {
+  for (const item of [
+    { path: "/custom/form" },
+    { path: "/custom/form-b" },
+    { path: "/custom/form-c" },
+    { path: "/custom/form-d" },
+  ]) {
     await page.goto(item.path);
-    await item.setup?.();
 
-    const addonSection = page.locator("section").filter({
-      has: page.getByRole("heading", { name: "想一併選擇其他客製化嗎？" }),
-    });
-
-    await expect(addonSection).toBeVisible();
-    await expect(addonSection).not.toContainText(item.current);
-
-    for (const option of [
-      "純客製水晶手鍊",
-      "塔羅 × 水晶手鍊",
-      "脈輪檢測 × 水晶手鍊",
-      "生命靈數 × 水晶手鍊",
-    ]) {
-      if (option !== item.current) {
-        await expect(addonSection).toContainText(option);
-      }
-    }
-
-    await addonSection.getByRole("button").first().click();
-    await expect(addonSection).toContainText(
-      "已選擇 1 項其他客製服務，請填寫以下完整表單。"
+    await expect(page.locator("body")).not.toContainText(
+      "想一併選擇其他客製化嗎？"
     );
-    for (const imageName of [
-      "金飾",
-      "銀飾",
-      "珠框銀管參考1",
-      "珠框銀管參考2",
-      "龍蝦扣",
-      "磁扣",
-      "彈力繩",
-      "吊飾加掛示意",
-    ]) {
-      await expect(
-        addonSection.getByRole("img", { name: imageName })
-      ).toBeVisible();
-    }
+    await expect(page.locator("body")).not.toContainText(
+      "可同時搭配其他客製服務，勾選後請直接填寫該方案的完整表單。"
+    );
   }
-});
-
-async function fillAddonBraceletFields(
-  addonForm: import("@playwright/test").Locator,
-  wristSize: string,
-  lineId: string
-) {
-  await addonForm
-    .getByPlaceholder("例如：招財、愛情、療癒、保護氣場……")
-    .fill("E2E 一併方案功效");
-  await addonForm.locator('input[type="number"]').fill(wristSize);
-  await addonForm.getByRole("button", { name: "剛好" }).click();
-  await addonForm.getByRole("button", { name: "都可以" }).click();
-  await addonForm.getByRole("button", { name: "不要" }).first().click();
-  await addonForm.getByRole("button", { name: "不要" }).nth(1).click();
-  await addonForm.getByRole("button", { name: "彈力繩" }).click();
-  await addonForm.getByRole("button", { name: "不要" }).nth(2).click();
-  await addonForm
-    .getByPlaceholder("例如：@your_ig_handle 或 LINE ID")
-    .fill(lineId);
-}
-
-test("pure custom form adds selected custom option products in one submit", async ({
-  page,
-}) => {
-  await page.goto("/custom/form");
-  await page
-    .locator("textarea")
-    .first()
-    .fill("E2E 測試：希望提升專注力與穩定情緒");
-  await page.locator('input[type="number"]').fill("13");
-  await page.getByRole("button", { name: /剛好/ }).click();
-  await page.getByRole("button", { name: "都可以" }).click();
-  await page
-    .locator("section")
-    .filter({ hasText: "銀管" })
-    .getByRole("button", { name: "不要" })
-    .first()
-    .click();
-  await page
-    .locator("section")
-    .filter({ hasText: "珠框" })
-    .getByRole("button", { name: "不要" })
-    .last()
-    .click();
-  await page.getByRole("button", { name: /彈力繩/ }).click();
-  await page
-    .locator("section")
-    .filter({ hasText: "要加吊飾嗎" })
-    .getByRole("button", { name: "不要" })
-    .click();
-  await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_line_id");
-
-  const addonSection = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "想一併選擇其他客製化嗎？" }),
-  });
-  await addonSection.getByRole("button", { name: /塔羅 × 水晶手鍊/ }).click();
-  await addonSection
-    .getByRole("button", { name: /脈輪檢測 × 水晶手鍊/ })
-    .click();
-
-  const tarotSupplement = page.getByTestId("custom-addon-full-form-tarot");
-  await tarotSupplement.getByRole("button", { name: /財富密碼/ }).click();
-  await expect(tarotSupplement).toContainText("財富密碼 ── 占卜內容");
-  await expect(tarotSupplement).toContainText("求財面對的阻礙");
-  await tarotSupplement
-    .getByPlaceholder("請填寫真實姓名")
-    .fill("E2E 塔羅一併客戶");
-  await tarotSupplement.getByPlaceholder("例如：1995/08/22").fill("1995/08/22");
-  await fillAddonBraceletFields(tarotSupplement, "15", "e2e_tarot_addon_line");
-
-  const chakraSupplement = page.getByTestId("custom-addon-full-form-chakra");
-  await chakraSupplement
-    .getByPlaceholder("請填寫真實姓名")
-    .fill("E2E 脈輪一併客戶");
-  await chakraSupplement
-    .getByPlaceholder("例如：1995/08/22")
-    .fill("1994/06/18");
-  await fillAddonBraceletFields(
-    chakraSupplement,
-    "16",
-    "e2e_chakra_addon_line"
-  );
-
-  await page.getByRole("button", { name: /確認，加入購物車/ }).click();
-
-  await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
-  await expect(page.locator("body")).toContainText("客製化商品");
-  await expect(page.locator("body")).toContainText("塔羅 × 水晶手鍊客製化商品");
-  await expect(page.locator("body")).toContainText(
-    "脈輪檢測 × 水晶手鍊客製化商品"
-  );
 });
 
 test("pure custom form blocks a legacy wrist size below 13 cm", async ({

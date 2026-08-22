@@ -4,32 +4,6 @@ import { CheckCircle, LockKeyhole, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import type { CustomDepositProductId } from "@/lib/customOrderingContent";
-import {
-  CUSTOM_ADDON_OPTIONS,
-  type CustomAddonId,
-  type CustomAddonSupplementData,
-  formatCustomAddonSupplementNote,
-} from "@/components/CustomFormAddonSelector";
-
-export function appendCustomAddonSupplementNotes(
-  baseNote: string,
-  selectedAddons: CustomAddonId[],
-  addonSupplements: CustomAddonSupplementData
-) {
-  const addonNotes = selectedAddons
-    .map((addonId) => {
-      const addonOption = CUSTOM_ADDON_OPTIONS.find((option) => option.id === addonId);
-      if (!addonOption) return null;
-      return [
-        "",
-        `【一併選擇方案補充資料：${addonOption.label}】`,
-        formatCustomAddonSupplementNote(addonId, addonSupplements),
-      ].join("\n");
-    })
-    .filter((note): note is string => Boolean(note));
-
-  return [baseNote, ...addonNotes].join("\n");
-}
 
 export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const search = useSearch();

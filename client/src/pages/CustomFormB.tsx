@@ -5,13 +5,6 @@ import { Link } from "wouter";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
-import CustomFormAddonSelector, {
-  EMPTY_CUSTOM_ADDON_SUPPLEMENTS,
-  type CustomAddonId,
-  type CustomAddonSupplementData,
-  formatCustomAddonNote,
-  validateCustomAddonSupplements,
-} from "@/components/CustomFormAddonSelector";
 import CustomFormFocusField, {
   type CustomFocusChoice,
   formatCustomFocusNote,
@@ -27,7 +20,6 @@ import {
 } from "@/lib/customOrderingContent";
 import {
   CustomFormAccessGate,
-  appendCustomAddonSupplementNotes,
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
 
@@ -333,8 +325,7 @@ const EMPTY_BRACELET: BraceletData = {
 
 function buildNote(
   tarot: TarotData,
-  bracelet: BraceletData,
-  selectedAddons: CustomAddonId[]
+  bracelet: BraceletData
 ): string {
   const tarotLines = [
     "【塔羅 × 水晶手鍊諮詢表單】",
@@ -400,10 +391,7 @@ function buildNote(
     `Instagram 帳號 / LINE ID：${bracelet.igHandle || "（未填）"}`,
   ];
 
-  return (
-    [...tarotLines, ...braceletLines].join("\n") +
-    formatCustomAddonNote(selectedAddons)
-  );
+  return [...tarotLines, ...braceletLines].join("\n");
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -411,9 +399,6 @@ function buildNote(
 export default function CustomFormB() {
   const [tarot, setTarot] = useState<TarotData>(EMPTY_TAROT);
   const [bracelet, setBracelet] = useState<BraceletData>(EMPTY_BRACELET);
-  const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
-  const [addonSupplements, setAddonSupplements] =
-    useState<CustomAddonSupplementData>(EMPTY_CUSTOM_ADDON_SUPPLEMENTS);
   const formSubmission = useCustomFormSubmission("tarot-crystal-deposit-product");
 
   const depositProduct = products.find(
@@ -1119,19 +1104,7 @@ export default function CustomFormB() {
     if (tarot.group === "single_q") return;
     if (!validateTarotData()) return;
     if (!validateBraceletData()) return;
-    const addonValidationError = validateCustomAddonSupplements(
-      selectedAddons,
-      addonSupplements
-    );
-    if (addonValidationError) {
-      toast.error(addonValidationError);
-      return;
-    }
-    const customConsultationNote = appendCustomAddonSupplementNotes(
-      buildNote(tarot, bracelet, selectedAddons),
-      selectedAddons,
-      addonSupplements
-    );
+    const customConsultationNote = buildNote(tarot, bracelet);
     try {
       await formSubmission.submitCustomNote(customConsultationNote);
     } catch (err) {
@@ -1328,15 +1301,6 @@ export default function CustomFormB() {
               </section>
             ))}
 
-          {canShowDetails && (
-            <CustomFormAddonSelector
-              currentAddonId="tarot"
-              selectedAddonIds={selectedAddons}
-              onChange={setSelectedAddons}
-              supplements={addonSupplements}
-              onSupplementsChange={setAddonSupplements}
-            />
-          )}
         </div>
 
         <div className="flex items-center justify-between">

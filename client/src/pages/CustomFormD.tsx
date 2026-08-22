@@ -4,13 +4,6 @@ import { ArrowLeft, Check } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
-import CustomFormAddonSelector, {
-  EMPTY_CUSTOM_ADDON_SUPPLEMENTS,
-  type CustomAddonId,
-  type CustomAddonSupplementData,
-  formatCustomAddonNote,
-  validateCustomAddonSupplements,
-} from "@/components/CustomFormAddonSelector";
 import CustomFormFocusField, {
   type CustomFocusChoice,
   formatCustomFocusNote,
@@ -26,7 +19,6 @@ import {
 } from "@/lib/customOrderingContent";
 import {
   CustomFormAccessGate,
-  appendCustomAddonSupplementNotes,
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
 
@@ -64,35 +56,30 @@ const EMPTY_FORM: FormData = {
   igHandle: "",
 };
 
-function buildNote(form: FormData, selectedAddons: CustomAddonId[]): string {
-  return (
-    [
-      "【生命靈數 × 水晶手鍊諮詢表單】",
-      "",
-      `姓名：${form.name || "（未填）"}`,
-      `西元生日：${form.birthday || "（未填）"}`,
-      `額外指定的其他功效：${formatCustomFocusNote(form.focus, form.focusStory)}`,
-      `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
-      `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
-      `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
-      `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
-      `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
-      `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
-      `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
-      `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
-      `其餘特殊需求：${form.specialRequests || "無"}`,
-      `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
-    ].join("\n") + formatCustomAddonNote(selectedAddons)
-  );
+function buildNote(form: FormData): string {
+  return [
+    "【生命靈數 × 水晶手鍊諮詢表單】",
+    "",
+    `姓名：${form.name || "（未填）"}`,
+    `西元生日：${form.birthday || "（未填）"}`,
+    `額外指定的其他功效：${formatCustomFocusNote(form.focus, form.focusStory)}`,
+    `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
+    `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
+    `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
+    `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
+    `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
+    `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
+    `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
+    `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
+    `其餘特殊需求：${form.specialRequests || "無"}`,
+    `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
+  ].join("\n");
 }
 
 const ACCENT = "oklch(0.68 0.11 30)";
 
 export default function CustomFormD() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
-  const [addonSupplements, setAddonSupplements] =
-    useState<CustomAddonSupplementData>(EMPTY_CUSTOM_ADDON_SUPPLEMENTS);
   const formSubmission = useCustomFormSubmission("numerology-crystal-deposit-product");
 
   const steps = [
@@ -534,19 +521,7 @@ export default function CustomFormD() {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    const addonValidationError = validateCustomAddonSupplements(
-      selectedAddons,
-      addonSupplements
-    );
-    if (addonValidationError) {
-      toast.error(addonValidationError);
-      return;
-    }
-    const customConsultationNote = appendCustomAddonSupplementNotes(
-      buildNote(form, selectedAddons),
-      selectedAddons,
-      addonSupplements
-    );
+    const customConsultationNote = buildNote(form);
     try {
       await formSubmission.submitCustomNote(customConsultationNote);
     } catch (err) {
@@ -613,16 +588,6 @@ export default function CustomFormD() {
               {item.field}
             </section>
           ))}
-        </div>
-
-        <div className="mb-8">
-          <CustomFormAddonSelector
-            currentAddonId="numerology"
-            selectedAddonIds={selectedAddons}
-            onChange={setSelectedAddons}
-            supplements={addonSupplements}
-            onSupplementsChange={setAddonSupplements}
-          />
         </div>
 
         <div className="flex items-center justify-between">
