@@ -303,10 +303,10 @@ export default function OrderResult() {
         <Dialog open={isCustomReminderOpen && canFillCustomForm} onOpenChange={handleCustomReminderOpenChange}>
           <DialogContent className="max-w-2xl border-rose-200 bg-rose-50 p-6 sm:p-8">
             <DialogTitle className="text-xl font-body font-semibold tracking-wide text-rose-800">
-              下一步：填寫客製需求
+              接下來，告訴我們你的故事。
             </DialogTitle>
             <DialogDescription className="text-base font-body leading-relaxed text-rose-700">
-              請填寫手圍、配件偏好與設計需求。
+              大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
             </DialogDescription>
             <div className="mt-3 space-y-3">
               {customDepositItems.map((item: any) => {
