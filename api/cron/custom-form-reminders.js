@@ -1,5 +1,17 @@
 // server/customFormReminders.ts
-import { and as and2, eq as eq3, isNull, lte, or, sql as sql2 } from "drizzle-orm";
+import { sql as sql2 } from "drizzle-orm";
+
+// server/db.ts
+import { eq, and, gt, sql } from "drizzle-orm";
+
+// server/_core/emailNormalize.ts
+function normalizeOrderEmail(email) {
+  return email.trim().toLowerCase();
+}
+
+// server/db.ts
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 
 // drizzle/schema.ts
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
@@ -148,10 +160,6 @@ var orders = mysqlTable("orders", {
   inventoryDeducted: boolean("inventoryDeducted").default(false).notNull(),
   // 付款時間
   paidAt: timestamp("paidAt"),
-  // 客製化表單提醒時間（3 分鐘測試 / 24 小時 / 72 小時）
-  customFormReminder3mSentAt: timestamp("customFormReminder3mSentAt"),
-  customFormReminder24hSentAt: timestamp("customFormReminder24hSentAt"),
-  customFormReminder72hSentAt: timestamp("customFormReminder72hSentAt"),
   // 老闆確認收款時間（銀行轉帳用）
   confirmedAt: timestamp("confirmedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -347,18 +355,6 @@ var dbProducts = mysqlTable("products", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
-
-// server/db.ts
-import { eq, and, gt, sql } from "drizzle-orm";
-
-// server/_core/emailNormalize.ts
-function normalizeOrderEmail(email) {
-  return email.trim().toLowerCase();
-}
-
-// server/db.ts
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 
 // server/_core/env.ts
 var ENV = {
@@ -587,23 +583,60 @@ function minutesAgo(minutes) {
 }
 function getReminderStage(candidate) {
   if (!candidate.paidAt) return null;
-  if (!candidate.customFormReminder24hSentAt && candidate.paidAt <= hoursAgo(24)) {
+  const paidAt = candidate.paidAt instanceof Date ? candidate.paidAt : new Date(candidate.paidAt);
+  if (!candidate.customFormReminder24hSentAt && paidAt <= hoursAgo(24)) {
     return "24h";
   }
-  if (!candidate.customFormReminder72hSentAt && candidate.paidAt <= hoursAgo(72)) {
+  if (!candidate.customFormReminder72hSentAt && paidAt <= hoursAgo(72)) {
     return "72h";
   }
-  if (!candidate.customFormReminder3mSentAt && candidate.paidAt <= minutesAgo(3)) {
+  if (!candidate.customFormReminder3mSentAt && paidAt <= minutesAgo(3)) {
     return "3m";
   }
   return null;
 }
-async function markReminderSent(orderId, reminderStage) {
+function getReminderColumn(reminderStage) {
+  if (reminderStage === "3m") return "customFormReminder3mSentAt";
+  if (reminderStage === "24h") return "customFormReminder24hSentAt";
+  return "customFormReminder72hSentAt";
+}
+function rowsFromExecuteResult(result) {
+  if (Array.isArray(result)) {
+    const first = result[0];
+    if (Array.isArray(first)) return first;
+    return result;
+  }
+  if (result && typeof result === "object" && "rows" in result) {
+    return result.rows;
+  }
+  return [];
+}
+async function executeRows(query) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const now = /* @__PURE__ */ new Date();
-  const update = reminderStage === "3m" ? { customFormReminder3mSentAt: now } : reminderStage === "24h" ? { customFormReminder24hSentAt: now } : { customFormReminder72hSentAt: now };
-  await db.update(orders).set(update).where(eq3(orders.id, orderId));
+  return rowsFromExecuteResult(await db.execute(query));
+}
+async function hasReminderColumns() {
+  const rows = await executeRows(sql2`
+    SELECT COLUMN_NAME AS columnName
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'orders'
+      AND COLUMN_NAME IN (
+        'customFormReminder3mSentAt',
+        'customFormReminder24hSentAt',
+        'customFormReminder72hSentAt'
+      )
+  `);
+  return rows.length === 3;
+}
+async function markReminderSent(orderId, reminderStage) {
+  const column = getReminderColumn(reminderStage);
+  await executeRows(sql2`
+    UPDATE \`orders\`
+    SET ${sql2.raw(`\`${column}\``)} = NOW()
+    WHERE \`id\` = ${orderId}
+  `);
 }
 async function sendReminder(candidate, reminderStage) {
   const lineResult = await notifyLineCustomFormReminder(candidate.id, reminderStage);
@@ -625,31 +658,36 @@ async function sendReminder(candidate, reminderStage) {
   return true;
 }
 async function runCustomFormReminderJob() {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const candidates = await db.select({
-    id: orders.id,
-    merchantTradeNo: orders.merchantTradeNo,
-    buyerName: orders.buyerName,
-    buyerEmail: orders.buyerEmail,
-    paidAt: orders.paidAt,
-    customFormReminder3mSentAt: orders.customFormReminder3mSentAt,
-    customFormReminder24hSentAt: orders.customFormReminder24hSentAt,
-    customFormReminder72hSentAt: orders.customFormReminder72hSentAt
-  }).from(orders).where(
-    and2(
-      eq3(orders.isCustomOrder, true),
-      eq3(orders.orderStatus, "deposit_paid"),
-      or(eq3(orders.paymentStatus, "paid"), eq3(orders.paymentStatus, "confirmed")),
-      lte(orders.paidAt, minutesAgo(3)),
-      sql2`(${orders.customerNote} IS NULL OR TRIM(${orders.customerNote}) = '' OR ${orders.customerNote} NOT LIKE ${`%${CUSTOMER_NOTE_MARKER}%`})`,
-      or(
-        isNull(orders.customFormReminder3mSentAt),
-        isNull(orders.customFormReminder24hSentAt),
-        and2(lte(orders.paidAt, hoursAgo(72)), isNull(orders.customFormReminder72hSentAt))
+  if (!await hasReminderColumns()) {
+    return { scanned: 0, sent3m: 0, sent24h: 0, sent72h: 0, skipped: 0, failed: 0 };
+  }
+  const candidates = await executeRows(sql2`
+    SELECT
+      \`id\`,
+      \`merchantTradeNo\`,
+      \`buyerName\`,
+      \`buyerEmail\`,
+      \`paidAt\`,
+      \`customFormReminder3mSentAt\`,
+      \`customFormReminder24hSentAt\`,
+      \`customFormReminder72hSentAt\`
+    FROM \`orders\`
+    WHERE \`isCustomOrder\` = TRUE
+      AND \`orderStatus\` = 'deposit_paid'
+      AND \`paymentStatus\` IN ('paid', 'confirmed')
+      AND \`paidAt\` <= ${minutesAgo(3)}
+      AND (
+        \`customerNote\` IS NULL
+        OR TRIM(\`customerNote\`) = ''
+        OR \`customerNote\` NOT LIKE ${`%${CUSTOMER_NOTE_MARKER}%`}
       )
-    )
-  ).limit(100);
+      AND (
+        \`customFormReminder3mSentAt\` IS NULL
+        OR \`customFormReminder24hSentAt\` IS NULL
+        OR (\`paidAt\` <= ${hoursAgo(72)} AND \`customFormReminder72hSentAt\` IS NULL)
+      )
+    LIMIT 100
+  `);
   const result = {
     scanned: candidates.length,
     sent3m: 0,

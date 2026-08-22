@@ -1,5 +1,4 @@
-import { and, eq, isNull, lte, or, sql } from "drizzle-orm";
-import { orders } from "../drizzle/schema";
+import { sql, type SQL } from "drizzle-orm";
 import { getDb } from "./db";
 import { sendCustomFormReminderEmail } from "./email";
 import { notifyLineCustomFormReminder } from "./lineMessage";
@@ -13,10 +12,10 @@ type ReminderCandidate = {
   merchantTradeNo: string;
   buyerName: string;
   buyerEmail: string;
-  paidAt: Date | null;
-  customFormReminder3mSentAt: Date | null;
-  customFormReminder24hSentAt: Date | null;
-  customFormReminder72hSentAt: Date | null;
+  paidAt: Date | string | null;
+  customFormReminder3mSentAt: Date | string | null;
+  customFormReminder24hSentAt: Date | string | null;
+  customFormReminder72hSentAt: Date | string | null;
 };
 
 type ReminderResult = {
@@ -42,32 +41,65 @@ function minutesAgo(minutes: number) {
 
 function getReminderStage(candidate: ReminderCandidate): ReminderStage | null {
   if (!candidate.paidAt) return null;
-  if (!candidate.customFormReminder24hSentAt && candidate.paidAt <= hoursAgo(24)) {
+  const paidAt = candidate.paidAt instanceof Date ? candidate.paidAt : new Date(candidate.paidAt);
+  if (!candidate.customFormReminder24hSentAt && paidAt <= hoursAgo(24)) {
     return "24h";
   }
-  if (!candidate.customFormReminder72hSentAt && candidate.paidAt <= hoursAgo(72)) {
+  if (!candidate.customFormReminder72hSentAt && paidAt <= hoursAgo(72)) {
     return "72h";
   }
-  if (!candidate.customFormReminder3mSentAt && candidate.paidAt <= minutesAgo(3)) {
+  if (!candidate.customFormReminder3mSentAt && paidAt <= minutesAgo(3)) {
     return "3m";
   }
   return null;
 }
 
-async function markReminderSent(orderId: number, reminderStage: ReminderStage) {
+function getReminderColumn(reminderStage: ReminderStage) {
+  if (reminderStage === "3m") return "customFormReminder3mSentAt";
+  if (reminderStage === "24h") return "customFormReminder24hSentAt";
+  return "customFormReminder72hSentAt";
+}
+
+function rowsFromExecuteResult<T>(result: unknown): T[] {
+  if (Array.isArray(result)) {
+    const first = result[0];
+    if (Array.isArray(first)) return first as T[];
+    return result as T[];
+  }
+  if (result && typeof result === "object" && "rows" in result) {
+    return (result as { rows: T[] }).rows;
+  }
+  return [];
+}
+
+async function executeRows<T>(query: SQL): Promise<T[]> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const now = new Date();
-  const update =
-    reminderStage === "3m"
-      ? { customFormReminder3mSentAt: now }
-      : reminderStage === "24h"
-        ? { customFormReminder24hSentAt: now }
-        : { customFormReminder72hSentAt: now };
-  await db
-    .update(orders)
-    .set(update)
-    .where(eq(orders.id, orderId));
+  return rowsFromExecuteResult<T>(await db.execute(query));
+}
+
+async function hasReminderColumns() {
+  const rows = await executeRows<{ columnName: string }>(sql`
+    SELECT COLUMN_NAME AS columnName
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'orders'
+      AND COLUMN_NAME IN (
+        'customFormReminder3mSentAt',
+        'customFormReminder24hSentAt',
+        'customFormReminder72hSentAt'
+      )
+  `);
+  return rows.length === 3;
+}
+
+async function markReminderSent(orderId: number, reminderStage: ReminderStage) {
+  const column = getReminderColumn(reminderStage);
+  await executeRows(sql`
+    UPDATE \`orders\`
+    SET ${sql.raw(`\`${column}\``)} = NOW()
+    WHERE \`id\` = ${orderId}
+  `);
 }
 
 async function sendReminder(candidate: ReminderCandidate, reminderStage: ReminderStage) {
@@ -92,36 +124,37 @@ async function sendReminder(candidate: ReminderCandidate, reminderStage: Reminde
 }
 
 export async function runCustomFormReminderJob(): Promise<ReminderResult> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!(await hasReminderColumns())) {
+    return { scanned: 0, sent3m: 0, sent24h: 0, sent72h: 0, skipped: 0, failed: 0 };
+  }
 
-  const candidates = await db
-    .select({
-      id: orders.id,
-      merchantTradeNo: orders.merchantTradeNo,
-      buyerName: orders.buyerName,
-      buyerEmail: orders.buyerEmail,
-      paidAt: orders.paidAt,
-      customFormReminder3mSentAt: orders.customFormReminder3mSentAt,
-      customFormReminder24hSentAt: orders.customFormReminder24hSentAt,
-      customFormReminder72hSentAt: orders.customFormReminder72hSentAt,
-    })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.isCustomOrder, true),
-        eq(orders.orderStatus, "deposit_paid"),
-        or(eq(orders.paymentStatus, "paid"), eq(orders.paymentStatus, "confirmed")),
-        lte(orders.paidAt, minutesAgo(3)),
-        sql`(${orders.customerNote} IS NULL OR TRIM(${orders.customerNote}) = '' OR ${orders.customerNote} NOT LIKE ${`%${CUSTOMER_NOTE_MARKER}%`})`,
-        or(
-          isNull(orders.customFormReminder3mSentAt),
-          isNull(orders.customFormReminder24hSentAt),
-          and(lte(orders.paidAt, hoursAgo(72)), isNull(orders.customFormReminder72hSentAt))
-        )
+  const candidates = await executeRows<ReminderCandidate>(sql`
+    SELECT
+      \`id\`,
+      \`merchantTradeNo\`,
+      \`buyerName\`,
+      \`buyerEmail\`,
+      \`paidAt\`,
+      \`customFormReminder3mSentAt\`,
+      \`customFormReminder24hSentAt\`,
+      \`customFormReminder72hSentAt\`
+    FROM \`orders\`
+    WHERE \`isCustomOrder\` = TRUE
+      AND \`orderStatus\` = 'deposit_paid'
+      AND \`paymentStatus\` IN ('paid', 'confirmed')
+      AND \`paidAt\` <= ${minutesAgo(3)}
+      AND (
+        \`customerNote\` IS NULL
+        OR TRIM(\`customerNote\`) = ''
+        OR \`customerNote\` NOT LIKE ${`%${CUSTOMER_NOTE_MARKER}%`}
       )
-    )
-    .limit(100);
+      AND (
+        \`customFormReminder3mSentAt\` IS NULL
+        OR \`customFormReminder24hSentAt\` IS NULL
+        OR (\`paidAt\` <= ${hoursAgo(72)} AND \`customFormReminder72hSentAt\` IS NULL)
+      )
+    LIMIT 100
+  `);
 
   const result: ReminderResult = {
     scanned: candidates.length,
