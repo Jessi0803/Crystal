@@ -248,6 +248,28 @@ function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
 
+function upsertCustomConsultationNote(existingNote: string | null, productId: string, customerNote: string) {
+  const startMarker = `【客製需求開始：${productId}】`;
+  const endMarker = `【客製需求結束：${productId}】`;
+  const noteBlock = [startMarker, customerNote.trim(), endMarker].join("\n");
+  const current = existingNote?.trim() ?? "";
+  if (!current) return noteBlock;
+
+  const startIndex = current.indexOf(startMarker);
+  const endIndex = current.indexOf(endMarker);
+  if (startIndex >= 0 && endIndex > startIndex) {
+    return [
+      current.slice(0, startIndex).trimEnd(),
+      noteBlock,
+      current.slice(endIndex + endMarker.length).trimStart(),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return [current, noteBlock].join("\n\n");
+}
+
 async function attachTwoItemFreeShippingEligibility<
   T extends { id: string; baseProductId?: string; twoItemFreeShippingEligible?: boolean },
 >(items: T[]) {
@@ -706,6 +728,59 @@ export const orderRouter = router({
       const order = await getOrderWithItems(input.merchantTradeNo);
       if (!order) return null;
       return order;
+    }),
+
+  submitCustomConsultation: publicProcedure
+    .input(
+      z.object({
+        merchantTradeNo: z.string().min(1),
+        productId: z.enum([
+          "custom-deposit-product",
+          "tarot-crystal-deposit-product",
+          "chakra-crystal-deposit-product",
+          "numerology-crystal-deposit-product",
+        ]),
+        customerNote: z.string().min(1).max(10000),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const order = await getOrderWithItems(input.merchantTradeNo);
+      if (!order) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
+      }
+      if (!order.isCustomOrder) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單不是客製化訂金訂單" });
+      }
+      const hasMatchingProduct = order.items.some((item) => item.productId === input.productId);
+      if (!hasMatchingProduct) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "表單方案與訂單商品不符" });
+      }
+      const canSubmit =
+        order.paymentStatus === "paid" ||
+        order.paymentStatus === "confirmed" ||
+        order.paymentStatus === "transfer_pending";
+      if (!canSubmit) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "請先完成付款後再填寫客製需求" });
+      }
+      if (order.orderStatus === "cancelled" || order.paymentStatus === "failed" || order.paymentStatus === "cancelled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單狀態無法填寫客製需求" });
+      }
+
+      const customerNote = upsertCustomConsultationNote(
+        order.customerNote,
+        input.productId,
+        input.customerNote
+      );
+
+      await db
+        .update(orders)
+        .set({ customerNote })
+        .where(eq(orders.merchantTradeNo, input.merchantTradeNo));
+
+      return { success: true };
     }),
 
   /**

@@ -15,11 +15,15 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
+  type CustomDepositProductId,
 } from "@/lib/customOrderingContent";
+import { useCart } from "@/contexts/CartContext";
+import { products } from "@/lib/data";
+import { toast } from "sonner";
 
 const LINE_URL = CUSTOM_LINE_URL;
 
@@ -37,6 +41,7 @@ const plans = [
     ],
     bgColor: "bg-[#F5EDD8]",
     formPath: "/custom/form",
+    productId: "custom-deposit-product" as CustomDepositProductId,
   },
   {
     id: "B",
@@ -53,6 +58,7 @@ const plans = [
     ],
     bgColor: "bg-[#E8E6F5]",
     formPath: "/custom/form-b",
+    productId: "tarot-crystal-deposit-product" as CustomDepositProductId,
   },
   {
     id: "C",
@@ -67,6 +73,7 @@ const plans = [
     ],
     bgColor: "bg-[#D8EFED]",
     formPath: "/custom/form-c",
+    productId: "chakra-crystal-deposit-product" as CustomDepositProductId,
   },
   {
     id: "D",
@@ -81,10 +88,14 @@ const plans = [
     ],
     bgColor: "bg-[#F0DEDE]",
     formPath: "/custom/form-d",
+    productId: "numerology-crystal-deposit-product" as CustomDepositProductId,
   },
 ];
 
 export default function Custom() {
+  const [, setLocation] = useLocation();
+  const { addToCart, setIsOpen } = useCart();
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -100,6 +111,17 @@ export default function Custom() {
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+
+  const handleStartPayment = (productId: CustomDepositProductId) => {
+    const product = products.find((item) => item.id === productId);
+    if (!product) {
+      toast.error("找不到訂金商品，請聯繫客服");
+      return;
+    }
+    addToCart(product);
+    setIsOpen(false);
+    setLocation("/checkout/start");
+  };
 
   return (
     <div className="bg-[#FAF9F6] text-[#4A4A4A] min-h-screen font-sans selection:bg-[#D8C3BD] selection:text-white overflow-x-hidden">
@@ -220,18 +242,17 @@ export default function Custom() {
 
                 {/* 按鈕 */}
                 <div className="mt-9 pt-7 border-t border-[#8E735B]/8">
-                  <Link href={plan.formPath}>
-                    <button
-                      type="button"
-                      className="w-full py-4 rounded-xl bg-[#8E735B] text-white text-sm tracking-[0.35em] border border-[#7a634e] shadow-md shadow-[#8E735B]/15 hover:bg-[#7a634e] hover:shadow-lg hover:shadow-[#8E735B]/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
-                    >
-                      填寫你的客製需求
-                      <ArrowRight
-                        size={16}
-                        className="opacity-90 group-hover/btn:translate-x-1 transition-transform"
-                      />
-                    </button>
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleStartPayment(plan.productId)}
+                    className="w-full py-4 rounded-xl bg-[#8E735B] text-white text-sm tracking-[0.35em] border border-[#7a634e] shadow-md shadow-[#8E735B]/15 hover:bg-[#7a634e] hover:shadow-lg hover:shadow-[#8E735B]/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
+                  >
+                    先付款預約
+                    <ArrowRight
+                      size={16}
+                      className="opacity-90 group-hover/btn:translate-x-1 transition-transform"
+                    />
+                  </button>
                 </div>
               </div>
             </div>

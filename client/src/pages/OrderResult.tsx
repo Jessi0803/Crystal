@@ -9,6 +9,7 @@ import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } fro
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
+import { CUSTOM_DEPOSIT_PRODUCT_IDS, getCustomFormPath } from "@/lib/customOrderingContent";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -176,6 +177,13 @@ export default function OrderResult() {
     ...STORE_BANK_INFO,
     ...((order as any)?.bankInfo ?? {}),
   };
+  const customDepositItems =
+    order?.items?.filter((item: any) => CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)) ?? [];
+  const canFillCustomForm =
+    customDepositItems.length > 0 &&
+    (order?.paymentStatus === "paid" ||
+      order?.paymentStatus === "confirmed" ||
+      order?.paymentStatus === "transfer_pending");
 
   const getShippingMethodLabel = () => {
     if (!order) return "";
@@ -270,6 +278,37 @@ export default function OrderResult() {
             </p>
           )}
         </div>
+
+        {canFillCustomForm && (
+          <div className="mb-6 border border-rose-200 bg-rose-50 p-5">
+            <p className="mb-1 text-sm font-body font-medium text-rose-800">
+              下一步：填寫客製需求
+            </p>
+            <p className="mb-4 text-sm font-body leading-relaxed text-rose-700">
+              請填寫手圍、配件偏好與設計需求，送出後會自動綁定到這筆訂單。
+            </p>
+            <div className="space-y-2">
+              {customDepositItems.map((item: any) => {
+                const customFormPath = getCustomFormPath(item.productId);
+                const hasCustomConsultationNote = Boolean(
+                  order.customerNote?.includes(`【客製需求開始：${item.productId}】`)
+                );
+                if (!customFormPath) return null;
+                return (
+                  <button
+                    key={item.id}
+                    className="btn-primary w-full"
+                    onClick={() =>
+                      setLocation(`${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}`)
+                    }
+                  >
+                    {hasCustomConsultationNote ? "修改" : "填寫"}{item.productName}需求
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 轉帳資訊 */}
         {order.paymentMethod === "atm" && order.paymentStatus === "transfer_pending" && (

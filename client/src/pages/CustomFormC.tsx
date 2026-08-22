@@ -2,20 +2,20 @@
 import { useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { Link } from "wouter";
-import { useCart } from "@/contexts/CartContext";
-import { products } from "@/lib/data";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import CustomFormAddonSelector, {
-  CUSTOM_ADDON_OPTIONS,
-  CUSTOM_ADDON_PRODUCT_IDS,
   EMPTY_CUSTOM_ADDON_SUPPLEMENTS,
   type CustomAddonId,
   type CustomAddonSupplementData,
   formatCustomAddonNote,
-  formatCustomAddonSupplementNote,
   validateCustomAddonSupplements,
 } from "@/components/CustomFormAddonSelector";
+import CustomFormFocusField, {
+  type CustomFocusChoice,
+  formatCustomFocusNote,
+  validateCustomFocus,
+} from "@/components/CustomFormFocusField";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 import {
@@ -24,11 +24,17 @@ import {
   CUSTOM_WRIST_SIZE_STEP,
   isValidCustomWristSize,
 } from "@/lib/customOrderingContent";
+import {
+  CustomFormAccessGate,
+  appendCustomAddonSupplementNotes,
+  useCustomFormSubmission,
+} from "@/lib/customFormSubmission";
 
 interface FormData {
   name: string;
   birthday: string;
-  effect: string;
+  focus: CustomFocusChoice;
+  focusStory: string;
   wristSize: string;
   fitPreference: "" | "just-right" | "loose";
   metalPreference: "" | "gold" | "silver" | "either";
@@ -44,7 +50,8 @@ interface FormData {
 const EMPTY_FORM: FormData = {
   name: "",
   birthday: "",
-  effect: "",
+  focus: "",
+  focusStory: "",
   wristSize: "",
   fitPreference: "",
   metalPreference: "",
@@ -64,7 +71,7 @@ function buildNote(form: FormData, selectedAddons: CustomAddonId[]): string {
       "",
       `姓名：${form.name || "（未填）"}`,
       `西元生日：${form.birthday || "（未填）"}`,
-      `想額外指定的功效：${form.effect || "無特別指定"}`,
+      `額外指定的其他功效：${formatCustomFocusNote(form.focus, form.focusStory)}`,
       `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
       `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
       `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
@@ -86,11 +93,7 @@ export default function CustomFormC() {
   const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
   const [addonSupplements, setAddonSupplements] =
     useState<CustomAddonSupplementData>(EMPTY_CUSTOM_ADDON_SUPPLEMENTS);
-  const { addToCart } = useCart();
-
-  const depositProduct = products.find(
-    p => p.id === "chakra-crystal-deposit-product"
-  );
+  const formSubmission = useCustomFormSubmission("chakra-crystal-deposit-product");
 
   const steps = [
     {
@@ -122,17 +125,16 @@ export default function CustomFormC() {
       ),
     },
     {
-      title: "有想額外指定的功效嗎？",
+      title: "這次有想要額外指定其他功效嗎？",
       subtitle:
-        "老闆會以脈輪檢測結果為主，但您也可以許願想加強的能量！沒有的話留空即可",
-      required: false,
+        "老闆會以脈輪檢測結果為主，你也可以許願想加強的能量；沒有想法就交給設計師",
+      required: true,
       field: (
-        <textarea
-          value={form.effect}
-          onChange={e => setForm({ ...form, effect: e.target.value })}
-          placeholder="例如：招財、愛情、療癒、保護氣場……沒有指定可以留空"
-          rows={5}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+        <CustomFormFocusField
+          value={form.focus}
+          otherStory={form.focusStory}
+          onChange={focus => setForm({ ...form, focus })}
+          onOtherStoryChange={focusStory => setForm({ ...form, focusStory })}
         />
       ),
     },
@@ -485,6 +487,15 @@ export default function CustomFormC() {
       toast.error("請填寫西元生日");
       return false;
     }
+    const focusError = validateCustomFocus(
+      form.focus,
+      form.focusStory,
+      "是否要額外指定其他功效"
+    );
+    if (focusError) {
+      toast.error(focusError);
+      return false;
+    }
     if (!form.wristSize) {
       toast.error("請填寫手圍尺寸");
       return false;
@@ -520,11 +531,7 @@ export default function CustomFormC() {
     return true;
   };
 
-  const handleSubmit = () => {
-    if (!depositProduct) {
-      toast.error("找不到訂金商品，請聯繫客服");
-      return;
-    }
+  const handleSubmit = async () => {
     if (!validateForm()) return;
     const addonValidationError = validateCustomAddonSupplements(
       selectedAddons,
@@ -534,28 +541,16 @@ export default function CustomFormC() {
       toast.error(addonValidationError);
       return;
     }
-    const customConsultationNote = buildNote(form, selectedAddons);
-    sessionStorage.setItem("customConsultationNote", customConsultationNote);
-    addToCart(depositProduct, { customConsultationNote });
-    selectedAddons.forEach(addonId => {
-      const addonProduct = products.find(
-        product => product.id === CUSTOM_ADDON_PRODUCT_IDS[addonId]
-      );
-      const addonOption = CUSTOM_ADDON_OPTIONS.find(
-        option => option.id === addonId
-      );
-      if (!addonProduct || !addonOption) return;
-
-      addToCart(addonProduct, {
-        customConsultationNote: [
-          customConsultationNote,
-          "",
-          `【一併選擇方案補充資料：${addonOption.label}】`,
-          formatCustomAddonSupplementNote(addonId, addonSupplements),
-        ].join("\n"),
-      });
-    });
-    toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
+    const customConsultationNote = appendCustomAddonSupplementNotes(
+      buildNote(form, selectedAddons),
+      selectedAddons,
+      addonSupplements
+    );
+    try {
+      await formSubmission.submitCustomNote(customConsultationNote);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試");
+    }
   };
 
   return (
@@ -580,6 +575,13 @@ export default function CustomFormC() {
         </div>
       </div>
 
+      <CustomFormAccessGate
+        merchantTradeNo={formSubmission.merchantTradeNo}
+        isLoading={formSubmission.isLoading}
+        isError={formSubmission.isError}
+        canFillForm={formSubmission.canFillForm}
+        hasExistingNote={formSubmission.hasExistingNote}
+      >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">
           <CustomFormOrderingIntro />
@@ -636,14 +638,16 @@ export default function CustomFormC() {
           <button
             type="button"
             onClick={handleSubmit}
+            disabled={formSubmission.isSubmitting}
             className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
             style={{ backgroundColor: ACCENT }}
           >
             <Check className="w-4 h-4" />
-            確認，加入購物車
+            {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
           </button>
         </div>
       </div>
+      </CustomFormAccessGate>
     </div>
   );
 }

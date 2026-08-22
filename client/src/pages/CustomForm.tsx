@@ -2,20 +2,20 @@
 import { useState } from "react";
 import { Check, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import { useCart } from "@/contexts/CartContext";
-import { products } from "@/lib/data";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import CustomFormAddonSelector, {
-  CUSTOM_ADDON_OPTIONS,
-  CUSTOM_ADDON_PRODUCT_IDS,
   EMPTY_CUSTOM_ADDON_SUPPLEMENTS,
   type CustomAddonId,
   type CustomAddonSupplementData,
   formatCustomAddonNote,
-  formatCustomAddonSupplementNote,
   validateCustomAddonSupplements,
 } from "@/components/CustomFormAddonSelector";
+import CustomFormFocusField, {
+  type CustomFocusChoice,
+  formatCustomFocusNote,
+  validateCustomFocus,
+} from "@/components/CustomFormFocusField";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 import {
@@ -24,8 +24,15 @@ import {
   CUSTOM_WRIST_SIZE_STEP,
   isValidCustomWristSize,
 } from "@/lib/customOrderingContent";
+import {
+  CustomFormAccessGate,
+  appendCustomAddonSupplementNotes,
+  useCustomFormSubmission,
+} from "@/lib/customFormSubmission";
 
 interface FormData {
+  focus: CustomFocusChoice;
+  focusStory: string;
   effect: string;
   wristSize: string;
   fitPreference: "" | "just-right" | "loose";
@@ -40,6 +47,8 @@ interface FormData {
 }
 
 const EMPTY_FORM: FormData = {
+  focus: "",
+  focusStory: "",
   effect: "",
   wristSize: "",
   fitPreference: "",
@@ -58,6 +67,7 @@ function buildNote(form: FormData, selectedAddons: CustomAddonId[]): string {
     [
       "【純客製水晶手鍊諮詢表單】",
       "",
+      `這次最想為自己調整的是：${formatCustomFocusNote(form.focus, form.focusStory)}`,
       `想要的功效：${form.effect || "（未填）"}`,
       `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
       `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
@@ -78,11 +88,22 @@ export default function CustomForm() {
   const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
   const [addonSupplements, setAddonSupplements] =
     useState<CustomAddonSupplementData>(EMPTY_CUSTOM_ADDON_SUPPLEMENTS);
-  const { addToCart } = useCart();
-
-  const depositProduct = products.find(p => p.id === "custom-deposit-product");
+  const formSubmission = useCustomFormSubmission("custom-deposit-product");
 
   const steps = [
+    {
+      title: "這次最想為自己調整的是？",
+      subtitle: "選一個目前最想被照顧到的面向，設計師會以此為主軸挑選水晶",
+      required: true,
+      field: (
+        <CustomFormFocusField
+          value={form.focus}
+          otherStory={form.focusStory}
+          onChange={focus => setForm({ ...form, focus })}
+          onOtherStoryChange={focusStory => setForm({ ...form, focusStory })}
+        />
+      ),
+    },
     {
       title: "您想要什麼功效？",
       subtitle:
@@ -439,6 +460,15 @@ export default function CustomForm() {
   ];
 
   const validateForm = () => {
+    const focusError = validateCustomFocus(
+      form.focus,
+      form.focusStory,
+      "這次最想為自己調整的面向"
+    );
+    if (focusError) {
+      toast.error(focusError);
+      return false;
+    }
     if (!form.effect.trim()) {
       toast.error("請填寫想要的功效");
       return false;
@@ -478,11 +508,7 @@ export default function CustomForm() {
     return true;
   };
 
-  const handleSubmit = () => {
-    if (!depositProduct) {
-      toast.error("找不到訂金商品，請聯繫客服");
-      return;
-    }
+  const handleSubmit = async () => {
     if (!validateForm()) return;
     const addonValidationError = validateCustomAddonSupplements(
       selectedAddons,
@@ -492,28 +518,16 @@ export default function CustomForm() {
       toast.error(addonValidationError);
       return;
     }
-    const customConsultationNote = buildNote(form, selectedAddons);
-    sessionStorage.setItem("customConsultationNote", customConsultationNote);
-    addToCart(depositProduct, { customConsultationNote });
-    selectedAddons.forEach(addonId => {
-      const addonProduct = products.find(
-        product => product.id === CUSTOM_ADDON_PRODUCT_IDS[addonId]
-      );
-      const addonOption = CUSTOM_ADDON_OPTIONS.find(
-        option => option.id === addonId
-      );
-      if (!addonProduct || !addonOption) return;
-
-      addToCart(addonProduct, {
-        customConsultationNote: [
-          customConsultationNote,
-          "",
-          `【一併選擇方案補充資料：${addonOption.label}】`,
-          formatCustomAddonSupplementNote(addonId, addonSupplements),
-        ].join("\n"),
-      });
-    });
-    toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
+    const customConsultationNote = appendCustomAddonSupplementNotes(
+      buildNote(form, selectedAddons),
+      selectedAddons,
+      addonSupplements
+    );
+    try {
+      await formSubmission.submitCustomNote(customConsultationNote);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試");
+    }
   };
 
   return (
@@ -538,6 +552,13 @@ export default function CustomForm() {
         </div>
       </div>
 
+      <CustomFormAccessGate
+        merchantTradeNo={formSubmission.merchantTradeNo}
+        isLoading={formSubmission.isLoading}
+        isError={formSubmission.isError}
+        canFillForm={formSubmission.canFillForm}
+        hasExistingNote={formSubmission.hasExistingNote}
+      >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">
           <CustomFormOrderingIntro />
@@ -594,14 +615,16 @@ export default function CustomForm() {
           <button
             type="button"
             onClick={handleSubmit}
+            disabled={formSubmission.isSubmitting}
             className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
             style={{ backgroundColor: "oklch(0.72 0.09 70)" }}
           >
             <Check className="w-4 h-4" />
-            確認，加入購物車
+            {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
           </button>
         </div>
       </div>
+      </CustomFormAccessGate>
     </div>
   );
 }

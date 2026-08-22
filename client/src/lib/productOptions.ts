@@ -1,5 +1,4 @@
 import type { Product } from "@/lib/data";
-import { isCustomDepositProduct } from "@/lib/customOrderingContent";
 
 const WRIST_SIZE_CATEGORIES = new Set(["love", "wealth", "protect", "healing"]);
 
@@ -24,7 +23,7 @@ export function hasClaspOption(product: Pick<Product, "category" | "claspOptions
 }
 
 export function requiresCustomFormBeforeCart(product: Pick<Product, "id" | "category">) {
-  return product.category === "custom" && isCustomDepositProduct(product.id);
+  return false;
 }
 
 export function requiresDetailSelectionBeforeCart(

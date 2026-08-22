@@ -2,20 +2,21 @@
 import { useState } from "react";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
-import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import CustomFormAddonSelector, {
-  CUSTOM_ADDON_OPTIONS,
-  CUSTOM_ADDON_PRODUCT_IDS,
   EMPTY_CUSTOM_ADDON_SUPPLEMENTS,
   type CustomAddonId,
   type CustomAddonSupplementData,
   formatCustomAddonNote,
-  formatCustomAddonSupplementNote,
   validateCustomAddonSupplements,
 } from "@/components/CustomFormAddonSelector";
+import CustomFormFocusField, {
+  type CustomFocusChoice,
+  formatCustomFocusNote,
+  validateCustomFocus,
+} from "@/components/CustomFormFocusField";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 import {
@@ -24,6 +25,11 @@ import {
   CUSTOM_WRIST_SIZE_STEP,
   isValidCustomWristSize,
 } from "@/lib/customOrderingContent";
+import {
+  CustomFormAccessGate,
+  appendCustomAddonSupplementNotes,
+  useCustomFormSubmission,
+} from "@/lib/customFormSubmission";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -278,7 +284,8 @@ interface TarotData {
 }
 
 interface BraceletData {
-  effect: string;
+  focus: CustomFocusChoice;
+  focusStory: string;
   wristSize: string;
   fitPreference: "" | "just-right" | "loose";
   metalPreference: "" | "gold" | "silver" | "either";
@@ -310,7 +317,8 @@ const EMPTY_TAROT: TarotData = {
 };
 
 const EMPTY_BRACELET: BraceletData = {
-  effect: "",
+  focus: "",
+  focusStory: "",
   wristSize: "",
   fitPreference: "",
   metalPreference: "",
@@ -379,7 +387,7 @@ function buildNote(
   const braceletLines = [
     "",
     "── 水晶手鍊偏好 ──",
-    `想額外指定的功效：${bracelet.effect || "無特別指定"}`,
+    `額外指定的其他功效：${formatCustomFocusNote(bracelet.focus, bracelet.focusStory)}`,
     `手圍：${bracelet.wristSize ? `${bracelet.wristSize} cm` : "（未填）"}`,
     `鬆緊偏好：${bracelet.fitPreference === "just-right" ? "剛好" : bracelet.fitPreference === "loose" ? "微鬆" : "（未填）"}`,
     `金飾 / 銀飾：${bracelet.metalPreference === "gold" ? "金飾" : bracelet.metalPreference === "silver" ? "銀飾" : bracelet.metalPreference === "either" ? "都可以" : "（未填）"}`,
@@ -406,7 +414,7 @@ export default function CustomFormB() {
   const [selectedAddons, setSelectedAddons] = useState<CustomAddonId[]>([]);
   const [addonSupplements, setAddonSupplements] =
     useState<CustomAddonSupplementData>(EMPTY_CUSTOM_ADDON_SUPPLEMENTS);
-  const { addToCart } = useCart();
+  const formSubmission = useCustomFormSubmission("tarot-crystal-deposit-product");
 
   const depositProduct = products.find(
     p => p.id === "tarot-crystal-deposit-product"
@@ -651,16 +659,18 @@ export default function CustomFormB() {
 
   const braceletSteps = [
     {
-      title: "有想額外指定的功效嗎？",
-      subtitle: "例如：招財、愛情、療癒……沒有特別想法也沒關係，留空即可",
-      required: false,
+      title: "這次有想要額外指定其他功效嗎？",
+      subtitle:
+        "老闆會以塔羅解讀結果為主，你也可以許願想加強的能量；沒有想法就交給設計師",
+      required: true,
       field: (
-        <textarea
-          value={bracelet.effect}
-          onChange={e => setBracelet({ ...bracelet, effect: e.target.value })}
-          placeholder="寫下想要的功效，沒有的話留空"
-          rows={5}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+        <CustomFormFocusField
+          value={bracelet.focus}
+          otherStory={bracelet.focusStory}
+          onChange={focus => setBracelet({ ...bracelet, focus })}
+          onOtherStoryChange={focusStory =>
+            setBracelet({ ...bracelet, focusStory })
+          }
         />
       ),
     },
@@ -1055,6 +1065,15 @@ export default function CustomFormB() {
   }
 
   function validateBraceletData(): boolean {
+    const focusError = validateCustomFocus(
+      bracelet.focus,
+      bracelet.focusStory,
+      "是否要額外指定其他功效"
+    );
+    if (focusError) {
+      toast.error(focusError);
+      return false;
+    }
     if (!bracelet.wristSize) {
       toast.error("請填寫手圍尺寸");
       return false;
@@ -1092,11 +1111,7 @@ export default function CustomFormB() {
 
   // ── 送出 ──────────────────────────────────────────────────────────────────
 
-  function handleSubmit() {
-    if (!depositProduct) {
-      toast.error("找不到訂金商品，請聯繫客服");
-      return;
-    }
+  async function handleSubmit() {
     if (!tarot.topic) {
       toast.error("請選擇占卜主題");
       return;
@@ -1112,29 +1127,16 @@ export default function CustomFormB() {
       toast.error(addonValidationError);
       return;
     }
-    const customConsultationNote = buildNote(tarot, bracelet, selectedAddons);
-    sessionStorage.setItem("customConsultationNote", customConsultationNote);
-    const unitPrice = depositProduct.price + selectedPriceAdjust;
-    addToCart(depositProduct, { unitPrice, customConsultationNote });
-    selectedAddons.forEach(addonId => {
-      const addonProduct = products.find(
-        product => product.id === CUSTOM_ADDON_PRODUCT_IDS[addonId]
-      );
-      const addonOption = CUSTOM_ADDON_OPTIONS.find(
-        option => option.id === addonId
-      );
-      if (!addonProduct || !addonOption) return;
-
-      addToCart(addonProduct, {
-        customConsultationNote: [
-          customConsultationNote,
-          "",
-          `【一併選擇方案補充資料：${addonOption.label}】`,
-          formatCustomAddonSupplementNote(addonId, addonSupplements),
-        ].join("\n"),
-      });
-    });
-    toast.success("已加入購物車。任選兩條商品享免運，可繼續選購或前往結帳");
+    const customConsultationNote = appendCustomAddonSupplementNotes(
+      buildNote(tarot, bracelet, selectedAddons),
+      selectedAddons,
+      addonSupplements
+    );
+    try {
+      await formSubmission.submitCustomNote(customConsultationNote);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試");
+    }
   }
 
   const canShowDetails = Boolean(tarot.topic) && tarot.group !== "single_q";
@@ -1163,6 +1165,13 @@ export default function CustomFormB() {
         </div>
       </div>
 
+      <CustomFormAccessGate
+        merchantTradeNo={formSubmission.merchantTradeNo}
+        isLoading={formSubmission.isLoading}
+        isError={formSubmission.isError}
+        canFillForm={formSubmission.canFillForm}
+        hasExistingNote={formSubmission.hasExistingNote}
+      >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">
           <CustomFormOrderingIntro />
@@ -1345,15 +1354,17 @@ export default function CustomFormB() {
             <button
               type="button"
               onClick={handleSubmit}
+              disabled={formSubmission.isSubmitting}
               className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
               style={{ backgroundColor: "oklch(0.65 0.12 290)" }}
             >
               <Check className="w-4 h-4" />
-              確認，加入購物車
+              {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
             </button>
           )}
         </div>
       </div>
+      </CustomFormAccessGate>
     </div>
   );
 }
