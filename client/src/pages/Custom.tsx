@@ -15,7 +15,7 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import {
   CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
@@ -93,8 +93,7 @@ const plans = [
 ];
 
 export default function Custom() {
-  const [, setLocation] = useLocation();
-  const { addToCart, setIsOpen } = useCart();
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -119,8 +118,6 @@ export default function Custom() {
       return;
     }
     addToCart(product);
-    setIsOpen(false);
-    setLocation("/checkout/start");
   };
 
   return (
