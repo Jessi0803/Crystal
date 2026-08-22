@@ -207,6 +207,14 @@ type AdminOrderNotificationPayload = {
   items: OrderItem[];
 };
 
+type CustomFormReminderEmailPayload = {
+  to: string;
+  buyerName: string;
+  merchantTradeNo: string;
+  reminderStage: "3m" | "24h" | "72h";
+  formUrl: string;
+};
+
 const SHIPPING_LABEL: Record<string, string> = {
   cvs_711: "7-11 超商取貨",
   cvs_family: "全家超商取貨",
@@ -424,6 +432,76 @@ export async function sendOrderConfirmEmail(payload: OrderConfirmPayload) {
     from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
     to,
     subject: `【${BRAND_NAME}】訂單確認 #${merchantTradeNo}`,
+    html,
+  });
+}
+
+export async function sendCustomFormReminderEmail(payload: CustomFormReminderEmailPayload) {
+  const resend = getResend();
+  const { to, buyerName, merchantTradeNo, reminderStage, formUrl } = payload;
+  const secondReminder = reminderStage === "72h";
+
+  const html = `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f9f7f4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e8e4df;">
+        <tr>
+          <td style="padding:32px 40px 24px;border-bottom:1px solid #f0ece7;text-align:center;">
+            <p style="margin:0;font-size:11px;letter-spacing:0.2em;color:#999;text-transform:uppercase;">Custom Design</p>
+            <h1 style="margin:8px 0 0;font-size:22px;font-weight:300;color:#1a1a1a;letter-spacing:0.08em;">LAFLEUR</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:13px;color:#555;">親愛的 ${escapeHtml(buyerName)}，</p>
+            <h2 style="margin:0 0 16px;font-size:18px;font-weight:500;color:#1a1a1a;">你的 LAFLEUR 客製設計還在等你🤍</h2>
+            <p style="margin:0 0 24px;font-size:13px;color:#666;line-height:1.8;">
+              我們還沒有收到你的客製資料，填寫完成後設計師才能開始為你進行設計。
+              ${secondReminder ? "<br>這是我們再一次溫柔提醒你完成表單。" : ""}
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:16px 20px;margin-bottom:24px;">
+              <tr>
+                <td style="font-size:13px;color:#555;padding:2px 0;">訂單編號：<strong style="color:#1a1a1a;">${escapeHtml(merchantTradeNo)}</strong></td>
+              </tr>
+            </table>
+            <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <tr>
+                <td style="background:#1a1a1a;">
+                  <a href="${escapeHtml(formUrl)}" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:12px;letter-spacing:0.15em;">
+                    填寫客製資料
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0;font-size:11px;color:#999;line-height:1.7;">
+              若按鈕無法點擊，請複製以下連結貼到瀏覽器：<br>
+              <a href="${escapeHtml(formUrl)}" style="color:#b8936a;word-break:break-all;">${escapeHtml(formUrl)}</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #f0ece7;text-align:center;">
+            <p style="margin:0;font-size:10px;color:#bbb;letter-spacing:0.1em;">
+              © ${new Date().getFullYear()} ${BRAND_NAME} · 天然水晶能量飾品
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return resend.emails.send({
+    from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
+    to,
+    subject: secondReminder
+      ? "【LAFLEUR】再次提醒你完成客製資料"
+      : "【LAFLEUR】你的客製設計還在等你",
     html,
   });
 }

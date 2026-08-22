@@ -366,6 +366,10 @@ var orders = mysqlTable("orders", {
   inventoryDeducted: boolean("inventoryDeducted").default(false).notNull(),
   // 付款時間
   paidAt: timestamp("paidAt"),
+  // 客製化表單提醒時間（3 分鐘測試 / 24 小時 / 72 小時）
+  customFormReminder3mSentAt: timestamp("customFormReminder3mSentAt"),
+  customFormReminder24hSentAt: timestamp("customFormReminder24hSentAt"),
+  customFormReminder72hSentAt: timestamp("customFormReminder72hSentAt"),
   // 老闆確認收款時間（銀行轉帳用）
   confirmedAt: timestamp("confirmedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

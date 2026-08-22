@@ -154,6 +154,33 @@ export async function notifyLineOrderShipped(orderId: number): Promise<LinePushR
   return pushLineTextMessage(lineUserId, text);
 }
 
+export async function notifyLineCustomFormReminder(
+  orderId: number,
+  reminderStage: "3m" | "24h" | "72h"
+): Promise<LinePushResult> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const lineUserId = await getLineUserIdForOrder(orderId);
+  if (!lineUserId) return { sent: false, reason: "missing_line_user" };
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) return { sent: false, reason: "missing_order" };
+
+  const text = [
+    "你的 LAFLEUR 客製設計還在等你🤍 我們還沒有收到你的客製資料，填寫完成後設計師才能開始為你進行設計。",
+    "",
+    `訂單編號：${order.merchantTradeNo}`,
+    reminderStage === "72h" ? "這是我們再一次溫柔提醒你完成表單。" : "",
+    "",
+    `填寫客製資料：${getSiteUrl()}/order/${encodeURIComponent(order.merchantTradeNo)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return pushLineTextMessage(lineUserId, text);
+}
+
 export async function notifyLineSafely(
   label: string,
   notify: () => Promise<LinePushResult>

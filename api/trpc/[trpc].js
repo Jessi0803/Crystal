@@ -175,6 +175,10 @@ var init_schema = __esm({
       inventoryDeducted: boolean("inventoryDeducted").default(false).notNull(),
       // 付款時間
       paidAt: timestamp("paidAt"),
+      // 客製化表單提醒時間（3 分鐘測試 / 24 小時 / 72 小時）
+      customFormReminder3mSentAt: timestamp("customFormReminder3mSentAt"),
+      customFormReminder24hSentAt: timestamp("customFormReminder24hSentAt"),
+      customFormReminder72hSentAt: timestamp("customFormReminder72hSentAt"),
       // 老闆確認收款時間（銀行轉帳用）
       confirmedAt: timestamp("confirmedAt"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1176,9 +1180,18 @@ async function attachItemsAndLogisticsForOrders(db, orderRows) {
 var MAX_PRODUCT_IMAGE_LEN = 6e4;
 function sanitizeProductImage(image) {
   if (!image) return null;
-  if (image.startsWith("data:")) return null;
-  if (image.length > MAX_PRODUCT_IMAGE_LEN) return null;
-  return image;
+  const normalized = normalizeProductImageUrl(image);
+  if (normalized.startsWith("data:")) return null;
+  if (normalized.length > MAX_PRODUCT_IMAGE_LEN) return null;
+  return normalized;
+}
+function normalizeProductImageUrl(image) {
+  const trimmed = image.trim();
+  if (!trimmed.includes("drive.google.com")) return trimmed;
+  const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
+  const idMatch = trimmed.match(/[?&]id=([^&#]+)/);
+  const id = fileMatch?.[1] ?? idMatch?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : trimmed;
 }
 async function createOrder(orderData, items) {
   const db = await getDb();
@@ -1331,7 +1344,7 @@ async function getAdminOrderSummaries(limit = 100, offset = 0, statusFilter) {
     current.push({
       id: row.id,
       productName: row.productName,
-      productImage: image
+      productImage: normalizeProductImageUrl(image)
     });
     thumbnailsByOrderId.set(row.orderId, current);
   }
@@ -1382,7 +1395,10 @@ async function getAdminOrderDetail(orderId) {
   return {
     ...order,
     totalAmount: displayTotalAmount,
-    items,
+    items: items.map((item) => ({
+      ...item,
+      productImage: item.productImage ? normalizeProductImageUrl(item.productImage) : item.productImage
+    })),
     logistics: logistics[0] ?? null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
     mergeInfo
@@ -3075,6 +3091,23 @@ async function normalizePurchaseOptionItems(items) {
 function isCustomCheckoutItem(item) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
+function upsertCustomConsultationNote(existingNote, productId, customerNote) {
+  const startMarker = `\u3010\u5BA2\u88FD\u9700\u6C42\u958B\u59CB\uFF1A${productId}\u3011`;
+  const endMarker = `\u3010\u5BA2\u88FD\u9700\u6C42\u7D50\u675F\uFF1A${productId}\u3011`;
+  const noteBlock = [startMarker, customerNote.trim(), endMarker].join("\n");
+  const current = existingNote?.trim() ?? "";
+  if (!current) return noteBlock;
+  const startIndex = current.indexOf(startMarker);
+  const endIndex = current.indexOf(endMarker);
+  if (startIndex >= 0 && endIndex > startIndex) {
+    return [
+      current.slice(0, startIndex).trimEnd(),
+      noteBlock,
+      current.slice(endIndex + endMarker.length).trimStart()
+    ].filter(Boolean).join("\n\n");
+  }
+  return [current, noteBlock].join("\n\n");
+}
 async function attachTwoItemFreeShippingEligibility(items) {
   const db = await getDb();
   if (!db) return items;
@@ -3122,7 +3155,7 @@ var orderRouter = router({
     z2.object({
       buyerName: z2.string().min(1),
       buyerEmail: z2.string().email(),
-      buyerPhone: z2.string().min(8),
+      buyerPhone: z2.string().min(1).max(64),
       checkoutRegion: z2.enum(["domestic", "overseas"]),
       paymentMethod: z2.enum(["credit", "atm"]),
       shippingMethod: z2.enum(["cvs_711", "cvs_family", "home"]),
@@ -3172,7 +3205,16 @@ var orderRouter = router({
           });
         }
       }
-      if (isCustomDepositCheckout) return;
+      if (isCustomDepositCheckout) {
+        if (!data.buyerPhone.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            message: "\u8ACB\u586B\u5BEB IG",
+            path: ["buyerPhone"]
+          });
+        }
+        return;
+      }
       if (data.checkoutRegion === "domestic") {
         const phone = data.buyerPhone.replace(/\s/g, "");
         if (!/^09\d{8}$/.test(phone)) {
@@ -3468,6 +3510,46 @@ var orderRouter = router({
     const order = await getOrderWithItems(input.merchantTradeNo);
     if (!order) return null;
     return order;
+  }),
+  submitCustomConsultation: publicProcedure.input(
+    z2.object({
+      merchantTradeNo: z2.string().min(1),
+      productId: z2.enum([
+        "custom-deposit-product",
+        "tarot-crystal-deposit-product",
+        "chakra-crystal-deposit-product",
+        "numerology-crystal-deposit-product"
+      ]),
+      customerNote: z2.string().min(1).max(1e4)
+    })
+  ).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const order = await getOrderWithItems(input.merchantTradeNo);
+    if (!order) {
+      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
+    }
+    if (!order.isCustomOrder) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u4E0D\u662F\u5BA2\u88FD\u5316\u8A02\u91D1\u8A02\u55AE" });
+    }
+    const hasMatchingProduct = order.items.some((item) => item.productId === input.productId);
+    if (!hasMatchingProduct) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8868\u55AE\u65B9\u6848\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
+    }
+    const canSubmit = order.paymentStatus === "paid" || order.paymentStatus === "confirmed" || order.paymentStatus === "transfer_pending";
+    if (!canSubmit) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u5148\u5B8C\u6210\u4ED8\u6B3E\u5F8C\u518D\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
+    }
+    if (order.orderStatus === "cancelled" || order.paymentStatus === "failed" || order.paymentStatus === "cancelled") {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u72C0\u614B\u7121\u6CD5\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
+    }
+    const customerNote = upsertCustomConsultationNote(
+      order.customerNote,
+      input.productId,
+      input.customerNote
+    );
+    await db.update(orders).set({ customerNote }).where(eq6(orders.merchantTradeNo, input.merchantTradeNo));
+    return { success: true };
   }),
   /**
    * 客人填入轉帳匯款末五碼
@@ -3898,6 +3980,7 @@ var orderRouter = router({
       paymentMethod: z2.enum(["credit", "atm"]),
       includeClearQuartzChips: z2.boolean().optional(),
       checkoutRegion: z2.enum(["domestic", "overseas"]),
+      receiverPhone: z2.string().min(1).max(32),
       shippingMethod: z2.enum(["cvs_711", "cvs_family", "home"]),
       cvsStoreId: z2.string().optional(),
       cvsStoreName: z2.string().optional(),
@@ -3912,7 +3995,15 @@ var orderRouter = router({
       intlPostalCode: z2.string().optional(),
       origin: z2.string().url()
     }).superRefine((data, ctx) => {
+      const receiverPhone = data.receiverPhone.trim();
       if (data.checkoutRegion === "domestic") {
+        if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
+          ctx.addIssue({
+            code: "custom",
+            message: "\u8ACB\u8F38\u5165\u53F0\u7063\u624B\u6A5F\u683C\u5F0F\uFF0809 \u958B\u982D\u5171 10 \u78BC\uFF09",
+            path: ["receiverPhone"]
+          });
+        }
         if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
           if (!data.cvsStoreId?.trim()) {
             ctx.addIssue({ code: "custom", message: "\u8ACB\u9078\u64C7\u8D85\u5546\u9580\u5E02", path: ["cvsStoreId"] });
@@ -3928,6 +4019,9 @@ var orderRouter = router({
           }
         }
       } else {
+        if (receiverPhone.length < 8) {
+          ctx.addIssue({ code: "custom", message: "\u8ACB\u586B\u5BEB\u806F\u7D61\u96FB\u8A71", path: ["receiverPhone"] });
+        }
         const payload = {
           intlCountry: data.intlCountry ?? "",
           intlAddrLine1: data.intlAddrLine1 ?? "",
@@ -4043,6 +4137,7 @@ var orderRouter = router({
       }
     }
     await db.update(orders).set({
+      buyerPhone: input.receiverPhone.trim(),
       deliveryRegion: isOverseas ? "overseas" : "domestic",
       shippingMethod,
       cvsStoreId: cvsStoreId ?? null,
@@ -5358,7 +5453,7 @@ function selectRelatedProductIds(relevantChunks, scoreMin = 0.55, maxProducts = 
   }
   return uniqueProductIdsFromChunks([...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)]).slice(0, maxProducts);
 }
-function normalizeProductImageUrl(url) {
+function normalizeProductImageUrl2(url) {
   const trimmed = url.trim();
   if (!trimmed.includes("drive.google.com")) return trimmed;
   const fileMatch = trimmed.match(/\/file\/d\/([^/?#]+)/);
@@ -5389,7 +5484,7 @@ async function loadRelatedProducts(productIds) {
           name: row.name,
           subtitle: row.subtitle ?? "",
           price: row.price,
-          image: normalizeProductImageUrl(row.image)
+          image: normalizeProductImageUrl2(row.image)
         });
       }
     } catch (error) {
@@ -5405,7 +5500,7 @@ async function loadRelatedProducts(productIds) {
       name: product.name,
       subtitle: product.subtitle,
       price: product.price,
-      image: normalizeProductImageUrl(product.image)
+      image: normalizeProductImageUrl2(product.image)
     });
   }
   return productIds.map((id) => byId.get(id)).filter((p) => Boolean(p));
@@ -6312,8 +6407,8 @@ async function ensureProductsTable() {
   }
   try {
     const customHowToUse = JSON.stringify([
-      "\u586B\u5BEB\u4EE5\u4E0B\u5831\u540D\u8868\u55AE\uFF0C\u63D0\u4F9B\u624B\u570D\u3001\u559C\u6B61\u91D1\u98FE\u6216\u9280\u98FE\uFF0C\u4E26\u78BA\u8A8D\u8A2D\u8A08\u9700\u6C42\u3002",
       "\u652F\u4ED8\u8A02\u91D1\u3002",
+      "\u586B\u5BEB\u5831\u540D\u8868\u55AE\uFF0C\u63D0\u4F9B\u624B\u570D\u3001\u559C\u6B61\u91D1\u98FE\u6216\u9280\u98FE\uFF0C\u4E26\u78BA\u8A8D\u8A2D\u8A08\u9700\u6C42\u3002",
       "\u52A0\u5165\u5B98\u65B9 LINE\uFF0C\u7B49\u5F85\u8A2D\u8A08\u5E2B\u50B3\u9001\u6C34\u6676\u642D\u914D\u5716\u3002",
       "\u624B\u934A\u8207\u8A2D\u8A08\u78BA\u8A8D\u5B8C\u6210\u5F8C\uFF0C\u5C07\u63D0\u4F9B\u5C3E\u6B3E\u5831\u50F9\u3002",
       "\u5C3E\u6B3E\u652F\u4ED8\u5B8C\u7562\uFF0C\u6E96\u5099\u51FA\u8CA8\u3002"
