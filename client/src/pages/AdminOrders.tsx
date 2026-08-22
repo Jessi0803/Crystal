@@ -40,6 +40,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { formatCustomConsultationNoteForDisplay } from "@shared/customConsultationNote";
 
 type StatusFilter =
   | "all"
@@ -618,14 +619,14 @@ function OrderRowCard({
                           <div key={member.orderId}>
                             <p className="mb-1 font-mono text-[11px] text-amber-700">{member.merchantTradeNo}</p>
                             <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                              {member.customerNote}
+                              {formatCustomConsultationNoteForDisplay(member.customerNote)}
                             </pre>
                           </div>
                         ))}
                     </div>
                   ) : (
                     <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                      {(detail as any).customerNote}
+                      {formatCustomConsultationNoteForDisplay((detail as any).customerNote)}
                     </pre>
                   )}
                 </div>

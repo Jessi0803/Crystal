@@ -4,6 +4,7 @@
  */
 import { Resend } from "resend";
 import { ENV } from "./_core/env";
+import { formatCustomConsultationNoteForDisplay } from "../shared/customConsultationNote";
 
 const FROM_ADDRESS = "service@goodaytarot.com";
 const BRAND_NAME = "椛 · Crystal";
@@ -306,7 +307,7 @@ export async function sendAdminOrderNotificationEmail(payload: AdminOrderNotific
             <p style="margin:0 0 4px;font-size:13px;color:#555;">Email：${escapeHtml(buyerEmail)}</p>
             <p style="margin:0 0 20px;font-size:13px;color:#555;">手機：${escapeHtml(buyerPhone)}</p>
 
-            ${customerNote ? `<p style="margin:0 0 20px;font-size:13px;color:#555;line-height:1.7;">顧客備註：${escapeHtml(customerNote)}</p>` : ""}
+            ${customerNote ? `<p style="margin:0 0 20px;font-size:13px;color:#555;line-height:1.7;">顧客備註：${escapeHtml(formatCustomConsultationNoteForDisplay(customerNote))}</p>` : ""}
 
             <p style="margin:0 0 8px;font-size:12px;color:#999;letter-spacing:0.12em;">商品明細</p>
             <table width="100%" cellpadding="0" cellspacing="0">
