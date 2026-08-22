@@ -4,14 +4,16 @@ import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
-import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
+import CustomFormDesignStyleField, {
+  type CustomDesignStyleChoice,
+  formatCustomDesignStyleNote,
+} from "@/components/CustomFormDesignStyleField";
 import CustomFormFocusField, {
   type CustomFocusChoice,
   formatCustomFocusNote,
   validateCustomFocus,
 } from "@/components/CustomFormFocusField";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
-import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 import {
   CUSTOM_WRIST_SIZE_MAX,
   CUSTOM_WRIST_SIZE_MIN,
@@ -278,13 +280,8 @@ interface TarotData {
 interface BraceletData {
   focus: CustomFocusChoice;
   focusStory: string;
+  designStyle: CustomDesignStyleChoice;
   wristSize: string;
-  fitPreference: "" | "just-right" | "loose";
-  metalPreference: "" | "gold" | "silver" | "either";
-  silverTube: "" | "yes" | "no";
-  beadFrame: "" | "yes" | "no";
-  claspType: "" | "lobster" | "magnet" | "elastic";
-  pendantCharm: "" | "yes" | "no";
   colorPreference: string;
   specialRequests: string;
   igHandle: string;
@@ -311,16 +308,11 @@ const EMPTY_TAROT: TarotData = {
 const EMPTY_BRACELET: BraceletData = {
   focus: "",
   focusStory: "",
+  designStyle: "",
   wristSize: "",
-  fitPreference: "",
-  metalPreference: "",
-  silverTube: "",
-  beadFrame: "",
-  claspType: "",
   colorPreference: "",
   specialRequests: "",
   igHandle: "",
-  pendantCharm: "",
 };
 
 function buildNote(
@@ -378,16 +370,11 @@ function buildNote(
   const braceletLines = [
     "",
     "── 水晶手鍊偏好 ──",
-    `額外指定的其他功效：${formatCustomFocusNote(bracelet.focus, bracelet.focusStory)}`,
+    `這次最想為自己調整的是：${formatCustomFocusNote(bracelet.focus, bracelet.focusStory)}`,
+    `喜歡 / 不喜歡的顏色：${bracelet.colorPreference || "無特別指定"}`,
+    `希望整體設計：${formatCustomDesignStyleNote(bracelet.designStyle)}`,
     `手圍：${bracelet.wristSize ? `${bracelet.wristSize} cm` : "（未填）"}`,
-    `鬆緊偏好：${bracelet.fitPreference === "just-right" ? "剛好" : bracelet.fitPreference === "loose" ? "微鬆" : "（未填）"}`,
-    `金飾 / 銀飾：${bracelet.metalPreference === "gold" ? "金飾" : bracelet.metalPreference === "silver" ? "銀飾" : bracelet.metalPreference === "either" ? "都可以" : "（未填）"}`,
-    `加銀管：${bracelet.silverTube === "yes" ? "要" : bracelet.silverTube === "no" ? "不要" : "（未填）"}`,
-    `珠框：${bracelet.beadFrame === "yes" ? "要" : bracelet.beadFrame === "no" ? "不要" : "（未填）"}`,
-    `扣具：${bracelet.claspType === "lobster" ? "龍蝦扣（+200元）" : bracelet.claspType === "magnet" ? "磁扣（+200元）" : bracelet.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
-    `吊飾：${bracelet.pendantCharm === "yes" ? "要加" : bracelet.pendantCharm === "no" ? "不要" : "（未填）"}`,
-    `特定顏色水晶：${bracelet.colorPreference || "無特別指定"}`,
-    `其餘特殊需求：${bracelet.specialRequests || "無"}`,
+    `最後想告訴設計師的內容：${bracelet.specialRequests || "無"}`,
     `Instagram 帳號 / LINE ID：${bracelet.igHandle || "（未填）"}`,
   ];
 
@@ -644,9 +631,8 @@ export default function CustomFormB() {
 
   const braceletSteps = [
     {
-      title: "除了這次搭配的能量主題外，這次最想為自己調整的是？",
-      subtitle:
-        "老闆會以塔羅解讀結果為主，你也可以許願想加強的能量；沒有想法就交給設計師",
+      title: "這次最想為自己調整的是？",
+      subtitle: "選一個目前最想被照顧到的面向，設計師會以此為主軸挑選水晶",
       required: true,
       field: (
         <CustomFormFocusField
@@ -660,245 +646,8 @@ export default function CustomFormB() {
       ),
     },
     {
-      title: "手圍尺寸是多少？",
-      subtitle: "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減",
-      required: true,
-      field: (
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            value={bracelet.wristSize}
-            onChange={e =>
-              setBracelet({ ...bracelet, wristSize: e.target.value })
-            }
-            placeholder="例如：15.5"
-            step={CUSTOM_WRIST_SIZE_STEP}
-            min={CUSTOM_WRIST_SIZE_MIN}
-            max={CUSTOM_WRIST_SIZE_MAX}
-            className="w-48 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
-          />
-          <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
-        </div>
-      ),
-    },
-    {
-      title: "手圍的鬆緊偏好？",
-      subtitle: "這會影響手鍊的實際製作尺寸",
-      required: true,
-      field: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            {
-              id: "just-right" as const,
-              label: "剛好",
-              desc: "會有水晶壓痕但不掐肉",
-            },
-            { id: "loose" as const, label: "微鬆", desc: "可輕微滑動" },
-          ].map(opt => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() =>
-                setBracelet({ ...bracelet, fitPreference: opt.id })
-              }
-              className={`px-5 py-4 text-sm font-body border-2 text-left transition-colors rounded-sm ${bracelet.fitPreference === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-            >
-              <span className="block font-semibold text-base mb-1">
-                {opt.label}
-              </span>
-              <span className="block text-xs leading-relaxed opacity-80">
-                {opt.desc}
-              </span>
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "喜歡金飾還是銀飾？",
-      subtitle: "這會影響配件（銀管、珠框等）的材質選擇",
-      required: true,
-      field: (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { id: "gold" as const, label: "金飾", img: "/golden.jpg" },
-              { id: "silver" as const, label: "銀飾", img: "/silver.jpg" },
-            ].map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() =>
-                  setBracelet({ ...bracelet, metalPreference: opt.id })
-                }
-                className={`border-2 rounded-sm overflow-hidden transition-colors ${bracelet.metalPreference === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-              >
-                <img
-                  src={opt.img}
-                  alt={opt.label}
-                  className="w-full h-40 object-cover"
-                />
-                <p
-                  className={`text-sm font-body text-center py-2.5 ${bracelet.metalPreference === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}
-                >
-                  {opt.label}
-                </p>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              setBracelet({ ...bracelet, metalPreference: "either" })
-            }
-            className={`w-full px-4 py-3 text-sm font-body border-2 transition-colors rounded-sm ${bracelet.metalPreference === "either" ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-          >
-            都可以
-          </button>
-        </div>
-      ),
-    },
-    {
-      title: "要加銀管或珠框嗎？",
-      subtitle: "可分開選擇，以下附上參考圖片",
-      required: true,
-      field: (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <img
-              src="/bead-frame-1.jpg"
-              alt="珠框銀管參考1"
-              className="w-full h-56 object-cover rounded-sm"
-            />
-            <img
-              src="/bead-frame-2.jpg"
-              alt="珠框銀管參考2"
-              className="w-full h-56 object-cover rounded-sm"
-            />
-          </div>
-          <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
-              銀管
-            </p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
-              穿在水晶珠之間的小金屬管，可增加層次感與精緻度
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: "yes" as const, label: "要" },
-                { id: "no" as const, label: "不要" },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() =>
-                    setBracelet({ ...bracelet, silverTube: opt.id })
-                  }
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${bracelet.silverTube === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
-              珠框
-            </p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
-              套在主石外的金屬框，可突顯主石、增加立體感
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: "yes" as const, label: "要" },
-                { id: "no" as const, label: "不要" },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() =>
-                    setBracelet({ ...bracelet, beadFrame: opt.id })
-                  }
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${bracelet.beadFrame === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "要換龍蝦扣或磁扣嗎？",
-      subtitle: "預設為彈力繩；若更換扣具需額外加收 200 元",
-      required: true,
-      field: (
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              {
-                id: "lobster" as const,
-                label: "龍蝦扣",
-                sub: "+200元",
-                img: "/lobster-clasp.jpg",
-              },
-              {
-                id: "magnet" as const,
-                label: "磁扣",
-                sub: "+200元",
-                img: "/magnet-clasp.png",
-              },
-              {
-                id: "elastic" as const,
-                label: "彈力繩",
-                sub: "免費",
-                img: "/elastic-cord.jpg",
-              },
-            ].map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setBracelet({ ...bracelet, claspType: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${bracelet.claspType === opt.id ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-              >
-                <div className="flex aspect-square items-center justify-center bg-[oklch(0.97_0_0)] p-1">
-                  <img
-                    src={opt.img}
-                    alt={opt.label}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <p
-                  className={`text-xs font-body py-2 ${bracelet.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}
-                >
-                  {opt.label}
-                  <br />
-                  <span className="text-[0.6rem] text-[oklch(0.55_0_0)]">
-                    （{opt.sub}）
-                  </span>
-                </p>
-              </button>
-            ))}
-          </div>
-          <ClaspDurabilityNotice />
-        </div>
-      ),
-    },
-    {
-      title: "要加吊飾嗎？",
-      subtitle: "可加掛於手鍊上，請選擇是否需要；細節可下單後與店家討論",
-      required: true,
-      field: (
-        <CustomFormPendantCharmField
-          value={bracelet.pendantCharm}
-          onChange={pendantCharm => setBracelet({ ...bracelet, pendantCharm })}
-        />
-      ),
-    },
-    {
-      title: "有想要的水晶顏色嗎？",
-      subtitle: "例如：偏粉色系、紫色、透明……沒有指定可以留空",
+      title: "有沒有特別喜歡／不喜歡的顏色？",
+      subtitle: "例如：喜歡粉色、紫色、透明；不喜歡太深、太亮……沒有特別指定也可以留空",
       required: false,
       field: (
         <textarea
@@ -906,15 +655,54 @@ export default function CustomFormB() {
           onChange={e =>
             setBracelet({ ...bracelet, colorPreference: e.target.value })
           }
-          placeholder="寫下喜歡的顏色或色系，沒有指定可以留空"
+          placeholder="寫下喜歡或不喜歡的顏色，沒有指定可以留空"
           rows={5}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
         />
       ),
     },
     {
-      title: "還有其他特殊需求嗎？",
-      subtitle: "例如過敏材質、特別風格、紀念意義……沒有的話留空即可",
+      title: "希望整體設計？",
+      subtitle: "選一個最接近你想像的方向",
+      required: true,
+      field: (
+        <CustomFormDesignStyleField
+          value={bracelet.designStyle}
+          onChange={designStyle => setBracelet({ ...bracelet, designStyle })}
+        />
+      ),
+    },
+    {
+      title: "手圍",
+      subtitle: "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減",
+      required: true,
+      field: (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              value={bracelet.wristSize}
+              onChange={e =>
+                setBracelet({ ...bracelet, wristSize: e.target.value })
+              }
+              placeholder="例如：15.5"
+              step={CUSTOM_WRIST_SIZE_STEP}
+              min={CUSTOM_WRIST_SIZE_MIN}
+              max={CUSTOM_WRIST_SIZE_MAX}
+              className="w-48 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+            />
+            <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
+          </div>
+          <p className="text-xs font-body text-[oklch(0.6_0_0)] leading-relaxed">
+            不知道怎麼量？拿皮尺平貼在想戴的位置，繞一圈的長度就是淨手圍。
+          </p>
+        </div>
+      ),
+    },
+    {
+      title: "最後，有沒有什麼想告訴設計師的？",
+      subtitle:
+        "自由填寫。可以寫喜歡／不喜歡的飾品、要不要吊飾、要不要銀管金管、鬆緊或扣具偏好、過敏材質、紀念意義等。",
       required: false,
       field: (
         <textarea
@@ -922,8 +710,8 @@ export default function CustomFormB() {
           onChange={e =>
             setBracelet({ ...bracelet, specialRequests: e.target.value })
           }
-          placeholder="有任何其他想說的都可以寫在這裡"
-          rows={5}
+          placeholder="例如：不喜歡太華麗、不要吊飾、想加銀管、希望彈力繩、容易過敏不要某種材質……"
+          rows={7}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
         />
       ),
@@ -954,9 +742,6 @@ export default function CustomFormB() {
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-sm transition-opacity hover:opacity-90"
               style={{ backgroundColor: "#06C755" }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.630 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-              </svg>
               加入官方 LINE
             </a>
           </div>
@@ -1059,32 +844,16 @@ export default function CustomFormB() {
       toast.error(focusError);
       return false;
     }
+    if (!bracelet.designStyle) {
+      toast.error("請選擇希望整體設計");
+      return false;
+    }
     if (!bracelet.wristSize) {
       toast.error("請填寫手圍尺寸");
       return false;
     }
     if (!isValidCustomWristSize(bracelet.wristSize)) {
       toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
-      return false;
-    }
-    if (!bracelet.fitPreference) {
-      toast.error("請選擇鬆緊偏好");
-      return false;
-    }
-    if (!bracelet.metalPreference) {
-      toast.error("請選擇金飾 / 銀飾偏好");
-      return false;
-    }
-    if (!bracelet.silverTube || !bracelet.beadFrame) {
-      toast.error("請選擇銀管和珠框的偏好");
-      return false;
-    }
-    if (!bracelet.claspType) {
-      toast.error("請選擇扣具");
-      return false;
-    }
-    if (!bracelet.pendantCharm) {
-      toast.error("請選擇是否要加吊飾");
       return false;
     }
     if (!bracelet.igHandle.trim()) {

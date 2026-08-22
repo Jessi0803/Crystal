@@ -3,14 +3,16 @@ import { useState } from "react";
 import { Check, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
+import CustomFormDesignStyleField, {
+  type CustomDesignStyleChoice,
+  formatCustomDesignStyleNote,
+} from "@/components/CustomFormDesignStyleField";
 import CustomFormFocusField, {
   type CustomFocusChoice,
   formatCustomFocusNote,
   validateCustomFocus,
 } from "@/components/CustomFormFocusField";
 import CustomFormOrderingIntro from "@/components/CustomFormOrderingIntro";
-import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
 import {
   CUSTOM_WRIST_SIZE_MAX,
   CUSTOM_WRIST_SIZE_MIN,
@@ -25,13 +27,8 @@ import {
 interface FormData {
   focus: CustomFocusChoice;
   focusStory: string;
+  designStyle: CustomDesignStyleChoice;
   wristSize: string;
-  fitPreference: "" | "just-right" | "loose";
-  metalPreference: "" | "gold" | "silver" | "either";
-  silverTube: "" | "yes" | "no";
-  beadFrame: "" | "yes" | "no";
-  claspType: "" | "lobster" | "magnet" | "elastic";
-  pendantCharm: "" | "yes" | "no";
   colorPreference: string;
   specialRequests: string;
   igHandle: string;
@@ -40,13 +37,8 @@ interface FormData {
 const EMPTY_FORM: FormData = {
   focus: "",
   focusStory: "",
+  designStyle: "",
   wristSize: "",
-  fitPreference: "",
-  metalPreference: "",
-  silverTube: "",
-  beadFrame: "",
-  claspType: "",
-  pendantCharm: "",
   colorPreference: "",
   specialRequests: "",
   igHandle: "",
@@ -57,15 +49,10 @@ function buildNote(form: FormData): string {
     "【純客製水晶手鍊諮詢表單】",
     "",
     `這次最想為自己調整的是：${formatCustomFocusNote(form.focus, form.focusStory)}`,
+    `喜歡 / 不喜歡的顏色：${form.colorPreference || "無特別指定"}`,
+    `希望整體設計：${formatCustomDesignStyleNote(form.designStyle)}`,
     `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
-    `鬆緊偏好：${form.fitPreference === "just-right" ? "剛好（有水晶壓痕但不掐肉）" : form.fitPreference === "loose" ? "微鬆（可輕微滑動）" : "（未填）"}`,
-    `金飾 / 銀飾：${form.metalPreference === "gold" ? "金飾" : form.metalPreference === "silver" ? "銀飾" : form.metalPreference === "either" ? "都可以" : "（未填）"}`,
-    `加銀管：${form.silverTube === "yes" ? "要" : form.silverTube === "no" ? "不要" : "（未填）"}`,
-    `珠框：${form.beadFrame === "yes" ? "要" : form.beadFrame === "no" ? "不要" : "（未填）"}`,
-    `扣具：${form.claspType === "lobster" ? "龍蝦扣（+200元）" : form.claspType === "magnet" ? "磁扣（+200元）" : form.claspType === "elastic" ? "不用，彈力繩就好" : "（未填）"}`,
-    `吊飾：${form.pendantCharm === "yes" ? "要加" : form.pendantCharm === "no" ? "不要" : "（未填）"}`,
-    `特定顏色水晶：${form.colorPreference || "無特別指定"}`,
-    `其餘特殊需求：${form.specialRequests || "無"}`,
+    `最後想告訴設計師的內容：${form.specialRequests || "無"}`,
     `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
   ].join("\n");
 }
@@ -89,7 +76,32 @@ export default function CustomForm() {
       ),
     },
     {
-      title: "手圍尺寸是多少？",
+      title: "有沒有特別喜歡／不喜歡的顏色？",
+      subtitle: "例如：喜歡粉色、紫色、透明；不喜歡太深、太亮……沒有特別指定也可以留空",
+      required: false,
+      field: (
+        <textarea
+          value={form.colorPreference}
+          onChange={e => setForm({ ...form, colorPreference: e.target.value })}
+          placeholder="寫下喜歡或不喜歡的顏色，沒有指定可以留空"
+          rows={5}
+          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+        />
+      ),
+    },
+    {
+      title: "希望整體設計？",
+      subtitle: "選一個最接近你想像的方向",
+      required: true,
+      field: (
+        <CustomFormDesignStyleField
+          value={form.designStyle}
+          onChange={designStyle => setForm({ ...form, designStyle })}
+        />
+      ),
+    },
+    {
+      title: "手圍",
       subtitle:
         "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減，我們會幫您調整鬆緊",
       required: true,
@@ -115,259 +127,16 @@ export default function CustomForm() {
       ),
     },
     {
-      title: "手圍的鬆緊偏好？",
-      subtitle: "這會影響手鍊的實際製作尺寸",
-      required: true,
-      field: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            {
-              id: "just-right" as const,
-              label: "剛好",
-              desc: "會有水晶壓痕但不掐肉，手鍊緊貼手腕",
-            },
-            {
-              id: "loose" as const,
-              label: "微鬆",
-              desc: "可輕微滑動，戴起來較為舒適寬鬆",
-            },
-          ].map(opt => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setForm({ ...form, fitPreference: opt.id })}
-              className={`px-5 py-4 text-sm font-body border-2 text-left transition-colors rounded-sm ${
-                form.fitPreference === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-              }`}
-            >
-              <span className="block font-semibold text-base mb-1">
-                {opt.label}
-              </span>
-              <span className="block text-xs leading-relaxed opacity-80">
-                {opt.desc}
-              </span>
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "喜歡金飾還是銀飾？",
-      subtitle: "這會影響配件（銀管、珠框等）的材質選擇",
-      required: true,
-      field: (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { id: "gold" as const, label: "金飾", img: "/golden.jpg" },
-              { id: "silver" as const, label: "銀飾", img: "/silver.jpg" },
-            ].map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setForm({ ...form, metalPreference: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${
-                  form.metalPreference === opt.id
-                    ? "border-[oklch(0.1_0_0)]"
-                    : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
-                }`}
-              >
-                <img
-                  src={opt.img}
-                  alt={opt.label}
-                  className="w-full h-44 object-cover"
-                />
-                <p
-                  className={`text-sm font-body text-center py-2.5 ${
-                    form.metalPreference === opt.id
-                      ? "bg-[oklch(0.97_0_0)] font-semibold"
-                      : "text-[oklch(0.45_0_0)]"
-                  }`}
-                >
-                  {opt.label}
-                </p>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, metalPreference: "either" })}
-            className={`w-full px-4 py-3 text-sm font-body border-2 transition-colors rounded-sm ${
-              form.metalPreference === "either"
-                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
-                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-            }`}
-          >
-            都可以
-          </button>
-        </div>
-      ),
-    },
-    {
-      title: "要加銀管或珠框嗎？",
-      subtitle: "可分開選擇，以下附上參考圖片",
-      required: true,
-      field: (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <img
-              src="/bead-frame-1.jpg"
-              alt="珠框銀管參考1"
-              className="w-full h-56 object-cover rounded-sm"
-            />
-            <img
-              src="/bead-frame-2.jpg"
-              alt="珠框銀管參考2"
-              className="w-full h-56 object-cover rounded-sm"
-            />
-          </div>
-          <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
-              銀管
-            </p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
-              穿在水晶珠之間的小金屬管，可增加層次感與精緻度
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: "yes" as const, label: "要" },
-                { id: "no" as const, label: "不要" },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, silverTube: opt.id })}
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.silverTube === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
-              珠框
-            </p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
-              套在主石外的金屬框，可突顯主石、增加立體感
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: "yes" as const, label: "要" },
-                { id: "no" as const, label: "不要" },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, beadFrame: opt.id })}
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${form.beadFrame === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "要換龍蝦扣或磁扣嗎？",
-      subtitle: "預設為彈力繩；若更換扣具需額外加收 200 元",
-      required: true,
-      field: (
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              {
-                id: "lobster" as const,
-                label: "龍蝦扣",
-                sub: "+200元",
-                img: "/lobster-clasp.jpg",
-              },
-              {
-                id: "magnet" as const,
-                label: "磁扣",
-                sub: "+200元",
-                img: "/magnet-clasp.png",
-              },
-              {
-                id: "elastic" as const,
-                label: "彈力繩",
-                sub: "免費",
-                img: "/elastic-cord.jpg",
-              },
-            ].map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setForm({ ...form, claspType: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${
-                  form.claspType === opt.id
-                    ? "border-[oklch(0.1_0_0)]"
-                    : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
-                }`}
-              >
-                <div className="flex aspect-square items-center justify-center bg-[oklch(0.97_0_0)] p-1">
-                  <img
-                    src={opt.img}
-                    alt={opt.label}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <p
-                  className={`text-xs font-body py-2 ${form.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}
-                >
-                  {opt.label}
-                  <br />
-                  <span className="text-[0.6rem] text-[oklch(0.55_0_0)]">
-                    （{opt.sub}）
-                  </span>
-                </p>
-              </button>
-            ))}
-          </div>
-          <ClaspDurabilityNotice />
-        </div>
-      ),
-    },
-    {
-      title: "要加吊飾嗎？",
-      subtitle: "可加掛於手鍊上，請選擇是否需要；細節可下單後與店家討論",
-      required: true,
-      field: (
-        <CustomFormPendantCharmField
-          value={form.pendantCharm}
-          onChange={pendantCharm => setForm({ ...form, pendantCharm })}
-        />
-      ),
-    },
-    {
-      title: "有想要的水晶顏色嗎？",
-      subtitle: "例如：偏粉色系、紫色、透明……沒有特別指定也沒關係，留空即可",
-      required: false,
-      field: (
-        <textarea
-          value={form.colorPreference}
-          onChange={e => setForm({ ...form, colorPreference: e.target.value })}
-          placeholder="寫下喜歡的顏色或色系，沒有指定可以留空"
-          rows={5}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
-        />
-      ),
-    },
-    {
-      title: "還有其他特殊需求嗎？",
+      title: "最後，有沒有什麼想告訴設計師的？",
       subtitle:
-        "任何其他想告訴老闆的事情，例如過敏材質、特別風格、紀念意義……沒有的話留空即可",
+        "自由填寫。可以寫喜歡／不喜歡的飾品、要不要吊飾、要不要銀管金管、鬆緊或扣具偏好、過敏材質、紀念意義等。",
       required: false,
       field: (
         <textarea
           value={form.specialRequests}
           onChange={e => setForm({ ...form, specialRequests: e.target.value })}
-          placeholder="有任何其他想說的都可以寫在這裡"
-          rows={5}
+          placeholder="例如：不喜歡太華麗、不要吊飾、想加銀管、希望彈力繩、容易過敏不要某種材質……"
+          rows={7}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
         />
       ),
@@ -438,32 +207,16 @@ export default function CustomForm() {
       toast.error(focusError);
       return false;
     }
+    if (!form.designStyle) {
+      toast.error("請選擇希望整體設計");
+      return false;
+    }
     if (!form.wristSize) {
       toast.error("請填寫手圍尺寸");
       return false;
     }
     if (!isValidCustomWristSize(form.wristSize)) {
       toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
-      return false;
-    }
-    if (!form.fitPreference) {
-      toast.error("請選擇鬆緊偏好");
-      return false;
-    }
-    if (!form.metalPreference) {
-      toast.error("請選擇金飾 / 銀飾偏好");
-      return false;
-    }
-    if (!form.silverTube || !form.beadFrame) {
-      toast.error("請選擇銀管和珠框的偏好");
-      return false;
-    }
-    if (!form.claspType) {
-      toast.error("請選擇扣具");
-      return false;
-    }
-    if (!form.pendantCharm) {
-      toast.error("請選擇是否要加吊飾");
       return false;
     }
     if (!form.igHandle.trim()) {

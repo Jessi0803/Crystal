@@ -8,7 +8,7 @@ export const CUSTOM_FOCUS_OPTIONS = [
   { id: "emotion", label: "情緒" },
   { id: "confidence", label: "自信" },
   { id: "new-start", label: "新的開始" },
-  { id: "other", label: "其他" },
+  { id: "other", label: "其他（可以跟我們說明你的故事）" },
   { id: "designer", label: "沒有想法，交給設計師" },
 ] as const;
 
@@ -69,7 +69,9 @@ export default function CustomFormFocusField({
             type="button"
             onClick={() => onChange(opt.id)}
             className={`px-4 py-3.5 text-sm font-body border-2 transition-colors rounded-sm ${
-              opt.id === "designer" ? "col-span-2 sm:col-span-3" : ""
+              opt.id === "designer" || opt.id === "other"
+                ? "col-span-2 sm:col-span-3"
+                : ""
             } ${
               value === opt.id
                 ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
