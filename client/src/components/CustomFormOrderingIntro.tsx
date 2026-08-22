@@ -21,8 +21,8 @@ export default function CustomFormOrderingIntro() {
           訂購流程
         </p>
         <ol className="ml-0.5 list-outside list-decimal space-y-2.5 pl-5 text-sm font-body font-light text-[oklch(0.32_0_0)] leading-[1.75] marker:font-medium marker:text-[oklch(0.58_0.09_70)]">
-          <li>先於客製方案頁支付訂金。</li>
-          <li>付款完成後，從訂單頁填寫以下報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
+          <li>支付訂金。</li>
+          <li>填寫報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
           <li>
             加入
             <a
