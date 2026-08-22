@@ -340,7 +340,7 @@ function OrderRowCard({
                     {[
                       { icon: <User className="w-3.5 h-3.5" />, label: "姓名", value: detail.buyerName },
                       { icon: <Mail className="w-3.5 h-3.5" />, label: "Email", value: detail.buyerEmail },
-                      { icon: <Phone className="w-3.5 h-3.5" />, label: "手機", value: detail.buyerPhone },
+                      { icon: <Phone className="w-3.5 h-3.5" />, label: detail.isCustomOrder ? "LINE" : "手機", value: detail.buyerPhone },
                       { icon: <MapPin className="w-3.5 h-3.5" />, label: "配送", value: detail.cvsStoreName ? `${getShippingLabel(detail.shippingMethod ?? "")} — ${detail.cvsStoreName}` : (detail.shippingAddress ?? getShippingLabel(detail.shippingMethod ?? "")) },
                     ].map((row) => (
                       <div key={row.label} className="flex items-start gap-2 text-sm font-body">
