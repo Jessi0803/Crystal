@@ -3,6 +3,11 @@ import { useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
+import CustomFormBraceletPreferenceFields, {
+  type CustomFormBraceletPreferences,
+  formatCustomBraceletPreferenceLines,
+  validateCustomBraceletPreferences,
+} from "@/components/CustomFormBraceletPreferenceFields";
 import CustomFormDesignStyleField, {
   type CustomDesignStyleChoice,
   formatCustomDesignStyleNote,
@@ -31,6 +36,12 @@ interface FormData {
   focusStory: string;
   designStyle: CustomDesignStyleChoice;
   wristSize: string;
+  fitPreference: CustomFormBraceletPreferences["fitPreference"];
+  metalPreference: CustomFormBraceletPreferences["metalPreference"];
+  silverTube: CustomFormBraceletPreferences["silverTube"];
+  beadFrame: CustomFormBraceletPreferences["beadFrame"];
+  claspType: CustomFormBraceletPreferences["claspType"];
+  pendantCharm: CustomFormBraceletPreferences["pendantCharm"];
   colorPreference: string;
   specialRequests: string;
   igHandle: string;
@@ -43,6 +54,12 @@ const EMPTY_FORM: FormData = {
   focusStory: "",
   designStyle: "",
   wristSize: "",
+  fitPreference: "",
+  metalPreference: "",
+  silverTube: "",
+  beadFrame: "",
+  claspType: "",
+  pendantCharm: "",
   colorPreference: "",
   specialRequests: "",
   igHandle: "",
@@ -58,6 +75,7 @@ function buildNote(form: FormData): string {
     `喜歡 / 不喜歡的顏色：${form.colorPreference || "無特別指定"}`,
     `希望整體設計：${formatCustomDesignStyleNote(form.designStyle)}`,
     `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
+    ...formatCustomBraceletPreferenceLines(form),
     `最後想告訴設計師的內容：${form.specialRequests || "無"}`,
     `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
   ].join("\n");
@@ -163,15 +181,26 @@ export default function CustomFormC() {
       ),
     },
     {
+      title: "配件與佩戴偏好",
+      subtitle: "請選擇鬆緊、金銀飾、銀管珠框、扣具與吊飾偏好",
+      required: true,
+      field: (
+        <CustomFormBraceletPreferenceFields
+          value={form}
+          onChange={updates => setForm({ ...form, ...updates })}
+        />
+      ),
+    },
+    {
       title: "最後，有沒有什麼想告訴設計師的？",
       subtitle:
-        "自由填寫。可以寫喜歡／不喜歡的飾品、要不要吊飾、要不要銀管金管、鬆緊或扣具偏好、過敏材質、紀念意義等。",
+        "自由填寫。可以補充喜歡／不喜歡的飾品、過敏材質、紀念意義，或其他想讓設計師知道的內容。",
       required: false,
       field: (
         <textarea
           value={form.specialRequests}
           onChange={e => setForm({ ...form, specialRequests: e.target.value })}
-          placeholder="例如：不喜歡太華麗、不要吊飾、想加銀管、希望彈力繩、容易過敏不要某種材質……"
+          placeholder="例如：不喜歡太華麗、容易過敏不要某種材質、想放入某個紀念意義……"
           rows={7}
           className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
         />
@@ -261,6 +290,11 @@ export default function CustomFormC() {
     }
     if (!isValidCustomWristSize(form.wristSize)) {
       toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
+      return false;
+    }
+    const preferenceError = validateCustomBraceletPreferences(form);
+    if (preferenceError) {
+      toast.error(preferenceError);
       return false;
     }
     if (!form.igHandle.trim()) {
