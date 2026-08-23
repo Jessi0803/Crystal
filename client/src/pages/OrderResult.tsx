@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
-import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } from "lucide-react";
+import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
@@ -376,31 +376,46 @@ export default function OrderResult() {
         </div>
 
         <Dialog open={isCustomReminderOpen && shouldPromptForCustomForm} onOpenChange={handleCustomReminderOpenChange}>
-          <DialogContent className="max-w-2xl border-rose-200 bg-rose-50 p-6 sm:p-8">
-            <DialogTitle className="text-xl font-body font-semibold tracking-wide text-rose-800">
-              接下來，告訴我們你的故事。
-            </DialogTitle>
-            <DialogDescription className="text-base font-body leading-relaxed text-rose-700">
-              大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
-            </DialogDescription>
-            <p className="text-sm font-body leading-relaxed text-rose-700/85">
-              客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
-            </p>
-            <div className="mt-3 space-y-3">
+          <DialogContent className="max-w-2xl border border-rose-100 bg-[oklch(0.995_0.012_20)] p-0 shadow-2xl shadow-black/12">
+            <div className="border-b border-rose-100 px-6 pb-5 pt-7 sm:px-8 sm:pt-8">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-700 shadow-sm ring-1 ring-rose-100">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <DialogTitle className="text-2xl font-body font-semibold leading-snug tracking-wide text-[oklch(0.28_0.11_20)]">
+                接下來，告訴我們你的故事。
+              </DialogTitle>
+              <DialogDescription className="mt-3 text-sm font-body leading-relaxed text-[oklch(0.43_0.08_20)]">
+                大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
+              </DialogDescription>
+              <div className="mt-4 border-l-2 border-[oklch(0.72_0.12_25)] bg-white/70 px-4 py-3">
+                <p className="text-xs font-body leading-relaxed text-[oklch(0.42_0.04_25)]">
+                  客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3 px-6 py-5 sm:px-8 sm:py-6">
               {pendingCustomDepositItems.map((item) => {
                 const customFormPath = getCustomFormPath(item.productId);
                 if (!customFormPath) return null;
                 return (
                   <button
                     key={`${item.id}-${item.itemIndex}`}
-                    className="w-full bg-black px-5 py-4 text-left text-sm font-body tracking-[0.12em] text-white transition-opacity hover:opacity-85"
+                    className="group flex w-full items-center justify-between gap-4 border border-[oklch(0.84_0.03_20)] bg-white px-5 py-4 text-left transition-colors hover:border-[oklch(0.45_0.08_20)] hover:bg-[oklch(0.985_0.01_20)]"
                     onClick={() =>
                       setLocation(
                         `${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}&orderItemId=${item.id}&itemIndex=${item.itemIndex}`
                       )
                     }
                   >
-                    填寫{item.productName}{item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}需求
+                    <span className="min-w-0">
+                      <span className="mb-1 block text-[0.68rem] font-body tracking-[0.16em] text-[oklch(0.54_0.06_20)]">
+                        填寫客製需求
+                      </span>
+                      <span className="block text-sm font-body font-medium leading-relaxed text-[oklch(0.16_0_0)]">
+                        {item.productName}{item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
+                      </span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-[oklch(0.4_0_0)] transition-transform group-hover:translate-x-1" />
                   </button>
                 );
               })}
