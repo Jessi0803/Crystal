@@ -29,7 +29,7 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1010);
   });
 
-  it("waives shipping for the payment-test email only", () => {
+  it("does not waive shipping for baby90522@gmail.com", () => {
     const fees = calcCheckoutFees({
       items: [{ id: "d003-venus", price: 950, quantity: 1 }],
       checkoutRegion: "domestic",
@@ -38,9 +38,9 @@ describe("checkout fee calculation", () => {
       buyerEmail: " Baby90522@gmail.com ",
     });
 
-    expect(fees.shippingFee).toBe(0);
-    expect(fees.emailFreeShipping).toBe(true);
-    expect(fees.total).toBe(950);
+    expect(fees.shippingFee).toBe(60);
+    expect(fees.emailFreeShipping).toBe(false);
+    expect(fees.total).toBe(1010);
   });
 
   it("waives shipping when an order-level override is set", () => {
@@ -80,7 +80,7 @@ describe("checkout fee calculation", () => {
     });
 
     expect(fees.shippingFee).toBe(130);
-    expect(fees.emailFreeShipping).toBe(true);
+    expect(fees.emailFreeShipping).toBe(false);
     expect(fees.forcedPaidShipping).toBe(true);
     expect(fees.total).toBe(1930);
   });

@@ -25,7 +25,7 @@ export const PAYMENT_FEE_RATES: Partial<Record<CheckoutPaymentMethod, number>> =
   paypal: 0,
 };
 
-export const FREE_SHIPPING_EMAILS = ["baby90522@gmail.com"];
+export const FREE_SHIPPING_EMAILS: string[] = [];
 
 export type CheckoutFeeItem = {
   id: string;
