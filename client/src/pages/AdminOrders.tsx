@@ -26,6 +26,8 @@ import {
   Trash2,
   GitMerge,
   ImageOff,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -41,6 +43,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { formatCustomConsultationNoteForDisplay } from "@shared/customConsultationNote";
+import { CUSTOM_DEPOSIT_PRODUCT_IDS, getCustomFormPath } from "@/lib/customOrderingContent";
 
 type StatusFilter =
   | "all"
@@ -159,6 +162,44 @@ type OrderSummary = {
   }[];
 };
 
+type CustomFormLink = {
+  key: string;
+  productName: string;
+  itemIndex: number;
+  quantity: number;
+  url: string;
+};
+
+function getAdminCustomFormLinks(detail: any): CustomFormLink[] {
+  if (!detail?.merchantTradeNo) return [];
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const customItems = (detail.items ?? []).filter((item: any) =>
+    CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)
+  );
+
+  return customItems.flatMap((item: any) => {
+    const formPath = getCustomFormPath(item.productId);
+    if (!formPath) return [];
+
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    return Array.from({ length: quantity }, (_, index) => {
+      const itemIndex = index + 1;
+      const params = new URLSearchParams({
+        order: detail.merchantTradeNo,
+        orderItemId: String(item.id),
+        itemIndex: String(itemIndex),
+      });
+      return {
+        key: `${item.id}-${itemIndex}`,
+        productName: item.productName,
+        itemIndex,
+        quantity,
+        url: `${origin}${formPath}?${params.toString()}`,
+      };
+    });
+  });
+}
+
 function openBase64DocumentInNewTab(base64: string, contentType: string) {
   const binary = window.atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -248,6 +289,17 @@ function OrderRowCard({
     },
     onError: (err) => toast.error(`託運單產生失敗：${err.message}`),
   });
+
+  const customFormLinks = getAdminCustomFormLinks(detail);
+
+  const copyCustomFormLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("客製表單連結已複製");
+    } catch {
+      toast.error("複製失敗，請手動選取連結");
+    }
+  };
 
   const displayStatus = order.orderStatus;
 
@@ -374,6 +426,43 @@ function OrderRowCard({
                   </div>
                 </div>
               </div>
+
+              {customFormLinks.length > 0 && (
+                <div className="mt-4 p-4 bg-rose-50 border border-rose-100 text-xs font-body text-rose-800">
+                  <p className="font-medium mb-3">客製表單連結</p>
+                  <div className="space-y-2">
+                    {customFormLinks.map((link) => (
+                      <div key={link.key} className="flex flex-col gap-2 border border-rose-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium text-rose-900">
+                            {link.productName}{link.quantity > 1 ? `（第 ${link.itemIndex} 件）` : ""}
+                          </p>
+                          <p className="mt-1 break-all font-mono text-[11px] text-rose-700">{link.url}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => copyCustomFormLink(link.url)}
+                            className="inline-flex items-center gap-1.5 border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-100"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            複製
+                          </button>
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 border border-rose-200 bg-white px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            開啟
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {((detail as any).transferReceiptUrl || detail.transferLastFive || detail.paymentMethod === "atm") && (
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-100 text-xs font-body text-blue-800">
