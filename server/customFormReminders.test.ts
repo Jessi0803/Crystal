@@ -33,7 +33,7 @@ function createCandidate(overrides: Partial<{
   merchantTradeNo: string;
   buyerName: string;
   buyerEmail: string;
-  paidAt: Date;
+  reminderBaseAt: Date;
   customFormReminder3mSentAt: Date | null;
   customFormReminder24hSentAt: Date | null;
   customFormReminder72hSentAt: Date | null;
@@ -43,7 +43,7 @@ function createCandidate(overrides: Partial<{
     merchantTradeNo: "CUSTOM001",
     buyerName: "測試顧客",
     buyerEmail: "buyer@example.com",
-    paidAt: new Date("2026-08-21T10:00:00Z"),
+    reminderBaseAt: new Date("2026-08-21T10:00:00Z"),
     customFormReminder3mSentAt: null,
     customFormReminder24hSentAt: null,
     customFormReminder72hSentAt: null,
@@ -60,6 +60,20 @@ function createMockDb(candidates: unknown[]) {
   return {
     execute,
   };
+}
+
+function sqlText(query: unknown) {
+  const chunks = (query as { queryChunks?: unknown[] }).queryChunks ?? [];
+  return chunks
+    .map((chunk) => {
+      if (typeof chunk === "string") return chunk;
+      if (chunk && typeof chunk === "object" && "value" in chunk) {
+        const value = (chunk as { value: unknown }).value;
+        return Array.isArray(value) ? value.join("") : String(value);
+      }
+      return "";
+    })
+    .join("");
 }
 
 function createOrderWithPendingCustomNote(customerNote: string | null = null) {
@@ -122,7 +136,7 @@ describe("custom form reminders", () => {
   it("sends the 3-minute test reminder before the formal 24-hour reminder is due", async () => {
     const db = createMockDb([
       createCandidate({
-        paidAt: new Date("2026-08-22T11:56:00Z"),
+        reminderBaseAt: new Date("2026-08-22T11:56:00Z"),
       }),
     ]);
     getDbMock.mockResolvedValue(db as Awaited<ReturnType<typeof getDb>>);
@@ -133,6 +147,24 @@ describe("custom form reminders", () => {
     expect(result).toEqual({ scanned: 1, sent3m: 1, sent24h: 0, sent72h: 0, skipped: 0, failed: 0 });
     expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "3m");
     expect(db.execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("starts reminders for ATM transfer-pending custom orders before admin confirmation", async () => {
+    const db = createMockDb([
+      createCandidate({
+        reminderBaseAt: new Date("2026-08-22T11:56:00Z"),
+      }),
+    ]);
+    getDbMock.mockResolvedValue(db as Awaited<ReturnType<typeof getDb>>);
+    notifyLineCustomFormReminderMock.mockResolvedValue({ sent: true });
+
+    const result = await runCustomFormReminderJob();
+
+    expect(result.sent3m).toBe(1);
+    expect(notifyLineCustomFormReminderMock).toHaveBeenCalledWith(101, "3m");
+    const candidateQuery = sqlText(db.execute.mock.calls[1][0]);
+    expect(candidateQuery).toContain("transfer_pending");
+    expect(candidateQuery).toContain("COALESCE");
   });
 
   it("still reminds when only one of two identical custom items has been submitted", async () => {
@@ -180,7 +212,7 @@ describe("custom form reminders", () => {
   it("sends the 72-hour reminder only after the 24-hour reminder was already sent", async () => {
     const db = createMockDb([
       createCandidate({
-        paidAt: new Date("2026-08-19T10:00:00Z"),
+        reminderBaseAt: new Date("2026-08-19T10:00:00Z"),
         customFormReminder24hSentAt: new Date("2026-08-20T10:30:00Z"),
       }),
     ]);
