@@ -248,6 +248,44 @@ function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
 
+function getCustomConsultationKey(productId: string, orderItemId?: number, itemIndex?: number) {
+  if (orderItemId && itemIndex) return `${productId}:${orderItemId}:${itemIndex}`;
+  return productId;
+}
+
+function getCustomConsultationStartMarker(productId: string, orderItemId?: number, itemIndex?: number) {
+  return `【客製需求開始：${getCustomConsultationKey(productId, orderItemId, itemIndex)}】`;
+}
+
+function upsertCustomConsultationNote(
+  existingNote: string | null,
+  productId: string,
+  customerNote: string,
+  orderItemId?: number,
+  itemIndex?: number
+) {
+  const key = getCustomConsultationKey(productId, orderItemId, itemIndex);
+  const startMarker = `【客製需求開始：${key}】`;
+  const endMarker = `【客製需求結束：${key}】`;
+  const noteBlock = [startMarker, customerNote.trim(), endMarker].join("\n");
+  const current = existingNote?.trim() ?? "";
+  if (!current) return noteBlock;
+
+  const startIndex = current.indexOf(startMarker);
+  const endIndex = current.indexOf(endMarker);
+  if (startIndex >= 0 && endIndex > startIndex) {
+    return [
+      current.slice(0, startIndex).trimEnd(),
+      noteBlock,
+      current.slice(endIndex + endMarker.length).trimStart(),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return [current, noteBlock].join("\n\n");
+}
+
 async function attachTwoItemFreeShippingEligibility<
   T extends { id: string; baseProductId?: string; twoItemFreeShippingEligible?: boolean },
 >(items: T[]) {
@@ -312,7 +350,7 @@ export const orderRouter = router({
         .object({
           buyerName: z.string().min(1),
           buyerEmail: z.string().email(),
-          buyerPhone: z.string().min(8),
+          buyerPhone: z.string().min(1).max(64),
           checkoutRegion: z.enum(["domestic", "overseas"]),
           paymentMethod: z.enum(["credit", "atm"]),
           shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
@@ -367,7 +405,16 @@ export const orderRouter = router({
             }
           }
 
-          if (isCustomDepositCheckout) return;
+          if (isCustomDepositCheckout) {
+            if (!data.buyerPhone.trim()) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請填寫 IG",
+                path: ["buyerPhone"],
+              });
+            }
+            return;
+          }
 
           if (data.checkoutRegion === "domestic") {
             const phone = data.buyerPhone.replace(/\s/g, "");
@@ -706,6 +753,73 @@ export const orderRouter = router({
       const order = await getOrderWithItems(input.merchantTradeNo);
       if (!order) return null;
       return order;
+    }),
+
+  submitCustomConsultation: publicProcedure
+    .input(
+      z.object({
+        merchantTradeNo: z.string().min(1),
+        productId: z.enum([
+          "custom-deposit-product",
+          "tarot-crystal-deposit-product",
+          "chakra-crystal-deposit-product",
+          "numerology-crystal-deposit-product",
+        ]),
+        orderItemId: z.number().int().positive().optional(),
+        itemIndex: z.number().int().positive().optional(),
+        customerNote: z.string().min(1).max(10000),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const order = await getOrderWithItems(input.merchantTradeNo);
+      if (!order) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
+      }
+      if (!order.isCustomOrder) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單不是客製化訂金訂單" });
+      }
+      const hasMatchingProduct = order.items.some((item) => item.productId === input.productId);
+      if (!hasMatchingProduct) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "表單方案與訂單商品不符" });
+      }
+      const targetItem = input.orderItemId
+        ? order.items.find((item) => item.id === input.orderItemId && item.productId === input.productId)
+        : order.items.find((item) => item.productId === input.productId);
+      if (!targetItem) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "找不到這一筆客製訂金商品" });
+      }
+      const itemIndex = input.itemIndex ?? 1;
+      if (itemIndex < 1 || itemIndex > targetItem.quantity) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "客製表單件數與訂單商品不符" });
+      }
+      const canSubmit =
+        order.paymentStatus === "paid" ||
+        order.paymentStatus === "confirmed" ||
+        order.paymentStatus === "transfer_pending";
+      if (!canSubmit) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "請先完成付款後再填寫客製需求" });
+      }
+      if (order.orderStatus === "cancelled" || order.paymentStatus === "failed" || order.paymentStatus === "cancelled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單狀態無法填寫客製需求" });
+      }
+
+      const customerNote = upsertCustomConsultationNote(
+        order.customerNote,
+        input.productId,
+        input.customerNote,
+        input.orderItemId,
+        input.itemIndex
+      );
+
+      await db
+        .update(orders)
+        .set({ customerNote })
+        .where(eq(orders.merchantTradeNo, input.merchantTradeNo));
+
+      return { success: true };
     }),
 
   /**
@@ -1334,6 +1448,7 @@ export const orderRouter = router({
           paymentMethod: z.enum(["credit", "atm"]),
           includeClearQuartzChips: z.boolean().optional(),
           checkoutRegion: z.enum(["domestic", "overseas"]),
+          receiverPhone: z.string().min(1).max(32),
           shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
           cvsStoreId: z.string().optional(),
           cvsStoreName: z.string().optional(),
@@ -1349,7 +1464,15 @@ export const orderRouter = router({
           origin: z.string().url(),
         })
         .superRefine((data, ctx) => {
+          const receiverPhone = data.receiverPhone.trim();
           if (data.checkoutRegion === "domestic") {
+            if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
+              ctx.addIssue({
+                code: "custom",
+                message: "請輸入台灣手機格式（09 開頭共 10 碼）",
+                path: ["receiverPhone"],
+              });
+            }
             if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
               if (!data.cvsStoreId?.trim()) {
                 ctx.addIssue({ code: "custom", message: "請選擇超商門市", path: ["cvsStoreId"] });
@@ -1365,6 +1488,9 @@ export const orderRouter = router({
               }
             }
           } else {
+            if (receiverPhone.length < 8) {
+              ctx.addIssue({ code: "custom", message: "請填寫聯絡電話", path: ["receiverPhone"] });
+            }
             const payload = {
               intlCountry: data.intlCountry ?? "",
               intlAddrLine1: data.intlAddrLine1 ?? "",
@@ -1512,6 +1638,7 @@ export const orderRouter = router({
 
       await db.update(orders)
         .set({
+          buyerPhone: input.receiverPhone.trim(),
           deliveryRegion: isOverseas ? "overseas" : "domestic",
           shippingMethod,
           cvsStoreId: cvsStoreId ?? null,

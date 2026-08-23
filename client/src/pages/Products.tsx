@@ -14,6 +14,7 @@ import { toast } from "sonner";
 const categories = [
   { id: "all", label: "全部商品" },
   { id: "monthly", label: "每月限量" },
+  { id: "custom", label: "客製化方案" },
   { id: "love", label: "愛情桃花" },
   { id: "wealth", label: "財運事業" },
   { id: "protect", label: "能量防護" },

@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { formatCustomConsultationNoteForDisplay } from "@shared/customConsultationNote";
 
 const PAGE_SIZE = 50;
 
@@ -179,7 +180,7 @@ function MemberOrderDetail({ orderId }: { orderId: number }) {
         <div className="bg-amber-50 border border-amber-100 p-3 text-xs font-body text-amber-800">
           <p className="font-medium mb-2">客製化諮詢內容</p>
           <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-            {(detail as any).customerNote}
+            {formatCustomConsultationNoteForDisplay((detail as any).customerNote)}
           </pre>
         </div>
       )}

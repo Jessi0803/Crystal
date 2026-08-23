@@ -3,12 +3,23 @@
  * 路由：/order/:merchantTradeNo
  * 顯示訂單狀態：待付款 / 轉帳待確認 / 已付款 / 付款失敗
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
-import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck } from "lucide-react";
+import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
+import { CUSTOM_DEPOSIT_PRODUCT_IDS, getCustomFormPath } from "@/lib/customOrderingContent";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS,
+  getRecentCustomFormSubmissionKey,
+} from "@/lib/customFormSubmission";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -23,11 +34,77 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   cancelled: "已取消",
 };
 
+type CustomDepositItemInstance = {
+  id: number;
+  productId: string;
+  productName: string;
+  itemIndex: number;
+  quantity: number;
+};
+
+function getCustomConsultationStartMarker(item: CustomDepositItemInstance) {
+  return `【客製需求開始：${item.productId}:${item.id}:${item.itemIndex}】`;
+}
+
+function hasCustomConsultationNote(customerNote: string | null | undefined, item: CustomDepositItemInstance) {
+  if (customerNote?.includes(getCustomConsultationStartMarker(item))) return true;
+  return item.itemIndex === 1 && Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`));
+}
+
+function wasCustomFormRecentlySubmitted(
+  merchantTradeNo: string | undefined,
+  item: CustomDepositItemInstance
+) {
+  if (!merchantTradeNo || typeof window === "undefined") return false;
+
+  const keys = [
+    getRecentCustomFormSubmissionKey({
+      merchantTradeNo,
+      productId: item.productId,
+      orderItemId: item.id,
+      itemIndex: item.itemIndex,
+    }),
+  ];
+  if (item.itemIndex === 1) {
+    keys.push(
+      getRecentCustomFormSubmissionKey({
+        merchantTradeNo,
+        productId: item.productId,
+      })
+    );
+  }
+
+  const now = Date.now();
+  return keys.some((key) => {
+    const submittedAt = Number(sessionStorage.getItem(key) ?? "");
+    if (!submittedAt) return false;
+    if (now - submittedAt > RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return false;
+    }
+    return true;
+  });
+}
+
+function expandCustomDepositItemInstances(items: any[]): CustomDepositItemInstance[] {
+  return items.flatMap((item: any) =>
+    Array.from({ length: Math.max(1, Number(item.quantity) || 1) }, (_, index) => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      itemIndex: index + 1,
+      quantity: Math.max(1, Number(item.quantity) || 1),
+    }))
+  );
+}
+
 export default function OrderResult() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const paypalCaptureStarted = useRef(false);
+  const [isCustomReminderOpen, setIsCustomReminderOpen] = useState(false);
+  const [dismissedCustomReminderOrderNo, setDismissedCustomReminderOrderNo] = useState("");
 
   const { data: order, isLoading, isError, refetch } = trpc.order.getOrder.useQuery(
     { merchantTradeNo: merchantTradeNo ?? "" },
@@ -176,6 +253,33 @@ export default function OrderResult() {
     ...STORE_BANK_INFO,
     ...((order as any)?.bankInfo ?? {}),
   };
+  const customDepositItems =
+    order?.items?.filter((item: any) => CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)) ?? [];
+  const customDepositItemInstances = expandCustomDepositItemInstances(customDepositItems);
+  const pendingCustomDepositItems = customDepositItemInstances.filter(
+    (item) =>
+      !hasCustomConsultationNote(order?.customerNote, item) &&
+      !wasCustomFormRecentlySubmitted(order?.merchantTradeNo, item)
+  );
+  const canFillCustomForm =
+    customDepositItems.length > 0 &&
+    (order?.paymentStatus === "paid" ||
+      order?.paymentStatus === "confirmed" ||
+      order?.paymentStatus === "transfer_pending");
+  const shouldPromptForCustomForm = canFillCustomForm && pendingCustomDepositItems.length > 0;
+
+  useEffect(() => {
+    const orderNo = order?.merchantTradeNo ?? "";
+    if (!shouldPromptForCustomForm || !orderNo || dismissedCustomReminderOrderNo === orderNo) return;
+    setIsCustomReminderOpen(true);
+  }, [shouldPromptForCustomForm, dismissedCustomReminderOrderNo, order?.merchantTradeNo]);
+
+  const handleCustomReminderOpenChange = (open: boolean) => {
+    setIsCustomReminderOpen(open);
+    if (!open && order?.merchantTradeNo) {
+      setDismissedCustomReminderOrderNo(order.merchantTradeNo);
+    }
+  };
 
   const getShippingMethodLabel = () => {
     if (!order) return "";
@@ -270,6 +374,54 @@ export default function OrderResult() {
             </p>
           )}
         </div>
+
+        <Dialog open={isCustomReminderOpen && shouldPromptForCustomForm} onOpenChange={handleCustomReminderOpenChange}>
+          <DialogContent className="max-w-2xl border border-rose-100 bg-[oklch(0.995_0.012_20)] p-0 shadow-2xl shadow-black/12">
+            <div className="border-b border-rose-100 px-6 pb-5 pt-7 sm:px-8 sm:pt-8">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-700 shadow-sm ring-1 ring-rose-100">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <DialogTitle className="text-2xl font-body font-semibold leading-snug tracking-wide text-[oklch(0.28_0.11_20)]">
+                接下來，告訴我們你的故事。
+              </DialogTitle>
+              <DialogDescription className="mt-3 text-sm font-body leading-relaxed text-[oklch(0.43_0.08_20)]">
+                大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
+              </DialogDescription>
+              <div className="mt-4 border-l-2 border-[oklch(0.72_0.12_25)] bg-white/70 px-4 py-3">
+                <p className="text-xs font-body leading-relaxed text-[oklch(0.42_0.04_25)]">
+                  客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3 px-6 py-5 sm:px-8 sm:py-6">
+              {pendingCustomDepositItems.map((item) => {
+                const customFormPath = getCustomFormPath(item.productId);
+                if (!customFormPath) return null;
+                return (
+                  <button
+                    key={`${item.id}-${item.itemIndex}`}
+                    className="group flex w-full items-center justify-between gap-4 border border-[oklch(0.84_0.03_20)] bg-white px-5 py-4 text-left transition-colors hover:border-[oklch(0.45_0.08_20)] hover:bg-[oklch(0.985_0.01_20)]"
+                    onClick={() =>
+                      setLocation(
+                        `${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}&orderItemId=${item.id}&itemIndex=${item.itemIndex}`
+                      )
+                    }
+                  >
+                    <span className="min-w-0">
+                      <span className="mb-1 block text-[0.68rem] font-body tracking-[0.16em] text-[oklch(0.54_0.06_20)]">
+                        填寫客製需求
+                      </span>
+                      <span className="block text-sm font-body font-medium leading-relaxed text-[oklch(0.16_0_0)]">
+                        {item.productName}{item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
+                      </span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-[oklch(0.4_0_0)] transition-transform group-hover:translate-x-1" />
+                  </button>
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* 轉帳資訊 */}
         {order.paymentMethod === "atm" && order.paymentStatus === "transfer_pending" && (

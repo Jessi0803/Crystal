@@ -145,7 +145,7 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
             </Link>
           </div>
           <div className="border-b border-[oklch(0.95_0_0)] px-5 py-3" style={{background: "oklch(0.97 0.01 70)"}}>
-            <Link href="/custom">
+            <Link href="/products?category=custom" onMouseEnter={onProductsIntent} onFocus={onProductsIntent}>
               <div
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-between cursor-pointer group"
@@ -336,7 +336,7 @@ export default function Navbar() {
                         <span className="text-xs text-[oklch(0.6_0_0)]">→</span>
                       </div>
                     </Link>
-                    <Link href="/custom">
+                    <Link href="/products?category=custom" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
                       <div className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer" style={{background: "oklch(0.97 0.01 70)"}}>
                         <span className="text-xs tracking-[0.1em] text-[oklch(0.55_0.08_70)] font-medium">客製化方案</span>
                         <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>

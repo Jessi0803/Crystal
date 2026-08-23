@@ -21,8 +21,8 @@ export default function CustomFormOrderingIntro() {
           訂購流程
         </p>
         <ol className="ml-0.5 list-outside list-decimal space-y-2.5 pl-5 text-sm font-body font-light text-[oklch(0.32_0_0)] leading-[1.75] marker:font-medium marker:text-[oklch(0.58_0.09_70)]">
-          <li>填寫以下報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
           <li>支付訂金。</li>
+          <li>填寫報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
           <li>
             加入
             <a
@@ -38,6 +38,9 @@ export default function CustomFormOrderingIntro() {
           <li>手鍊與設計確認完成後，將提供尾款報價。</li>
           <li>尾款支付完畢，準備出貨。</li>
         </ol>
+        <p className="mt-4 border-l-2 border-[oklch(0.72_0.09_70)] pl-3 text-xs font-body leading-relaxed text-[oklch(0.42_0_0)]">
+          客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
+        </p>
       </div>
 
       <div className="rounded-sm border border-[oklch(0.9_0.03_85)] bg-[oklch(0.985_0.012_85)] px-4 py-4 sm:px-5 sm:py-5">

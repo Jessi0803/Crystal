@@ -40,6 +40,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { formatCustomConsultationNoteForDisplay } from "@shared/customConsultationNote";
 
 type StatusFilter =
   | "all"
@@ -340,7 +341,7 @@ function OrderRowCard({
                     {[
                       { icon: <User className="w-3.5 h-3.5" />, label: "姓名", value: detail.buyerName },
                       { icon: <Mail className="w-3.5 h-3.5" />, label: "Email", value: detail.buyerEmail },
-                      { icon: <Phone className="w-3.5 h-3.5" />, label: "手機", value: detail.buyerPhone },
+                      { icon: <Phone className="w-3.5 h-3.5" />, label: detail.isCustomOrder ? "LINE" : "手機", value: detail.buyerPhone },
                       { icon: <MapPin className="w-3.5 h-3.5" />, label: "配送", value: detail.cvsStoreName ? `${getShippingLabel(detail.shippingMethod ?? "")} — ${detail.cvsStoreName}` : (detail.shippingAddress ?? getShippingLabel(detail.shippingMethod ?? "")) },
                     ].map((row) => (
                       <div key={row.label} className="flex items-start gap-2 text-sm font-body">
@@ -618,14 +619,14 @@ function OrderRowCard({
                           <div key={member.orderId}>
                             <p className="mb-1 font-mono text-[11px] text-amber-700">{member.merchantTradeNo}</p>
                             <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                              {member.customerNote}
+                              {formatCustomConsultationNoteForDisplay(member.customerNote)}
                             </pre>
                           </div>
                         ))}
                     </div>
                   ) : (
                     <pre className="whitespace-pre-wrap leading-relaxed" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-                      {(detail as any).customerNote}
+                      {formatCustomConsultationNoteForDisplay((detail as any).customerNote)}
                     </pre>
                   )}
                 </div>

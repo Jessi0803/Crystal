@@ -18,6 +18,22 @@ export function isCustomDepositProduct(id: string): id is CustomDepositProductId
   return (CUSTOM_DEPOSIT_PRODUCT_IDS as readonly string[]).includes(id);
 }
 
+export const CUSTOM_FORM_PATH_BY_PRODUCT_ID: Record<CustomDepositProductId, string> = {
+  "custom-deposit-product": "/custom/form",
+  "tarot-crystal-deposit-product": "/custom/form-b",
+  "chakra-crystal-deposit-product": "/custom/form-c",
+  "numerology-crystal-deposit-product": "/custom/form-d",
+};
+
+export const CUSTOM_PRODUCT_ID_BY_FORM_PATH: Record<string, CustomDepositProductId> =
+  Object.fromEntries(
+    Object.entries(CUSTOM_FORM_PATH_BY_PRODUCT_ID).map(([productId, formPath]) => [formPath, productId])
+  ) as Record<string, CustomDepositProductId>;
+
+export function getCustomFormPath(productId: string) {
+  return isCustomDepositProduct(productId) ? CUSTOM_FORM_PATH_BY_PRODUCT_ID[productId] : null;
+}
+
 export const CUSTOM_BRACELET_PRICE_DISPLAY = "NT$1,500 ± NT$300";
 
 export function getCustomPriceDisplay(productId: string, priceRange: string) {

@@ -3,10 +3,12 @@
   "installCommand": "pnpm install",
   "buildCommand": "pnpm run build",
   "functions": {
-    "api/trpc/[trpc].js": {
-      "maxDuration": 60
-    }
+    "api/trpc/[trpc].js": { "maxDuration": 60 },
+    "api/cron/custom-form-reminders.js": { "maxDuration": 60 }
   },
+  "crons": [
+    { "path": "/api/cron/custom-form-reminders", "schedule": "*/3 * * * *" }
+  ],
   "rewrites": [
     { "source": "/api/oauth/callback", "destination": "/api/trpc/line-oauth-callback" },
     { "source": "/api/oauth/line/start", "destination": "/api/trpc/line-oauth-start" },
