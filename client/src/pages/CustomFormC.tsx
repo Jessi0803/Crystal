@@ -116,7 +116,7 @@ export default function CustomFormC() {
       ),
     },
     {
-      title: "這次最想為自己調整的是？",
+      title: "除了這次搭配的能量主題外，這次最想為自己調整的是？",
       subtitle: "選一個目前最想被照顧到的面向，設計師會以此為主軸挑選水晶",
       required: true,
       field: (
