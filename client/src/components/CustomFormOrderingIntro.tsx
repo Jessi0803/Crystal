@@ -38,6 +38,9 @@ export default function CustomFormOrderingIntro() {
           <li>手鍊與設計確認完成後，將提供尾款報價。</li>
           <li>尾款支付完畢，準備出貨。</li>
         </ol>
+        <p className="mt-4 border-l-2 border-[oklch(0.72_0.09_70)] pl-3 text-xs font-body leading-relaxed text-[oklch(0.42_0_0)]">
+          客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
+        </p>
       </div>
 
       <div className="rounded-sm border border-[oklch(0.9_0.03_85)] bg-[oklch(0.985_0.012_85)] px-4 py-4 sm:px-5 sm:py-5">

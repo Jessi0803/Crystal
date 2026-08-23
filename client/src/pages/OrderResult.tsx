@@ -383,6 +383,9 @@ export default function OrderResult() {
             <DialogDescription className="text-base font-body leading-relaxed text-rose-700">
               大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
             </DialogDescription>
+            <p className="text-sm font-body leading-relaxed text-rose-700/85">
+              客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
+            </p>
             <div className="mt-3 space-y-3">
               {pendingCustomDepositItems.map((item) => {
                 const customFormPath = getCustomFormPath(item.productId);
