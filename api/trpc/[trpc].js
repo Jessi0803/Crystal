@@ -668,6 +668,7 @@ var ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
     "baby90522@gmail.com",
+    "k0919933386@gmail.com",
     ...process.env.ADMIN_EMAILS?.split(",") ?? []
   ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
 );
@@ -968,7 +969,7 @@ var OVERSEAS_SHIPPING_FEES = {
   GB: 644,
   AU: 552
 };
-var FREE_SHIPPING_EMAILS = ["baby90522@gmail.com"];
+var FREE_SHIPPING_EMAILS = [];
 function isCheckoutFeeExemptProduct(item) {
   const productId = item.baseProductId ?? item.id;
   return CUSTOM_PRODUCT_IDS.includes(productId) || productId.startsWith("test-") || item.id.startsWith("test-") || item.name?.includes("\u6E2C\u8A66\u7528") === true;
@@ -2966,6 +2967,40 @@ var STORE_BANK_INFO = {
   accountNumber: "111004444556"
 };
 
+// shared/tarotPricing.ts
+var TAROT_DEPOSIT_PRODUCT_ID = "tarot-crystal-deposit-product";
+var TAROT_TOPIC_OPTION_PREFIX = "tarot-topic:";
+var TAROT_BASE_READING_PRICE = 899;
+var TAROT_TOPICS = [
+  { id: "love-guide", label: "\u6200\u611B\u6307\u5357", originalPrice: 999, price: 899 },
+  { id: "reconciliation", label: "\u611F\u60C5\u5FA9\u5408", originalPrice: 999, price: 899 },
+  { id: "secret-love", label: "\u7DE3\u4F86\u6697\u6200", originalPrice: 999, price: 899 },
+  { id: "romance-luck", label: "\u65FA\u6843\u82B1\u904B", originalPrice: 999, price: 899 },
+  { id: "friendship", label: "\u53CB\u60C5\u53EF\u8CB4", originalPrice: 999, price: 899 },
+  { id: "two-paths", label: "\u96D9\u5411\u4E4B\u8DEF", originalPrice: 999, price: 899 },
+  { id: "wealth-code", label: "\u8CA1\u5BCC\u5BC6\u78BC", originalPrice: 999, price: 899 },
+  { id: "entrepreneurship", label: "\u5275\u696D\u885D\u885D", originalPrice: 999, price: 899 },
+  { id: "career", label: "\u8077\u6DAF\u63A2\u7D22", originalPrice: 999, price: 899 },
+  { id: "interview", label: "\u9762\u8A66\u52DD\u7D93", originalPrice: 999, price: 899 },
+  { id: "evolution", label: "\u9032\u5316\u4EBA\u751F", originalPrice: 999, price: 899 },
+  { id: "healing", label: "\u5FC3\u9748\u7642\u7652", originalPrice: 999, price: 899 },
+  { id: "guardian", label: "\u5B88\u8B77\u795E", originalPrice: 1088, price: 979 },
+  { id: "past-life-3", label: "\u524D\u4E16\u4ECA\u751F3", originalPrice: 800, price: 720 },
+  { id: "past-life-2", label: "\u524D\u4E16\u4ECA\u751F2", originalPrice: 999, price: 899 },
+  { id: "past-life-1", label: "\u524D\u4E16\u4ECA\u751F1", originalPrice: 1288, price: 1159 },
+  { id: "annual-fortune-3", label: "\u6D41\u5E74\u904B\u52E23", originalPrice: 1088, price: 979 },
+  { id: "annual-fortune-1", label: "\u6D41\u5E74\u904B\u52E21", originalPrice: 1288, price: 1159 },
+  { id: "annual-fortune-2", label: "\u6D41\u5E74\u904B\u52E22", originalPrice: 1588, price: 1429 }
+];
+function getTarotTopicByOptionId(optionId) {
+  if (!optionId?.startsWith(TAROT_TOPIC_OPTION_PREFIX)) return void 0;
+  const topicId = optionId.slice(TAROT_TOPIC_OPTION_PREFIX.length);
+  return TAROT_TOPICS.find((topic) => topic.id === topicId);
+}
+function getTarotDepositPrice(productBasePrice, topic) {
+  return productBasePrice - TAROT_BASE_READING_PRICE + topic.price;
+}
+
 // server/routers/order.ts
 var TRANSFER_RECEIPT_CONTENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
 async function getClearQuartzChipsAddOn(db) {
@@ -3055,9 +3090,27 @@ async function normalizePurchaseOptionItems(items) {
     requestedOptionQuantity.set(key, (requestedOptionQuantity.get(key) ?? 0) + item.quantity);
   }
   return items.map((item) => {
-    if (!item.purchaseOptionId) return item;
     const productId = item.baseProductId ?? item.id;
     const product = productById.get(productId);
+    if (productId === TAROT_DEPOSIT_PRODUCT_ID) {
+      const topic = getTarotTopicByOptionId(item.purchaseOptionId);
+      if (!product || !topic) {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "\u8ACB\u91CD\u65B0\u9078\u64C7\u5854\u7F85\u5360\u535C\u4E3B\u984C\u5F8C\u518D\u7D50\u5E33\u3002"
+        });
+      }
+      const optionProductName2 = `${product.name}\uFF08${topic.label}\uFF09`;
+      return {
+        ...item,
+        name: item.name.startsWith(optionProductName2) ? item.name : item.name.replace(product.name, optionProductName2),
+        price: getTarotDepositPrice(product.price, topic),
+        image: item.image || product.image,
+        purchaseOptionLabel: topic.label,
+        purchaseOptionUsesOwnStock: false
+      };
+    }
+    if (!item.purchaseOptionId) return item;
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
     if (!product || !option || option.active === false) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u7684\u8CFC\u8CB7\u65B9\u6848\u5DF2\u4E0D\u53EF\u8CFC\u8CB7\u3002` });

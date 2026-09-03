@@ -31,6 +31,7 @@ export function requiresDetailSelectionBeforeCart(
 ) {
   return (
     requiresCustomFormBeforeCart(product) ||
+    product.id === "tarot-crystal-deposit-product" ||
     (hasWristSizeOption(product) && hasFitPreferenceOption(product) && hasClaspOption(product))
   );
 }

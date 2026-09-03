@@ -26,6 +26,11 @@ import {
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
 import {
+  getTarotDepositPrice,
+  getTarotTopicByLabel,
+  tarotTopicOptionId,
+} from "@shared/tarotPricing";
+import {
   Dialog,
   DialogContent,
   DialogTitle,
@@ -169,7 +174,7 @@ export default function ProductDetail() {
     "benefits" | "content" | "howto" | "notices" | "warranty" | "wrist"
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
-  const [selectedTarotReadingName, setSelectedTarotReadingName] = useState(tarotReadingCategories[0].items[0].name);
+  const [selectedTarotReadingName, setSelectedTarotReadingName] = useState("");
   const [selectedGalleryImage, setSelectedGalleryImage] = useState("");
   const wristSizes = useMemo(
     () => buildWristSizes(product?.wristSizeMin, product?.wristSizeMax),
@@ -203,6 +208,7 @@ export default function ProductDetail() {
     setShowClaspGuide(false);
     // 清空而非填入第一張，讓預設方案的圖片能在載入時就顯示
     setSelectedGalleryImage("");
+    setSelectedTarotReadingName("");
     setSelectedPurchaseOptionId(product?.purchaseOptions?.find((option) => option.active !== false)?.id ?? "");
   }, [id, product?.id]);
   useEffect(() => {
@@ -329,11 +335,14 @@ export default function ProductDetail() {
     ? hasWristSizePriceRules ? originalBasePrice : applySaleRate(originalBasePrice, saleRate)
     : product.price);
   const claspExtra = hasClaspOption && effectiveSelectedClaspType !== "elastic" ? 200 : 0;
-  const currentPrice = basePrice + claspExtra;
+  const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
+  const selectedTarotTopic = getTarotTopicByLabel(selectedTarotReadingName);
+  const currentPrice = isTarotDepositProduct && selectedTarotTopic
+    ? getTarotDepositPrice(product.price, selectedTarotTopic)
+    : basePrice + claspExtra;
   const originalCurrentPrice = originalBasePrice + claspExtra;
   const hasCurrentPriceSale = currentPrice < originalCurrentPrice;
   const shouldShowCurrentPrice = hasTieredBraceletPricing || hasSelectedOptionWristSizePricing;
-  const isTarotDepositProduct = product.id === "tarot-crystal-deposit-product";
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
   const isNumerologyDepositProduct = product.id === "numerology-crystal-deposit-product";
@@ -346,8 +355,7 @@ export default function ProductDetail() {
     tarotReadingCategories.find((category) => category.id === activeTarotCategory)?.items ??
     tarotReadingCategories[0].items;
   const selectedTarotReading =
-    activeTarotPriceList.find((item) => item.name === selectedTarotReadingName) ??
-    activeTarotPriceList[0];
+    activeTarotPriceList.find((item) => item.name === selectedTarotReadingName);
   const isPreorderItem =
     product.category !== "custom" &&
     availability?.available !== false &&
@@ -363,6 +371,10 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     if (isSoldOutItem) {
       toast.error("此每月限量商品已售完，無法預購");
+      return;
+    }
+    if (isTarotDepositProduct && !selectedTarotTopic) {
+      toast.error("請先選擇塔羅占卜主題");
       return;
     }
     for (let i = 0; i < qty; i++) {
@@ -388,15 +400,20 @@ export default function ProductDetail() {
             }
           : {
               unitPrice: currentPrice,
-              purchaseOptionId: selectedPurchaseOption?.id,
-              purchaseOptionLabel: selectedPurchaseOption?.label,
+              purchaseOptionId: isTarotDepositProduct && selectedTarotTopic
+                ? tarotTopicOptionId(selectedTarotTopic.id)
+                : selectedPurchaseOption?.id,
+              purchaseOptionLabel: isTarotDepositProduct
+                ? selectedTarotTopic?.label
+                : selectedPurchaseOption?.label,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
           }
       );
     }
-    toast.success(`已加入購物袋：${product.name}${selectedPurchaseOption ? `（${selectedPurchaseOption.label}）` : ""} × ${qty}`);
+    const selectedLabel = isTarotDepositProduct ? selectedTarotTopic?.label : selectedPurchaseOption?.label;
+    toast.success(`已加入購物袋：${product.name}${selectedLabel ? `（${selectedLabel}）` : ""} × ${qty}`);
     setIsOpen(true);
   };
 
@@ -538,6 +555,11 @@ export default function ProductDetail() {
                         <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
                         <CustomPriceTile label="塔羅價格" value="價目表 9 折" note="各塔羅方案可於下方切換查看" />
                       </div>
+                      <CustomPriceTile
+                        label="本次付款金額"
+                        value={selectedTarotTopic ? `NT$${currentPrice.toLocaleString()}` : "請先選擇占卜主題"}
+                        note="此金額包含手鍊訂金與所選塔羅方案；付款後主題不可更換"
+                      />
                       <div className="bg-[oklch(0.99_0_0)] border border-[oklch(0.92_0_0)] px-4 py-4 sm:px-5 sm:py-5">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-3">
                           <div>
@@ -561,7 +583,7 @@ export default function ProductDetail() {
                                 type="button"
                                 onClick={() => {
                                   setActiveTarotCategory(category.id);
-                                  setSelectedTarotReadingName(category.items[0].name);
+                                  setSelectedTarotReadingName("");
                                 }}
                                 className={`shrink-0 border px-3.5 py-2 text-xs font-body transition-colors ${
                                   isActive
@@ -581,7 +603,7 @@ export default function ProductDetail() {
                               type="button"
                               onClick={() => setSelectedTarotReadingName(item.name)}
                               className={`flex items-center justify-between gap-3 border px-3.5 py-3 text-left transition-colors ${
-                                selectedTarotReading.name === item.name
+                                selectedTarotReading?.name === item.name
                                   ? "border-[oklch(0.18_0_0)] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
                                   : "border-[oklch(0.92_0_0)] bg-white hover:border-[oklch(0.68_0_0)]"
                               }`}
@@ -598,6 +620,7 @@ export default function ProductDetail() {
                             </button>
                           ))}
                         </div>
+                        {selectedTarotReading ? (
                         <div className="mt-4 border-l border-[oklch(0.68_0_0)] bg-white px-4 py-4 sm:px-5 sm:py-5">
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div>
@@ -626,6 +649,11 @@ export default function ProductDetail() {
                             ))}
                           </ul>
                         </div>
+                        ) : (
+                          <p className="mt-4 border border-dashed border-[oklch(0.82_0_0)] bg-white px-4 py-4 text-sm font-body text-[oklch(0.48_0_0)]">
+                            請選擇一個占卜主題，系統會在付款前確認本次金額。
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : isBasicCustomDepositProduct ? (
@@ -849,9 +877,10 @@ export default function ProductDetail() {
                 <button
                   type="button"
                   onClick={handleAddToCart}
-                  className="w-full py-3.5 text-sm font-body tracking-widest text-white transition-opacity hover:opacity-90 bg-[oklch(0.25_0_0)]"
+                  disabled={isTarotDepositProduct && !selectedTarotTopic}
+                  className="w-full py-3.5 text-sm font-body tracking-widest text-white transition-opacity hover:opacity-90 bg-[oklch(0.25_0_0)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  加入購物袋
+                  {isTarotDepositProduct && !selectedTarotTopic ? "請先選擇占卜主題" : "加入購物袋"}
                 </button>
                 <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] text-center mt-2">
                   完成付款後，訂單頁會引導您填寫客製需求

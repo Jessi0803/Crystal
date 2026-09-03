@@ -15,7 +15,7 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
@@ -94,6 +94,7 @@ const plans = [
 
 export default function Custom() {
   const { addToCart } = useCart();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -112,6 +113,10 @@ export default function Custom() {
   }, []);
 
   const handleStartPayment = (productId: CustomDepositProductId) => {
+    if (productId === "tarot-crystal-deposit-product") {
+      setLocation(`/products/${productId}`);
+      return;
+    }
     const product = products.find((item) => item.id === productId);
     if (!product) {
       toast.error("找不到訂金商品，請聯繫客服");

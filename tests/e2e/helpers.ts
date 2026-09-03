@@ -111,6 +111,7 @@ export async function createAtmHomeDeliveryOrder(page: Page, email: string) {
 export async function fillPureCustomDepositForm(page: Page, options: { proceedToCheckout?: boolean } = {}) {
   const { proceedToCheckout = true } = options;
   await page.goto("/custom/form");
+  await page.getByRole("button", { name: "沒有想法，交給設計師", exact: true }).click();
   await page.locator("textarea").first().fill("E2E 測試：希望提升專注力與穩定情緒");
   await page.locator('input[type="number"]').fill("13");
   await page.getByRole("button", { name: /剛好/ }).click();
@@ -156,7 +157,7 @@ export async function fillProfileCustomDepositForm(
   await page.goto(path);
   await page.locator('input[placeholder="請填寫真實姓名"]').fill(customerName);
   await page.locator('input[placeholder="例如：1995/08/22"]').fill("1994/06/18");
-  await page.locator('textarea[placeholder*="招財"]').fill("E2E 穩定情緒");
+  await page.getByRole("button", { name: "沒有想法，交給設計師", exact: true }).click();
   await page.locator('input[type="number"]').fill(wristSize);
   await page.getByRole("button", { name: /剛好/ }).click();
   await page.getByRole("button", { name: "都可以" }).click();
@@ -180,7 +181,7 @@ export async function fillTarotCustomDepositForm(page: Page, options: { proceedT
   await page.getByRole("button", { name: /財富密碼/ }).click();
   await page.locator('input[placeholder="請填寫真實姓名"]').fill("E2E 塔羅客戶");
   await page.locator('input[placeholder="例如：1995/08/22"]').fill("1993/03/15");
-  await page.locator('textarea[placeholder*="功效"]').fill("E2E 財運測試");
+  await page.getByRole("button", { name: "沒有想法，交給設計師", exact: true }).click();
   await page.locator('input[type="number"]').fill("19");
   await page.getByRole("button", { name: /微鬆/ }).click();
   await page.getByRole("button", { name: "都可以" }).click();

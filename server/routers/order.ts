@@ -67,6 +67,11 @@ import {
 import { calcCheckoutFees } from "@shared/checkoutFees";
 import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "@shared/const";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
+import {
+  getTarotDepositPrice,
+  getTarotTopicByOptionId,
+  TAROT_DEPOSIT_PRODUCT_ID,
+} from "@shared/tarotPricing";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -188,9 +193,29 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
   }
 
   return items.map((item) => {
-    if (!item.purchaseOptionId) return item;
     const productId = item.baseProductId ?? item.id;
     const product = productById.get(productId);
+    if (productId === TAROT_DEPOSIT_PRODUCT_ID) {
+      const topic = getTarotTopicByOptionId(item.purchaseOptionId);
+      if (!product || !topic) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "請重新選擇塔羅占卜主題後再結帳。",
+        });
+      }
+      const optionProductName = `${product.name}（${topic.label}）`;
+      return {
+        ...item,
+        name: item.name.startsWith(optionProductName)
+          ? item.name
+          : item.name.replace(product.name, optionProductName),
+        price: getTarotDepositPrice(product.price, topic),
+        image: item.image || product.image,
+        purchaseOptionLabel: topic.label,
+        purchaseOptionUsesOwnStock: false,
+      };
+    }
+    if (!item.purchaseOptionId) return item;
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
     if (!product || !option || option.active === false) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `「${item.name}」的購買方案已不可購買。` });

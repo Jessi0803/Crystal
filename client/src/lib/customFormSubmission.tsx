@@ -42,12 +42,11 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const submitMutation = trpc.order.submitCustomConsultation.useMutation();
 
   const order = orderQuery.data;
-  const hasMatchingProduct = Boolean(
-    order?.items?.some((item: any) =>
+  const matchingOrderItem = order?.items?.find((item: any) =>
       item.productId === productId &&
       (!hasItemInstance || (item.id === orderItemId && itemIndex <= item.quantity))
-    )
   );
+  const hasMatchingProduct = Boolean(matchingOrderItem);
   const isPaymentReady =
     order?.paymentStatus === "paid" ||
     order?.paymentStatus === "confirmed" ||
@@ -84,6 +83,7 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
   return {
     merchantTradeNo,
     order,
+    matchingOrderItem,
     isLoading: orderQuery.isLoading,
     isError: orderQuery.isError,
     canFillForm,

@@ -392,6 +392,7 @@ var ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
     "baby90522@gmail.com",
+    "k0919933386@gmail.com",
     ...process.env.ADMIN_EMAILS?.split(",") ?? []
   ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
 );
@@ -639,15 +640,15 @@ function minutesAgo(minutes) {
   return new Date(Date.now() - minutes * 60 * 1e3);
 }
 function getReminderStage(candidate) {
-  if (!candidate.paidAt) return null;
-  const paidAt = candidate.paidAt instanceof Date ? candidate.paidAt : new Date(candidate.paidAt);
-  if (!candidate.customFormReminder24hSentAt && paidAt <= hoursAgo(24)) {
+  if (!candidate.reminderBaseAt) return null;
+  const reminderBaseAt = candidate.reminderBaseAt instanceof Date ? candidate.reminderBaseAt : new Date(candidate.reminderBaseAt);
+  if (!candidate.customFormReminder24hSentAt && reminderBaseAt <= hoursAgo(24)) {
     return "24h";
   }
-  if (!candidate.customFormReminder72hSentAt && paidAt <= hoursAgo(72)) {
+  if (!candidate.customFormReminder72hSentAt && reminderBaseAt <= hoursAgo(72)) {
     return "72h";
   }
-  if (!candidate.customFormReminder3mSentAt && paidAt <= minutesAgo(3)) {
+  if (!candidate.customFormReminder3mSentAt && reminderBaseAt <= minutesAgo(3)) {
     return "3m";
   }
   return null;
@@ -744,19 +745,21 @@ async function runCustomFormReminderJob() {
       \`merchantTradeNo\`,
       \`buyerName\`,
       \`buyerEmail\`,
-      \`paidAt\`,
+      COALESCE(\`paidAt\`, \`createdAt\`) AS \`reminderBaseAt\`,
       \`customFormReminder3mSentAt\`,
       \`customFormReminder24hSentAt\`,
       \`customFormReminder72hSentAt\`
     FROM \`orders\`
     WHERE \`isCustomOrder\` = TRUE
-      AND \`orderStatus\` = 'deposit_paid'
-      AND \`paymentStatus\` IN ('paid', 'confirmed')
-      AND \`paidAt\` <= ${minutesAgo(3)}
+      AND (
+        (\`orderStatus\` = 'deposit_paid' AND \`paymentStatus\` IN ('paid', 'confirmed'))
+        OR \`paymentStatus\` = 'transfer_pending'
+      )
+      AND COALESCE(\`paidAt\`, \`createdAt\`) <= ${minutesAgo(3)}
       AND (
         \`customFormReminder3mSentAt\` IS NULL
         OR \`customFormReminder24hSentAt\` IS NULL
-        OR (\`paidAt\` <= ${hoursAgo(72)} AND \`customFormReminder72hSentAt\` IS NULL)
+        OR (COALESCE(\`paidAt\`, \`createdAt\`) <= ${hoursAgo(72)} AND \`customFormReminder72hSentAt\` IS NULL)
       )
     LIMIT 100
   `);

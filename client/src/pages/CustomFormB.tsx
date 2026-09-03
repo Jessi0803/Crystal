@@ -1,8 +1,7 @@
 // 椛˙Crystal — 塔羅 × 水晶手鍊報名表單
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
-import { products } from "@/lib/data";
 import { toast } from "sonner";
 import CustomFormBraceletPreferenceFields, {
   type CustomFormBraceletPreferences,
@@ -28,6 +27,7 @@ import {
   CustomFormAccessGate,
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
+import { getTarotTopicByOptionId } from "@shared/tarotPricing";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -228,16 +228,6 @@ const TOPIC_CONTENT: Record<string, { desc?: string; items: string[] }> = {
   },
 };
 
-// 各主題相對於基本方案的價格調整（訂金同步調整）
-const TOPIC_PRICE_ADJUST: Record<string, number> = {
-  前世今生1: 260,
-  前世今生3: -179,
-  流年運勢1: 260,
-  流年運勢2: 530,
-  流年運勢3: 80,
-  守護神: 80,
-};
-
 const tarotTopics: { label: string; group: TarotGroup }[] = [
   { label: "戀愛指南", group: "couple" },
   { label: "感情復合", group: "couple" },
@@ -404,14 +394,24 @@ export default function CustomFormB() {
   const [tarot, setTarot] = useState<TarotData>(EMPTY_TAROT);
   const [bracelet, setBracelet] = useState<BraceletData>(EMPTY_BRACELET);
   const formSubmission = useCustomFormSubmission("tarot-crystal-deposit-product");
-
-  const depositProduct = products.find(
-    p => p.id === "tarot-crystal-deposit-product"
+  const paidTopic = getTarotTopicByOptionId(
+    formSubmission.matchingOrderItem?.purchaseOptionId
   );
-  const selectedPriceAdjust = TOPIC_PRICE_ADJUST[tarot.topic] ?? 0;
-  const displayedAmount = depositProduct
-    ? depositProduct.price + selectedPriceAdjust
-    : 0;
+  const paidTopicFormOption = paidTopic
+    ? tarotTopics.find(t => t.label.replace(/\s+/g, "") === paidTopic.label.replace(/\s+/g, ""))
+    : undefined;
+  const isTopicLocked = Boolean(paidTopicFormOption);
+
+  useEffect(() => {
+    if (!paidTopicFormOption) return;
+    setTarot(current => current.topic === paidTopicFormOption.label
+      ? current
+      : {
+          ...current,
+          topic: paidTopicFormOption.label,
+          group: paidTopicFormOption.group,
+        });
+  }, [paidTopicFormOption?.label, paidTopicFormOption?.group]);
 
   // ── 塔羅資料欄位（依主題動態產生）────────────────────────────────────────
 
@@ -950,25 +950,28 @@ export default function CustomFormB() {
               className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3"
               style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
             >
-              1. 想占卜哪個主題？
+              1. 占卜主題
             </h2>
-            {/* 動態總價顯示 */}
-            {tarot.group !== "single_q" && (
-              <div className="mb-5 flex items-baseline gap-2">
-                <span className="text-sm font-body text-[oklch(0.5_0_0)]">
-                  手鍊訂金＋占卜金額：
-                </span>
-                <span
-                  className="text-2xl font-medium text-[oklch(0.1_0_0)]"
-                  style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-                >
-                  NT$ {displayedAmount.toLocaleString()}
-                </span>
+            {isTopicLocked ? (
+              <div className="mb-5 border border-[oklch(0.82_0.04_290)] bg-[oklch(0.97_0.01_290)] px-4 py-4">
+                <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-1">付款前已選擇</p>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-xl font-medium text-[oklch(0.15_0_0)]">{paidTopicFormOption?.label}</p>
+                  {formSubmission.matchingOrderItem?.unitPrice != null && (
+                    <p className="text-sm font-body text-[oklch(0.4_0_0)]">
+                      已付訂金 NT$ {Number(formSubmission.matchingOrderItem.unitPrice).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <p className="mt-2 text-xs font-body text-[oklch(0.55_0_0)]">此主題已隨訂單確認，表單內不可更換。</p>
               </div>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            ) : (
+              <>
+                <p className="mb-4 text-sm font-body leading-relaxed text-amber-700">
+                  這是舊版訂單，付款時尚未保存占卜主題，請在此補選。
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {tarotTopics.map(t => {
-                const adj = TOPIC_PRICE_ADJUST[t.label] ?? 0;
                 const hasImage = !!TOPIC_CONTENT[t.label];
                 const isSelected = tarot.topic === t.label;
                 return (
@@ -999,7 +1002,9 @@ export default function CustomFormB() {
                   </button>
                 );
               })}
-            </div>
+                </div>
+              </>
+            )}
 
             {/* 主題說明文字預覽 */}
             {tarot.topic && TOPIC_CONTENT[tarot.topic] && (

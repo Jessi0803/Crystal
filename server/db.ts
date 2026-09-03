@@ -9,6 +9,7 @@ const ADMIN_EMAIL_ALLOWLIST = new Set(
   [
     "goodaytarot@gmail.com",
     "baby90522@gmail.com",
+    "k0919933386@gmail.com",
     ...(process.env.ADMIN_EMAILS?.split(",") ?? []),
   ]
     .map((email) => email.trim())

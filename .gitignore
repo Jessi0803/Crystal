@@ -1,5 +1,6 @@
 # Dependencies
 **/node_modules
+node_modules.from-other-machine/
 .pnpm-store/
 
 # Build outputs
@@ -125,3 +126,5 @@ _vercel_ref/
 # as a Serverless Function without relying on build-script ordering.
 _gitdir/
 /.git
+.vercel
+.env*
