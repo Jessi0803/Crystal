@@ -431,10 +431,10 @@ export const orderRouter = router({
           }
 
           if (isCustomDepositCheckout) {
-            if (!data.buyerPhone.trim()) {
+            if (!/^09\d{8}$/.test(data.buyerPhone.replace(/\s/g, ""))) {
               ctx.addIssue({
                 code: "custom",
-                message: "請填寫 IG",
+                message: "請輸入有效的手機號碼（09xxxxxxxx）",
                 path: ["buyerPhone"],
               });
             }

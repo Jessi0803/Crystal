@@ -68,6 +68,11 @@ function compressTransferReceipt(file: File): Promise<{ dataBase64: string; cont
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const { items, totalPrice, clearCart } = useCart();
   const hasCustomDepositItem =
     items.length > 0 && items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));
@@ -250,7 +255,8 @@ export default function Checkout() {
     }
 
     if (isCustomDepositCheckout) {
-      if (!form.buyerPhone.trim()) errs.buyerPhone = "請填寫 IG";
+      if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
+        errs.buyerPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
     } else if (checkoutRegion === "domestic") {
       if (!form.buyerPhone.trim() || !/^09\d{8}$/.test(form.buyerPhone.replace(/\s/g, "")))
         errs.buyerPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
@@ -470,7 +476,7 @@ export default function Checkout() {
       <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10">
           {/* Left: Form */}
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} className="order-2 space-y-8 lg:order-1">
 
             {/* 配送地區 */}
             {!isCustomDepositCheckout && (
@@ -566,14 +572,12 @@ export default function Checkout() {
                 </div>
                 <div>
                   <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-                    {isCustomDepositCheckout ? "IG" : checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
+                    {isCustomDepositCheckout || checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
                   </label>
                   <input
-                    type={isCustomDepositCheckout ? "text" : "tel"}
+                    type="tel"
                     placeholder={
-                      isCustomDepositCheckout
-                        ? "請輸入 IG 帳號"
-                        : checkoutRegion === "domestic"
+                      isCustomDepositCheckout || checkoutRegion === "domestic"
                         ? "09xxxxxxxx"
                         : "含國碼或當地號碼"
                     }
@@ -581,9 +585,6 @@ export default function Checkout() {
                     onChange={(e) => setForm((f) => ({ ...f, buyerPhone: e.target.value }))}
                     className={inputClass("buyerPhone")}
                   />
-                  {isCustomDepositCheckout && (
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1">以便傳送手鍊設計圖給您</p>
-                  )}
                   {errors.buyerPhone && <p className="text-xs text-red-400 mt-1">{errors.buyerPhone}</p>}
                 </div>
               </div>
@@ -1091,7 +1092,7 @@ export default function Checkout() {
           </form>
 
           {/* Right: Order Summary */}
-          <div className="lg:sticky lg:top-8 h-fit">
+          <div className="order-1 h-fit lg:order-2 lg:sticky lg:top-8">
             <div className="border border-[oklch(0.93_0_0)] p-6">
               <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
                 訂單摘要

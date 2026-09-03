@@ -3282,10 +3282,10 @@ var orderRouter = router({
         }
       }
       if (isCustomDepositCheckout) {
-        if (!data.buyerPhone.trim()) {
+        if (!/^09\d{8}$/.test(data.buyerPhone.replace(/\s/g, ""))) {
           ctx.addIssue({
             code: "custom",
-            message: "\u8ACB\u586B\u5BEB IG",
+            message: "\u8ACB\u8F38\u5165\u6709\u6548\u7684\u624B\u6A5F\u865F\u78BC\uFF0809xxxxxxxx\uFF09",
             path: ["buyerPhone"]
           });
         }

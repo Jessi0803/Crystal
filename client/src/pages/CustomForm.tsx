@@ -172,7 +172,7 @@ export default function CustomForm() {
     {
       title: "完成！付完訂金後記得加入 LINE",
       subtitle: "",
-      required: false,
+      required: true,
       field: (
         <div className="space-y-6">
           <div
@@ -206,11 +206,12 @@ export default function CustomForm() {
               htmlFor="custom-contact-handle"
               className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5"
             >
-              Instagram 帳號 / LINE ID
+              Instagram 帳號 / LINE ID <span className="text-red-400">*</span>
             </label>
             <input
               id="custom-contact-handle"
               type="text"
+              required
               value={form.igHandle}
               onChange={e => setForm({ ...form, igHandle: e.target.value })}
               placeholder="例如：@your_ig_handle 或 LINE ID"
