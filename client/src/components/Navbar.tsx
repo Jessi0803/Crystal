@@ -245,6 +245,33 @@ export default function Navbar() {
     setMobileGuideOpen(false);
   }, [location, search]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const lockedScrollY = window.scrollY;
+    const lockedUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const handleDesktopResize = () => {
+      if (desktopQuery.matches) setMobileOpen(false);
+    };
+    desktopQuery.addEventListener("change", handleDesktopResize);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      desktopQuery.removeEventListener("change", handleDesktopResize);
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (currentUrl === lockedUrl) {
+        window.scrollTo(0, lockedScrollY);
+      }
+    };
+  }, [mobileOpen]);
+
   const closeMobileMenu = useCallback(() => {
     setMobileOpen(false);
     setMobileCatOpen(false);
@@ -256,7 +283,7 @@ export default function Navbar() {
     <>
       {/* ── Main Header ── */}
       <header
-        className={`sticky top-0 z-50 bg-white transition-shadow duration-300 ${
+        className={`${mobileOpen ? "fixed inset-x-0 top-0" : "sticky top-0"} z-50 bg-white transition-shadow duration-300 ${
           scrolled ? "shadow-[0_1px_0_0_oklch(0.9_0_0)]" : "border-b border-[oklch(0.93_0_0)]"
         }`}
       >
@@ -313,6 +340,7 @@ export default function Navbar() {
                   onClick={() => setMobileOpen(!mobileOpen)}
                   className="lg:hidden p-1.5 text-[oklch(0.25_0_0)]"
                   aria-label="選單"
+                  aria-expanded={mobileOpen}
                 >
                   {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
                 </button>
@@ -323,8 +351,8 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
-            <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
+          <div className="fixed inset-x-0 bottom-0 top-14 z-50 overflow-y-auto overscroll-contain border-t border-[oklch(0.93_0_0)] bg-white lg:hidden">
+            <nav className="mx-auto flex min-h-full max-w-[1440px] flex-col gap-0 px-4 py-4">
               <Link href="/products?category=monthly" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
                 <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   每月限量
@@ -429,6 +457,9 @@ export default function Navbar() {
           </div>
         )}
       </header>
+
+      {/* Keep the document height stable while the mobile header is fixed. */}
+      {mobileOpen && <div aria-hidden="true" className="h-14 lg:hidden" />}
 
       {/* ── 跑馬燈公告 ── */}
       {showAnnouncement && (
