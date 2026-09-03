@@ -1,6 +1,6 @@
 // 日日好日 — Products Page
 // Design: Vacanza-inspired minimal grid layout
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
@@ -76,6 +76,8 @@ export default function Products() {
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState(initialSort);
   const [showFilter, setShowFilter] = useState(false);
+  const categoryTabsRef = useRef<HTMLDivElement>(null);
+  const categoryButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [, setLocation] = useLocation();
   const { addToCart } = useCart();
   const { data: productSalesTotals = [] } = trpc.order.getProductSalesTotals.useQuery();
@@ -111,6 +113,25 @@ export default function Products() {
     setActiveCategory(p.get("category") || "all");
     setSortBy(p.get("sort") || "sales");
   }, [search]);
+
+  useEffect(() => {
+    const container = categoryTabsRef.current;
+    const target = categoryButtonRefs.current[activeCategory];
+    if (!container || !target) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const centeredOffset =
+        targetRect.left - containerRect.left - (containerRect.width - targetRect.width) / 2;
+      container.scrollTo({
+        left: container.scrollLeft + centeredOffset,
+        behavior: "smooth",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeCategory]);
 
   const filtered = products
     .filter((p) => {
@@ -164,11 +185,18 @@ export default function Products() {
         {/* Filter Bar */}
         <div className="flex items-center justify-between py-5 border-b border-[oklch(0.93_0_0)]">
           {/* Category Tabs */}
-          <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
+          <div
+            ref={categoryTabsRef}
+            className="flex min-w-0 flex-1 items-center gap-0 overflow-x-auto scrollbar-hide"
+          >
             {categories.map((cat) => (
               <button
                 key={cat.id}
+                ref={(element) => {
+                  categoryButtonRefs.current[cat.id] = element;
+                }}
                 onClick={() => setActiveCategory(cat.id)}
+                aria-current={activeCategory === cat.id ? "page" : undefined}
                 className={`shrink-0 px-4 py-2 text-[0.7rem] tracking-[0.1em] font-body transition-colors border-b-2 ${
                   activeCategory === cat.id
                     ? "border-[oklch(0.1_0_0)] text-[oklch(0.1_0_0)]"

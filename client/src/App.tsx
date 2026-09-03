@@ -42,10 +42,32 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import CartDrawer from "./components/CartDrawer";
 import ChatBot from "./components/ChatBot";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useEffect, useState } from "react";
 
 const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@011tymeh";
+
+function RouteScrollManager() {
+  const [location] = useLocation();
+  const search = useSearch();
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const hash = window.location.hash.slice(1);
+      if (hash) {
+        const target = document.getElementById(decodeURIComponent(hash));
+        if (target) {
+          target.scrollIntoView();
+          return;
+        }
+      }
+      window.scrollTo(0, 0);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location, search]);
+
+  return null;
+}
 
 function LineWelcomeModal() {
   const [show, setShow] = useState(false);
@@ -155,6 +177,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <CartProvider>
           <TooltipProvider>
+            <RouteScrollManager />
             <Toaster position="top-right" />
             {isAdminPage ? (
               <Router />

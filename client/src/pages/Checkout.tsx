@@ -68,11 +68,6 @@ function compressTransferReceipt(file: File): Promise<{ dataBase64: string; cont
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
   const { items, totalPrice, clearCart } = useCart();
   const hasCustomDepositItem =
     items.length > 0 && items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.product.id));

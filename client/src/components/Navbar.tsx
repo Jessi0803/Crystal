@@ -1,7 +1,7 @@
 // 日日好日 — Navbar
 // Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
@@ -95,6 +95,8 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
   const [open, setOpen] = useState(false);
   const [effectOpen, setEffectOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [location] = useLocation();
+  const search = useSearch();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -105,6 +107,11 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    setOpen(false);
+    setEffectOpen(false);
+  }, [location, search]);
 
   return (
     <div ref={ref} className="relative" onMouseEnter={onProductsIntent} onFocus={onProductsIntent}>
@@ -208,6 +215,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { totalItems, setIsOpen } = useCart();
   const [location] = useLocation();
+  const search = useSearch();
   const prefetchProducts = useProductListPrefetch();
   const { data: siteSettings } = trpc.siteSettings.public.useQuery(undefined, {
     refetchInterval: 15_000,
@@ -235,7 +243,14 @@ export default function Navbar() {
     setMobileCatOpen(false);
     setMobileEffectOpen(false);
     setMobileGuideOpen(false);
-  }, [location]);
+  }, [location, search]);
+
+  const closeMobileMenu = useCallback(() => {
+    setMobileOpen(false);
+    setMobileCatOpen(false);
+    setMobileEffectOpen(false);
+    setMobileGuideOpen(false);
+  }, []);
 
   return (
     <>
@@ -311,7 +326,7 @@ export default function Navbar() {
           <div className="lg:hidden border-t border-[oklch(0.93_0_0)] bg-white">
             <nav className="max-w-[1440px] mx-auto px-4 py-4 flex flex-col gap-0">
               <Link href="/products?category=monthly" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   每月限量
                 </span>
               </Link>
@@ -331,13 +346,13 @@ export default function Navbar() {
                 {mobileCatOpen && (
                   <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
                     <Link href="/products" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                      <div className="flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                      <div onClick={closeMobileMenu} className="flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
                         <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">查看全部商品</span>
                         <span className="text-xs text-[oklch(0.6_0_0)]">→</span>
                       </div>
                     </Link>
                     <Link href="/products?category=custom" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                      <div className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer" style={{background: "oklch(0.97 0.01 70)"}}>
+                      <div onClick={closeMobileMenu} className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer" style={{background: "oklch(0.97 0.01 70)"}}>
                         <span className="text-xs tracking-[0.1em] text-[oklch(0.55_0.08_70)] font-medium">客製化方案</span>
                         <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
                       </div>
@@ -354,7 +369,7 @@ export default function Navbar() {
                       <div className="pb-1">
                         {effectSeriesLinks.map((cat) => (
                           <Link key={cat.href} href={cat.href}>
-                            <div className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                            <div onClick={closeMobileMenu} className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
                               <span className="text-base w-5 shrink-0">{cat.icon}</span>
                               <div>
                                 <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
@@ -370,7 +385,7 @@ export default function Navbar() {
               </div>
 
               <Link href="/crystal-workshop">
-                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   水晶創業班
                 </span>
               </Link>
@@ -393,7 +408,7 @@ export default function Navbar() {
                       { label: "常見問題", href: "/shopping-guide#faq" },
                     ].map((item) => (
                       <Link key={item.href} href={item.href}>
-                        <div className="px-5 py-3 text-sm text-[oklch(0.3_0_0)] hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                        <div onClick={closeMobileMenu} className="px-5 py-3 text-sm text-[oklch(0.3_0_0)] hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
                           {item.label}
                         </div>
                       </Link>
@@ -404,12 +419,12 @@ export default function Navbar() {
 
               {/* 品牌故事 */}
               <Link href="/about">
-                <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
                   品牌故事
                 </span>
               </Link>
 
-              <MobileMemberLinks />
+              <MobileMemberLinks onNavigate={closeMobileMenu} />
             </nav>
           </div>
         )}
@@ -470,7 +485,7 @@ function MemberIconButton() {
 }
 
 /** 手機版 mobile menu 底部的登入/會員連結 */
-function MobileMemberLinks() {
+function MobileMemberLinks({ onNavigate }: { onNavigate: () => void }) {
   const { data: user } = trpc.auth.me.useQuery();
   const utils = trpc.useUtils();
 
@@ -486,18 +501,21 @@ function MobileMemberLinks() {
       <>
         {user.role === "admin" && (
           <Link href="/admin/orders">
-            <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+            <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
               後台
             </span>
           </Link>
         )}
         <Link href="/member">
-          <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+          <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
             會員中心（{user.name ?? user.email}）
           </span>
         </Link>
         <button
-          onClick={() => logoutMutation.mutate()}
+          onClick={() => {
+            onNavigate();
+            logoutMutation.mutate();
+          }}
           className="w-full text-left py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.35_0_0)] transition-colors"
         >
           登出
@@ -508,7 +526,7 @@ function MobileMemberLinks() {
 
   return (
     <Link href="/login">
-      <span className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+      <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
         會員登入
       </span>
     </Link>
