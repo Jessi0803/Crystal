@@ -95,10 +95,25 @@ async function getClearQuartzChipsAddOn(db: NonNullable<Awaited<ReturnType<typeo
 async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>, orderIds: number[]) {
   if (!db) throw new Error("Database not available");
 
-  await db.delete(orderBalancePayments).where(inArray(orderBalancePayments.orderId, orderIds));
-  await db.delete(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
-  await db.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
-  await db.delete(orders).where(inArray(orders.id, orderIds));
+  await db.transaction(async (tx) => {
+    const mergeMemberships = await tx
+      .select({ groupId: orderMergeMembers.groupId })
+      .from(orderMergeMembers)
+      .where(inArray(orderMergeMembers.orderId, orderIds));
+    const mergeGroupIds = Array.from(new Set(mergeMemberships.map((row) => row.groupId)));
+
+    // Dissolve an affected merge group before deleting any of its orders. This
+    // prevents surviving legacy orders from pointing at a deleted main order.
+    if (mergeGroupIds.length > 0) {
+      await tx.delete(orderMergeMembers).where(inArray(orderMergeMembers.groupId, mergeGroupIds));
+      await tx.delete(orderMergeGroups).where(inArray(orderMergeGroups.id, mergeGroupIds));
+    }
+
+    await tx.delete(orderBalancePayments).where(inArray(orderBalancePayments.orderId, orderIds));
+    await tx.delete(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
+    await tx.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
+    await tx.delete(orders).where(inArray(orders.id, orderIds));
+  });
 }
 
 function getReceiptExtension(contentType: string, filename?: string) {
@@ -210,15 +225,16 @@ async function assertReadyForFulfillment(
     .from(orderBalancePayments)
     .where(inArray(orderBalancePayments.orderId, context.orderIds));
   const mainBalance = balances.find((balance) => balance.orderId === context.mainOrderId);
-  const unresolvedBalance = balances.find((balance) => balance.paymentStatus !== "paid");
-
   if (!mainBalance) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "客製訂單尚未設定尾款；若無需尾款，請先使用「確認尾款為 0」",
     });
   }
-  if (mainBalance.paymentStatus !== "paid" || unresolvedBalance) {
+  // A merged group has one authoritative balance on its main order. Older
+  // member orders can retain superseded balance rows and must not block the
+  // group after the main balance has been paid.
+  if (mainBalance.paymentStatus !== "paid") {
     throw new TRPCError({ code: "BAD_REQUEST", message: "客製訂單尾款尚未完成，不能進入出貨流程" });
   }
 }
@@ -1643,6 +1659,9 @@ export const orderRouter = router({
       if (balancePayment.paymentStatus === "paid") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
       }
+      if (balancePayment.paymentStatus !== "pending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此尾款連結目前不可付款" });
+      }
 
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -1817,6 +1836,13 @@ export const orderRouter = router({
       transferReceiptImageFilename: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
+      const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
+      if (!balancePayment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到尾款資料" });
+      }
+      if (balancePayment.paymentStatus !== "pending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此尾款連結目前不可提交轉帳資料" });
+      }
       const receiptContentType = input.transferReceiptImageContentType;
       if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "轉帳截圖請上傳 JPG、PNG 或 WebP 圖片" });

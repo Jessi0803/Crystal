@@ -1604,6 +1604,9 @@ async function confirmBalanceTransfer(merchantTradeNo, audit) {
   const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!balance) throw new Error("Balance payment not found");
   if (balance.paymentStatus === "paid") return;
+  if (balance.paymentStatus === "failed" || balance.paymentStatus === "cancelled") {
+    throw new Error("Inactive balance payment cannot be confirmed");
+  }
   const now = /* @__PURE__ */ new Date();
   const manualAudit = audit ? {
     source: "admin_manual_balance_confirmation",
@@ -3055,10 +3058,18 @@ async function getClearQuartzChipsAddOn(db) {
 }
 async function deleteCancelledOrderRecords(db, orderIds) {
   if (!db) throw new Error("Database not available");
-  await db.delete(orderBalancePayments).where(inArray2(orderBalancePayments.orderId, orderIds));
-  await db.delete(logisticsOrders).where(inArray2(logisticsOrders.orderId, orderIds));
-  await db.delete(orderItems).where(inArray2(orderItems.orderId, orderIds));
-  await db.delete(orders).where(inArray2(orders.id, orderIds));
+  await db.transaction(async (tx) => {
+    const mergeMemberships = await tx.select({ groupId: orderMergeMembers.groupId }).from(orderMergeMembers).where(inArray2(orderMergeMembers.orderId, orderIds));
+    const mergeGroupIds = Array.from(new Set(mergeMemberships.map((row) => row.groupId)));
+    if (mergeGroupIds.length > 0) {
+      await tx.delete(orderMergeMembers).where(inArray2(orderMergeMembers.groupId, mergeGroupIds));
+      await tx.delete(orderMergeGroups).where(inArray2(orderMergeGroups.id, mergeGroupIds));
+    }
+    await tx.delete(orderBalancePayments).where(inArray2(orderBalancePayments.orderId, orderIds));
+    await tx.delete(logisticsOrders).where(inArray2(logisticsOrders.orderId, orderIds));
+    await tx.delete(orderItems).where(inArray2(orderItems.orderId, orderIds));
+    await tx.delete(orders).where(inArray2(orders.id, orderIds));
+  });
 }
 function getReceiptExtension(contentType, filename) {
   const ext = filename?.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -3135,14 +3146,13 @@ async function assertReadyForFulfillment(db, context) {
     paymentStatus: orderBalancePayments.paymentStatus
   }).from(orderBalancePayments).where(inArray2(orderBalancePayments.orderId, context.orderIds));
   const mainBalance = balances.find((balance) => balance.orderId === context.mainOrderId);
-  const unresolvedBalance = balances.find((balance) => balance.paymentStatus !== "paid");
   if (!mainBalance) {
     throw new TRPCError3({
       code: "BAD_REQUEST",
       message: "\u5BA2\u88FD\u8A02\u55AE\u5C1A\u672A\u8A2D\u5B9A\u5C3E\u6B3E\uFF1B\u82E5\u7121\u9700\u5C3E\u6B3E\uFF0C\u8ACB\u5148\u4F7F\u7528\u300C\u78BA\u8A8D\u5C3E\u6B3E\u70BA 0\u300D"
     });
   }
-  if (mainBalance.paymentStatus !== "paid" || unresolvedBalance) {
+  if (mainBalance.paymentStatus !== "paid") {
     throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8A02\u55AE\u5C3E\u6B3E\u5C1A\u672A\u5B8C\u6210\uFF0C\u4E0D\u80FD\u9032\u5165\u51FA\u8CA8\u6D41\u7A0B" });
   }
 }
@@ -4253,6 +4263,9 @@ var orderRouter = router({
     if (balancePayment.paymentStatus === "paid") {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5C3E\u6B3E\u5DF2\u4ED8\u6B3E" });
     }
+    if (balancePayment.paymentStatus !== "pending") {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u4ED8\u6B3E" });
+    }
     const db = await getDb();
     if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const isOverseas = input.checkoutRegion === "overseas";
@@ -4389,6 +4402,13 @@ var orderRouter = router({
     transferReceiptImageContentType: z2.string(),
     transferReceiptImageFilename: z2.string().optional()
   })).mutation(async ({ input }) => {
+    const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
+    if (!balancePayment) {
+      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u5C3E\u6B3E\u8CC7\u6599" });
+    }
+    if (balancePayment.paymentStatus !== "pending") {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u63D0\u4EA4\u8F49\u5E33\u8CC7\u6599" });
+    }
     const receiptContentType = input.transferReceiptImageContentType;
     if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u8ACB\u4E0A\u50B3 JPG\u3001PNG \u6216 WebP \u5716\u7247" });

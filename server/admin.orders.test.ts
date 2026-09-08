@@ -148,10 +148,12 @@ function createMockDb(selectResults: unknown[]) {
     where: vi.fn().mockResolvedValue(undefined),
   };
 
-  return {
+  const db: any = {
     select: vi.fn(() => createQueryChain(queue.shift() ?? [])),
     delete: vi.fn(() => deleteChain),
   };
+  db.transaction = vi.fn(async (callback: (tx: typeof db) => unknown) => callback(db));
+  return db;
 }
 
 function createMutationMockDb(selectResults: unknown[]) {
@@ -425,6 +427,7 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
         { id: 10, orderStatus: "cancelled", merchantTradeNo: "CANCEL001" },
         { id: 11, orderStatus: "cancelled", merchantTradeNo: "CANCEL002" },
       ],
+      [{ groupId: 7 }],
     ]);
     getDbMock.mockResolvedValue(db as any);
 
@@ -432,8 +435,8 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
     const result = await caller.order.deleteCancelledOrders({ orderIds: [10, 11] });
 
     expect(result).toEqual({ success: true, deletedCount: 2 });
-    expect(db.select).toHaveBeenCalledTimes(1);
-    expect(db.delete).toHaveBeenCalledTimes(4);
+    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(db.delete).toHaveBeenCalledTimes(6);
   });
 
   it("混入非已取消訂單時不刪除", async () => {
@@ -573,6 +576,28 @@ describe("order fulfillment first-phase rules", () => {
     expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledTimes(2);
     expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledWith(1);
     expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledWith(2);
+  });
+
+  it("uses only the merged main order balance when an old member balance is still pending", async () => {
+    const db = createMutationMockDb([
+      [{ id: 1, merchantTradeNo: "MERGE-MAIN" }],
+      [{ groupId: 50, mainOrderId: 1 }],
+      [{ orderId: 1 }, { orderId: 2 }],
+      [
+        { id: 1, merchantTradeNo: "MERGE-MAIN", paymentStatus: "paid", orderStatus: "paid", isCustomOrder: true },
+        { id: 2, merchantTradeNo: "MERGE-MEMBER", paymentStatus: "paid", orderStatus: "paid", isCustomOrder: true },
+      ],
+      [
+        { orderId: 1, paymentStatus: "paid" },
+        { orderId: 2, paymentStatus: "pending" },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 1, status: "shipped" });
+
+    expect(db.updateChain.set).toHaveBeenCalledWith({ orderStatus: "shipped" });
+    expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledTimes(2);
   });
 
   it("allows a paid overseas order to be marked shipped without a logistics record", async () => {
@@ -749,6 +774,31 @@ describe("order.updateFreeShippingOverride (admin procedure)", () => {
 describe("order.getBalancePaymentCheckout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("rejects a cancelled legacy member balance before changing checkout data", async () => {
+    getBalancePaymentDetailMock.mockResolvedValue({
+      id: 2,
+      orderId: 4170001,
+      merchantTradeNo: "CANCELLED-BALANCE",
+      paymentStatus: "cancelled",
+      order: { id: 4170001 },
+    } as any);
+    const db = createMutationMockDb([]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await expect(createPublicCaller().order.getBalancePaymentCheckout({
+      merchantTradeNo: "CANCELLED-BALANCE",
+      paymentMethod: "credit",
+      checkoutRegion: "domestic",
+      receiverPhone: "0912345678",
+      shippingMethod: "home",
+      shippingAddress: "台北市測試路 1 號",
+      receiverZipCode: "100",
+      origin: "https://example.test",
+    })).rejects.toThrow("此尾款連結目前不可付款");
+
+    expect(db.update).not.toHaveBeenCalled();
   });
 
   it("waives balance-payment shipping when the original order already qualifies for domestic free shipping", async () => {

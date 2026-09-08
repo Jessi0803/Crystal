@@ -291,7 +291,8 @@ export default function BalancePayment() {
 
   const isPaid = data.paymentStatus === "paid";
   const isTransferPending = data.paymentStatus === "transfer_pending";
-  const showPaymentChoice = !isPaid && !isTransferPending && !startCheckout.isSuccess;
+  const isInactive = data.paymentStatus === "failed" || data.paymentStatus === "cancelled";
+  const showPaymentChoice = data.paymentStatus === "pending" && !startCheckout.isSuccess;
   const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
   const balanceItems: CheckoutFeeItem[] = [
     {
@@ -442,18 +443,22 @@ export default function BalancePayment() {
               <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-4" />
             ) : isTransferPending ? (
               <Banknote className="w-14 h-14 text-blue-500 mx-auto mb-4" />
+            ) : isInactive ? (
+              <XCircle className="w-14 h-14 text-slate-400 mx-auto mb-4" />
             ) : (
               <CreditCard className="w-14 h-14 text-rose-500 mx-auto mb-4" />
             )}
             <p className="text-xs tracking-[0.16em] text-[oklch(0.5_0_0)] font-body mb-2">客製化尾款</p>
             <h1 className="text-2xl text-[oklch(0.12_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
-              {isPaid ? "尾款已完成付款" : isTransferPending ? "等待轉帳確認" : "請完成客製化尾款"}
+              {isPaid ? "尾款已完成付款" : isTransferPending ? "等待轉帳確認" : isInactive ? "尾款連結已失效" : "請完成客製化尾款"}
             </h1>
             <p className="text-sm font-body text-[oklch(0.5_0_0)] mt-3">
               {isPaid
                 ? "感謝您的付款，訂單已轉為已付款並會進入出貨流程。"
                 : isTransferPending
                 ? "老闆確認收款後將更新訂單狀態，請耐心等候。"
+                : isInactive
+                ? "此連結已取消或失效，如仍需付款請聯繫客服取得新的尾款連結。"
                 : "這是老闆為您的客製化訂單產生的尾款付款連結。"}
             </p>
           </div>
@@ -488,7 +493,7 @@ export default function BalancePayment() {
                 <span className="text-[oklch(0.12_0_0)]">NT$ {data.clearQuartzChipsItem.subtotal.toLocaleString()}</span>
               </div>
             )}
-            {!isPaid && !isTransferPending && (
+            {showPaymentChoice && (
               <>
                 {includeClearQuartzChips && hasLiveClearQuartzChipsProduct && (
                   <div className="flex justify-between gap-4 text-sm font-body">
@@ -517,6 +522,7 @@ export default function BalancePayment() {
                 {isPaid ? "已付款"
                   : isTransferPending ? "⏳ 轉帳待確認"
                   : data.paymentStatus === "failed" ? "付款失敗"
+                  : data.paymentStatus === "cancelled" ? "已取消"
                   : "待付款"}
               </span>
             </div>

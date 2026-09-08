@@ -1191,6 +1191,9 @@ export async function confirmBalanceTransfer(
   if (!balance) throw new Error("Balance payment not found");
 
   if (balance.paymentStatus === "paid") return;
+  if (balance.paymentStatus === "failed" || balance.paymentStatus === "cancelled") {
+    throw new Error("Inactive balance payment cannot be confirmed");
+  }
 
   const now = new Date();
   const manualAudit = audit
