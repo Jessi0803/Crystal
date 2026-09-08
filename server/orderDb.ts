@@ -1175,7 +1175,10 @@ export async function updateBalancePaymentTransferCode(
   }
 }
 
-export async function confirmBalanceTransfer(merchantTradeNo: string) {
+export async function confirmBalanceTransfer(
+  merchantTradeNo: string,
+  audit?: { adminUserId: number; note?: string }
+) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
@@ -1187,15 +1190,86 @@ export async function confirmBalanceTransfer(merchantTradeNo: string) {
     .limit(1);
   if (!balance) throw new Error("Balance payment not found");
 
+  if (balance.paymentStatus === "paid") return;
+
+  const now = new Date();
+  const manualAudit = audit
+    ? {
+        source: "admin_manual_balance_confirmation",
+        adminUserId: audit.adminUserId,
+        note: audit.note?.trim() || null,
+        confirmedAt: now.toISOString(),
+      }
+    : balance.ecpayNotifyData;
+
   await db
     .update(orderBalancePayments)
-    .set({ paymentStatus: "paid", paidAt: new Date() })
+    .set({ paymentStatus: "paid", paidAt: now, ecpayNotifyData: manualAudit })
     .where(eq(orderBalancePayments.id, balance.id));
 
   await db
     .update(orders)
-    .set({ orderStatus: "paid", paymentStatus: "confirmed", paidAt: new Date() })
+    .set({ orderStatus: "paid", paymentStatus: "confirmed", confirmedAt: now })
     .where(eq(orders.id, balance.orderId));
+}
+
+export async function settleZeroBalancePayment(
+  orderId: number,
+  audit: { adminUserId: number; note?: string }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
+
+  return db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+    if (!order) throw new Error("Order not found");
+    if (!order.isCustomOrder) throw new Error("Only custom orders can waive a balance");
+
+    const [existing] = await tx
+      .select({ id: orderBalancePayments.id })
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.orderId, orderId))
+      .limit(1);
+    if (existing) throw new Error("Balance payment already exists");
+
+    const merchantTradeNo = `CZ${Date.now().toString(36).toUpperCase()}${Math.random()
+      .toString(36)
+      .slice(2, 6)
+      .toUpperCase()}`.slice(0, 20);
+    const now = new Date();
+    const auditData = {
+      source: "admin_zero_balance",
+      adminUserId: audit.adminUserId,
+      note: audit.note?.trim() || null,
+      confirmedAt: now.toISOString(),
+    };
+
+    await tx.insert(orderBalancePayments).values({
+      orderId,
+      merchantTradeNo,
+      amount: 0,
+      shippingFee: 0,
+      paymentFee: 0,
+      totalAmount: 0,
+      paymentMethod: "atm",
+      paymentStatus: "paid",
+      tradeNo: "ADMIN_ZERO_BALANCE",
+      ecpayNotifyData: auditData,
+      paidAt: now,
+    });
+
+    await tx
+      .update(orders)
+      .set({ orderStatus: "paid", paymentStatus: "confirmed", confirmedAt: now })
+      .where(eq(orders.id, orderId));
+
+    return { merchantTradeNo };
+  });
 }
 
 export function isCustomDepositProduct(items: { id: string; baseProductId?: string }[]) {

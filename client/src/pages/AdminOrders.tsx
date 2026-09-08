@@ -273,6 +273,16 @@ function OrderRowCard({
     onError: (err) => toast.error(err.message || "確認失敗"),
   });
 
+  const settleZeroBalance = trpc.order.settleZeroBalance.useMutation({
+    onSuccess: async () => {
+      await utils.order.getOrderDetail.invalidate({ orderId: order.id });
+      await utils.order.listOrders.invalidate();
+      await utils.order.getStats.invalidate();
+      toast.success("已確認尾款為 0，訂單可進入出貨流程");
+    },
+    onError: (err) => toast.error(err.message || "確認零尾款失敗"),
+  });
+
   const updateFreeShippingOverride = trpc.order.updateFreeShippingOverride.useMutation({
     onSuccess: async (data) => {
       await utils.order.getOrderDetail.invalidate({ orderId: order.id });
@@ -584,8 +594,27 @@ function OrderRowCard({
                   </button>
                 )}
 
+                {detail.isCustomOrder && detail.orderStatus === "deposit_paid" &&
+                  !detail.balancePayment &&
+                  (!(detail as any).mergeInfo || (detail as any).mergeInfo.role === "main") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const note = window.prompt("請確認此客製訂單確實無需收取尾款。可填寫備註：", "無需補尾款");
+                      if (note === null) return;
+                      settleZeroBalance.mutate({ orderId: detail.id, note });
+                    }}
+                    disabled={settleZeroBalance.isPending}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-body hover:bg-emerald-100 transition-colors disabled:opacity-60"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {settleZeroBalance.isPending ? "確認中..." : "確認尾款為 0"}
+                  </button>
+                )}
+
                 {(detail.orderStatus === "paid" || detail.orderStatus === "processing") &&
                   !detail.logistics &&
+                  (!detail.isCustomOrder || detail.balancePayment?.paymentStatus === "paid") &&
                   (!(detail as any).mergeInfo || (detail as any).mergeInfo.role === "main") && (
                   <button
                     onClick={() => createLogistics.mutate({ orderId: detail.id })}
@@ -726,9 +755,9 @@ function OrderRowCard({
                   <p className="font-medium mb-1">尾款資訊</p>
                   <p>尾款編號：{detail.balancePayment.merchantTradeNo}</p>
                   <p>尾款金額：NT$ {detail.balancePayment.amount.toLocaleString()}</p>
-                  <p>付款方式：{(detail.balancePayment as any).paymentMethod === "atm" ? "轉帳" : "信用卡"}</p>
+                  <p>付款方式：{detail.balancePayment.amount === 0 ? "免尾款" : (detail.balancePayment as any).paymentMethod === "atm" ? "轉帳" : "信用卡"}</p>
                   <p>尾款狀態：{
-                    detail.balancePayment.paymentStatus === "paid" ? "✅ 已付款"
+                    detail.balancePayment.paymentStatus === "paid" ? detail.balancePayment.amount === 0 ? "✅ 已確認免尾款" : "✅ 已付款"
                     : (detail.balancePayment.paymentStatus as string) === "transfer_pending" ? "⏳ 轉帳待確認"
                     : detail.balancePayment.paymentStatus === "failed" ? "❌ 付款失敗"
                     : "待付款"
@@ -752,7 +781,7 @@ function OrderRowCard({
                     </a>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {(detail.balancePayment.paymentStatus as string) !== "transfer_pending" && detail.balancePayment.paymentStatus !== "paid" && (
+                    {detail.balancePayment.amount > 0 && (detail.balancePayment.paymentStatus as string) !== "transfer_pending" && detail.balancePayment.paymentStatus !== "paid" && (
                     <button
                       onClick={async () => {
                         const link = `${window.location.origin}/balance/${encodeURIComponent(detail.balancePayment!.merchantTradeNo)}`;
@@ -769,18 +798,18 @@ function OrderRowCard({
                       複製尾款連結
                     </button>
                     )}
-                    {(detail.balancePayment.paymentStatus as string) === "transfer_pending" && (
+                    {detail.balancePayment.amount > 0 && detail.balancePayment.paymentStatus !== "paid" && (
                       <button
                         onClick={() => {
-                          if (window.confirm("確認已收到尾款轉帳？")) {
-                            confirmBalanceTransfer.mutate({ merchantTradeNo: detail.balancePayment!.merchantTradeNo });
-                          }
+                          const note = window.prompt("確認已收到尾款？可填寫收款來源或備註：", "LINE 管理員確認");
+                          if (note === null) return;
+                          confirmBalanceTransfer.mutate({ merchantTradeNo: detail.balancePayment!.merchantTradeNo, note });
                         }}
                         disabled={confirmBalanceTransfer.isPending}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-60"
                       >
                         <CheckCircle className="w-3.5 h-3.5" />
-                        確認收到尾款
+                        人工確認尾款已收
                       </button>
                     )}
                   </div>
@@ -879,7 +908,7 @@ export default function AdminOrders() {
       toast.success("訂單狀態已更新");
       refetchListAndStats();
     },
-    onError: () => toast.error("更新失敗，請重試"),
+    onError: (err) => toast.error(err.message || "更新失敗，請重試"),
   });
 
   const deleteCancelledOrder = trpc.order.deleteCancelledOrder.useMutation({

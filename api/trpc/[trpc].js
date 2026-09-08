@@ -1597,14 +1597,57 @@ async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive, trans
     await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq2(orders.id, balance.orderId));
   }
 }
-async function confirmBalanceTransfer(merchantTradeNo) {
+async function confirmBalanceTransfer(merchantTradeNo, audit) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
   const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!balance) throw new Error("Balance payment not found");
-  await db.update(orderBalancePayments).set({ paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq2(orderBalancePayments.id, balance.id));
-  await db.update(orders).set({ orderStatus: "paid", paymentStatus: "confirmed", paidAt: /* @__PURE__ */ new Date() }).where(eq2(orders.id, balance.orderId));
+  if (balance.paymentStatus === "paid") return;
+  const now = /* @__PURE__ */ new Date();
+  const manualAudit = audit ? {
+    source: "admin_manual_balance_confirmation",
+    adminUserId: audit.adminUserId,
+    note: audit.note?.trim() || null,
+    confirmedAt: now.toISOString()
+  } : balance.ecpayNotifyData;
+  await db.update(orderBalancePayments).set({ paymentStatus: "paid", paidAt: now, ecpayNotifyData: manualAudit }).where(eq2(orderBalancePayments.id, balance.id));
+  await db.update(orders).set({ orderStatus: "paid", paymentStatus: "confirmed", confirmedAt: now }).where(eq2(orders.id, balance.orderId));
+}
+async function settleZeroBalancePayment(orderId, audit) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq2(orders.id, orderId)).limit(1);
+    if (!order) throw new Error("Order not found");
+    if (!order.isCustomOrder) throw new Error("Only custom orders can waive a balance");
+    const [existing] = await tx.select({ id: orderBalancePayments.id }).from(orderBalancePayments).where(eq2(orderBalancePayments.orderId, orderId)).limit(1);
+    if (existing) throw new Error("Balance payment already exists");
+    const merchantTradeNo = `CZ${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`.slice(0, 20);
+    const now = /* @__PURE__ */ new Date();
+    const auditData = {
+      source: "admin_zero_balance",
+      adminUserId: audit.adminUserId,
+      note: audit.note?.trim() || null,
+      confirmedAt: now.toISOString()
+    };
+    await tx.insert(orderBalancePayments).values({
+      orderId,
+      merchantTradeNo,
+      amount: 0,
+      shippingFee: 0,
+      paymentFee: 0,
+      totalAmount: 0,
+      paymentMethod: "atm",
+      paymentStatus: "paid",
+      tradeNo: "ADMIN_ZERO_BALANCE",
+      ecpayNotifyData: auditData,
+      paidAt: now
+    });
+    await tx.update(orders).set({ orderStatus: "paid", paymentStatus: "confirmed", confirmedAt: now }).where(eq2(orders.id, orderId));
+    return { merchantTradeNo };
+  });
 }
 function isCustomDepositProduct(items) {
   return items.some((item) => CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id));
@@ -3032,6 +3075,77 @@ function siteBaseUrl(req) {
   const proto = (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader?.split(",")[0]?.trim()) || (req.protocol === "https" ? "https" : "http");
   return `${proto}://${host}`;
 }
+var MERGED_ORDER_SYNC_STATUSES = /* @__PURE__ */ new Set([
+  "processing",
+  "shipped",
+  "arrived",
+  "picked_up",
+  "not_picked",
+  "completed",
+  "cancelled"
+]);
+var FULFILLMENT_STATUSES = /* @__PURE__ */ new Set([
+  "shipped",
+  "arrived",
+  "picked_up",
+  "not_picked",
+  "completed"
+]);
+async function getOrderOperationContext(db, orderId) {
+  const [mergeMember] = await db.select({
+    groupId: orderMergeMembers.groupId,
+    mainOrderId: orderMergeGroups.mainOrderId
+  }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, orderId)).limit(1);
+  if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== orderId) {
+    throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u64CD\u4F5C" });
+  }
+  if (!mergeMember?.groupId) {
+    return { groupId: null, mainOrderId: orderId, orderIds: [orderId] };
+  }
+  const members = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
+  return {
+    groupId: mergeMember.groupId,
+    mainOrderId: mergeMember.mainOrderId ?? orderId,
+    orderIds: members.map((member) => member.orderId)
+  };
+}
+async function assertReadyForFulfillment(db, context) {
+  const groupOrders = await db.select({
+    id: orders.id,
+    merchantTradeNo: orders.merchantTradeNo,
+    paymentStatus: orders.paymentStatus,
+    orderStatus: orders.orderStatus,
+    isCustomOrder: orders.isCustomOrder
+  }).from(orders).where(inArray2(orders.id, context.orderIds));
+  if (groupOrders.length !== context.orderIds.length) {
+    throw new TRPCError3({ code: "NOT_FOUND", message: "\u90E8\u5206\u5408\u4F75\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
+  }
+  const unpaidOrders = groupOrders.filter(
+    (order) => !["paid", "confirmed"].includes(order.paymentStatus)
+  );
+  if (unpaidOrders.length > 0) {
+    throw new TRPCError3({
+      code: "BAD_REQUEST",
+      message: `\u5C1A\u6709\u8A02\u55AE\u672A\u5B8C\u6210\u4ED8\u6B3E\uFF1A${unpaidOrders.map((order) => order.merchantTradeNo).join(", ")}`
+    });
+  }
+  if (!groupOrders.some((order) => order.isCustomOrder)) return;
+  const balances = await db.select({
+    orderId: orderBalancePayments.orderId,
+    paymentStatus: orderBalancePayments.paymentStatus
+  }).from(orderBalancePayments).where(inArray2(orderBalancePayments.orderId, context.orderIds));
+  const mainBalance = balances.find((balance) => balance.orderId === context.mainOrderId);
+  const unresolvedBalance = balances.find((balance) => balance.paymentStatus !== "paid");
+  if (!mainBalance) {
+    throw new TRPCError3({
+      code: "BAD_REQUEST",
+      message: "\u5BA2\u88FD\u8A02\u55AE\u5C1A\u672A\u8A2D\u5B9A\u5C3E\u6B3E\uFF1B\u82E5\u7121\u9700\u5C3E\u6B3E\uFF0C\u8ACB\u5148\u4F7F\u7528\u300C\u78BA\u8A8D\u5C3E\u6B3E\u70BA 0\u300D"
+    });
+  }
+  if (mainBalance.paymentStatus !== "paid" || unresolvedBalance) {
+    throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8A02\u55AE\u5C3E\u6B3E\u5C1A\u672A\u5B8C\u6210\uFF0C\u4E0D\u80FD\u9032\u5165\u51FA\u8CA8\u6D41\u7A0B" });
+  }
+}
 function generateOrderMergeCode() {
   const now = /* @__PURE__ */ new Date();
   const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -3675,26 +3789,26 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq6(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
-    const [mergeMember] = await db.select({
-      groupId: orderMergeMembers.groupId,
-      mainOrderId: orderMergeGroups.mainOrderId
-    }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
-    if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u64CD\u4F5C" });
-    }
+    const operationContext = await getOrderOperationContext(db, input.orderId);
     if (input.status === "transfer_pending") {
       await db.update(orders).set({ paymentStatus: "transfer_pending" }).where(eq6(orders.id, order.id));
       return { success: true };
     }
-    if (input.status === "cancelled" && mergeMember?.groupId) {
-      const mergedOrders = await db.select({
-        id: orders.id,
-        merchantTradeNo: orders.merchantTradeNo
-      }).from(orderMergeMembers).leftJoin(orders, eq6(orderMergeMembers.orderId, orders.id)).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
-      for (const mergedOrder of mergedOrders) {
-        if (!mergedOrder.id || !mergedOrder.merchantTradeNo) continue;
-        await updateOrderStatus(mergedOrder.merchantTradeNo, "cancelled");
-        await restoreInventoryOnCancel(mergedOrder.merchantTradeNo);
+    if (MERGED_ORDER_SYNC_STATUSES.has(input.status)) {
+      if (FULFILLMENT_STATUSES.has(input.status)) {
+        await assertReadyForFulfillment(db, operationContext);
+      }
+      await db.update(orders).set({ orderStatus: input.status }).where(inArray2(orders.id, operationContext.orderIds));
+      if (input.status === "cancelled") {
+        const affectedOrders = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(inArray2(orders.id, operationContext.orderIds));
+        await Promise.all(
+          affectedOrders.map((affectedOrder) => restoreInventoryOnCancel(affectedOrder.merchantTradeNo))
+        );
+      }
+      if (input.status === "shipped") {
+        await Promise.all(
+          operationContext.orderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId))
+        );
       }
       return { success: true };
     }
@@ -3702,12 +3816,6 @@ var orderRouter = router({
     if (input.status === "paid") {
       await db.update(orders).set({ paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq6(orders.id, order.id));
       await deductInventoryAfterPayment(order.merchantTradeNo);
-    }
-    if (input.status === "cancelled") {
-      await restoreInventoryOnCancel(order.merchantTradeNo);
-    }
-    if (input.status === "shipped") {
-      await notifyCustomerOrderShippedSafely(order.id);
     }
     return { success: true };
   }),
@@ -3876,6 +3984,25 @@ var orderRouter = router({
       paymentLink: `${origin}/balance/${encodeURIComponent(payment.merchantTradeNo)}`
     };
   }),
+  /** 管理員明確確認客製訂單無尾款；沒有尾款紀錄仍代表尚未報價。 */
+  settleZeroBalance: adminProcedure.input(z2.object({
+    orderId: z2.number().int().positive(),
+    note: z2.string().max(500).optional()
+  })).mutation(async ({ input, ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    await getOrderOperationContext(db, input.orderId);
+    try {
+      const result = await settleZeroBalancePayment(input.orderId, {
+        adminUserId: ctx.user.id,
+        note: input.note
+      });
+      return { success: true, merchantTradeNo: result.merchantTradeNo };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "\u78BA\u8A8D\u96F6\u5C3E\u6B3E\u5931\u6557";
+      throw new TRPCError3({ code: "BAD_REQUEST", message });
+    }
+  }),
   /**
    * 建立物流訂單（管理後台）
    */
@@ -3884,18 +4011,8 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const [order] = await db.select().from(orders).where(eq6(orders.id, input.orderId)).limit(1);
     if (!order) throw new Error("Order not found");
-    const [mergeMember] = await db.select({
-      groupId: orderMergeMembers.groupId,
-      mainOrderId: orderMergeGroups.mainOrderId,
-      mergeCode: orderMergeGroups.mergeCode
-    }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
-    if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
-      const [mainOrder] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq6(orders.id, mergeMember.mainOrderId)).limit(1);
-      throw new TRPCError3({
-        code: "BAD_REQUEST",
-        message: `\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE ${mainOrder?.merchantTradeNo ?? mergeMember.mainOrderId}\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u5EFA\u7ACB\u7269\u6D41`
-      });
-    }
+    const operationContext = await getOrderOperationContext(db, input.orderId);
+    await assertReadyForFulfillment(db, operationContext);
     const logisticsMerchantTradeNo = `L${Date.now()}`;
     const logisticsType = order.shippingMethod === "home" ? "HOME" : "CVS";
     const logisticsSubType = order.shippingMethod === "cvs_711" ? "UNIMARTC2C" : order.shippingMethod === "cvs_family" ? "FAMIC2C" : "TCAT";
@@ -3963,13 +4080,11 @@ var orderRouter = router({
           logisticsStatus: "in_transit",
           ecpayLogisticsData: ecpayResult.raw
         }).where(eq6(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
-        if (mergeMember?.groupId) {
-          const mergeRows = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
-          const mergedOrderIds = mergeRows.map((row) => row.orderId);
-          if (mergedOrderIds.length > 0) {
-            await db.update(orders).set({ orderStatus: "shipped" }).where(inArray2(orders.id, mergedOrderIds));
-            await Promise.all(mergedOrderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId)));
-          }
+        if (operationContext.groupId) {
+          await db.update(orders).set({ orderStatus: "shipped" }).where(inArray2(orders.id, operationContext.orderIds));
+          await Promise.all(
+            operationContext.orderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId))
+          );
         } else {
           await updateOrderStatus(order.merchantTradeNo, "shipped");
           await notifyCustomerOrderShippedSafely(input.orderId);
@@ -4292,8 +4407,14 @@ var orderRouter = router({
     await deductInventoryAfterBalancePayment(input.merchantTradeNo);
     return { success: true };
   }),
-  confirmBalanceTransfer: adminProcedure.input(z2.object({ merchantTradeNo: z2.string().min(1) })).mutation(async ({ input }) => {
-    await confirmBalanceTransfer(input.merchantTradeNo);
+  confirmBalanceTransfer: adminProcedure.input(z2.object({
+    merchantTradeNo: z2.string().min(1),
+    note: z2.string().max(500).optional()
+  })).mutation(async ({ input, ctx }) => {
+    await confirmBalanceTransfer(input.merchantTradeNo, {
+      adminUserId: ctx.user.id,
+      note: input.note
+    });
     await deductInventoryAfterBalancePayment(input.merchantTradeNo);
     return { success: true };
   }),

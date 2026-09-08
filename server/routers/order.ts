@@ -31,6 +31,7 @@ import {
   getBalancePaymentDetail,
   updateBalancePaymentTransferCode,
   confirmBalanceTransfer,
+  settleZeroBalancePayment,
 } from "../orderDb";
 import {
   deductInventoryAfterBalancePayment,
@@ -117,6 +118,109 @@ function siteBaseUrl(req: { get(name: string): string | undefined; protocol?: st
     (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader?.split(",")[0]?.trim()) ||
     (req.protocol === "https" ? "https" : "http");
   return `${proto}://${host}`;
+}
+
+type OrderDatabase = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+const MERGED_ORDER_SYNC_STATUSES = new Set([
+  "processing",
+  "shipped",
+  "arrived",
+  "picked_up",
+  "not_picked",
+  "completed",
+  "cancelled",
+]);
+
+const FULFILLMENT_STATUSES = new Set([
+  "shipped",
+  "arrived",
+  "picked_up",
+  "not_picked",
+  "completed",
+]);
+
+async function getOrderOperationContext(db: OrderDatabase, orderId: number) {
+  const [mergeMember] = await db
+    .select({
+      groupId: orderMergeMembers.groupId,
+      mainOrderId: orderMergeGroups.mainOrderId,
+    })
+    .from(orderMergeMembers)
+    .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
+    .where(eq(orderMergeMembers.orderId, orderId))
+    .limit(1);
+
+  if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== orderId) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單已併入主訂單，請從主訂單操作" });
+  }
+
+  if (!mergeMember?.groupId) {
+    return { groupId: null, mainOrderId: orderId, orderIds: [orderId] };
+  }
+
+  const members = await db
+    .select({ orderId: orderMergeMembers.orderId })
+    .from(orderMergeMembers)
+    .where(eq(orderMergeMembers.groupId, mergeMember.groupId));
+
+  return {
+    groupId: mergeMember.groupId,
+    mainOrderId: mergeMember.mainOrderId ?? orderId,
+    orderIds: members.map((member) => member.orderId),
+  };
+}
+
+async function assertReadyForFulfillment(
+  db: OrderDatabase,
+  context: Awaited<ReturnType<typeof getOrderOperationContext>>
+) {
+  const groupOrders = await db
+    .select({
+      id: orders.id,
+      merchantTradeNo: orders.merchantTradeNo,
+      paymentStatus: orders.paymentStatus,
+      orderStatus: orders.orderStatus,
+      isCustomOrder: orders.isCustomOrder,
+    })
+    .from(orders)
+    .where(inArray(orders.id, context.orderIds));
+
+  if (groupOrders.length !== context.orderIds.length) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "部分合併訂單不存在，請重新整理後再試" });
+  }
+
+  const unpaidOrders = groupOrders.filter(
+    (order) => !["paid", "confirmed"].includes(order.paymentStatus)
+  );
+  if (unpaidOrders.length > 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `尚有訂單未完成付款：${unpaidOrders.map((order) => order.merchantTradeNo).join(", ")}`,
+    });
+  }
+
+  if (!groupOrders.some((order) => order.isCustomOrder)) return;
+
+  const balances = await db
+    .select({
+      orderId: orderBalancePayments.orderId,
+      paymentStatus: orderBalancePayments.paymentStatus,
+    })
+    .from(orderBalancePayments)
+    .where(inArray(orderBalancePayments.orderId, context.orderIds));
+  const mainBalance = balances.find((balance) => balance.orderId === context.mainOrderId);
+  const unresolvedBalance = balances.find((balance) => balance.paymentStatus !== "paid");
+
+  if (!mainBalance) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "客製訂單尚未設定尾款；若無需尾款，請先使用「確認尾款為 0」",
+    });
+  }
+  if (mainBalance.paymentStatus !== "paid" || unresolvedBalance) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "客製訂單尾款尚未完成，不能進入出貨流程" });
+  }
 }
 
 function generateOrderMergeCode() {
@@ -893,19 +997,7 @@ export const orderRouter = router({
       const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
 
-      const [mergeMember] = await db
-        .select({
-          groupId: orderMergeMembers.groupId,
-          mainOrderId: orderMergeGroups.mainOrderId,
-        })
-        .from(orderMergeMembers)
-        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
-        .where(eq(orderMergeMembers.orderId, input.orderId))
-        .limit(1);
-
-      if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單已併入主訂單，請從主訂單操作" });
-      }
+      const operationContext = await getOrderOperationContext(db, input.orderId);
 
       // 轉帳待確認屬於「付款狀態」(paymentStatus)，不是訂單狀態(orderStatus)，
       // 列表與統計也是用 paymentStatus 篩選，因此直接更新 paymentStatus。
@@ -914,19 +1006,29 @@ export const orderRouter = router({
         return { success: true };
       }
 
-      if (input.status === "cancelled" && mergeMember?.groupId) {
-        const mergedOrders = await db
-          .select({
-            id: orders.id,
-            merchantTradeNo: orders.merchantTradeNo,
-          })
-          .from(orderMergeMembers)
-          .leftJoin(orders, eq(orderMergeMembers.orderId, orders.id))
-          .where(eq(orderMergeMembers.groupId, mergeMember.groupId));
-        for (const mergedOrder of mergedOrders) {
-          if (!mergedOrder.id || !mergedOrder.merchantTradeNo) continue;
-          await dbUpdateOrderStatus(mergedOrder.merchantTradeNo, "cancelled");
-          await restoreInventoryOnCancel(mergedOrder.merchantTradeNo);
+      if (MERGED_ORDER_SYNC_STATUSES.has(input.status)) {
+        if (FULFILLMENT_STATUSES.has(input.status)) {
+          await assertReadyForFulfillment(db, operationContext);
+        }
+
+        await db
+          .update(orders)
+          .set({ orderStatus: input.status })
+          .where(inArray(orders.id, operationContext.orderIds));
+
+        if (input.status === "cancelled") {
+          const affectedOrders = await db
+            .select({ merchantTradeNo: orders.merchantTradeNo })
+            .from(orders)
+            .where(inArray(orders.id, operationContext.orderIds));
+          await Promise.all(
+            affectedOrders.map((affectedOrder) => restoreInventoryOnCancel(affectedOrder.merchantTradeNo))
+          );
+        }
+        if (input.status === "shipped") {
+          await Promise.all(
+            operationContext.orderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId))
+          );
         }
         return { success: true };
       }
@@ -938,12 +1040,6 @@ export const orderRouter = router({
         // deductInventoryAfterPayment 以 inventoryDeducted 旗標防止重複扣減。
         await db.update(orders).set({ paymentStatus: "paid", paidAt: new Date() }).where(eq(orders.id, order.id));
         await deductInventoryAfterPayment(order.merchantTradeNo);
-      }
-      if (input.status === "cancelled") {
-        await restoreInventoryOnCancel(order.merchantTradeNo);
-      }
-      if (input.status === "shipped") {
-        await notifyCustomerOrderShippedSafely(order.id);
       }
       return { success: true };
     }),
@@ -1201,6 +1297,29 @@ export const orderRouter = router({
       };
     }),
 
+  /** 管理員明確確認客製訂單無尾款；沒有尾款紀錄仍代表尚未報價。 */
+  settleZeroBalance: adminProcedure
+    .input(z.object({
+      orderId: z.number().int().positive(),
+      note: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await getOrderOperationContext(db, input.orderId);
+
+      try {
+        const result = await settleZeroBalancePayment(input.orderId, {
+          adminUserId: ctx.user.id,
+          note: input.note,
+        });
+        return { success: true, merchantTradeNo: result.merchantTradeNo };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "確認零尾款失敗";
+        throw new TRPCError({ code: "BAD_REQUEST", message });
+      }
+    }),
+
   /**
    * 建立物流訂單（管理後台）
    */
@@ -1212,28 +1331,8 @@ export const orderRouter = router({
       const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
 
-      const [mergeMember] = await db
-        .select({
-          groupId: orderMergeMembers.groupId,
-          mainOrderId: orderMergeGroups.mainOrderId,
-          mergeCode: orderMergeGroups.mergeCode,
-        })
-        .from(orderMergeMembers)
-        .leftJoin(orderMergeGroups, eq(orderMergeMembers.groupId, orderMergeGroups.id))
-        .where(eq(orderMergeMembers.orderId, input.orderId))
-        .limit(1);
-
-      if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
-        const [mainOrder] = await db
-          .select({ merchantTradeNo: orders.merchantTradeNo })
-          .from(orders)
-          .where(eq(orders.id, mergeMember.mainOrderId))
-          .limit(1);
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `此訂單已併入主訂單 ${mainOrder?.merchantTradeNo ?? mergeMember.mainOrderId}，請從主訂單建立物流`,
-        });
-      }
+      const operationContext = await getOrderOperationContext(db, input.orderId);
+      await assertReadyForFulfillment(db, operationContext);
 
       // 強制使用 C2C 物流類型（避免舊訂單存了 B2C 類型）
       const logisticsMerchantTradeNo = `L${Date.now()}`;
@@ -1324,16 +1423,14 @@ export const orderRouter = router({
             .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
 
           // 更新訂單狀態為已出貨；若是合併主單，整組訂單同步出貨狀態。
-          if (mergeMember?.groupId) {
-            const mergeRows = await db
-              .select({ orderId: orderMergeMembers.orderId })
-              .from(orderMergeMembers)
-              .where(eq(orderMergeMembers.groupId, mergeMember.groupId));
-            const mergedOrderIds = mergeRows.map((row) => row.orderId);
-            if (mergedOrderIds.length > 0) {
-              await db.update(orders).set({ orderStatus: "shipped" }).where(inArray(orders.id, mergedOrderIds));
-              await Promise.all(mergedOrderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId)));
-            }
+          if (operationContext.groupId) {
+            await db
+              .update(orders)
+              .set({ orderStatus: "shipped" })
+              .where(inArray(orders.id, operationContext.orderIds));
+            await Promise.all(
+              operationContext.orderIds.map((orderId) => notifyCustomerOrderShippedSafely(orderId))
+            );
           } else {
             await dbUpdateOrderStatus(order.merchantTradeNo, "shipped");
             await notifyCustomerOrderShippedSafely(input.orderId);
@@ -1740,9 +1837,15 @@ export const orderRouter = router({
     }),
 
   confirmBalanceTransfer: adminProcedure
-    .input(z.object({ merchantTradeNo: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      await confirmBalanceTransfer(input.merchantTradeNo);
+    .input(z.object({
+      merchantTradeNo: z.string().min(1),
+      note: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await confirmBalanceTransfer(input.merchantTradeNo, {
+        adminUserId: ctx.user.id,
+        note: input.note,
+      });
       await deductInventoryAfterBalancePayment(input.merchantTradeNo);
       return { success: true };
     }),

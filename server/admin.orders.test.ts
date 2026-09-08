@@ -43,6 +43,7 @@ vi.mock("./orderDb", () => ({
   getBalancePaymentDetail: vi.fn(),
   updateBalancePaymentTransferCode: vi.fn(),
   confirmBalanceTransfer: vi.fn(),
+  settleZeroBalancePayment: vi.fn(),
 }));
 
 vi.mock("./db", () => ({
@@ -56,6 +57,7 @@ vi.mock("./ecpay", () => ({
 }));
 
 vi.mock("./inventoryDb", () => ({
+  deductInventoryAfterBalancePayment: vi.fn(),
   deductInventoryAfterPayment: vi.fn(),
   restoreInventoryOnCancel: vi.fn(),
   ensureOrdersColumns: vi.fn(),
@@ -90,27 +92,33 @@ import {
   getAdminOrderSummaries,
   getOrderWithItems,
   getBalancePaymentDetail,
+  confirmBalanceTransfer,
+  settleZeroBalancePayment,
 } from "./orderDb";
 import { getDb } from "./db";
 import { appRouter } from "./appRouter";
-import { getProductAvailability } from "./inventoryDb";
+import { deductInventoryAfterBalancePayment, getProductAvailability } from "./inventoryDb";
 import {
   capturePayPalOrder,
   verifyPayPalOrderBelongsToMerchant,
 } from "./_core/paypal";
 import { storagePut } from "./storage";
-import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
+import { notifyCustomerOrderPlacedSafely, notifyCustomerOrderShippedSafely } from "./customerOrderNotification";
 
 const getAdminOrderSummariesMock = vi.mocked(getAdminOrderSummaries);
 const createOrderMock = vi.mocked(createOrder);
 const getOrderWithItemsMock = vi.mocked(getOrderWithItems);
 const getBalancePaymentDetailMock = vi.mocked(getBalancePaymentDetail);
+const confirmBalanceTransferMock = vi.mocked(confirmBalanceTransfer);
+const settleZeroBalancePaymentMock = vi.mocked(settleZeroBalancePayment);
 const getDbMock = vi.mocked(getDb);
 const getProductAvailabilityMock = vi.mocked(getProductAvailability);
 const verifyPayPalOrderBelongsToMerchantMock = vi.mocked(verifyPayPalOrderBelongsToMerchant);
 const capturePayPalOrderMock = vi.mocked(capturePayPalOrder);
 const storagePutMock = vi.mocked(storagePut);
 const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
+const notifyCustomerOrderShippedSafelyMock = vi.mocked(notifyCustomerOrderShippedSafely);
+const deductInventoryAfterBalancePaymentMock = vi.mocked(deductInventoryAfterBalancePayment);
 
 function createCaller(user: { id: number; role: string } | null) {
   return appRouter.createCaller({
@@ -443,6 +451,148 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
       code: "BAD_REQUEST",
     });
     expect(db.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("order fulfillment first-phase rules", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("blocks logistics creation when a custom order has no explicit balance settlement", async () => {
+    const db = createMutationMockDb([
+      [{ id: 91, merchantTradeNo: "CUSTOM-NO-BALANCE", shippingMethod: "home" }],
+      [],
+      [{
+        id: 91,
+        merchantTradeNo: "CUSTOM-NO-BALANCE",
+        paymentStatus: "paid",
+        orderStatus: "deposit_paid",
+        isCustomOrder: true,
+      }],
+      [],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await expect(
+      createCaller({ id: 1, role: "admin" }).order.createLogistics({ orderId: 91 })
+    ).rejects.toThrow("尚未設定尾款");
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("records an explicit zero-balance settlement with the acting admin", async () => {
+    const db = createMutationMockDb([[]]);
+    getDbMock.mockResolvedValue(db as any);
+    settleZeroBalancePaymentMock.mockResolvedValue({ merchantTradeNo: "CZZERO001" });
+
+    const result = await createCaller({ id: 7, role: "admin" }).order.settleZeroBalance({
+      orderId: 91,
+      note: "設計師確認無尾款",
+    });
+
+    expect(result).toEqual({ success: true, merchantTradeNo: "CZZERO001" });
+    expect(settleZeroBalancePaymentMock).toHaveBeenCalledWith(91, {
+      adminUserId: 7,
+      note: "設計師確認無尾款",
+    });
+  });
+
+  it("allows an admin to confirm a pending balance without a receipt or last-five code", async () => {
+    confirmBalanceTransferMock.mockResolvedValue(undefined);
+
+    await createCaller({ id: 8, role: "admin" }).order.confirmBalanceTransfer({
+      merchantTradeNo: "CBLINE001",
+      note: "LINE 管理員確認",
+    });
+
+    expect(confirmBalanceTransferMock).toHaveBeenCalledWith("CBLINE001", {
+      adminUserId: 8,
+      note: "LINE 管理員確認",
+    });
+    expect(deductInventoryAfterBalancePaymentMock).toHaveBeenCalledWith("CBLINE001");
+  });
+
+  it("blocks a manual shipped status while a custom balance is still pending", async () => {
+    const db = createMutationMockDb([
+      [{ id: 92, merchantTradeNo: "CUSTOM-PENDING-BALANCE" }],
+      [],
+      [{
+        id: 92,
+        merchantTradeNo: "CUSTOM-PENDING-BALANCE",
+        paymentStatus: "confirmed",
+        orderStatus: "deposit_paid",
+        isCustomOrder: true,
+      }],
+      [{ orderId: 92, paymentStatus: "pending" }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await expect(
+      createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 92, status: "shipped" })
+    ).rejects.toThrow("尾款尚未完成");
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("allows fulfillment after an explicit zero balance has been marked paid", async () => {
+    const db = createMutationMockDb([
+      [{ id: 93, merchantTradeNo: "CUSTOM-ZERO-BALANCE" }],
+      [],
+      [{
+        id: 93,
+        merchantTradeNo: "CUSTOM-ZERO-BALANCE",
+        paymentStatus: "confirmed",
+        orderStatus: "paid",
+        isCustomOrder: true,
+      }],
+      [{ orderId: 93, paymentStatus: "paid" }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 93, status: "shipped" });
+
+    expect(db.updateChain.set).toHaveBeenCalledWith({ orderStatus: "shipped" });
+    expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledWith(93);
+  });
+
+  it("syncs a manually shipped merged order group after all payments are settled", async () => {
+    const db = createMutationMockDb([
+      [{ id: 1, merchantTradeNo: "MERGE-MAIN" }],
+      [{ groupId: 50, mainOrderId: 1 }],
+      [{ orderId: 1 }, { orderId: 2 }],
+      [
+        { id: 1, merchantTradeNo: "MERGE-MAIN", paymentStatus: "paid", orderStatus: "paid", isCustomOrder: true },
+        { id: 2, merchantTradeNo: "MERGE-MEMBER", paymentStatus: "paid", orderStatus: "paid", isCustomOrder: false },
+      ],
+      [{ orderId: 1, paymentStatus: "paid" }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 1, status: "shipped" });
+
+    expect(db.updateChain.set).toHaveBeenCalledWith({ orderStatus: "shipped" });
+    expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledTimes(2);
+    expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledWith(1);
+    expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledWith(2);
+  });
+
+  it("allows a paid overseas order to be marked shipped without a logistics record", async () => {
+    const db = createMutationMockDb([
+      [{ id: 71, merchantTradeNo: "OVERSEAS001" }],
+      [],
+      [{
+        id: 71,
+        merchantTradeNo: "OVERSEAS001",
+        paymentStatus: "paid",
+        orderStatus: "paid",
+        isCustomOrder: false,
+      }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 71, status: "shipped" });
+
+    expect(db.updateChain.set).toHaveBeenCalledWith({ orderStatus: "shipped" });
+    expect(notifyCustomerOrderShippedSafelyMock).toHaveBeenCalledWith(71);
   });
 });
 
