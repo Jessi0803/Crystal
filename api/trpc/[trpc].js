@@ -3585,7 +3585,10 @@ var orderRouter = router({
   getOrder: publicProcedure.input(z2.object({ merchantTradeNo: z2.string() })).query(async ({ input }) => {
     const order = await getOrderWithItems(input.merchantTradeNo);
     if (!order) return null;
-    return order;
+    return {
+      ...order,
+      paymentSandbox: usePaymentSandbox
+    };
   }),
   submitCustomConsultation: publicProcedure.input(
     z2.object({

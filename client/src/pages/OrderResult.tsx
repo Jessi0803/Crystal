@@ -556,13 +556,15 @@ export default function OrderResult() {
         </div>
 
         {/* Sandbox Note */}
-        <div className="mt-8 p-4 bg-[oklch(0.97_0_0)] border border-[oklch(0.93_0_0)]">
-          <p className="text-xs font-body text-[oklch(0.5_0_0)] font-medium mb-1">🧪 沙盒測試環境</p>
-          <p className="text-xs font-body text-[oklch(0.6_0_0)]">
-            目前為綠界沙盒測試模式，所有交易均為模擬，不會產生真實扣款。
-            正式上線前請替換為正式商店憑證。
-          </p>
-        </div>
+        {order.paymentMethod === "credit" && order.paymentSandbox && (
+          <div className="mt-8 p-4 bg-[oklch(0.97_0_0)] border border-[oklch(0.93_0_0)]">
+            <p className="text-xs font-body text-[oklch(0.5_0_0)] font-medium mb-1">🧪 沙盒測試環境</p>
+            <p className="text-xs font-body text-[oklch(0.6_0_0)]">
+              目前為綠界沙盒測試模式，所有交易均為模擬，不會產生真實扣款。
+              正式上線前請替換為正式商店憑證。
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

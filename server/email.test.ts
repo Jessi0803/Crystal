@@ -3,6 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Resend } from "resend";
+import "dotenv/config";
 
 describe("Resend API Key", () => {
   it("should have RESEND_API_KEY set", () => {

@@ -332,6 +332,80 @@ describe("order notification timing", () => {
   });
 });
 
+describe("order.createAndPay security regression coverage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createOrderMock.mockResolvedValue(101);
+    mockAvailableProducts();
+  });
+
+  it.fails("does not trust a client-supplied price for a normal product", async () => {
+    const db = createMutationMockDb([
+      [{
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1280,
+        image: "",
+        wristSizePriceRules: [],
+        purchaseOptions: [],
+      }],
+      [{ id: "bracelet-1", twoItemFreeShippingEligible: true }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const input = checkoutInput("credit");
+    input.items[0].price = 1;
+
+    await createPublicCaller().order.createAndPay(input);
+
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 1410 }),
+      [expect.objectContaining({ productId: "bracelet-1", unitPrice: 1280, subtotal: 1280 })]
+    );
+  });
+
+  it.fails("rejects zero, negative, fractional, and unreasonably large quantities", async () => {
+    getDbMock.mockResolvedValue(null as any);
+    const caller = createPublicCaller();
+
+    for (const quantity of [0, -1, 1.5, 10_001]) {
+      const input = checkoutInput("credit");
+      input.items[0].quantity = quantity;
+      await expect(caller.order.createAndPay(input)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+    }
+
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("order public access security regression coverage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.fails("does not expose an order to an anonymous caller holding only its order number", async () => {
+    getOrderWithItemsMock.mockResolvedValue({
+      id: 501,
+      userId: 77,
+      merchantTradeNo: "PRIVATE001",
+      buyerName: "Private Customer",
+      buyerEmail: "private@example.com",
+      buyerPhone: "0912345678",
+      shippingAddress: "台北市測試地址",
+      customerNote: "private custom consultation",
+      items: [],
+      logistics: null,
+      balancePayment: null,
+    } as Awaited<ReturnType<typeof getOrderWithItems>>);
+
+    await expect(
+      createPublicCaller().order.getOrder({ merchantTradeNo: "PRIVATE001" })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
+
 describe("order.deleteCancelledOrders (admin procedure)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -573,6 +647,7 @@ describe("order.getBalancePaymentCheckout", () => {
       merchantTradeNo: "CBALANCE001",
       paymentMethod: "credit",
       checkoutRegion: "domestic",
+      receiverPhone: "0912345678",
       shippingMethod: "cvs_711",
       cvsStoreId: "123456",
       cvsStoreName: "測試門市",
@@ -663,6 +738,7 @@ describe("order.getBalancePaymentCheckout", () => {
       merchantTradeNo: "CBALANCE001",
       paymentMethod: "credit",
       checkoutRegion: "domestic",
+      receiverPhone: "0912345678",
       shippingMethod: "cvs_711",
       cvsStoreId: "123456",
       cvsStoreName: "測試門市",

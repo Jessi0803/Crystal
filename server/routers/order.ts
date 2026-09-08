@@ -10,6 +10,7 @@ import {
   generateMerchantTradeNo,
   buildCreditPaymentParams,
   ECPAY_CONFIG,
+  usePaymentSandbox,
 } from "../ecpay";
 import {
   createOrder,
@@ -777,7 +778,10 @@ export const orderRouter = router({
     .query(async ({ input }) => {
       const order = await getOrderWithItems(input.merchantTradeNo);
       if (!order) return null;
-      return order;
+      return {
+        ...order,
+        paymentSandbox: usePaymentSandbox,
+      };
     }),
 
   submitCustomConsultation: publicProcedure

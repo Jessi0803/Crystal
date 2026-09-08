@@ -18,7 +18,7 @@ export default function AdminSettings() {
   const utils = trpc.useUtils();
   const { data: settings, isLoading } = trpc.siteSettings.admin.useQuery();
   const updateSettings = trpc.siteSettings.update.useMutation({
-    onSuccess: async (updatedSettings) => {
+    onSuccess: async updatedSettings => {
       utils.siteSettings.admin.setData(undefined, updatedSettings);
       utils.siteSettings.public.setData(undefined, updatedSettings);
       toast.success("網站設定已更新");
@@ -27,7 +27,7 @@ export default function AdminSettings() {
         utils.siteSettings.public.invalidate(),
       ]);
     },
-    onError: (err) => toast.error(err.message || "更新網站設定失敗"),
+    onError: err => toast.error(err.message || "更新網站設定失敗"),
   });
 
   const [announcementText, setAnnouncementText] = useState("");
@@ -49,11 +49,18 @@ export default function AdminSettings() {
       <div className="min-h-screen bg-[oklch(0.97_0_0)] flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl mb-2 text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+          <h1
+            className="text-xl mb-2 text-[oklch(0.1_0_0)]"
+            style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
+          >
             無存取權限
           </h1>
-          <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-6">此頁面僅限管理員存取。</p>
-          <button className="btn-primary" onClick={() => setLocation("/")}>返回首頁</button>
+          <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-6">
+            此頁面僅限管理員存取。
+          </p>
+          <button className="btn-primary" onClick={() => setLocation("/")}>
+            返回首頁
+          </button>
         </div>
       </div>
     );
@@ -77,7 +84,10 @@ export default function AdminSettings() {
             >
               <ArrowLeft className="w-3 h-3" /> 訂單管理
             </button>
-            <h1 className="text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+            <h1
+              className="text-lg text-[oklch(0.1_0_0)]"
+              style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
+            >
               網站設定
             </h1>
           </div>
@@ -105,7 +115,9 @@ export default function AdminSettings() {
               <Settings className="w-5 h-5 text-[oklch(0.25_0_0)]" />
             </div>
             <div>
-              <p className="text-sm font-medium text-[oklch(0.12_0_0)]">首頁跑馬燈公告</p>
+              <p className="text-sm font-medium text-[oklch(0.12_0_0)]">
+                全站公告
+              </p>
               <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
                 這裡會控制網站上方循環顯示的活動文字。
               </p>
@@ -117,7 +129,9 @@ export default function AdminSettings() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2">
               <Megaphone className="w-4 h-4 text-[oklch(0.35_0_0)]" />
-              <p className="text-sm font-medium text-[oklch(0.12_0_0)]">公告內容</p>
+              <p className="text-sm font-medium text-[oklch(0.12_0_0)]">
+                公告內容
+              </p>
             </div>
             <label className="inline-flex items-center gap-2 text-xs font-body text-[oklch(0.35_0_0)]">
               <Switch
@@ -130,12 +144,14 @@ export default function AdminSettings() {
           </div>
 
           <label className="block">
-            <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">公告文字</span>
+            <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">
+              公告文字
+            </span>
             <textarea
               value={announcementText}
               disabled={isLoading || updateSettings.isPending}
               maxLength={200}
-              onChange={(e) => setAnnouncementText(e.target.value)}
+              onChange={e => setAnnouncementText(e.target.value)}
               className="w-full min-h-28 border border-[oklch(0.86_0_0)] px-3 py-3 text-sm font-body leading-relaxed disabled:bg-[oklch(0.96_0_0)]"
             />
             <span className="block text-right text-[11px] text-[oklch(0.58_0_0)] font-body mt-1">
@@ -144,14 +160,23 @@ export default function AdminSettings() {
           </label>
 
           <div>
-            <p className="text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">前台預覽</p>
+            <p className="text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">
+              前台預覽
+            </p>
             <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.92_0_0)] py-2 overflow-hidden">
               <div className="flex whitespace-nowrap">
-                {Array(4).fill(null).map((_, i) => (
-                  <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
-                    {announcementEnabled && announcementText.trim() ? `${announcementText.trim()} ` : "跑馬燈已關閉 "}
-                  </span>
-                ))}
+                {Array(4)
+                  .fill(null)
+                  .map((_, i) => (
+                    <span
+                      key={i}
+                      className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase"
+                    >
+                      {announcementEnabled && announcementText.trim()
+                        ? `${announcementText.trim()} `
+                        : "跑馬燈已關閉 "}
+                    </span>
+                  ))}
               </div>
             </div>
           </div>

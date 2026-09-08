@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,9 @@ const CATEGORY_WEALTH_IMG = "/images/categories/wealth.jpg";
 const CATEGORY_PROTECT_IMG = "/images/categories/protect.jpg";
 const CATEGORY_HEALING_IMG = "/images/categories/healing.jpg";
 const HERO_BANNER2_IMG = "/images/best-sellers.jpg";
+const DAILY_ENERGY_BOTANICAL_IMG = "/images/home/daily-energy-botanical-transparent-web.png";
+const DAILY_ENERGY_RIGHT_BOTANICAL_IMG = "/images/home/daily-energy-right-botanical-transparent-web.png";
+const DAILY_ENERGY_SUN_GLYPH_IMG = "/images/home/daily-energy-sun-glyph-web.png";
 const customerReviewImages = Array.from(
   { length: 15 },
   (_, index) => `/reviews/review-${String(index + 1).padStart(2, "0")}.jpg`
@@ -328,11 +331,49 @@ export default function Home() {
       </section>
 
       {/* ─── TODAY'S ENERGY QUOTE ─── */}
-      <section className="py-12 px-4 text-center border-b border-[oklch(0.93_0_0)]">
-        <p className="eyebrow mb-3">TODAY'S ENERGY · 今日能量語錄</p>
-          <blockquote className="text-xl sm:text-2xl font-light text-[oklch(0.2_0_0)] max-w-xl mx-auto leading-relaxed" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-          "{quote}"
-        </blockquote>
+      <section className="bg-white px-4 py-8 sm:py-10">
+        <div className="relative mx-auto w-full max-w-[1280px] pt-7 sm:pt-9">
+          <div className="relative isolate overflow-hidden rounded-[1.65rem] bg-[#fff7f1] px-6 pb-6 pt-12 text-center shadow-[0_12px_34px_rgba(128,103,81,0.07)] sm:px-14 sm:pb-7 sm:pt-14">
+            <div aria-hidden="true" className="absolute -left-12 -top-16 -z-10 size-48 rounded-full bg-[#efd8c8]/12" />
+            <div aria-hidden="true" className="absolute -bottom-24 right-[7%] -z-10 size-56 rounded-full bg-[#f2dfd2]/14" />
+            <div aria-hidden="true" className="absolute right-[30%] top-5 -z-10 h-16 w-28 rotate-[-12deg] rounded-full bg-white/15" />
+            <img
+              src={DAILY_ENERGY_BOTANICAL_IMG}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[clamp(5.5rem,10vw,8rem)] object-contain opacity-40"
+            />
+            <img
+              src={DAILY_ENERGY_RIGHT_BOTANICAL_IMG}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 right-0 -z-10 h-auto w-[clamp(4.75rem,8vw,6.5rem)] object-contain opacity-40"
+            />
+            <Sparkles aria-hidden="true" className="absolute left-[22%] top-7 -z-10 h-auto w-4 text-[#d4ad91]/65 sm:left-[24%] sm:top-9 sm:w-5" strokeWidth={1.25} />
+            <Sparkles aria-hidden="true" className="absolute right-[20%] top-8 -z-10 h-auto w-3.5 text-[#d4ad91]/60 sm:right-[23%] sm:top-10 sm:w-4" strokeWidth={1.25} />
+
+            <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center">
+              <p className="mb-2 text-[0.62rem] font-body font-medium tracking-[0.18em] text-[oklch(0.62_0.05_65)] sm:mb-3 sm:text-xs sm:tracking-[0.28em]">
+                TODAY&apos;S ENERGY <span className="mx-1 text-[oklch(0.7_0.06_65)] sm:mx-1.5">•</span> 今日能量語錄
+              </p>
+              <blockquote className="max-w-3xl px-3 text-base font-light leading-[1.75] text-[oklch(0.2_0.01_55)] [text-wrap:balance] sm:px-12 sm:text-[1.35rem] md:text-2xl" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>
+                <span aria-hidden="true" className="mr-1 text-[1.4em] leading-none text-[oklch(0.55_0.035_60)]">“</span>
+                {quote}
+                <span aria-hidden="true" className="ml-1 text-[1.4em] leading-none text-[oklch(0.55_0.035_60)]">”</span>
+              </blockquote>
+            </div>
+          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-0 z-20 flex size-14 -translate-x-1/2 items-center justify-center rounded-full border-2 border-[#ead9cc]/75 bg-[#fff9f4] sm:size-20"
+          >
+            <img
+              src={DAILY_ENERGY_SUN_GLYPH_IMG}
+              alt=""
+              className="h-auto w-11 object-contain sm:w-16"
+            />
+          </div>
+        </div>
       </section>
 
       {/* ─── TOP ITEMS ─── */}
