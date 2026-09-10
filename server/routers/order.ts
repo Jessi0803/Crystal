@@ -74,6 +74,7 @@ import {
   getTarotTopicByOptionId,
   TAROT_DEPOSIT_PRODUCT_ID,
 } from "@shared/tarotPricing";
+import { createOrderAccessToken, verifyOrderAccessToken } from "../orderAccess";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
 const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -265,8 +266,9 @@ const CartItemSchema = z.object({
     value: z.string(),
   })).optional(),
   name: z.string(),
-  price: z.number(),
-  quantity: z.number(),
+  // 價格欄位只保留向下相容；實際成交價一律由伺服器依商品資料重算。
+  price: z.number().finite(),
+  quantity: z.number().int().min(1).max(100),
   image: z.string().optional(),
   isPreorder: z.boolean().optional(),
   twoItemFreeShippingEligible: z.boolean().optional(),
@@ -274,6 +276,35 @@ const CartItemSchema = z.object({
 });
 
 type CheckoutItem = z.infer<typeof CartItemSchema>;
+
+const OrderAccessSchema = z.object({
+  merchantTradeNo: z.string().min(1),
+  accessToken: z.string().min(1).optional(),
+  buyerEmail: z.string().trim().email().optional(),
+});
+
+function hasOrderAccess(
+  order: { userId?: number | null; merchantTradeNo: string; buyerEmail: string },
+  user: { id: number; role?: string | null } | null,
+  input: { accessToken?: string; buyerEmail?: string }
+) {
+  if (user?.role === "admin") return true;
+  if (user?.id != null && order.userId === user.id) return true;
+  if (verifyOrderAccessToken(order.merchantTradeNo, order.buyerEmail, input.accessToken)) return true;
+  return order.userId == null &&
+    Boolean(input.buyerEmail) &&
+    normalizeOrderEmail(input.buyerEmail!) === normalizeOrderEmail(order.buyerEmail);
+}
+
+function assertOrderAccess(
+  order: { userId?: number | null; merchantTradeNo: string; buyerEmail: string },
+  user: { id: number; role?: string | null } | null,
+  input: { accessToken?: string; buyerEmail?: string }
+) {
+  if (!hasOrderAccess(order, user, input)) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "請驗證訂購 Email 後查看訂單" });
+  }
+}
 
 function getWristSizeRulePrice(
   product: { wristSizePriceRules?: { maxWristSize: number; price: number }[] | null },
@@ -288,7 +319,9 @@ function getWristSizeRulePrice(
 
 async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
   const db = await getDb();
-  if (!db) return items;
+  if (!db) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "目前無法確認商品價格，請稍後再試。" });
+  }
 
   const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
   if (productIds.length === 0) return items;
@@ -299,6 +332,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
       name: dbProducts.name,
       price: dbProducts.price,
       image: dbProducts.image,
+      active: dbProducts.active,
       wristSizePriceRules: dbProducts.wristSizePriceRules,
       purchaseOptions: dbProducts.purchaseOptions,
     })
@@ -318,7 +352,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
     const product = productById.get(productId);
     if (productId === TAROT_DEPOSIT_PRODUCT_ID) {
       const topic = getTarotTopicByOptionId(item.purchaseOptionId);
-      if (!product || !topic) {
+      if (!product || product.active === false || !topic) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "請重新選擇塔羅占卜主題後再結帳。",
@@ -336,7 +370,19 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
         purchaseOptionUsesOwnStock: false,
       };
     }
-    if (!item.purchaseOptionId) return item;
+    if (!product || product.active === false) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `「${item.name}」已不存在或不可購買。` });
+    }
+    if (!item.purchaseOptionId) {
+      return {
+        ...item,
+        id: product.id,
+        baseProductId: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image || item.image,
+      };
+    }
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
     if (!product || !option || option.active === false) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `「${item.name}」的購買方案已不可購買。` });
@@ -640,6 +686,7 @@ export const orderRouter = router({
       const merchantTradeNo = generateMerchantTradeNo();
       const isPreorder = submittedItems.some((i) => i.isPreorder);
       const buyerEmail = normalizeOrderEmail(input.buyerEmail);
+      const orderAccessToken = createOrderAccessToken(merchantTradeNo, buyerEmail) ?? undefined;
 
       let shippingAddress = isCustomOrder ? undefined : input.shippingAddress;
       let receiverZipCode = isCustomOrder ? undefined : input.receiverZipCode;
@@ -781,6 +828,7 @@ export const orderRouter = router({
           return {
             kind: "paypal" as const,
             merchantTradeNo,
+            orderAccessToken,
             approvalUrl,
           };
         } catch (e) {
@@ -803,6 +851,7 @@ export const orderRouter = router({
           kind: "atm" as const,
           paymentMethod: "atm" as const,
           merchantTradeNo,
+          orderAccessToken,
           bankInfo: STORE_BANK_INFO,
         };
       }
@@ -825,6 +874,7 @@ export const orderRouter = router({
         kind: "ecpay_credit" as const,
         paymentMethod: "credit" as const,
         merchantTradeNo,
+        orderAccessToken,
         paymentURL: ECPAY_CONFIG.PaymentURL,
         paymentParams,
       };
@@ -894,10 +944,11 @@ export const orderRouter = router({
    * 查詢訂單（含商品明細）
    */
   getOrder: publicProcedure
-    .input(z.object({ merchantTradeNo: z.string() }))
-    .query(async ({ input }) => {
+    .input(OrderAccessSchema)
+    .query(async ({ input, ctx }) => {
       const order = await getOrderWithItems(input.merchantTradeNo);
       if (!order) return null;
+      assertOrderAccess(order, ctx.user, input);
       return {
         ...order,
         paymentSandbox: usePaymentSandbox,
@@ -908,6 +959,8 @@ export const orderRouter = router({
     .input(
       z.object({
         merchantTradeNo: z.string().min(1),
+        accessToken: z.string().min(1).optional(),
+        buyerEmail: z.string().trim().email().optional(),
         productId: z.enum([
           "custom-deposit-product",
           "tarot-crystal-deposit-product",
@@ -919,7 +972,7 @@ export const orderRouter = router({
         customerNote: z.string().min(1).max(10000),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -927,6 +980,7 @@ export const orderRouter = router({
       if (!order) {
         throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
       }
+      assertOrderAccess(order, ctx.user, input);
       if (!order.isCustomOrder) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單不是客製化訂金訂單" });
       }
@@ -977,9 +1031,14 @@ export const orderRouter = router({
   submitTransferCode: publicProcedure
     .input(z.object({
       merchantTradeNo: z.string(),
+      accessToken: z.string().min(1).optional(),
+      buyerEmail: z.string().trim().email().optional(),
       lastFive: z.string().length(5).regex(/^\d+$/),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const order = await getOrderWithItems(input.merchantTradeNo);
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
+      assertOrderAccess(order, ctx.user, input);
       await updateOrderTransferLastFive(input.merchantTradeNo, input.lastFive);
       return { success: true };
     }),

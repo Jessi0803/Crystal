@@ -17,9 +17,13 @@ const ADMIN_EMAIL_ALLOWLIST = new Set(
     .map(normalizeOrderEmail)
 );
 
-export function shouldGrantAdminRole(openId: string, email?: string | null) {
+export function shouldGrantAdminRole(
+  openId: string,
+  email?: string | null,
+  emailVerified = false
+) {
   if (openId === ENV.ownerOpenId) return true;
-  if (!email) return false;
+  if (!email || !emailVerified) return false;
   return ADMIN_EMAIL_ALLOWLIST.has(normalizeOrderEmail(email));
 }
 
@@ -111,7 +115,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (shouldGrantAdminRole(user.openId, user.email)) {
+    } else if (shouldGrantAdminRole(user.openId, user.email, user.emailVerified === true)) {
       values.role = 'admin';
       updateSet.role = 'admin';
     }
@@ -189,7 +193,10 @@ async function mergeDuplicateMemberIntoPrimary(opts: {
     .set({ userId: opts.primaryUserId })
     .where(eq(chatbotLogs.userId, opts.duplicateUserId));
 
-  const shouldKeepAdmin = primary.role === "admin" || duplicate.role === "admin" || shouldGrantAdminRole(opts.lineOpenId, opts.email);
+  const shouldKeepAdmin =
+    primary.role === "admin" ||
+    duplicate.role === "admin" ||
+    shouldGrantAdminRole(opts.lineOpenId, opts.email, true);
   await db
     .update(users)
     .set({
@@ -281,7 +288,7 @@ export async function upsertLineUserAsPrimary(data: {
         emailVerified: true,
         verifyToken: null,
         verifyTokenExpiresAt: null,
-        role: shouldGrantAdminRole(data.openId, email ?? lineUser.email) || lineUser.role === "admin" ? "admin" : lineUser.role,
+        role: shouldGrantAdminRole(data.openId, email ?? lineUser.email, true) || lineUser.role === "admin" ? "admin" : lineUser.role,
         lastSignedIn,
         updatedAt: new Date(),
       })
@@ -301,7 +308,7 @@ export async function upsertLineUserAsPrimary(data: {
         verifyToken: null,
         verifyTokenExpiresAt: null,
         role:
-          shouldGrantAdminRole(data.openId, email) || sameEmailUser.role === "admin"
+          shouldGrantAdminRole(data.openId, email, true) || sameEmailUser.role === "admin"
             ? "admin"
             : sameEmailUser.role,
         lastSignedIn,

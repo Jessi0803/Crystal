@@ -23,6 +23,10 @@ import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
 
 const SALT_ROUNDS = 10;
 
+function trustedSiteOrigin() {
+  return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
+}
+
 // 密碼規則：至少 8 字元
 const passwordSchema = z.string().min(8, "密碼至少需要 8 個字元");
 
@@ -67,7 +71,7 @@ export const memberRouter = router({
       const verifyToken = crypto.randomBytes(32).toString("hex");
       const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 小時
       await db.setVerifyToken(input.email, verifyToken, verifyExpiresAt);
-      const siteOrigin = input.origin ?? "https://goodaytarot.com";
+      const siteOrigin = trustedSiteOrigin();
       const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
       let verificationEmailSent = false;
       try {
@@ -115,7 +119,7 @@ export const memberRouter = router({
       }
 
       // 既有帳號若符合 admin 名單，登入時自動補齊 admin 權限。
-      if (db.shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+      if (db.shouldGrantAdminRole(user.openId, user.email, user.emailVerified === true) && user.role !== "admin") {
         const db2 = await db.getDb();
         if (db2) {
           const { users } = await import("../../drizzle/schema");
@@ -163,7 +167,7 @@ export const memberRouter = router({
       const verifyToken = crypto.randomBytes(32).toString("hex");
       const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await db.setVerifyToken(ctx.user.email, verifyToken, verifyExpiresAt);
-      const siteOrigin = input.origin ?? "https://goodaytarot.com";
+      const siteOrigin = trustedSiteOrigin();
       const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
       await sendVerificationEmail({
         to: ctx.user.email,
@@ -191,7 +195,7 @@ export const memberRouter = router({
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 小時後過期
       await db.setResetToken(input.email, token, expiresAt);
 
-      const siteOrigin = input.origin ?? "https://goodaytarot.com";
+      const siteOrigin = trustedSiteOrigin();
       const resetUrl = `${siteOrigin}/reset-password?token=${token}`;
 
       // 必須 await，Vercel Serverless 會在 response 結束後凍結 function

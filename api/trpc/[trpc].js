@@ -672,9 +672,9 @@ var ADMIN_EMAIL_ALLOWLIST = new Set(
     ...process.env.ADMIN_EMAILS?.split(",") ?? []
   ].map((email) => email.trim()).filter(Boolean).map(normalizeOrderEmail)
 );
-function shouldGrantAdminRole(openId, email) {
+function shouldGrantAdminRole(openId, email, emailVerified = false) {
   if (openId === ENV.ownerOpenId) return true;
-  if (!email) return false;
+  if (!email || !emailVerified) return false;
   return ADMIN_EMAIL_ALLOWLIST.has(normalizeOrderEmail(email));
 }
 var _pool = null;
@@ -749,7 +749,7 @@ async function upsertUser(user) {
     if (user.role !== void 0) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (shouldGrantAdminRole(user.openId, user.email)) {
+    } else if (shouldGrantAdminRole(user.openId, user.email, user.emailVerified === true)) {
       values.role = "admin";
       updateSet.role = "admin";
     }
@@ -800,7 +800,7 @@ async function mergeDuplicateMemberIntoPrimary(opts) {
   if (!primary || !duplicate) return;
   await db.update(orders).set({ userId: opts.primaryUserId }).where(eq(orders.userId, opts.duplicateUserId));
   await db.update(chatbotLogs).set({ userId: opts.primaryUserId }).where(eq(chatbotLogs.userId, opts.duplicateUserId));
-  const shouldKeepAdmin = primary.role === "admin" || duplicate.role === "admin" || shouldGrantAdminRole(opts.lineOpenId, opts.email);
+  const shouldKeepAdmin = primary.role === "admin" || duplicate.role === "admin" || shouldGrantAdminRole(opts.lineOpenId, opts.email, true);
   await db.update(users).set({
     openId: opts.lineOpenId,
     name: opts.name?.trim() || primary.name || duplicate.name,
@@ -868,7 +868,7 @@ async function upsertLineUserAsPrimary(data) {
       emailVerified: true,
       verifyToken: null,
       verifyTokenExpiresAt: null,
-      role: shouldGrantAdminRole(data.openId, email ?? lineUser.email) || lineUser.role === "admin" ? "admin" : lineUser.role,
+      role: shouldGrantAdminRole(data.openId, email ?? lineUser.email, true) || lineUser.role === "admin" ? "admin" : lineUser.role,
       lastSignedIn,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq(users.id, lineUser.id));
@@ -883,7 +883,7 @@ async function upsertLineUserAsPrimary(data) {
       emailVerified: true,
       verifyToken: null,
       verifyTokenExpiresAt: null,
-      role: shouldGrantAdminRole(data.openId, email) || sameEmailUser.role === "admin" ? "admin" : sameEmailUser.role,
+      role: shouldGrantAdminRole(data.openId, email, true) || sameEmailUser.role === "admin" ? "admin" : sameEmailUser.role,
       lastSignedIn,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq(users.id, sameEmailUser.id));
@@ -3047,6 +3047,23 @@ function getTarotDepositPrice(productBasePrice, topic) {
   return productBasePrice - TAROT_BASE_READING_PRICE + topic.price;
 }
 
+// server/orderAccess.ts
+import crypto3 from "node:crypto";
+function accessPayload(merchantTradeNo, buyerEmail) {
+  return `order-access:v1:${merchantTradeNo}:${normalizeOrderEmail(buyerEmail)}`;
+}
+function createOrderAccessToken(merchantTradeNo, buyerEmail) {
+  if (!ENV.cookieSecret) return null;
+  return crypto3.createHmac("sha256", ENV.cookieSecret).update(accessPayload(merchantTradeNo, buyerEmail)).digest("base64url");
+}
+function verifyOrderAccessToken(merchantTradeNo, buyerEmail, token) {
+  const expected = createOrderAccessToken(merchantTradeNo, buyerEmail);
+  if (!expected || !token) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const tokenBuffer = Buffer.from(token);
+  return expectedBuffer.length === tokenBuffer.length && crypto3.timingSafeEqual(expectedBuffer, tokenBuffer);
+}
+
 // server/routers/order.ts
 var TRANSFER_RECEIPT_CONTENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
 async function getClearQuartzChipsAddOn(db) {
@@ -3180,13 +3197,30 @@ var CartItemSchema = z2.object({
     value: z2.string()
   })).optional(),
   name: z2.string(),
-  price: z2.number(),
-  quantity: z2.number(),
+  // 價格欄位只保留向下相容；實際成交價一律由伺服器依商品資料重算。
+  price: z2.number().finite(),
+  quantity: z2.number().int().min(1).max(100),
   image: z2.string().optional(),
   isPreorder: z2.boolean().optional(),
   twoItemFreeShippingEligible: z2.boolean().optional(),
   purchaseOptionUsesOwnStock: z2.boolean().optional()
 });
+var OrderAccessSchema = z2.object({
+  merchantTradeNo: z2.string().min(1),
+  accessToken: z2.string().min(1).optional(),
+  buyerEmail: z2.string().trim().email().optional()
+});
+function hasOrderAccess(order, user, input) {
+  if (user?.role === "admin") return true;
+  if (user?.id != null && order.userId === user.id) return true;
+  if (verifyOrderAccessToken(order.merchantTradeNo, order.buyerEmail, input.accessToken)) return true;
+  return order.userId == null && Boolean(input.buyerEmail) && normalizeOrderEmail(input.buyerEmail) === normalizeOrderEmail(order.buyerEmail);
+}
+function assertOrderAccess(order, user, input) {
+  if (!hasOrderAccess(order, user, input)) {
+    throw new TRPCError3({ code: "UNAUTHORIZED", message: "\u8ACB\u9A57\u8B49\u8A02\u8CFC Email \u5F8C\u67E5\u770B\u8A02\u55AE" });
+  }
+}
 function getWristSizeRulePrice(product, wristSize) {
   const rules = product.wristSizePriceRules?.filter((rule) => Number.isFinite(rule.maxWristSize) && Number.isFinite(rule.price)).sort((a, b) => a.maxWristSize - b.maxWristSize);
   if (!rules?.length) return null;
@@ -3194,7 +3228,9 @@ function getWristSizeRulePrice(product, wristSize) {
 }
 async function normalizePurchaseOptionItems(items) {
   const db = await getDb();
-  if (!db) return items;
+  if (!db) {
+    throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "\u76EE\u524D\u7121\u6CD5\u78BA\u8A8D\u5546\u54C1\u50F9\u683C\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002" });
+  }
   const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
   if (productIds.length === 0) return items;
   const products2 = await db.select({
@@ -3202,6 +3238,7 @@ async function normalizePurchaseOptionItems(items) {
     name: dbProducts.name,
     price: dbProducts.price,
     image: dbProducts.image,
+    active: dbProducts.active,
     wristSizePriceRules: dbProducts.wristSizePriceRules,
     purchaseOptions: dbProducts.purchaseOptions
   }).from(dbProducts).where(inArray2(dbProducts.id, productIds));
@@ -3218,7 +3255,7 @@ async function normalizePurchaseOptionItems(items) {
     const product = productById.get(productId);
     if (productId === TAROT_DEPOSIT_PRODUCT_ID) {
       const topic = getTarotTopicByOptionId(item.purchaseOptionId);
-      if (!product || !topic) {
+      if (!product || product.active === false || !topic) {
         throw new TRPCError3({
           code: "BAD_REQUEST",
           message: "\u8ACB\u91CD\u65B0\u9078\u64C7\u5854\u7F85\u5360\u535C\u4E3B\u984C\u5F8C\u518D\u7D50\u5E33\u3002"
@@ -3234,7 +3271,19 @@ async function normalizePurchaseOptionItems(items) {
         purchaseOptionUsesOwnStock: false
       };
     }
-    if (!item.purchaseOptionId) return item;
+    if (!product || product.active === false) {
+      throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
+    }
+    if (!item.purchaseOptionId) {
+      return {
+        ...item,
+        id: product.id,
+        baseProductId: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image || item.image
+      };
+    }
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
     if (!product || !option || option.active === false) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u7684\u8CFC\u8CB7\u65B9\u6848\u5DF2\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
@@ -3488,6 +3537,7 @@ var orderRouter = router({
     const merchantTradeNo = generateMerchantTradeNo();
     const isPreorder = submittedItems.some((i) => i.isPreorder);
     const buyerEmail = normalizeOrderEmail(input.buyerEmail);
+    const orderAccessToken = createOrderAccessToken(merchantTradeNo, buyerEmail) ?? void 0;
     let shippingAddress = isCustomOrder ? void 0 : input.shippingAddress;
     let receiverZipCode = isCustomOrder ? void 0 : input.receiverZipCode;
     let cvsStoreId = isCustomOrder ? void 0 : input.cvsStoreId;
@@ -3611,6 +3661,7 @@ var orderRouter = router({
         return {
           kind: "paypal",
           merchantTradeNo,
+          orderAccessToken,
           approvalUrl
         };
       } catch (e) {
@@ -3628,6 +3679,7 @@ var orderRouter = router({
         kind: "atm",
         paymentMethod: "atm",
         merchantTradeNo,
+        orderAccessToken,
         bankInfo: STORE_BANK_INFO
       };
     }
@@ -3647,6 +3699,7 @@ var orderRouter = router({
       kind: "ecpay_credit",
       paymentMethod: "credit",
       merchantTradeNo,
+      orderAccessToken,
       paymentURL: ECPAY_CONFIG.PaymentURL,
       paymentParams
     };
@@ -3706,9 +3759,10 @@ var orderRouter = router({
   /**
    * 查詢訂單（含商品明細）
    */
-  getOrder: publicProcedure.input(z2.object({ merchantTradeNo: z2.string() })).query(async ({ input }) => {
+  getOrder: publicProcedure.input(OrderAccessSchema).query(async ({ input, ctx }) => {
     const order = await getOrderWithItems(input.merchantTradeNo);
     if (!order) return null;
+    assertOrderAccess(order, ctx.user, input);
     return {
       ...order,
       paymentSandbox: usePaymentSandbox
@@ -3717,6 +3771,8 @@ var orderRouter = router({
   submitCustomConsultation: publicProcedure.input(
     z2.object({
       merchantTradeNo: z2.string().min(1),
+      accessToken: z2.string().min(1).optional(),
+      buyerEmail: z2.string().trim().email().optional(),
       productId: z2.enum([
         "custom-deposit-product",
         "tarot-crystal-deposit-product",
@@ -3727,13 +3783,14 @@ var orderRouter = router({
       itemIndex: z2.number().int().positive().optional(),
       customerNote: z2.string().min(1).max(1e4)
     })
-  ).mutation(async ({ input }) => {
+  ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const order = await getOrderWithItems(input.merchantTradeNo);
     if (!order) {
       throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
     }
+    assertOrderAccess(order, ctx.user, input);
     if (!order.isCustomOrder) {
       throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u4E0D\u662F\u5BA2\u88FD\u5316\u8A02\u91D1\u8A02\u55AE" });
     }
@@ -3771,8 +3828,13 @@ var orderRouter = router({
    */
   submitTransferCode: publicProcedure.input(z2.object({
     merchantTradeNo: z2.string(),
+    accessToken: z2.string().min(1).optional(),
+    buyerEmail: z2.string().trim().email().optional(),
     lastFive: z2.string().length(5).regex(/^\d+$/)
-  })).mutation(async ({ input }) => {
+  })).mutation(async ({ input, ctx }) => {
+    const order = await getOrderWithItems(input.merchantTradeNo);
+    if (!order) throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
+    assertOrderAccess(order, ctx.user, input);
     await updateOrderTransferLastFive(input.merchantTradeNo, input.lastFive);
     return { success: true };
   }),
@@ -6233,8 +6295,11 @@ var SDKServer = class {
 var sdk = new SDKServer();
 
 // server/routers/member.ts
-import * as crypto3 from "crypto";
+import * as crypto4 from "crypto";
 var SALT_ROUNDS = 10;
+function trustedSiteOrigin() {
+  return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
+}
 var passwordSchema = z5.string().min(8, "\u5BC6\u78BC\u81F3\u5C11\u9700\u8981 8 \u500B\u5B57\u5143");
 var memberRouter = router({
   /** 註冊 */
@@ -6265,10 +6330,10 @@ var memberRouter = router({
     const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
     const cookieOptions = getSessionCookieOptions(ctx.req);
     ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
-    const verifyToken = crypto3.randomBytes(32).toString("hex");
+    const verifyToken = crypto4.randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
     await setVerifyToken(input.email, verifyToken, verifyExpiresAt);
-    const siteOrigin = input.origin ?? "https://goodaytarot.com";
+    const siteOrigin = trustedSiteOrigin();
     const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
     let verificationEmailSent = false;
     try {
@@ -6308,7 +6373,7 @@ var memberRouter = router({
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
     }
-    if (shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+    if (shouldGrantAdminRole(user.openId, user.email, user.emailVerified === true) && user.role !== "admin") {
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -6344,10 +6409,10 @@ var memberRouter = router({
     if (user.emailVerified) {
       return { success: true, message: "Email \u5DF2\u7D93\u9A57\u8B49\u904E" };
     }
-    const verifyToken = crypto3.randomBytes(32).toString("hex");
+    const verifyToken = crypto4.randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
     await setVerifyToken(ctx.user.email, verifyToken, verifyExpiresAt);
-    const siteOrigin = input.origin ?? "https://goodaytarot.com";
+    const siteOrigin = trustedSiteOrigin();
     const verifyUrl = `${siteOrigin}/verify-email?token=${verifyToken}`;
     await sendVerificationEmail({
       to: ctx.user.email,
@@ -6365,10 +6430,10 @@ var memberRouter = router({
     if (!user || !user.passwordHash) {
       return { success: true, message: "\u82E5\u6B64 Email \u5DF2\u8A3B\u518A\uFF0C\u91CD\u8A2D\u9023\u7D50\u5DF2\u767C\u9001" };
     }
-    const token = crypto3.randomBytes(32).toString("hex");
+    const token = crypto4.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await setResetToken(input.email, token, expiresAt);
-    const siteOrigin = input.origin ?? "https://goodaytarot.com";
+    const siteOrigin = trustedSiteOrigin();
     const resetUrl = `${siteOrigin}/reset-password?token=${token}`;
     try {
       await sendPasswordResetEmail({
@@ -7230,7 +7295,7 @@ async function createContext(opts) {
 }
 
 // server/lineOAuthRoutes.ts
-import * as crypto4 from "node:crypto";
+import * as crypto5 from "node:crypto";
 import { parse as parseCookieHeader2 } from "cookie";
 var LINE_STATE_COOKIE = "line_oauth_state";
 var LINE_RETURN_TO_COOKIE = "line_oauth_return_to";
@@ -7316,7 +7381,7 @@ function lineOAuthStart(req, res) {
     );
     return;
   }
-  const state = crypto4.randomBytes(24).toString("hex");
+  const state = crypto5.randomBytes(24).toString("hex");
   const callback = lineCallbackUrl(req);
   const returnTo = safeReturnTo(req.query.returnTo);
   const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 6e5 };
@@ -7377,7 +7442,7 @@ async function lineOAuthCallback(req, res) {
     if (!user) {
       throw new Error("user_missing_after_upsert");
     }
-    if (shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+    if (shouldGrantAdminRole(user.openId, user.email, user.emailVerified === true) && user.role !== "admin") {
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -7408,7 +7473,7 @@ function registerLineOAuthRoutes(app2) {
 
 // server/lineWebhookRoutes.ts
 import express from "express";
-import * as crypto5 from "node:crypto";
+import * as crypto6 from "node:crypto";
 function getMessagingChannelSecret() {
   return process.env.LINE_MESSAGING_CHANNEL_SECRET?.trim() || process.env.LINE_WEBHOOK_CHANNEL_SECRET?.trim();
 }
@@ -7416,10 +7481,10 @@ function timingSafeEqualString(a, b) {
   const aBuffer = Buffer.from(a);
   const bBuffer = Buffer.from(b);
   if (aBuffer.length !== bBuffer.length) return false;
-  return crypto5.timingSafeEqual(aBuffer, bBuffer);
+  return crypto6.timingSafeEqual(aBuffer, bBuffer);
 }
 function verifyLineSignature(rawBody, signature, channelSecret) {
-  const expected = crypto5.createHmac("sha256", channelSecret).update(rawBody).digest("base64");
+  const expected = crypto6.createHmac("sha256", channelSecret).update(rawBody).digest("base64");
   return timingSafeEqualString(expected, signature);
 }
 function parseLineWebhookBody(rawBody) {

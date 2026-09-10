@@ -4,6 +4,7 @@ import { CheckCircle, LockKeyhole, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import type { CustomDepositProductId } from "@/lib/customOrderingContent";
+import { getSavedOrderAccess } from "@/lib/orderAccess";
 
 export const RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS = 2 * 60 * 1000;
 
@@ -34,9 +35,10 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const orderItemId = Number(params.get("orderItemId") ?? "");
   const itemIndex = Number(params.get("itemIndex") ?? "");
   const hasItemInstance = Number.isInteger(orderItemId) && orderItemId > 0 && Number.isInteger(itemIndex) && itemIndex > 0;
+  const orderAccess = getSavedOrderAccess(merchantTradeNo);
 
   const orderQuery = trpc.order.getOrder.useQuery(
-    { merchantTradeNo },
+    { merchantTradeNo, ...orderAccess },
     { enabled: merchantTradeNo.length > 0 }
   );
   const submitMutation = trpc.order.submitCustomConsultation.useMutation();
@@ -60,6 +62,7 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     }
     await submitMutation.mutateAsync({
       merchantTradeNo,
+      ...orderAccess,
       productId,
       ...(hasItemInstance ? { orderItemId, itemIndex } : {}),
       customerNote,

@@ -27,7 +27,7 @@ function createMockDb(selectResults: unknown[][]) {
       updateSetCalls.push(values);
       return updateChain;
     }),
-    where: vi.fn().mockResolvedValue(undefined),
+    where: vi.fn().mockResolvedValue([{ affectedRows: 1 }]),
   };
 
   return {

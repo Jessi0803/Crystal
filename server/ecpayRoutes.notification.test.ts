@@ -57,6 +57,7 @@ function ecpayPaidPayload() {
     MerchantTradeNo: "CREDIT001",
     RtnCode: "1",
     TradeNo: "TRADE001",
+    TradeAmt: "1880",
     CheckMacValue: "VALID",
   };
 }
@@ -66,6 +67,7 @@ describe("ECPay order placed notification timing", () => {
     vi.clearAllMocks();
     verifyCheckMacValueMock.mockReturnValue(true);
     getBalancePaymentByMerchantTradeNoMock.mockResolvedValue(null);
+    updateOrderPaymentStatusMock.mockResolvedValue(true);
   });
 
   it("notifies the customer when a pending credit-card order is paid", async () => {
@@ -73,6 +75,7 @@ describe("ECPay order placed notification timing", () => {
       id: 301,
       merchantTradeNo: "CREDIT001",
       paymentStatus: "pending",
+      totalAmount: 1880,
     } as Awaited<ReturnType<typeof getOrderByMerchantTradeNo>>);
 
     await expect(handleECPayPaymentNotify(ecpayPaidPayload())).resolves.toBe("1|OK");
@@ -92,12 +95,15 @@ describe("ECPay order placed notification timing", () => {
       id: 302,
       merchantTradeNo: "CREDIT001",
       paymentStatus: "paid",
+      totalAmount: 1880,
     } as Awaited<ReturnType<typeof getOrderByMerchantTradeNo>>);
+
+    updateOrderPaymentStatusMock.mockResolvedValue(false);
 
     await expect(handleECPayPaymentNotify(ecpayPaidPayload())).resolves.toBe("1|OK");
 
     expect(updateOrderPaymentStatusMock).toHaveBeenCalled();
-    expect(deductInventoryAfterPaymentMock).toHaveBeenCalledWith("CREDIT001");
+    expect(deductInventoryAfterPaymentMock).not.toHaveBeenCalled();
     expect(notifyCustomerOrderPlacedSafelyMock).not.toHaveBeenCalled();
   });
 });

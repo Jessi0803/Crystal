@@ -74,7 +74,7 @@ describe("ECPay callback security regression coverage", () => {
     } as Awaited<ReturnType<typeof getOrderByMerchantTradeNo>>);
   });
 
-  it.fails("rejects a signed callback whose amount differs from the stored order total", async () => {
+  it("rejects a signed callback whose amount differs from the stored order total", async () => {
     await expect(
       handleECPayPaymentNotify(paidPayload({ TradeAmt: "1" }))
     ).resolves.toBe("0|TradeAmt Error");
@@ -83,13 +83,16 @@ describe("ECPay callback security regression coverage", () => {
     expect(deductInventoryAfterPaymentMock).not.toHaveBeenCalled();
   });
 
-  it.fails("claims a simultaneous paid callback only once", async () => {
+  it("claims a simultaneous paid callback only once", async () => {
+    updateOrderPaymentStatusMock
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
     await Promise.all([
       handleECPayPaymentNotify(paidPayload()),
       handleECPayPaymentNotify(paidPayload()),
     ]);
 
-    expect(updateOrderPaymentStatusMock).toHaveBeenCalledTimes(1);
+    expect(updateOrderPaymentStatusMock).toHaveBeenCalledTimes(2);
     expect(deductInventoryAfterPaymentMock).toHaveBeenCalledTimes(1);
     expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledTimes(1);
   });

@@ -41,6 +41,13 @@ function normalizeInsertValue(value: unknown) {
   return value;
 }
 
+function getAffectedRows(result: unknown) {
+  const candidate = Array.isArray(result) ? result[0] : result;
+  if (!candidate || typeof candidate !== "object") return 0;
+  const affectedRows = (candidate as { affectedRows?: unknown }).affectedRows;
+  return typeof affectedRows === "number" ? affectedRows : 0;
+}
+
 async function insertOrderCompat(db: DbInstance, orderData: InsertOrder) {
   const entries = Object.entries(orderData)
     .filter(([, value]) => value !== undefined)
@@ -479,7 +486,7 @@ export async function updateOrderPaymentStatus(
     .where(eq(orders.merchantTradeNo, merchantTradeNo))
     .limit(1);
 
-  await db
+  const result = await db
     .update(orders)
     .set({
       paymentStatus: status,
@@ -493,7 +500,14 @@ export async function updateOrderPaymentStatus(
       ecpayNotifyData: notifyData,
       paidAt: status === "paid" ? new Date() : undefined,
     })
-    .where(eq(orders.merchantTradeNo, merchantTradeNo));
+    .where(
+      and(
+        eq(orders.merchantTradeNo, merchantTradeNo),
+        eq(orders.paymentStatus, "pending")
+      )
+    );
+
+  return getAffectedRows(result) > 0;
 }
 
 export async function updateOrderTransferLastFive(
@@ -1127,7 +1141,7 @@ export async function updateBalancePaymentStatus(
     .limit(1);
   if (!balance) return null;
 
-  await db
+  const result = await db
     .update(orderBalancePayments)
     .set({
       paymentStatus: status,
@@ -1135,7 +1149,14 @@ export async function updateBalancePaymentStatus(
       ecpayNotifyData: notifyData,
       paidAt: status === "paid" ? new Date() : null,
     })
-    .where(eq(orderBalancePayments.id, balance.id));
+    .where(
+      and(
+        eq(orderBalancePayments.id, balance.id),
+        eq(orderBalancePayments.paymentStatus, "pending")
+      )
+    );
+
+  if (getAffectedRows(result) === 0) return null;
 
   if (status === "paid") {
     await db

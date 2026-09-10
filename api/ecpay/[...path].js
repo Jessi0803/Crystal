@@ -87,27 +87,6 @@ function verifyLogisticsCheckMacValue(params) {
   const expected = generateLogisticsCheckMacValue(rest);
   return expected === CheckMacValue;
 }
-function formatECPayDate(date) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-function parseLogisticsResponse(text2) {
-  const result = {};
-  const [firstPart = "", ...restParts] = text2.split("|");
-  let rtnCode = "";
-  if (firstPart && !firstPart.includes("=")) {
-    rtnCode = firstPart.trim();
-  } else if (firstPart) {
-    restParts.unshift(firstPart);
-  }
-  const rest = restParts.join("|");
-  const pairs = rest.includes("&") ? rest.split("&") : restParts;
-  for (const pair of pairs) {
-    const [k, ...v] = pair.split("=");
-    if (k) result[k.trim()] = v.join("=").trim();
-  }
-  return { rtnCode: rtnCode || result["RtnCode"] || "", result };
-}
 function buildCVSMapParams(opts) {
   const params = {
     MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
@@ -120,90 +99,6 @@ function buildCVSMapParams(opts) {
   };
   params.CheckMacValue = generateLogisticsCheckMacValue(params);
   return params;
-}
-async function createCVSLogisticsOrder(opts) {
-  const params = {
-    MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
-    MerchantTradeNo: opts.logisticsMerchantTradeNo,
-    MerchantTradeDate: formatECPayDate(/* @__PURE__ */ new Date()),
-    LogisticsType: "CVS",
-    LogisticsSubType: opts.logisticsSubType,
-    GoodsAmount: String(opts.goodsAmount),
-    GoodsName: opts.goodsName,
-    SenderName: opts.senderName,
-    SenderCellPhone: opts.senderPhone,
-    SenderZipCode: opts.senderZipCode || process.env.SENDER_ZIPCODE || "330",
-    ReceiverName: opts.receiverName,
-    ReceiverCellPhone: opts.receiverPhone,
-    ReceiverStoreID: opts.receiverStoreID,
-    IsCollection: opts.isCollection ?? "N",
-    ServerReplyURL: opts.serverReplyURL
-  };
-  if (opts.isCollection === "Y" && opts.collectionAmount) {
-    params.CollectionAmount = String(opts.collectionAmount);
-  }
-  params.CheckMacValue = generateLogisticsCheckMacValue(params);
-  const formBody = new URLSearchParams(params).toString();
-  const response = await fetch(ECPAY_LOGISTICS_CONFIG.CreateURL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: formBody
-  });
-  const text2 = await response.text();
-  console.log("[ECPay Logistics] Create CVS response:", text2);
-  const { rtnCode, result } = parseLogisticsResponse(text2);
-  const success = rtnCode === "1" || result["RtnCode"] === "300" || rtnCode === "300";
-  return {
-    success,
-    allPayLogisticsId: result["AllPayLogisticsID"] ?? "",
-    cvsPaymentNo: result["CVSPaymentNo"] ?? "",
-    cvsValidationNo: result["CVSValidationNo"] ?? "",
-    rtnMsg: result["RtnMsg"] ?? text2,
-    raw: result
-  };
-}
-async function createHomeLogisticsOrder(opts) {
-  const params = {
-    MerchantID: ECPAY_LOGISTICS_CONFIG.MerchantID,
-    MerchantTradeNo: opts.logisticsMerchantTradeNo,
-    MerchantTradeDate: formatECPayDate(/* @__PURE__ */ new Date()),
-    LogisticsType: "HOME",
-    LogisticsSubType: "TCAT",
-    GoodsAmount: String(opts.goodsAmount),
-    GoodsName: opts.goodsName,
-    SenderName: opts.senderName,
-    SenderPhone: opts.senderPhone,
-    SenderZipCode: opts.senderZipCode || process.env.SENDER_ZIPCODE || "330",
-    SenderAddress: opts.senderAddress,
-    ReceiverName: opts.receiverName,
-    ReceiverPhone: opts.receiverPhone,
-    ReceiverZipCode: opts.receiverZipCode ?? "",
-    ReceiverAddress: opts.receiverAddress,
-    Temperature: opts.temperature ?? "0001",
-    Specification: "0001",
-    // 60cm
-    ScheduledPickupTime: opts.schedulePickupTime ?? "1",
-    ScheduledDeliveryTime: "1",
-    ServerReplyURL: opts.serverReplyURL
-  };
-  params.CheckMacValue = generateLogisticsCheckMacValue(params);
-  const formBody = new URLSearchParams(params).toString();
-  const response = await fetch(ECPAY_LOGISTICS_CONFIG.CreateURL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: formBody
-  });
-  const text2 = await response.text();
-  console.log("[ECPay Logistics] Create HOME response:", text2);
-  const { rtnCode, result } = parseLogisticsResponse(text2);
-  const success = rtnCode === "1";
-  return {
-    success,
-    allPayLogisticsId: result["AllPayLogisticsID"] ?? "",
-    bookingNote: result["BookingNote"] ?? "",
-    rtnMsg: result["RtnMsg"] ?? text2,
-    raw: result
-  };
 }
 
 // server/orderDb.ts
@@ -623,6 +518,12 @@ var CUSTOM_NUMEROLOGY_PRODUCT_ID = "numerology-crystal-deposit-product";
 var CUSTOM_PRODUCT_IDS = [CUSTOM_PRODUCT_ID, CUSTOM_TAROT_PRODUCT_ID, CUSTOM_CHAKRA_PRODUCT_ID, CUSTOM_NUMEROLOGY_PRODUCT_ID];
 
 // server/orderDb.ts
+function getAffectedRows(result) {
+  const candidate = Array.isArray(result) ? result[0] : result;
+  if (!candidate || typeof candidate !== "object") return 0;
+  const affectedRows = candidate.affectedRows;
+  return typeof affectedRows === "number" ? affectedRows : 0;
+}
 var balancePaymentLegacySelect = {
   id: orderBalancePayments.id,
   orderId: orderBalancePayments.orderId,
@@ -680,13 +581,19 @@ async function updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notify
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const [order] = await db.select({ isCustomOrder: orders.isCustomOrder }).from(orders).where(eq2(orders.merchantTradeNo, merchantTradeNo)).limit(1);
-  await db.update(orders).set({
+  const result = await db.update(orders).set({
     paymentStatus: status,
     orderStatus: status === "paid" ? order?.isCustomOrder ? "deposit_paid" : "paid" : "cancelled",
     tradeNo,
     ecpayNotifyData: notifyData,
     paidAt: status === "paid" ? /* @__PURE__ */ new Date() : void 0
-  }).where(eq2(orders.merchantTradeNo, merchantTradeNo));
+  }).where(
+    and2(
+      eq2(orders.merchantTradeNo, merchantTradeNo),
+      eq2(orders.paymentStatus, "pending")
+    )
+  );
+  return getAffectedRows(result) > 0;
 }
 async function updateLogisticsStatus(logisticsMerchantTradeNo, status, extra) {
   const db = await getDb();
@@ -709,12 +616,18 @@ async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, noti
   await ensureBalancePaymentColumns(db);
   const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   if (!balance) return null;
-  await db.update(orderBalancePayments).set({
+  const result = await db.update(orderBalancePayments).set({
     paymentStatus: status,
     tradeNo,
     ecpayNotifyData: notifyData,
     paidAt: status === "paid" ? /* @__PURE__ */ new Date() : null
-  }).where(eq2(orderBalancePayments.id, balance.id));
+  }).where(
+    and2(
+      eq2(orderBalancePayments.id, balance.id),
+      eq2(orderBalancePayments.paymentStatus, "pending")
+    )
+  );
+  if (getAffectedRows(result) === 0) return null;
   if (status === "paid") {
     await db.update(orders).set({ orderStatus: "paid", paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq2(orders.id, balance.orderId));
   }
@@ -824,9 +737,6 @@ var PAYMENT_LABEL = {
   bank_transfer: "\u8F49\u5E33",
   paypal: "PayPal"
 };
-function escapeHtml(value) {
-  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
 async function sendOrderConfirmEmail(payload) {
   const resend = getResend();
   const {
@@ -925,91 +835,6 @@ async function sendOrderConfirmEmail(payload) {
     html
   });
 }
-async function sendOrderShippedEmail(payload) {
-  const resend = getResend();
-  const {
-    to,
-    buyerName,
-    merchantTradeNo,
-    totalAmount,
-    shippingMethod,
-    paymentMethod,
-    cvsStoreName,
-    receiverAddress,
-    items
-  } = payload;
-  const itemRows = items.map(
-    (item) => `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;">${escapeHtml(item.productName)}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#666;text-align:center;">\xD7 ${item.quantity}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;text-align:right;">NT$ ${item.subtotal.toLocaleString()}</td>
-      </tr>`
-  ).join("");
-  const deliveryInfo = shippingMethod === "home" ? `<p style="margin:4px 0;font-size:13px;color:#555;">\u914D\u9001\u5730\u5740\uFF1A${escapeHtml(receiverAddress ?? "\u2014")}</p>` : `<p style="margin:4px 0;font-size:13px;color:#555;">\u53D6\u8CA8\u9580\u5E02\uFF1A${escapeHtml(cvsStoreName ?? "\u2014")}</p>`;
-  const html = `
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f9f7f4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e8e4df;">
-        <tr>
-          <td style="padding:32px 40px 24px;border-bottom:1px solid #f0ece7;text-align:center;">
-            <p style="margin:0;font-size:11px;letter-spacing:0.2em;color:#999;text-transform:uppercase;">Crystal Energy</p>
-            <h1 style="margin:8px 0 0;font-size:22px;font-weight:300;color:#1a1a1a;letter-spacing:0.08em;">${BRAND_NAME}</h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:36px 40px;">
-            <p style="margin:0 0 4px;font-size:13px;color:#555;">\u89AA\u611B\u7684 ${escapeHtml(buyerName)}\uFF0C</p>
-            <h2 style="margin:0 0 16px;font-size:18px;font-weight:500;color:#1a1a1a;">\u60A8\u7684\u8A02\u55AE\u5DF2\u51FA\u8CA8</h2>
-            <p style="margin:0 0 24px;font-size:13px;color:#666;line-height:1.8;">
-              \u60A8\u7684\u6C34\u6676\u5546\u54C1\u5DF2\u5B8C\u6210\u51FA\u8CA8\u5B89\u6392\uFF0C\u8ACB\u7559\u610F\u914D\u9001\u901A\u77E5\u8207\u53D6\u8CA8\u8A0A\u606F\u3002
-            </p>
-
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:16px 20px;margin-bottom:24px;">
-              <tr><td style="font-size:11px;letter-spacing:0.1em;color:#999;padding-bottom:10px;">\u8A02\u55AE\u8CC7\u8A0A</td></tr>
-              <tr><td style="font-size:13px;color:#555;padding:2px 0;">\u8A02\u55AE\u7DE8\u865F\uFF1A<strong style="color:#1a1a1a;">${escapeHtml(merchantTradeNo)}</strong></td></tr>
-              <tr><td style="font-size:13px;color:#555;padding:2px 0;">\u4ED8\u6B3E\u65B9\u5F0F\uFF1A${escapeHtml(PAYMENT_LABEL[paymentMethod] ?? paymentMethod)}</td></tr>
-              <tr><td style="font-size:13px;color:#555;padding:2px 0;">\u914D\u9001\u65B9\u5F0F\uFF1A${escapeHtml(SHIPPING_LABEL[shippingMethod] ?? shippingMethod)}</td></tr>
-              <tr><td style="font-size:13px;color:#555;padding:2px 0;">${deliveryInfo}</td></tr>
-            </table>
-
-            <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.1em;color:#999;">\u5546\u54C1\u660E\u7D30</p>
-            <table width="100%" cellpadding="0" cellspacing="0">
-              ${itemRows}
-              <tr>
-                <td colspan="2" style="padding:14px 0 0;font-size:13px;font-weight:600;color:#1a1a1a;">\u8A02\u55AE\u7E3D\u8A08</td>
-                <td style="padding:14px 0 0;font-size:15px;font-weight:600;color:#1a1a1a;text-align:right;">NT$ ${totalAmount.toLocaleString()}</td>
-              </tr>
-            </table>
-
-            <p style="margin:24px 0 0;font-size:12px;color:#999;line-height:1.8;">
-              \u82E5\u914D\u9001\u8CC7\u8A0A\u6709\u4EFB\u4F55\u554F\u984C\uFF0C\u6B61\u8FCE\u900F\u904E\u5B98\u7DB2\u6216 LINE \u806F\u7E6B\u6211\u5011\u3002
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 40px;border-top:1px solid #f0ece7;text-align:center;">
-            <p style="margin:0;font-size:10px;color:#bbb;letter-spacing:0.1em;">
-              \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} ${BRAND_NAME} \xB7 \u5929\u7136\u6C34\u6676\u80FD\u91CF\u98FE\u54C1
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-  return resend.emails.send({
-    from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
-    to,
-    subject: `\u3010${BRAND_NAME}\u3011\u60A8\u7684\u8A02\u55AE\u5DF2\u51FA\u8CA8 #${merchantTradeNo}`,
-    html
-  });
-}
 
 // server/lineMessage.ts
 import { eq as eq4 } from "drizzle-orm";
@@ -1081,27 +906,6 @@ ${productLines}` : "",
   ].filter(Boolean).join("\n");
   return pushLineTextMessage(lineUserId, text2);
 }
-async function notifyLineOrderShipped(orderId) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const lineUserId = await getLineUserIdForOrder(orderId);
-  if (!lineUserId) return { sent: false, reason: "missing_line_user" };
-  const [order] = await db.select().from(orders).where(eq4(orders.id, orderId)).limit(1);
-  if (!order) return { sent: false, reason: "missing_order" };
-  const [logistics] = await db.select().from(logisticsOrders).where(eq4(logisticsOrders.orderId, orderId)).limit(1);
-  const shippingLabel = order.shippingMethod === "home" ? "\u9ED1\u8C93\u5B85\u6025\u4FBF" : order.shippingMethod === "cvs_711" ? "7-11 \u5E97\u5230\u5E97" : "\u5168\u5BB6\u5E97\u5230\u5E97";
-  const trackingNo = logistics?.bookingNote || logistics?.allPayLogisticsId || logistics?.logisticsMerchantTradeNo;
-  const text2 = [
-    `${order.buyerName} \u60A8\u597D\uFF0C\u60A8\u7684\u8A02\u55AE\u5DF2\u51FA\u8CA8\u3002`,
-    "",
-    `\u8A02\u55AE\u7DE8\u865F\uFF1A${order.merchantTradeNo}`,
-    `\u914D\u9001\u65B9\u5F0F\uFF1A${shippingLabel}`,
-    trackingNo ? `\u7269\u6D41\u7DE8\u865F\uFF1A${trackingNo}` : "",
-    "",
-    `\u67E5\u770B\u8A02\u55AE\uFF1A${getSiteUrl()}/order/${encodeURIComponent(order.merchantTradeNo)}`
-  ].filter(Boolean).join("\n");
-  return pushLineTextMessage(lineUserId, text2);
-}
 
 // server/customerOrderNotification.ts
 async function getMerchantTradeNoByOrderId(orderId) {
@@ -1142,18 +946,6 @@ async function notifyCustomerOrderPlacedSafely(orderId) {
     await sendOrderConfirmEmail(emailPayload);
   } catch (error) {
     console.error("[CustomerOrderNotification] order placed failed:", error);
-  }
-}
-async function notifyCustomerOrderShippedSafely(orderId) {
-  try {
-    const lineResult = await notifyLineOrderShipped(orderId);
-    if (lineResult.sent) return;
-    if (lineResult.reason === "missing_order") return;
-    const emailPayload = await getOrderEmailPayload(orderId);
-    if (!emailPayload) return;
-    await sendOrderShippedEmail(emailPayload);
-  } catch (error) {
-    console.error("[CustomerOrderNotification] order shipped failed:", error);
   }
 }
 
@@ -1200,21 +992,26 @@ async function handleECPayPaymentNotify(notifyData) {
   const status = rtnCode === "1" ? "paid" : "failed";
   const order = await getOrderByMerchantTradeNo(merchantTradeNo);
   if (order) {
-    const shouldNotifyOrderPlaced = status === "paid" && order.paymentStatus !== "paid" && order.paymentStatus !== "confirmed";
-    await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-    if (status === "paid") {
+    if (!matchesECPayAmount(notifyData.TradeAmt, order.totalAmount)) {
+      console.error(`[ECPay Notify] TradeAmt mismatch for ${merchantTradeNo}`);
+      return "0|TradeAmt Error";
+    }
+    const claimed = await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (claimed && status === "paid") {
       await deductInventoryAfterPayment(merchantTradeNo);
-      if (shouldNotifyOrderPlaced) {
-        await notifyCustomerOrderPlacedSafely(order.id);
-      }
+      await notifyCustomerOrderPlacedSafely(order.id);
     }
     console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
     return "1|OK";
   }
   const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
   if (balancePayment) {
-    await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-    if (status === "paid") {
+    if (!matchesECPayAmount(notifyData.TradeAmt, balancePayment.totalAmount)) {
+      console.error(`[ECPay Notify] Balance TradeAmt mismatch for ${merchantTradeNo}`);
+      return "0|TradeAmt Error";
+    }
+    const claimed = await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (claimed && status === "paid") {
       await deductInventoryAfterBalancePayment(merchantTradeNo);
     }
     console.log(`[ECPay Notify] Balance ${merchantTradeNo} \u2192 ${status}`);
@@ -1222,6 +1019,9 @@ async function handleECPayPaymentNotify(notifyData) {
   }
   console.error("[ECPay Notify] Order not found:", merchantTradeNo);
   return "0|Order Not Found";
+}
+function matchesECPayAmount(rawAmount, expectedAmount) {
+  return typeof rawAmount === "string" && /^\d+$/.test(rawAmount) && Number(rawAmount) === expectedAmount;
 }
 function registerECPayRoutes(app2) {
   app2.post("/api/ecpay/notify", async (req, res) => {
@@ -1349,77 +1149,6 @@ ${inputs}
     } catch (err) {
       console.error("[ECPay Logistics Notify] Error:", err);
       res.send("0|Server Error");
-    }
-  });
-  app2.post("/api/ecpay/create-logistics", async (req, res) => {
-    try {
-      const { orderId } = req.body;
-      const db = await getDb();
-      if (!db) {
-        res.status(500).json({ error: "DB unavailable" });
-        return;
-      }
-      const [order] = await db.select().from(orders).where(eq6(orders.id, orderId)).limit(1);
-      if (!order) {
-        res.status(404).json({ error: "Order not found" });
-        return;
-      }
-      const [logistics] = await db.select().from(logisticsOrders).where(eq6(logisticsOrders.orderId, orderId)).limit(1);
-      if (!logistics) {
-        res.status(404).json({ error: "Logistics order not found" });
-        return;
-      }
-      const forwardedProto2 = req.headers["x-forwarded-proto"];
-      const protocol2 = forwardedProto2 ? forwardedProto2.split(",")[0].trim() : req.protocol;
-      const origin = `${protocol2}://${req.get("host")}`;
-      const serverReplyURL = `${origin}/api/ecpay/logistics-notify`;
-      let result;
-      if (order.shippingMethod === "home") {
-        result = await createHomeLogisticsOrder({
-          logisticsMerchantTradeNo: logistics.logisticsMerchantTradeNo,
-          goodsName: "\u691BCrystal\u80FD\u91CF\u6C34\u6676",
-          goodsAmount: order.totalAmount,
-          senderName: process.env.OWNER_NAME || "\u691BCrystal",
-          senderPhone: process.env.SENDER_PHONE || "0903288876",
-          senderZipCode: process.env.SENDER_ZIPCODE || "110",
-          senderAddress: "\u53F0\u5317\u5E02\u4FE1\u7FA9\u5340",
-          receiverName: order.buyerName,
-          receiverPhone: order.buyerPhone,
-          receiverAddress: order.shippingAddress || "",
-          serverReplyURL
-        });
-      } else {
-        const logisticsSubType = order.shippingMethod === "cvs_711" ? "UNIMARTC2C" : "FAMIC2C";
-        result = await createCVSLogisticsOrder({
-          logisticsMerchantTradeNo: logistics.logisticsMerchantTradeNo,
-          goodsName: "\u691BCrystal\u80FD\u91CF\u6C34\u6676",
-          goodsAmount: order.totalAmount,
-          senderName: process.env.OWNER_NAME || "\u691BCrystal",
-          senderPhone: process.env.SENDER_PHONE || "0903288876",
-          senderZipCode: process.env.SENDER_ZIPCODE || "110",
-          receiverName: order.buyerName,
-          receiverPhone: order.buyerPhone,
-          receiverStoreID: order.cvsStoreId || "",
-          logisticsSubType,
-          serverReplyURL
-        });
-      }
-      if (result.success) {
-        await db.update(logisticsOrders).set({
-          allPayLogisticsId: result.allPayLogisticsId,
-          cvsPaymentNo: result.cvsPaymentNo,
-          cvsValidationNo: result.cvsValidationNo,
-          bookingNote: result.bookingNote,
-          logisticsStatus: "in_transit",
-          ecpayLogisticsData: result.raw
-        }).where(eq6(logisticsOrders.orderId, orderId));
-        await db.update(orders).set({ orderStatus: "shipped" }).where(eq6(orders.id, orderId));
-        await notifyCustomerOrderShippedSafely(orderId);
-      }
-      res.json(result);
-    } catch (err) {
-      console.error("[ECPay Create Logistics] Error:", err);
-      res.status(500).json({ error: String(err) });
     }
   });
 }

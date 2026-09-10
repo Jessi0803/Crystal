@@ -8,6 +8,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, CreditCard, Store, ShieldCheck, Lock, Banknote, MapPin, Home, Globe, ImageUp, X } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
+import { saveOrderAccess } from "@/lib/orderAccess";
 import { toast } from "sonner";
 import {
   AU_STATE_OPTIONS,
@@ -332,6 +333,8 @@ export default function Checkout() {
         origin: window.location.origin,
         customerNote: hasCustomDepositItem ? customConsultationNote : undefined,
       });
+
+      saveOrderAccess(result.merchantTradeNo, result.orderAccessToken, form.buyerEmail);
 
       clearCart();
       if (hasCustomDepositItem) {

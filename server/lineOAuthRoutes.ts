@@ -201,7 +201,7 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
         throw new Error("user_missing_after_upsert");
       }
 
-      if (db.shouldGrantAdminRole(user.openId, user.email) && user.role !== "admin") {
+      if (db.shouldGrantAdminRole(user.openId, user.email, user.emailVerified === true) && user.role !== "admin") {
         const db2 = await db.getDb();
         if (db2) {
           const { users } = await import("../drizzle/schema");

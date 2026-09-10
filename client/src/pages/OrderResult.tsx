@@ -20,6 +20,7 @@ import {
   RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS,
   getRecentCustomFormSubmissionKey,
 } from "@/lib/customFormSubmission";
+import { getSavedOrderAccess, saveOrderAccess, type SavedOrderAccess } from "@/lib/orderAccess";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -105,14 +106,26 @@ export default function OrderResult() {
   const paypalCaptureStarted = useRef(false);
   const [isCustomReminderOpen, setIsCustomReminderOpen] = useState(false);
   const [dismissedCustomReminderOrderNo, setDismissedCustomReminderOrderNo] = useState("");
+  const [orderAccess, setOrderAccess] = useState<SavedOrderAccess>(() =>
+    getSavedOrderAccess(merchantTradeNo)
+  );
+  const [accessEmail, setAccessEmail] = useState("");
 
-  const { data: order, isLoading, isError, refetch } = trpc.order.getOrder.useQuery(
-    { merchantTradeNo: merchantTradeNo ?? "" },
+  const { data: order, isLoading, isError, error, refetch } = trpc.order.getOrder.useQuery(
+    {
+      merchantTradeNo: merchantTradeNo ?? "",
+      accessToken: orderAccess.accessToken,
+      buyerEmail: orderAccess.buyerEmail,
+    },
     {
       enabled: !!merchantTradeNo,
       refetchInterval: 5000,
     }
   );
+
+  useEffect(() => {
+    setOrderAccess(getSavedOrderAccess(merchantTradeNo));
+  }, [merchantTradeNo]);
 
   const capturePayPal = trpc.order.capturePayPal.useMutation({
     onSuccess: (data) => {
@@ -304,20 +317,41 @@ export default function OrderResult() {
   }
 
   if (isError) {
+    const requiresVerification = error?.data?.code === "UNAUTHORIZED";
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <XCircle className="w-12 h-12 text-red-400 mb-4" />
         <p className="text-xl mb-2" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
-          查詢訂單失敗
+          {requiresVerification ? "驗證訪客訂單" : "查詢訂單失敗"}
         </p>
         <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
           訂單編號：{merchantTradeNo}
-          <br />伺服器暫時無法取得訂單資訊，請稍後重試。
+          <br />{requiresVerification ? "請輸入建立訂單時使用的 Email。" : "伺服器暫時無法取得訂單資訊，請稍後重試。"}
         </p>
+        {requiresVerification && (
+          <form
+            className="w-full max-w-sm mb-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const buyerEmail = accessEmail.trim();
+              if (!buyerEmail || !merchantTradeNo) return;
+              saveOrderAccess(merchantTradeNo, undefined, buyerEmail);
+              setOrderAccess({ buyerEmail });
+            }}
+          >
+            <input
+              type="email"
+              required
+              value={accessEmail}
+              onChange={(event) => setAccessEmail(event.target.value)}
+              placeholder="訂購 Email"
+              className="w-full border border-black/20 px-4 py-3 mb-3"
+            />
+            <button className="btn-primary w-full" type="submit">驗證並查看訂單</button>
+          </form>
+        )}
         <div className="flex gap-3">
-          <button className="btn-primary" onClick={() => refetch()}>
-            重新查詢
-          </button>
+          {!requiresVerification && <button className="btn-primary" onClick={() => refetch()}>重新查詢</button>}
           <button className="btn-outline" onClick={() => setLocation("/")}>
             返回首頁
           </button>

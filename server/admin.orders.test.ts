@@ -54,6 +54,7 @@ vi.mock("./ecpay", () => ({
   generateMerchantTradeNo: vi.fn().mockReturnValue("MOCK001"),
   buildCreditPaymentParams: vi.fn().mockReturnValue({}),
   ECPAY_CONFIG: { PaymentURL: "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5" },
+  usePaymentSandbox: false,
 }));
 
 vi.mock("./inventoryDb", () => ({
@@ -284,7 +285,18 @@ describe("order.listOrders (admin procedure)", () => {
 describe("order notification timing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getDbMock.mockResolvedValue(null as any);
+    getDbMock.mockResolvedValue(createMutationMockDb([
+      [{
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1280,
+        image: "",
+        active: true,
+        wristSizePriceRules: [],
+        purchaseOptions: [],
+      }],
+      [{ id: "bracelet-1", twoItemFreeShippingEligible: true }],
+    ]) as any);
     createOrderMock.mockResolvedValue(101);
     storagePutMock.mockResolvedValue({ url: "https://example.test/receipt.png", key: "receipt.png" });
     mockAvailableProducts();
@@ -349,13 +361,14 @@ describe("order.createAndPay security regression coverage", () => {
     mockAvailableProducts();
   });
 
-  it.fails("does not trust a client-supplied price for a normal product", async () => {
+  it("does not trust a client-supplied price for a normal product", async () => {
     const db = createMutationMockDb([
       [{
         id: "bracelet-1",
         name: "通知測試手鍊",
         price: 1280,
         image: "",
+        active: true,
         wristSizePriceRules: [],
         purchaseOptions: [],
       }],
@@ -370,11 +383,13 @@ describe("order.createAndPay security regression coverage", () => {
 
     expect(createOrderMock).toHaveBeenCalledWith(
       expect.objectContaining({ totalAmount: 1410 }),
-      [expect.objectContaining({ productId: "bracelet-1", unitPrice: 1280, subtotal: 1280 })]
+      expect.arrayContaining([
+        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1280, subtotal: 1280 }),
+      ])
     );
   });
 
-  it.fails("rejects zero, negative, fractional, and unreasonably large quantities", async () => {
+  it("rejects zero, negative, fractional, and unreasonably large quantities", async () => {
     getDbMock.mockResolvedValue(null as any);
     const caller = createPublicCaller();
 
@@ -395,7 +410,7 @@ describe("order public access security regression coverage", () => {
     vi.clearAllMocks();
   });
 
-  it.fails("does not expose an order to an anonymous caller holding only its order number", async () => {
+  it("does not expose an order to an anonymous caller holding only its order number", async () => {
     getOrderWithItemsMock.mockResolvedValue({
       id: 501,
       userId: 77,
@@ -413,6 +428,29 @@ describe("order public access security regression coverage", () => {
     await expect(
       createPublicCaller().order.getOrder({ merchantTradeNo: "PRIVATE001" })
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("keeps legacy guest orders accessible after the buyer verifies the order email", async () => {
+    getOrderWithItemsMock.mockResolvedValue({
+      id: 502,
+      userId: null,
+      merchantTradeNo: "GUEST001",
+      buyerName: "Guest Customer",
+      buyerEmail: "guest@example.com",
+      buyerPhone: "0912345678",
+      shippingAddress: "台北市測試地址",
+      customerNote: null,
+      items: [],
+      logistics: null,
+      balancePayment: null,
+    } as Awaited<ReturnType<typeof getOrderWithItems>>);
+
+    await expect(
+      createPublicCaller().order.getOrder({
+        merchantTradeNo: "GUEST001",
+        buyerEmail: " Guest@Example.com ",
+      })
+    ).resolves.toMatchObject({ merchantTradeNo: "GUEST001" });
   });
 });
 

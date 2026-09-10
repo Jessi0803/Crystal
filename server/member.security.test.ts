@@ -28,7 +28,7 @@ describe("password reset URL security regression coverage", () => {
     } as Awaited<ReturnType<typeof db.getUserByEmail>>);
   });
 
-  it.fails("ignores an attacker-controlled origin when generating a reset link", async () => {
+  it("ignores an attacker-controlled origin when generating a reset link", async () => {
     const caller = memberRouter.createCaller({
       user: null,
       req: {} as any,

@@ -10,8 +10,6 @@ import { verifyCheckMacValue } from "./ecpay";
 import {
   verifyLogisticsCheckMacValue,
   buildCVSMapParams,
-  createCVSLogisticsOrder,
-  createHomeLogisticsOrder,
   ECPAY_LOGISTICS_CONFIG,
 } from "./ecpayLogistics";
 import {
@@ -24,7 +22,6 @@ import {
 import { deductInventoryAfterBalancePayment, deductInventoryAfterPayment } from "./inventoryDb";
 import {
   notifyCustomerOrderPlacedSafely,
-  notifyCustomerOrderShippedSafely,
 } from "./customerOrderNotification";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
@@ -86,14 +83,14 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
   const status = rtnCode === "1" ? "paid" : "failed";
   const order = await getOrderByMerchantTradeNo(merchantTradeNo);
   if (order) {
-    const shouldNotifyOrderPlaced =
-      status === "paid" && order.paymentStatus !== "paid" && order.paymentStatus !== "confirmed";
-    await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-    if (status === "paid") {
+    if (!matchesECPayAmount(notifyData.TradeAmt, order.totalAmount)) {
+      console.error(`[ECPay Notify] TradeAmt mismatch for ${merchantTradeNo}`);
+      return "0|TradeAmt Error";
+    }
+    const claimed = await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (claimed && status === "paid") {
       await deductInventoryAfterPayment(merchantTradeNo);
-      if (shouldNotifyOrderPlaced) {
-        await notifyCustomerOrderPlacedSafely(order.id);
-      }
+      await notifyCustomerOrderPlacedSafely(order.id);
     }
     console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
     return "1|OK";
@@ -101,8 +98,12 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
 
   const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
   if (balancePayment) {
-    await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
-    if (status === "paid") {
+    if (!matchesECPayAmount(notifyData.TradeAmt, balancePayment.totalAmount)) {
+      console.error(`[ECPay Notify] Balance TradeAmt mismatch for ${merchantTradeNo}`);
+      return "0|TradeAmt Error";
+    }
+    const claimed = await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (claimed && status === "paid") {
       await deductInventoryAfterBalancePayment(merchantTradeNo);
     }
     console.log(`[ECPay Notify] Balance ${merchantTradeNo} → ${status}`);
@@ -111,6 +112,10 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
 
   console.error("[ECPay Notify] Order not found:", merchantTradeNo);
   return "0|Order Not Found";
+}
+
+function matchesECPayAmount(rawAmount: string | undefined, expectedAmount: number) {
+  return typeof rawAmount === "string" && /^\d+$/.test(rawAmount) && Number(rawAmount) === expectedAmount;
 }
 
 export function registerECPayRoutes(app: Application) {
@@ -314,88 +319,4 @@ ${inputs}
     }
   });
 
-  /**
-   * 建立物流訂單 API（由後台管理員觸發）
-   * POST /api/ecpay/create-logistics
-   */
-  app.post("/api/ecpay/create-logistics", async (req: Request, res: Response) => {
-    try {
-      const { orderId } = req.body as { orderId: number };
-      const db = await getDb();
-      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
-
-      const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-      if (!order) { res.status(404).json({ error: "Order not found" }); return; }
-
-      const [logistics] = await db
-        .select()
-        .from(logisticsOrders)
-        .where(eq(logisticsOrders.orderId, orderId))
-        .limit(1);
-
-      if (!logistics) { res.status(404).json({ error: "Logistics order not found" }); return; }
-
-      // 優先使用 x-forwarded-proto（反向代理後 req.protocol 可能是 http）
-      const forwardedProto2 = req.headers['x-forwarded-proto'] as string | undefined;
-      const protocol2 = forwardedProto2 ? forwardedProto2.split(',')[0].trim() : req.protocol;
-      const origin = `${protocol2}://${req.get("host")}`;
-      const serverReplyURL = `${origin}/api/ecpay/logistics-notify`;
-
-      let result;
-      if (order.shippingMethod === "home") {
-        result = await createHomeLogisticsOrder({
-          logisticsMerchantTradeNo: logistics.logisticsMerchantTradeNo,
-          goodsName: "椛Crystal能量水晶",
-          goodsAmount: order.totalAmount,
-          senderName: process.env.OWNER_NAME || "椛Crystal",
-          senderPhone: process.env.SENDER_PHONE || "0903288876",
-          senderZipCode: process.env.SENDER_ZIPCODE || "110",
-          senderAddress: "台北市信義區",
-          receiverName: order.buyerName,
-          receiverPhone: order.buyerPhone,
-          receiverAddress: order.shippingAddress || "",
-          serverReplyURL,
-        });
-      } else {
-        const logisticsSubType = order.shippingMethod === "cvs_711" ? "UNIMARTC2C" : "FAMIC2C";
-        result = await createCVSLogisticsOrder({
-          logisticsMerchantTradeNo: logistics.logisticsMerchantTradeNo,
-          goodsName: "椛Crystal能量水晶",
-          goodsAmount: order.totalAmount,
-          senderName: process.env.OWNER_NAME || "椛Crystal",
-          senderPhone: process.env.SENDER_PHONE || "0903288876",
-          senderZipCode: process.env.SENDER_ZIPCODE || "110",
-          receiverName: order.buyerName,
-          receiverPhone: order.buyerPhone,
-          receiverStoreID: order.cvsStoreId || "",
-          logisticsSubType,
-          serverReplyURL,
-        });
-      }
-
-      if (result.success) {
-        // 更新物流訂單資訊
-        await db
-          .update(logisticsOrders)
-          .set({
-            allPayLogisticsId: result.allPayLogisticsId,
-            cvsPaymentNo: (result as any).cvsPaymentNo,
-            cvsValidationNo: (result as any).cvsValidationNo,
-            bookingNote: (result as any).bookingNote,
-            logisticsStatus: "in_transit",
-            ecpayLogisticsData: result.raw,
-          })
-          .where(eq(logisticsOrders.orderId, orderId));
-
-        // 更新訂單狀態為已出貨
-        await db.update(orders).set({ orderStatus: "shipped" }).where(eq(orders.id, orderId));
-        await notifyCustomerOrderShippedSafely(orderId);
-      }
-
-      res.json(result);
-    } catch (err) {
-      console.error("[ECPay Create Logistics] Error:", err);
-      res.status(500).json({ error: String(err) });
-    }
-  });
 }
