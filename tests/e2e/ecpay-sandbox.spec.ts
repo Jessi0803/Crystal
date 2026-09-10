@@ -4,7 +4,7 @@ import { fillDomesticHomeCheckout, fillTransferCheckoutFields, goToCheckoutWithS
 const sandboxTest = process.env.RUN_ECPAY_SANDBOX === "true" ? test : test.skip;
 
 async function expectSandboxConfiguration(page: import("@playwright/test").Page) {
-  const response = await page.request.get("/api/trpc/system.envCheck");
+  const response = await page.request.get("/api/trpc/system.paymentMode");
   const text = await response.text();
 
   expect(response.ok()).toBeTruthy();

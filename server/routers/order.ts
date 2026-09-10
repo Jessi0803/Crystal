@@ -5,7 +5,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import type { OverseasShipCountryCode } from "@shared/overseasShipping";
-import { adminProcedure, publicProcedure, router } from "../_core/trpc";
+import { adminProcedure, publicProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
+import type { TrpcContext } from "../_core/context";
+import { enforceRateLimit } from "../_core/rateLimit";
 import {
   generateMerchantTradeNo,
   buildCreditPaymentParams,
@@ -298,10 +300,17 @@ function hasOrderAccess(
 
 function assertOrderAccess(
   order: { userId?: number | null; merchantTradeNo: string; buyerEmail: string },
-  user: { id: number; role?: string | null } | null,
+  ctx: Pick<TrpcContext, "user" | "req" | "res">,
   input: { accessToken?: string; buyerEmail?: string }
 ) {
-  if (!hasOrderAccess(order, user, input)) {
+  if (!hasOrderAccess(order, ctx.user, input)) {
+    enforceRateLimit(
+      ctx.req,
+      ctx.res,
+      `order-access:${order.merchantTradeNo}`,
+      8,
+      15 * 60_000
+    );
     throw new TRPCError({ code: "UNAUTHORIZED", message: "請驗證訂購 Email 後查看訂單" });
   }
 }
@@ -536,7 +545,7 @@ export const orderRouter = router({
    * - credit：回傳綠界付款表單參數
    * - atm：回傳轉帳帳號資訊
    */
-  createAndPay: publicProcedure
+  createAndPay: rateLimitedPublicProcedure({ scope: "checkout", limit: 20, windowMs: 15 * 60_000 })
     .input(
       z
         .object({
@@ -883,7 +892,7 @@ export const orderRouter = router({
   /**
    * PayPal 核准後於 return 頁呼叫：驗證訂單與 PayPal Order 後 Capture
    */
-  capturePayPal: publicProcedure
+  capturePayPal: rateLimitedPublicProcedure({ scope: "paypal-capture", limit: 20, windowMs: 15 * 60_000 })
     .input(
       z.object({
         merchantTradeNo: z.string().min(1),
@@ -943,12 +952,15 @@ export const orderRouter = router({
   /**
    * 查詢訂單（含商品明細）
    */
-  getOrder: publicProcedure
+  getOrder: rateLimitedPublicProcedure({ scope: "order-read", limit: 240, windowMs: 15 * 60_000 })
     .input(OrderAccessSchema)
     .query(async ({ input, ctx }) => {
       const order = await getOrderWithItems(input.merchantTradeNo);
-      if (!order) return null;
-      assertOrderAccess(order, ctx.user, input);
+      if (!order) {
+        enforceRateLimit(ctx.req, ctx.res, "order-read-miss", 12, 15 * 60_000);
+        return null;
+      }
+      assertOrderAccess(order, ctx, input);
       return {
         ...order,
         paymentSandbox: usePaymentSandbox,
@@ -980,7 +992,7 @@ export const orderRouter = router({
       if (!order) {
         throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
       }
-      assertOrderAccess(order, ctx.user, input);
+      assertOrderAccess(order, ctx, input);
       if (!order.isCustomOrder) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單不是客製化訂金訂單" });
       }
@@ -1038,7 +1050,7 @@ export const orderRouter = router({
     .mutation(async ({ input, ctx }) => {
       const order = await getOrderWithItems(input.merchantTradeNo);
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
-      assertOrderAccess(order, ctx.user, input);
+      assertOrderAccess(order, ctx, input);
       await updateOrderTransferLastFive(input.merchantTradeNo, input.lastFive);
       return { success: true };
     }),
@@ -1635,13 +1647,17 @@ export const orderRouter = router({
       };
     }),
 
-  getBalancePayment: publicProcedure
+  getBalancePayment: rateLimitedPublicProcedure({ scope: "balance-read", limit: 240, windowMs: 15 * 60_000 })
     .input(z.object({ merchantTradeNo: z.string().min(1) }))
-    .query(async ({ input }) => {
-      return getBalancePaymentDetail(input.merchantTradeNo);
+    .query(async ({ input, ctx }) => {
+      const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
+      if (!balancePayment) {
+        enforceRateLimit(ctx.req, ctx.res, "balance-read-miss", 12, 15 * 60_000);
+      }
+      return balancePayment;
     }),
 
-  getBalancePaymentCheckout: publicProcedure
+  getBalancePaymentCheckout: rateLimitedPublicProcedure({ scope: "balance-write", limit: 20, windowMs: 15 * 60_000 })
     .input(
       z
         .object({
@@ -1886,7 +1902,7 @@ export const orderRouter = router({
       };
     }),
 
-  submitBalanceTransferCode: publicProcedure
+  submitBalanceTransferCode: rateLimitedPublicProcedure({ scope: "balance-write", limit: 20, windowMs: 15 * 60_000 })
     .input(z.object({
       merchantTradeNo: z.string().min(1),
       lastFive: z.string().length(5).regex(/^\d+$/),

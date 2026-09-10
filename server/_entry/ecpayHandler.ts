@@ -5,10 +5,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import express from "express";
 import { registerECPayRoutes } from "../ecpayRoutes";
+import { publicServerError, setSecurityHeaders } from "../_core/httpSecurity";
 
 const app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(setSecurityHeaders);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 registerECPayRoutes(app);
 
@@ -23,8 +25,7 @@ app.use(
     res: express.Response,
     _next: express.NextFunction
   ) => {
-    const message =
-      err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/ecpay] express error:", err);
     if (!res.headersSent) {
       res
@@ -48,7 +49,7 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
       res
     );
   } catch (err) {
-    const message = err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/ecpay] handler threw:", err);
     writeJson(res, 500, { error: { code: "HANDLER_THREW", message } });
   }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { adminProcedure, publicProcedure, router } from "../_core/trpc";
+import { adminProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { searchKnowledge, type ScoredChunk } from "../crystalKnowledge";
 import { ENV } from "../_core/env";
@@ -296,7 +296,7 @@ async function saveChatbotLog(params: {
 }
 
 export const chatbotRouter = router({
-  chat: publicProcedure
+  chat: rateLimitedPublicProcedure({ scope: "chatbot", limit: 20, windowMs: 5 * 60_000 })
     .input(
       z.object({
         message: z.string().min(1).max(CHATBOT_MAX_MESSAGE_LENGTH),

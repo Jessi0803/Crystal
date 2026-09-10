@@ -403,7 +403,7 @@ function getSessionCookieOptions(req) {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: secure ? "none" : "lax",
+    sameSite: "lax",
     secure
   };
 }
@@ -519,17 +519,66 @@ async function notifyOwner(payload) {
 }
 
 // server/_core/trpc.ts
-import { initTRPC, TRPCError as TRPCError2 } from "@trpc/server";
+import { initTRPC, TRPCError as TRPCError3 } from "@trpc/server";
 import superjson from "superjson";
+
+// server/_core/rateLimit.ts
+import { TRPCError as TRPCError2 } from "@trpc/server";
+var buckets = /* @__PURE__ */ new Map();
+var MAX_BUCKETS = 1e4;
+function requestIp(req) {
+  const headers = req?.headers ?? {};
+  const vercelIp = headers["x-vercel-forwarded-for"];
+  const forwarded = headers["x-forwarded-for"];
+  const raw = vercelIp ?? forwarded;
+  const first = (Array.isArray(raw) ? raw[0] : raw)?.split(",")[0]?.trim();
+  return first || req?.ip || req?.socket?.remoteAddress || "unknown";
+}
+function pruneExpired(now) {
+  if (buckets.size < MAX_BUCKETS) return;
+  buckets.forEach((bucket, key) => {
+    if (bucket.resetAt <= now) buckets.delete(key);
+  });
+  if (buckets.size >= MAX_BUCKETS) buckets.delete(buckets.keys().next().value);
+}
+function enforceRateLimit(req, res, scope, limit, windowMs) {
+  const now = Date.now();
+  pruneExpired(now);
+  const key = `${scope}:${requestIp(req)}`;
+  const current = buckets.get(key);
+  const bucket = !current || current.resetAt <= now ? { count: 1, resetAt: now + windowMs } : { count: current.count + 1, resetAt: current.resetAt };
+  buckets.set(key, bucket);
+  if (typeof res?.setHeader === "function") {
+    res.setHeader("X-RateLimit-Limit", String(limit));
+    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, limit - bucket.count)));
+  }
+  if (bucket.count <= limit) return;
+  const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1e3));
+  if (typeof res?.setHeader === "function") res.setHeader("Retry-After", String(retryAfter));
+  throw new TRPCError2({
+    code: "TOO_MANY_REQUESTS",
+    message: "\u64CD\u4F5C\u904E\u65BC\u983B\u7E41\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66"
+  });
+}
+
+// server/_core/trpc.ts
 var t = initTRPC.context().create({
   transformer: superjson
 });
 var router = t.router;
 var publicProcedure = t.procedure;
+function rateLimitedPublicProcedure(config) {
+  return t.procedure.use(
+    t.middleware(async ({ ctx, next }) => {
+      enforceRateLimit(ctx.req, ctx.res, config.scope, config.limit, config.windowMs);
+      return next();
+    })
+  );
+}
 var requireUser = t.middleware(async (opts) => {
   const { ctx, next } = opts;
   if (!ctx.user) {
-    throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    throw new TRPCError3({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
   return next({
     ctx: {
@@ -539,11 +588,19 @@ var requireUser = t.middleware(async (opts) => {
   });
 });
 var protectedProcedure = t.procedure.use(requireUser);
+function rateLimitedProtectedProcedure(config) {
+  return protectedProcedure.use(
+    t.middleware(async ({ ctx, next }) => {
+      enforceRateLimit(ctx.req, ctx.res, config.scope, config.limit, config.windowMs);
+      return next();
+    })
+  );
+}
 var adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
     if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+      throw new TRPCError3({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
     return next({
       ctx: {
@@ -563,22 +620,20 @@ var systemRouter = router({
   ).query(() => ({
     ok: true
   })),
-  /** 診斷用：確認環境變數是否正確注入（不回傳實際値） */
-  envCheck: publicProcedure.query(() => ({
-    hasResendApiKey: !!ENV.resendApiKey && ENV.resendApiKey.length > 0,
-    resendApiKeyPrefix: ENV.resendApiKey ? ENV.resendApiKey.substring(0, 8) + "..." : "(empty)",
-    nodeEnv: process.env.NODE_ENV ?? "(not set)",
-    // 綠界金流
-    hasEcpayMerchantId: !!process.env.ECPAY_MERCHANT_ID,
-    ecpayMerchantId: process.env.ECPAY_MERCHANT_ID || "(empty)",
-    hasEcpayHashKey: !!process.env.ECPAY_HASH_KEY,
-    ecpayHashKeyPrefix: process.env.ECPAY_HASH_KEY ? process.env.ECPAY_HASH_KEY.substring(0, 6) + "..." : "(empty)",
+  /** 前台及 E2E 只需要知道目前是否為沙盒，不暴露商店識別資料。 */
+  paymentMode: publicProcedure.query(() => ({
     ecpaySandbox: process.env.ECPAY_SANDBOX === "true",
-    // 綠界物流
+    ecpayLogisticsSandbox: process.env.ECPAY_LOGISTICS_SANDBOX === "true"
+  })),
+  /** 僅供管理員診斷環境變數是否注入；不回傳值或金鑰前綴。 */
+  envCheck: adminProcedure.query(() => ({
+    hasResendApiKey: !!ENV.resendApiKey && ENV.resendApiKey.length > 0,
+    nodeEnv: process.env.NODE_ENV ?? "(not set)",
+    hasEcpayMerchantId: !!process.env.ECPAY_MERCHANT_ID,
+    hasEcpayHashKey: !!process.env.ECPAY_HASH_KEY,
+    ecpaySandbox: process.env.ECPAY_SANDBOX === "true",
     hasEcpayLogisticsMerchantId: !!process.env.ECPAY_LOGISTICS_MERCHANT_ID,
-    ecpayLogisticsMerchantId: process.env.ECPAY_LOGISTICS_MERCHANT_ID || "(empty)",
     hasEcpayLogisticsHashKey: !!process.env.ECPAY_LOGISTICS_HASH_KEY,
-    ecpayLogisticsHashKeyPrefix: process.env.ECPAY_LOGISTICS_HASH_KEY ? process.env.ECPAY_LOGISTICS_HASH_KEY.substring(0, 6) + "..." : "(empty)",
     hasEcpayLogisticsHashIV: !!process.env.ECPAY_LOGISTICS_HASH_IV,
     ecpayLogisticsSandbox: process.env.ECPAY_LOGISTICS_SANDBOX === "true"
   })),
@@ -597,7 +652,7 @@ var systemRouter = router({
 
 // server/routers/order.ts
 import { z as z2 } from "zod";
-import { TRPCError as TRPCError3 } from "@trpc/server";
+import { TRPCError as TRPCError4 } from "@trpc/server";
 
 // server/ecpay.ts
 import crypto from "crypto";
@@ -653,6 +708,7 @@ function buildCreditPaymentParams(opts) {
 
 // server/orderDb.ts
 import { eq as eq2, desc, and as and2, gte, sql as sql2, inArray, or } from "drizzle-orm";
+import crypto2 from "node:crypto";
 
 // server/_core/emailNormalize.ts
 function normalizeOrderEmail(email) {
@@ -1518,9 +1574,7 @@ async function createLogisticsOrder(data) {
   return created;
 }
 function generateBalanceMerchantTradeNo() {
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `CB${ts}${rand}`.substring(0, 20);
+  return `CB${crypto2.randomBytes(9).toString("hex").toUpperCase()}`;
 }
 async function createOrReplaceBalancePayment(opts) {
   const db = await getDb();
@@ -1744,7 +1798,6 @@ async function ensureOrdersColumns() {
   }
   ordersColumnsEnsured = true;
 }
-var NO_EXPIRY_LOCK_DATE = /* @__PURE__ */ new Date("2038-01-01T00:00:00.000Z");
 var NON_INVENTORY_PRODUCT_IDS = /* @__PURE__ */ new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
 function shouldSkipInventory(productId) {
   return NON_INVENTORY_PRODUCT_IDS.has(productId);
@@ -1790,67 +1843,6 @@ async function upsertProductInventory(data) {
   } else {
     await db.insert(productInventory).values(data);
   }
-}
-async function acquireInventoryLock(productId, quantity, sessionToken, ttlMs = 10 * 60 * 1e3) {
-  const db = await getDb();
-  if (!db) return { success: false, reason: "Database not available" };
-  if (shouldSkipInventory(productId)) {
-    return { success: true };
-  }
-  await releaseExpiredLocks();
-  const inv = await getProductInventory(productId);
-  const monthlyLimited = await isMonthlyLimitedProduct(productId);
-  if (!inv || inv.stock === -1) {
-    await createLock(productId, quantity, sessionToken, ttlMs);
-    return { success: true };
-  }
-  if (inv.stock <= 0) {
-    if (monthlyLimited) {
-      return { success: false, reason: "\u5546\u54C1\u5DF2\u552E\u5B8C" };
-    }
-    await createLock(productId, quantity, sessionToken, ttlMs);
-    return { success: true };
-  }
-  const now = /* @__PURE__ */ new Date();
-  const activeLocks = await db.select().from(inventoryLocks).where(
-    and3(
-      eq3(inventoryLocks.productId, productId),
-      sql3`${inventoryLocks.expiresAt} > NOW()`
-    )
-  );
-  const lockedQty = activeLocks.reduce((sum, l) => sum + l.quantity, 0);
-  const availableQty = inv.stock - lockedQty;
-  if (availableQty < quantity) {
-    if (monthlyLimited) {
-      return { success: false, reason: "\u5546\u54C1\u5EAB\u5B58\u4E0D\u8DB3" };
-    }
-    await createLock(productId, quantity, sessionToken, ttlMs);
-    return { success: true };
-  }
-  await createLock(productId, quantity, sessionToken, ttlMs);
-  return { success: true };
-}
-async function createLock(productId, quantity, sessionToken, ttlMs) {
-  const db = await getDb();
-  if (!db) return;
-  const expiresAt = ttlMs == null ? NO_EXPIRY_LOCK_DATE : new Date(Date.now() + ttlMs);
-  await db.insert(inventoryLocks).values({
-    productId,
-    quantity,
-    sessionToken,
-    expiresAt
-  });
-}
-async function releaseExpiredLocks() {
-  const db = await getDb();
-  if (!db) return;
-  const now = /* @__PURE__ */ new Date();
-  await db.delete(inventoryLocks).where(lt(inventoryLocks.expiresAt, now));
-}
-async function releaseSessionLocks(sessionToken) {
-  const db = await getDb();
-  if (!db) return;
-  await db.delete(inventoryLocks).where(eq3(inventoryLocks.sessionToken, sessionToken));
 }
 async function deductInventoryAfterPayment(merchantTradeNo) {
   const db = await getDb();
@@ -1929,7 +1921,7 @@ async function getProductAvailability(productId) {
 }
 
 // server/ecpayLogistics.ts
-import crypto2 from "crypto";
+import crypto3 from "crypto";
 var useLogisticsSandbox = process.env.ECPAY_LOGISTICS_SANDBOX === "true";
 var ECPAY_LOGISTICS_CONFIG = {
   MerchantID: ENV.ecpayLogisticsMerchantId || "2000132",
@@ -1951,7 +1943,7 @@ function generateLogisticsCheckMacValue(params, hashKey = ECPAY_LOGISTICS_CONFIG
   );
   const raw = `HashKey=${hashKey}&` + sortedKeys.map((k) => `${k}=${params[k]}`).join("&") + `&HashIV=${hashIV}`;
   const encoded = ecpayUrlEncode2(raw).toLowerCase();
-  return crypto2.createHash("md5").update(encoded).digest("hex").toUpperCase();
+  return crypto3.createHash("md5").update(encoded).digest("hex").toUpperCase();
 }
 function formatECPayDate2(date) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -2071,7 +2063,7 @@ function buildPrintTradeDocURL(opts) {
 function encryptLogisticsData(data) {
   const json2 = JSON.stringify(data);
   const encoded = encodeURIComponent(json2);
-  const cipher = crypto2.createCipheriv(
+  const cipher = crypto3.createCipheriv(
     "aes-128-cbc",
     ECPAY_LOGISTICS_CONFIG.HashKey,
     ECPAY_LOGISTICS_CONFIG.HashIV
@@ -3048,20 +3040,20 @@ function getTarotDepositPrice(productBasePrice, topic) {
 }
 
 // server/orderAccess.ts
-import crypto3 from "node:crypto";
+import crypto4 from "node:crypto";
 function accessPayload(merchantTradeNo, buyerEmail) {
   return `order-access:v1:${merchantTradeNo}:${normalizeOrderEmail(buyerEmail)}`;
 }
 function createOrderAccessToken(merchantTradeNo, buyerEmail) {
   if (!ENV.cookieSecret) return null;
-  return crypto3.createHmac("sha256", ENV.cookieSecret).update(accessPayload(merchantTradeNo, buyerEmail)).digest("base64url");
+  return crypto4.createHmac("sha256", ENV.cookieSecret).update(accessPayload(merchantTradeNo, buyerEmail)).digest("base64url");
 }
 function verifyOrderAccessToken(merchantTradeNo, buyerEmail, token) {
   const expected = createOrderAccessToken(merchantTradeNo, buyerEmail);
   if (!expected || !token) return false;
   const expectedBuffer = Buffer.from(expected);
   const tokenBuffer = Buffer.from(token);
-  return expectedBuffer.length === tokenBuffer.length && crypto3.timingSafeEqual(expectedBuffer, tokenBuffer);
+  return expectedBuffer.length === tokenBuffer.length && crypto4.timingSafeEqual(expectedBuffer, tokenBuffer);
 }
 
 // server/routers/order.ts
@@ -3069,7 +3061,7 @@ var TRANSFER_RECEIPT_CONTENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "ima
 async function getClearQuartzChipsAddOn(db) {
   const [product] = await db.select().from(dbProducts).where(eq6(dbProducts.id, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)).limit(1);
   if (!product || !product.active) {
-    throw new TRPCError3({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u767D\u6C34\u6676\u788E\u77F3\u52A0\u8CFC\u5546\u54C1" });
+    throw new TRPCError4({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u767D\u6C34\u6676\u788E\u77F3\u52A0\u8CFC\u5546\u54C1" });
   }
   return product;
 }
@@ -3125,7 +3117,7 @@ async function getOrderOperationContext(db, orderId) {
     mainOrderId: orderMergeGroups.mainOrderId
   }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, orderId)).limit(1);
   if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== orderId) {
-    throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u64CD\u4F5C" });
+    throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u5DF2\u4F75\u5165\u4E3B\u8A02\u55AE\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u64CD\u4F5C" });
   }
   if (!mergeMember?.groupId) {
     return { groupId: null, mainOrderId: orderId, orderIds: [orderId] };
@@ -3146,13 +3138,13 @@ async function assertReadyForFulfillment(db, context) {
     isCustomOrder: orders.isCustomOrder
   }).from(orders).where(inArray2(orders.id, context.orderIds));
   if (groupOrders.length !== context.orderIds.length) {
-    throw new TRPCError3({ code: "NOT_FOUND", message: "\u90E8\u5206\u5408\u4F75\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
+    throw new TRPCError4({ code: "NOT_FOUND", message: "\u90E8\u5206\u5408\u4F75\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
   }
   const unpaidOrders = groupOrders.filter(
     (order) => !["paid", "confirmed"].includes(order.paymentStatus)
   );
   if (unpaidOrders.length > 0) {
-    throw new TRPCError3({
+    throw new TRPCError4({
       code: "BAD_REQUEST",
       message: `\u5C1A\u6709\u8A02\u55AE\u672A\u5B8C\u6210\u4ED8\u6B3E\uFF1A${unpaidOrders.map((order) => order.merchantTradeNo).join(", ")}`
     });
@@ -3164,13 +3156,13 @@ async function assertReadyForFulfillment(db, context) {
   }).from(orderBalancePayments).where(inArray2(orderBalancePayments.orderId, context.orderIds));
   const mainBalance = balances.find((balance) => balance.orderId === context.mainOrderId);
   if (!mainBalance) {
-    throw new TRPCError3({
+    throw new TRPCError4({
       code: "BAD_REQUEST",
       message: "\u5BA2\u88FD\u8A02\u55AE\u5C1A\u672A\u8A2D\u5B9A\u5C3E\u6B3E\uFF1B\u82E5\u7121\u9700\u5C3E\u6B3E\uFF0C\u8ACB\u5148\u4F7F\u7528\u300C\u78BA\u8A8D\u5C3E\u6B3E\u70BA 0\u300D"
     });
   }
   if (mainBalance.paymentStatus !== "paid") {
-    throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8A02\u55AE\u5C3E\u6B3E\u5C1A\u672A\u5B8C\u6210\uFF0C\u4E0D\u80FD\u9032\u5165\u51FA\u8CA8\u6D41\u7A0B" });
+    throw new TRPCError4({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8A02\u55AE\u5C3E\u6B3E\u5C1A\u672A\u5B8C\u6210\uFF0C\u4E0D\u80FD\u9032\u5165\u51FA\u8CA8\u6D41\u7A0B" });
   }
 }
 function generateOrderMergeCode() {
@@ -3216,9 +3208,16 @@ function hasOrderAccess(order, user, input) {
   if (verifyOrderAccessToken(order.merchantTradeNo, order.buyerEmail, input.accessToken)) return true;
   return order.userId == null && Boolean(input.buyerEmail) && normalizeOrderEmail(input.buyerEmail) === normalizeOrderEmail(order.buyerEmail);
 }
-function assertOrderAccess(order, user, input) {
-  if (!hasOrderAccess(order, user, input)) {
-    throw new TRPCError3({ code: "UNAUTHORIZED", message: "\u8ACB\u9A57\u8B49\u8A02\u8CFC Email \u5F8C\u67E5\u770B\u8A02\u55AE" });
+function assertOrderAccess(order, ctx, input) {
+  if (!hasOrderAccess(order, ctx.user, input)) {
+    enforceRateLimit(
+      ctx.req,
+      ctx.res,
+      `order-access:${order.merchantTradeNo}`,
+      8,
+      15 * 6e4
+    );
+    throw new TRPCError4({ code: "UNAUTHORIZED", message: "\u8ACB\u9A57\u8B49\u8A02\u8CFC Email \u5F8C\u67E5\u770B\u8A02\u55AE" });
   }
 }
 function getWristSizeRulePrice(product, wristSize) {
@@ -3229,7 +3228,7 @@ function getWristSizeRulePrice(product, wristSize) {
 async function normalizePurchaseOptionItems(items) {
   const db = await getDb();
   if (!db) {
-    throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "\u76EE\u524D\u7121\u6CD5\u78BA\u8A8D\u5546\u54C1\u50F9\u683C\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002" });
+    throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "\u76EE\u524D\u7121\u6CD5\u78BA\u8A8D\u5546\u54C1\u50F9\u683C\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002" });
   }
   const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
   if (productIds.length === 0) return items;
@@ -3256,7 +3255,7 @@ async function normalizePurchaseOptionItems(items) {
     if (productId === TAROT_DEPOSIT_PRODUCT_ID) {
       const topic = getTarotTopicByOptionId(item.purchaseOptionId);
       if (!product || product.active === false || !topic) {
-        throw new TRPCError3({
+        throw new TRPCError4({
           code: "BAD_REQUEST",
           message: "\u8ACB\u91CD\u65B0\u9078\u64C7\u5854\u7F85\u5360\u535C\u4E3B\u984C\u5F8C\u518D\u7D50\u5E33\u3002"
         });
@@ -3272,7 +3271,7 @@ async function normalizePurchaseOptionItems(items) {
       };
     }
     if (!product || product.active === false) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
     }
     if (!item.purchaseOptionId) {
       return {
@@ -3286,17 +3285,17 @@ async function normalizePurchaseOptionItems(items) {
     }
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
     if (!product || !option || option.active === false) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u7684\u8CFC\u8CB7\u65B9\u6848\u5DF2\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u7684\u8CFC\u8CB7\u65B9\u6848\u5DF2\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
     }
     const requestedQuantity = requestedOptionQuantity.get(`${productId}:${item.purchaseOptionId}`) ?? item.quantity;
     if (option.stock != null && option.stock !== -1 && option.stock < requestedQuantity) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${product.name}\uFF08${option.label}\uFF09\u300D\u5EAB\u5B58\u4E0D\u8DB3\u3002` });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${product.name}\uFF08${option.label}\uFF09\u300D\u5EAB\u5B58\u4E0D\u8DB3\u3002` });
     }
     const optionProductName = `${product.name}\uFF08${option.label}\uFF09`;
     if (option.type === "combo") {
       const groups = option.wristSizeGroups ?? [];
       if (groups.length === 0) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u5C1A\u672A\u8A2D\u5B9A\u7D44\u5408\u624B\u570D\u50F9\u683C\u3002` });
+        throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u5C1A\u672A\u8A2D\u5B9A\u7D44\u5408\u624B\u570D\u50F9\u683C\u3002` });
       }
       const selections = item.wristSizeSelections ?? [];
       const price = groups.reduce((sum, group) => {
@@ -3304,7 +3303,7 @@ async function normalizePurchaseOptionItems(items) {
         const wristSize2 = selected == null ? NaN : Number(selected.value);
         const groupPrice = Number.isFinite(wristSize2) ? getWristSizeRulePrice(group, wristSize2) : null;
         if (groupPrice == null) {
-          throw new TRPCError3({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u7F3A\u5C11 ${group.label} \u7684\u50F9\u683C\u3002` });
+          throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u7F3A\u5C11 ${group.label} \u7684\u50F9\u683C\u3002` });
         }
         return sum + groupPrice;
       }, 0);
@@ -3400,7 +3399,7 @@ var orderRouter = router({
    * - credit：回傳綠界付款表單參數
    * - atm：回傳轉帳帳號資訊
    */
-  createAndPay: publicProcedure.input(
+  createAndPay: rateLimitedPublicProcedure({ scope: "checkout", limit: 20, windowMs: 15 * 6e4 }).input(
     z2.object({
       buyerName: z2.string().min(1),
       buyerEmail: z2.string().email(),
@@ -3516,7 +3515,7 @@ var orderRouter = router({
     });
     submittedItems = await normalizePurchaseOptionItems(submittedItems);
     if (submittedItems.length === 0) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8CFC\u7269\u8ECA\u6C92\u6709\u53EF\u7D50\u5E33\u5546\u54C1" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8CFC\u7269\u8ECA\u6C92\u6709\u53EF\u7D50\u5E33\u5546\u54C1" });
     }
     const isCustomOrder = isCustomDepositProduct(submittedItems);
     const checkoutRegion = isCustomOrder ? "domestic" : input.checkoutRegion;
@@ -3528,7 +3527,7 @@ var orderRouter = router({
       const productId = item.baseProductId ?? item.id;
       const availability = await getProductAvailability(productId);
       if (availability.isMonthlyLimited && (!availability.available || availability.stock !== -1 && availability.stock < item.quantity)) {
-        throw new TRPCError3({
+        throw new TRPCError4({
           code: "BAD_REQUEST",
           message: `\u300C${item.name}\u300D\u5DF2\u552E\u5B8C\uFF0C\u7121\u6CD5\u9810\u8CFC\u3002`
         });
@@ -3550,7 +3549,7 @@ var orderRouter = router({
       cvsType = void 0;
       const countryCode = input.intlCountry.trim();
       if (!isOverseasShipCountryCode(countryCode)) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u4E0D\u652F\u63F4\u7684\u6D77\u5916\u914D\u9001\u5730\u5340" });
+        throw new TRPCError4({ code: "BAD_REQUEST", message: "\u4E0D\u652F\u63F4\u7684\u6D77\u5916\u914D\u9001\u5730\u5340" });
       }
       overseasCountry = countryCode;
       const formatted = formatOverseasShippingAddress({
@@ -3594,11 +3593,11 @@ var orderRouter = router({
       const receiptBase64 = input.transferReceiptImageBase64;
       const receiptContentType = input.transferReceiptImageContentType;
       if (!receiptBase64 || !receiptContentType || !TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u4E0A\u50B3\u8F49\u5E33\u6210\u529F\u622A\u5716" });
+        throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8ACB\u4E0A\u50B3\u8F49\u5E33\u6210\u529F\u622A\u5716" });
       }
       const receiptBuffer = Buffer.from(receiptBase64, "base64");
       if (receiptBuffer.length === 0 || receiptBuffer.length > 6 * 1024 * 1024) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u5927\u5C0F\u9700\u5C0F\u65BC 6MB" });
+        throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u5927\u5C0F\u9700\u5C0F\u65BC 6MB" });
       }
       const ext = getReceiptExtension(receiptContentType, input.transferReceiptImageFilename);
       const uploaded = await storagePut(`transfer-receipts/${merchantTradeNo}-${Date.now()}.${ext}`, receiptBuffer, receiptContentType);
@@ -3667,7 +3666,7 @@ var orderRouter = router({
       } catch (e) {
         console.error("[createAndPay paypal]", e);
         const missing = e instanceof Error && e.message === "PAYPAL_CREDENTIALS_MISSING";
-        throw new TRPCError3({
+        throw new TRPCError4({
           code: missing ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
           message: missing ? "\u6D77\u5916 PayPal \u4ED8\u6B3E\u5C1A\u672A\u5B8C\u6210\u5546\u5E97\u8A2D\u5B9A\uFF0C\u8ACB\u6539\u9078\u570B\u5167\u7D50\u5E33\u6216\u806F\u7D61\u5BA2\u670D\u3002" : "\u5EFA\u7ACB PayPal \u4ED8\u6B3E\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002"
         });
@@ -3707,7 +3706,7 @@ var orderRouter = router({
   /**
    * PayPal 核准後於 return 頁呼叫：驗證訂單與 PayPal Order 後 Capture
    */
-  capturePayPal: publicProcedure.input(
+  capturePayPal: rateLimitedPublicProcedure({ scope: "paypal-capture", limit: 20, windowMs: 15 * 6e4 }).input(
     z2.object({
       merchantTradeNo: z2.string().min(1),
       paypalOrderId: z2.string().min(1)
@@ -3715,22 +3714,22 @@ var orderRouter = router({
   ).mutation(async ({ input }) => {
     const order = await getOrderWithItems(input.merchantTradeNo);
     if (!order) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
     }
     if (order.paymentMethod !== "paypal") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u7121\u9700 PayPal \u6263\u6B3E" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u7121\u9700 PayPal \u6263\u6B3E" });
     }
     if (order.paymentStatus === "paid" || order.paymentStatus === "confirmed") {
       return { success: true, alreadyPaid: true };
     }
     if (order.paymentStatus !== "pending") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8A02\u55AE\u72C0\u614B\u7121\u6CD5\u5B8C\u6210\u4ED8\u6B3E" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8A02\u55AE\u72C0\u614B\u7121\u6CD5\u5B8C\u6210\u4ED8\u6B3E" });
     }
     try {
       await verifyPayPalOrderBelongsToMerchant(input.paypalOrderId, input.merchantTradeNo);
     } catch (e) {
       console.error("[capturePayPal verify]", e);
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "FORBIDDEN",
         message: e instanceof Error && e.message === "PAYPAL_ORDER_MISMATCH" ? "\u4ED8\u6B3E\u8CC7\u6599\u8207\u8A02\u55AE\u4E0D\u7B26" : "\u7121\u6CD5\u9A57\u8B49 PayPal \u8A02\u55AE"
       });
@@ -3738,7 +3737,7 @@ var orderRouter = router({
     try {
       const cap = await capturePayPalOrder(input.paypalOrderId);
       if (cap.status !== "completed") {
-        throw new TRPCError3({
+        throw new TRPCError4({
           code: "BAD_REQUEST",
           message: cap.message ?? "PayPal \u6263\u6B3E\u5931\u6557"
         });
@@ -3748,9 +3747,9 @@ var orderRouter = router({
       await notifyCustomerOrderPlacedSafely(order.id);
       return { success: true, alreadyPaid: false };
     } catch (e) {
-      if (e instanceof TRPCError3) throw e;
+      if (e instanceof TRPCError4) throw e;
       console.error("[capturePayPal]", e);
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "INTERNAL_SERVER_ERROR",
         message: e instanceof Error ? e.message : "PayPal \u6263\u6B3E\u767C\u751F\u932F\u8AA4"
       });
@@ -3759,10 +3758,13 @@ var orderRouter = router({
   /**
    * 查詢訂單（含商品明細）
    */
-  getOrder: publicProcedure.input(OrderAccessSchema).query(async ({ input, ctx }) => {
+  getOrder: rateLimitedPublicProcedure({ scope: "order-read", limit: 240, windowMs: 15 * 6e4 }).input(OrderAccessSchema).query(async ({ input, ctx }) => {
     const order = await getOrderWithItems(input.merchantTradeNo);
-    if (!order) return null;
-    assertOrderAccess(order, ctx.user, input);
+    if (!order) {
+      enforceRateLimit(ctx.req, ctx.res, "order-read-miss", 12, 15 * 6e4);
+      return null;
+    }
+    assertOrderAccess(order, ctx, input);
     return {
       ...order,
       paymentSandbox: usePaymentSandbox
@@ -3788,30 +3790,30 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const order = await getOrderWithItems(input.merchantTradeNo);
     if (!order) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
     }
-    assertOrderAccess(order, ctx.user, input);
+    assertOrderAccess(order, ctx, input);
     if (!order.isCustomOrder) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u4E0D\u662F\u5BA2\u88FD\u5316\u8A02\u91D1\u8A02\u55AE" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u4E0D\u662F\u5BA2\u88FD\u5316\u8A02\u91D1\u8A02\u55AE" });
     }
     const hasMatchingProduct = order.items.some((item) => item.productId === input.productId);
     if (!hasMatchingProduct) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8868\u55AE\u65B9\u6848\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8868\u55AE\u65B9\u6848\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
     }
     const targetItem = input.orderItemId ? order.items.find((item) => item.id === input.orderItemId && item.productId === input.productId) : order.items.find((item) => item.productId === input.productId);
     if (!targetItem) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u9019\u4E00\u7B46\u5BA2\u88FD\u8A02\u91D1\u5546\u54C1" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u9019\u4E00\u7B46\u5BA2\u88FD\u8A02\u91D1\u5546\u54C1" });
     }
     const itemIndex = input.itemIndex ?? 1;
     if (itemIndex < 1 || itemIndex > targetItem.quantity) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8868\u55AE\u4EF6\u6578\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u5BA2\u88FD\u8868\u55AE\u4EF6\u6578\u8207\u8A02\u55AE\u5546\u54C1\u4E0D\u7B26" });
     }
     const canSubmit = order.paymentStatus === "paid" || order.paymentStatus === "confirmed" || order.paymentStatus === "transfer_pending";
     if (!canSubmit) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u5148\u5B8C\u6210\u4ED8\u6B3E\u5F8C\u518D\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8ACB\u5148\u5B8C\u6210\u4ED8\u6B3E\u5F8C\u518D\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
     }
     if (order.orderStatus === "cancelled" || order.paymentStatus === "failed" || order.paymentStatus === "cancelled") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u72C0\u614B\u7121\u6CD5\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u8A02\u55AE\u72C0\u614B\u7121\u6CD5\u586B\u5BEB\u5BA2\u88FD\u9700\u6C42" });
     }
     const customerNote = upsertCustomConsultationNote(
       order.customerNote,
@@ -3833,8 +3835,8 @@ var orderRouter = router({
     lastFive: z2.string().length(5).regex(/^\d+$/)
   })).mutation(async ({ input, ctx }) => {
     const order = await getOrderWithItems(input.merchantTradeNo);
-    if (!order) throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
-    assertOrderAccess(order, ctx.user, input);
+    if (!order) throw new TRPCError4({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u8A02\u55AE" });
+    assertOrderAccess(order, ctx, input);
     await updateOrderTransferLastFive(input.merchantTradeNo, input.lastFive);
     return { success: true };
   }),
@@ -3898,9 +3900,9 @@ var orderRouter = router({
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const [order] = await db.select({ id: orders.id, orderStatus: orders.orderStatus }).from(orders).where(eq6(orders.id, input.orderId)).limit(1);
-    if (!order) throw new TRPCError3({ code: "NOT_FOUND", message: "Order not found" });
+    if (!order) throw new TRPCError4({ code: "NOT_FOUND", message: "Order not found" });
     if (order.orderStatus !== "cancelled") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u53EA\u80FD\u522A\u9664\u5DF2\u53D6\u6D88\u7684\u8A02\u55AE" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u53EA\u80FD\u522A\u9664\u5DF2\u53D6\u6D88\u7684\u8A02\u55AE" });
     }
     await deleteCancelledOrderRecords(db, [order.id]);
     return { success: true };
@@ -3922,11 +3924,11 @@ var orderRouter = router({
       merchantTradeNo: orders.merchantTradeNo
     }).from(orders).where(inArray2(orders.id, orderIds));
     if (rows.length !== orderIds.length) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "\u90E8\u5206\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "\u90E8\u5206\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
     }
     const notCancelled = rows.filter((order) => order.orderStatus !== "cancelled");
     if (notCancelled.length > 0) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "BAD_REQUEST",
         message: `\u53EA\u80FD\u522A\u9664\u5DF2\u53D6\u6D88\u7684\u8A02\u55AE\uFF1A${notCancelled.map((order) => order.merchantTradeNo).join(", ")}`
       });
@@ -3948,31 +3950,31 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const orderIds = Array.from(new Set(input.orderIds));
     if (orderIds.length < 2) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u81F3\u5C11\u9078\u53D6\u5169\u7B46\u4E0D\u540C\u8A02\u55AE" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8ACB\u81F3\u5C11\u9078\u53D6\u5169\u7B46\u4E0D\u540C\u8A02\u55AE" });
     }
     const rows = await db.select().from(orders).where(inArray2(orders.id, orderIds));
     if (rows.length !== orderIds.length) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "\u90E8\u5206\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "\u90E8\u5206\u8A02\u55AE\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u5F8C\u518D\u8A66" });
     }
     const customOrderIds = new Set(rows.filter((order) => order.isCustomOrder).map((order) => order.id));
     const unmergeable = rows.filter((order) => !mergeableOrderStatuses.has(order.orderStatus));
     if (unmergeable.length > 0) {
-      throw new TRPCError3({
+      throw new TRPCError4({
         code: "BAD_REQUEST",
         message: `\u53EA\u80FD\u5408\u4F75\u5C1A\u672A\u51FA\u8CA8/\u672A\u53D6\u6D88\u7684\u8A02\u55AE\uFF1A${unmergeable.map((order) => order.merchantTradeNo).join(", ")}`
       });
     }
     const normalizedEmails = new Set(rows.map((order) => normalizeOrderEmail(order.buyerEmail)));
     if (normalizedEmails.size > 1) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u53EA\u80FD\u5408\u4F75\u540C\u4E00\u4F4D\u8CB7\u5BB6\u7684\u8A02\u55AE" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u53EA\u80FD\u5408\u4F75\u540C\u4E00\u4F4D\u8CB7\u5BB6\u7684\u8A02\u55AE" });
     }
     const existingLogistics = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(inArray2(logisticsOrders.orderId, orderIds));
     if (existingLogistics.length > 0) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5DF2\u6709\u7269\u6D41\u55AE\u7684\u8A02\u55AE\u4E0D\u80FD\u518D\u5408\u4F75" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u5DF2\u6709\u7269\u6D41\u55AE\u7684\u8A02\u55AE\u4E0D\u80FD\u518D\u5408\u4F75" });
     }
     const existingMergeMembers = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(inArray2(orderMergeMembers.orderId, orderIds));
     if (existingMergeMembers.length > 0) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u9078\u53D6\u7684\u8A02\u55AE\u5DF2\u6709\u5408\u4F75\u7D00\u9304" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u9078\u53D6\u7684\u8A02\u55AE\u5DF2\u6709\u5408\u4F75\u7D00\u9304" });
     }
     const latestOrder = rows.reduce(
       (latest, order) => new Date(order.createdAt).getTime() > new Date(latest.createdAt).getTime() ? order : latest
@@ -3980,7 +3982,7 @@ var orderRouter = router({
     const mainOrderId = orderIds.find((orderId) => customOrderIds.has(orderId)) ?? latestOrder.id;
     const mainOrder = rows.find((order) => order.id === mainOrderId);
     if (!mainOrder) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u53EF\u4F5C\u70BA\u4E3B\u8A02\u55AE\u7684\u8A02\u55AE" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u627E\u4E0D\u5230\u53EF\u4F5C\u70BA\u4E3B\u8A02\u55AE\u7684\u8A02\u55AE" });
     }
     const mergeCode = generateOrderMergeCode();
     await db.insert(orderMergeGroups).values({
@@ -3990,7 +3992,7 @@ var orderRouter = router({
     });
     const [group] = await db.select().from(orderMergeGroups).where(eq6(orderMergeGroups.mergeCode, mergeCode)).limit(1);
     if (!group) {
-      throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "\u5408\u4F75\u7FA4\u7D44\u5EFA\u7ACB\u5931\u6557" });
+      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "\u5408\u4F75\u7FA4\u7D44\u5EFA\u7ACB\u5931\u6557" });
     }
     await db.insert(orderMergeMembers).values(orderIds.map((orderId) => ({
       groupId: group.id,
@@ -4014,14 +4016,14 @@ var orderRouter = router({
     if (!db) throw new Error("Database not available");
     const [order] = await db.select({ id: orders.id }).from(orders).where(eq6(orders.id, input.orderId)).limit(1);
     if (!order) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "Order not found" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "Order not found" });
     }
     const [mergeMember] = await db.select({
       groupId: orderMergeMembers.groupId,
       mainOrderId: orderMergeGroups.mainOrderId
     }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
     if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8ACB\u5F9E\u5408\u4F75\u4E3B\u8A02\u55AE\u8ABF\u6574\u514D\u904B\u8A2D\u5B9A" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8ACB\u5F9E\u5408\u4F75\u4E3B\u8A02\u55AE\u8ABF\u6574\u514D\u904B\u8A2D\u5B9A" });
     }
     if (mergeMember?.groupId) {
       const mergeRows = await db.select({ orderId: orderMergeMembers.orderId }).from(orderMergeMembers).where(eq6(orderMergeMembers.groupId, mergeMember.groupId));
@@ -4046,7 +4048,7 @@ var orderRouter = router({
       mainOrderId: orderMergeGroups.mainOrderId
     }).from(orderMergeMembers).leftJoin(orderMergeGroups, eq6(orderMergeMembers.groupId, orderMergeGroups.id)).where(eq6(orderMergeMembers.orderId, input.orderId)).limit(1);
     if (mergeMember?.mainOrderId && mergeMember.mainOrderId !== input.orderId) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u88AB\u5408\u4F75\u8A02\u55AE\u4E0D\u53EF\u7522\u751F\u5C3E\u6B3E\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u7522\u751F\u5408\u4F75\u5C3E\u6B3E" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u88AB\u5408\u4F75\u8A02\u55AE\u4E0D\u53EF\u7522\u751F\u5C3E\u6B3E\uFF0C\u8ACB\u5F9E\u4E3B\u8A02\u55AE\u7522\u751F\u5408\u4F75\u5C3E\u6B3E" });
     }
     const payment = await createOrReplaceBalancePayment(input);
     const origin = siteBaseUrl(ctx.req);
@@ -4072,7 +4074,7 @@ var orderRouter = router({
       return { success: true, merchantTradeNo: result.merchantTradeNo };
     } catch (error) {
       const message = error instanceof Error ? error.message : "\u78BA\u8A8D\u96F6\u5C3E\u6B3E\u5931\u6557";
-      throw new TRPCError3({ code: "BAD_REQUEST", message });
+      throw new TRPCError4({ code: "BAD_REQUEST", message });
     }
   }),
   /**
@@ -4239,7 +4241,7 @@ var orderRouter = router({
   getOrderDetail: adminProcedure.input(z2.object({ orderId: z2.number() })).query(async ({ input }) => {
     const order = await getAdminOrderDetail(input.orderId);
     if (!order) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "Order not found" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "Order not found" });
     }
     return {
       ...order,
@@ -4249,10 +4251,14 @@ var orderRouter = router({
       )
     };
   }),
-  getBalancePayment: publicProcedure.input(z2.object({ merchantTradeNo: z2.string().min(1) })).query(async ({ input }) => {
-    return getBalancePaymentDetail(input.merchantTradeNo);
+  getBalancePayment: rateLimitedPublicProcedure({ scope: "balance-read", limit: 240, windowMs: 15 * 6e4 }).input(z2.object({ merchantTradeNo: z2.string().min(1) })).query(async ({ input, ctx }) => {
+    const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
+    if (!balancePayment) {
+      enforceRateLimit(ctx.req, ctx.res, "balance-read-miss", 12, 15 * 6e4);
+    }
+    return balancePayment;
   }),
-  getBalancePaymentCheckout: publicProcedure.input(
+  getBalancePaymentCheckout: rateLimitedPublicProcedure({ scope: "balance-write", limit: 20, windowMs: 15 * 6e4 }).input(
     z2.object({
       merchantTradeNo: z2.string().min(1),
       paymentMethod: z2.enum(["credit", "atm"]),
@@ -4320,16 +4326,16 @@ var orderRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
     if (!balancePayment) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u5C3E\u6B3E\u8CC7\u6599" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u5C3E\u6B3E\u8CC7\u6599" });
     }
     if (balancePayment.paymentStatus === "paid") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u5C3E\u6B3E\u5DF2\u4ED8\u6B3E" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u5C3E\u6B3E\u5DF2\u4ED8\u6B3E" });
     }
     if (balancePayment.paymentStatus !== "pending") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u4ED8\u6B3E" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u4ED8\u6B3E" });
     }
     const db = await getDb();
-    if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const isOverseas = input.checkoutRegion === "overseas";
     const shippingMethod = isOverseas ? "home" : input.shippingMethod;
     let shippingAddress = input.shippingAddress;
@@ -4344,7 +4350,7 @@ var orderRouter = router({
       cvsType = void 0;
       const countryCode = input.intlCountry.trim();
       if (!isOverseasShipCountryCode(countryCode)) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u4E0D\u652F\u63F4\u7684\u6D77\u5916\u914D\u9001\u5730\u5340" });
+        throw new TRPCError4({ code: "BAD_REQUEST", message: "\u4E0D\u652F\u63F4\u7684\u6D77\u5916\u914D\u9001\u5730\u5340" });
       }
       overseasCountry = countryCode;
       const formatted = formatOverseasShippingAddress({
@@ -4457,7 +4463,7 @@ var orderRouter = router({
       paymentFee: feeSummary.paymentFee
     };
   }),
-  submitBalanceTransferCode: publicProcedure.input(z2.object({
+  submitBalanceTransferCode: rateLimitedPublicProcedure({ scope: "balance-write", limit: 20, windowMs: 15 * 6e4 }).input(z2.object({
     merchantTradeNo: z2.string().min(1),
     lastFive: z2.string().length(5).regex(/^\d+$/),
     transferReceiptImageBase64: z2.string().max(8e6),
@@ -4466,18 +4472,18 @@ var orderRouter = router({
   })).mutation(async ({ input }) => {
     const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
     if (!balancePayment) {
-      throw new TRPCError3({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u5C3E\u6B3E\u8CC7\u6599" });
+      throw new TRPCError4({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u5C3E\u6B3E\u8CC7\u6599" });
     }
     if (balancePayment.paymentStatus !== "pending") {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u63D0\u4EA4\u8F49\u5E33\u8CC7\u6599" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u63D0\u4EA4\u8F49\u5E33\u8CC7\u6599" });
     }
     const receiptContentType = input.transferReceiptImageContentType;
     if (!TRANSFER_RECEIPT_CONTENT_TYPES.has(receiptContentType)) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u8ACB\u4E0A\u50B3 JPG\u3001PNG \u6216 WebP \u5716\u7247" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u8ACB\u4E0A\u50B3 JPG\u3001PNG \u6216 WebP \u5716\u7247" });
     }
     const receiptBuffer = Buffer.from(input.transferReceiptImageBase64, "base64");
     if (receiptBuffer.length === 0 || receiptBuffer.length > 6 * 1024 * 1024) {
-      throw new TRPCError3({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u5927\u5C0F\u9700\u5C0F\u65BC 6MB" });
+      throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8F49\u5E33\u622A\u5716\u5927\u5C0F\u9700\u5C0F\u65BC 6MB" });
     }
     const ext = getReceiptExtension(receiptContentType, input.transferReceiptImageFilename);
     const uploaded = await storagePut(
@@ -4533,7 +4539,7 @@ var orderRouter = router({
 
 // server/routers/chatbot.ts
 import { z as z3 } from "zod";
-import { TRPCError as TRPCError4 } from "@trpc/server";
+import { TRPCError as TRPCError5 } from "@trpc/server";
 import { and as and5, desc as desc2, eq as eq8, inArray as inArray3, or as or2, sql as sql5 } from "drizzle-orm";
 
 // server/crystalKnowledge.ts
@@ -5819,7 +5825,7 @@ async function saveChatbotLog(params) {
   }
 }
 var chatbotRouter = router({
-  chat: publicProcedure.input(
+  chat: rateLimitedPublicProcedure({ scope: "chatbot", limit: 20, windowMs: 5 * 6e4 }).input(
     z3.object({
       message: z3.string().min(1).max(CHATBOT_MAX_MESSAGE_LENGTH),
       sessionId: z3.string().min(1).max(64).optional(),
@@ -5848,7 +5854,7 @@ var chatbotRouter = router({
       queryVector = await embedQuery(queryText);
     } catch (e) {
       console.error("[chatbot] embed error:", e);
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: `Embed failed: ${e instanceof Error ? e.message : String(e)}` });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: `Embed failed: ${e instanceof Error ? e.message : String(e)}` });
     }
     const relevantChunks = await searchKnowledge(queryText, queryVector, 10, 0.45);
     const hasUnavailableCrystalMatch = relevantChunks.some(
@@ -5930,7 +5936,7 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
   ).query(async ({ input }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const conditions = [];
     const search = input.search?.trim();
@@ -5966,7 +5972,7 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
   ).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const ids = Array.from(new Set(input.ids));
     await db.delete(chatbotLogs).where(inArray3(chatbotLogs.id, ids));
@@ -5994,42 +6000,6 @@ var inventoryRouter = router({
       }))
     );
     return results;
-  }),
-  /**
-   * 嘗試鎖定庫存（進入結帳時呼叫，保留 10 分鐘）
-   */
-  acquireLock: publicProcedure.input(
-    z4.object({
-      items: z4.array(
-        z4.object({
-          productId: z4.string(),
-          quantity: z4.number().min(1)
-        })
-      ),
-      sessionToken: z4.string()
-    })
-  ).mutation(async ({ input }) => {
-    const results = [];
-    for (const item of input.items) {
-      const result = await acquireInventoryLock(
-        item.productId,
-        item.quantity,
-        input.sessionToken
-      );
-      results.push({ productId: item.productId, ...result });
-      if (!result.success) {
-        await releaseSessionLocks(input.sessionToken);
-        return { success: false, failedItem: item.productId, reason: result.reason };
-      }
-    }
-    return { success: true };
-  }),
-  /**
-   * 釋放庫存鎖定（取消結帳時呼叫）
-   */
-  releaseLock: publicProcedure.input(z4.object({ sessionToken: z4.string() })).mutation(async ({ input }) => {
-    await releaseSessionLocks(input.sessionToken);
-    return { success: true };
   }),
   /**
    * 管理員設定商品庫存
@@ -6063,7 +6033,7 @@ var inventoryRouter = router({
 });
 
 // server/routers/member.ts
-import { TRPCError as TRPCError5 } from "@trpc/server";
+import { TRPCError as TRPCError6 } from "@trpc/server";
 import * as bcrypt from "bcryptjs";
 import { z as z5 } from "zod";
 
@@ -6295,7 +6265,7 @@ var SDKServer = class {
 var sdk = new SDKServer();
 
 // server/routers/member.ts
-import * as crypto4 from "crypto";
+import * as crypto5 from "crypto";
 var SALT_ROUNDS = 10;
 function trustedSiteOrigin() {
   return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
@@ -6303,7 +6273,7 @@ function trustedSiteOrigin() {
 var passwordSchema = z5.string().min(8, "\u5BC6\u78BC\u81F3\u5C11\u9700\u8981 8 \u500B\u5B57\u5143");
 var memberRouter = router({
   /** 註冊 */
-  register: publicProcedure.input(
+  register: rateLimitedPublicProcedure({ scope: "member-auth", limit: 20, windowMs: 15 * 6e4 }).input(
     z5.object({
       email: z5.string().email("\u8ACB\u8F38\u5165\u6709\u6548\u7684 Email"),
       password: passwordSchema,
@@ -6313,7 +6283,7 @@ var memberRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const existing = await getUserByEmail(input.email);
     if (existing) {
-      throw new TRPCError5({
+      throw new TRPCError6({
         code: "CONFLICT",
         message: "\u6B64 Email \u5DF2\u88AB\u8A3B\u518A\uFF0C\u8ACB\u76F4\u63A5\u767B\u5165\u6216\u4F7F\u7528\u5FD8\u8A18\u5BC6\u78BC"
       });
@@ -6325,12 +6295,12 @@ var memberRouter = router({
       name: input.name
     });
     if (!user) {
-      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "\u8A3B\u518A\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
+      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8A3B\u518A\u5931\u6557\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66" });
     }
     const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
     const cookieOptions = getSessionCookieOptions(ctx.req);
     ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
-    const verifyToken = crypto4.randomBytes(32).toString("hex");
+    const verifyToken = crypto5.randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
     await setVerifyToken(input.email, verifyToken, verifyExpiresAt);
     const siteOrigin = trustedSiteOrigin();
@@ -6353,7 +6323,7 @@ var memberRouter = router({
     };
   }),
   /** 登入 */
-  login: publicProcedure.input(
+  login: rateLimitedPublicProcedure({ scope: "member-auth", limit: 20, windowMs: 15 * 6e4 }).input(
     z5.object({
       email: z5.string().email("\u8ACB\u8F38\u5165\u6709\u6548\u7684 Email"),
       password: z5.string().min(1, "\u8ACB\u8F38\u5165\u5BC6\u78BC")
@@ -6361,14 +6331,14 @@ var memberRouter = router({
   ).mutation(async ({ input, ctx }) => {
     let user = await getUserByEmail(input.email);
     if (!user || !user.passwordHash) {
-      throw new TRPCError5({
+      throw new TRPCError6({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
     }
     const valid = await bcrypt.compare(input.password, user.passwordHash);
     if (!valid) {
-      throw new TRPCError5({
+      throw new TRPCError6({
         code: "UNAUTHORIZED",
         message: "Email \u6216\u5BC6\u78BC\u932F\u8AA4"
       });
@@ -6388,10 +6358,10 @@ var memberRouter = router({
     return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
   }),
   /** 驗證 Email */
-  verifyEmail: publicProcedure.input(z5.object({ token: z5.string().min(1) })).mutation(async ({ input }) => {
+  verifyEmail: rateLimitedPublicProcedure({ scope: "member-verify", limit: 20, windowMs: 15 * 6e4 }).input(z5.object({ token: z5.string().min(1) })).mutation(async ({ input }) => {
     const user = await getUserByVerifyToken(input.token);
     if (!user) {
-      throw new TRPCError5({
+      throw new TRPCError6({
         code: "BAD_REQUEST",
         message: "\u9A57\u8B49\u9023\u7D50\u5DF2\u5931\u6548\u6216\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u767C\u9001\u9A57\u8B49\u4FE1"
       });
@@ -6400,16 +6370,16 @@ var memberRouter = router({
     return { success: true, message: "Email \u5DF2\u9A57\u8B49\u6210\u529F" };
   }),
   /** 重新發送驗證信 */
-  resendVerification: protectedProcedure.input(z5.object({ origin: z5.string().optional() })).mutation(async ({ input, ctx }) => {
+  resendVerification: rateLimitedProtectedProcedure({ scope: "member-verification-email", limit: 5, windowMs: 60 * 6e4 }).input(z5.object({ origin: z5.string().optional() })).mutation(async ({ input, ctx }) => {
     if (!ctx.user.email) {
-      throw new TRPCError5({ code: "BAD_REQUEST", message: "\u7121\u6CD5\u53D6\u5F97 Email" });
+      throw new TRPCError6({ code: "BAD_REQUEST", message: "\u7121\u6CD5\u53D6\u5F97 Email" });
     }
     const user = await getUserByEmail(ctx.user.email);
-    if (!user) throw new TRPCError5({ code: "NOT_FOUND", message: "\u5E33\u865F\u4E0D\u5B58\u5728" });
+    if (!user) throw new TRPCError6({ code: "NOT_FOUND", message: "\u5E33\u865F\u4E0D\u5B58\u5728" });
     if (user.emailVerified) {
       return { success: true, message: "Email \u5DF2\u7D93\u9A57\u8B49\u904E" };
     }
-    const verifyToken = crypto4.randomBytes(32).toString("hex");
+    const verifyToken = crypto5.randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
     await setVerifyToken(ctx.user.email, verifyToken, verifyExpiresAt);
     const siteOrigin = trustedSiteOrigin();
@@ -6422,7 +6392,7 @@ var memberRouter = router({
     return { success: true, message: "\u9A57\u8B49\u4FE1\u5DF2\u91CD\u65B0\u767C\u9001" };
   }),
   /** 申請重設密碼 */
-  forgotPassword: publicProcedure.input(z5.object({
+  forgotPassword: rateLimitedPublicProcedure({ scope: "member-password", limit: 5, windowMs: 60 * 6e4 }).input(z5.object({
     email: z5.string().email(),
     origin: z5.string().optional()
   })).mutation(async ({ input }) => {
@@ -6430,7 +6400,7 @@ var memberRouter = router({
     if (!user || !user.passwordHash) {
       return { success: true, message: "\u82E5\u6B64 Email \u5DF2\u8A3B\u518A\uFF0C\u91CD\u8A2D\u9023\u7D50\u5DF2\u767C\u9001" };
     }
-    const token = crypto4.randomBytes(32).toString("hex");
+    const token = crypto5.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await setResetToken(input.email, token, expiresAt);
     const siteOrigin = trustedSiteOrigin();
@@ -6450,7 +6420,7 @@ var memberRouter = router({
     };
   }),
   /** 使用 token 重設密碼 */
-  resetPassword: publicProcedure.input(
+  resetPassword: rateLimitedPublicProcedure({ scope: "member-password", limit: 10, windowMs: 60 * 6e4 }).input(
     z5.object({
       token: z5.string().min(1),
       newPassword: passwordSchema
@@ -6458,7 +6428,7 @@ var memberRouter = router({
   ).mutation(async ({ input }) => {
     const user = await getUserByResetToken(input.token);
     if (!user) {
-      throw new TRPCError5({
+      throw new TRPCError6({
         code: "BAD_REQUEST",
         message: "\u91CD\u8A2D\u9023\u7D50\u5DF2\u5931\u6548\u6216\u4E0D\u5B58\u5728\uFF0C\u8ACB\u91CD\u65B0\u7533\u8ACB"
       });
@@ -6470,7 +6440,7 @@ var memberRouter = router({
   /** 更新會員姓名 */
   updateProfile: protectedProcedure.input(z5.object({ name: z5.string().min(1).max(50) })).mutation(async ({ input, ctx }) => {
     const db2 = await getDb();
-    if (!db2) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR" });
     const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const { eq: eq12 } = await import("drizzle-orm");
     await db2.update(users2).set({ name: input.name }).where(eq12(users2.openId, ctx.user.openId));
@@ -6489,7 +6459,7 @@ var memberRouter = router({
 // server/routers/products.ts
 import { z as z6 } from "zod";
 import { eq as eq9, and as and6, inArray as inArray4, sql as sql6 } from "drizzle-orm";
-import { TRPCError as TRPCError6 } from "@trpc/server";
+import { TRPCError as TRPCError7 } from "@trpc/server";
 init_schema();
 var tableEnsured = false;
 async function trySyncChatbotKnowledge(action) {
@@ -6889,7 +6859,7 @@ var productRouter = router({
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     const id = `prod-${Date.now()}`;
     await db.insert(dbProducts).values({ id, ...input });
     await trySyncChatbotKnowledge(() => syncProductKnowledge({ id, ...input }));
@@ -6899,7 +6869,7 @@ var productRouter = router({
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     const { id, ...data } = input;
     await db.update(dbProducts).set(data).where(eq9(dbProducts.id, id));
     await trySyncChatbotKnowledge(() => syncProductKnowledgeById(id));
@@ -6909,7 +6879,7 @@ var productRouter = router({
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq9(dbProducts.id, input.id));
     await trySyncChatbotKnowledge(() => syncProductKnowledgeById(input.id));
     return { success: true };
@@ -6918,7 +6888,7 @@ var productRouter = router({
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     const rows = await db.select().from(dbProducts).where(inArray4(dbProducts.id, input.productIds));
     const products2 = rows.filter((product) => product.category !== "test");
     for (const product of products2) {
@@ -6938,7 +6908,7 @@ var productRouter = router({
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     const rows = await db.select().from(dbProducts).where(inArray4(dbProducts.id, input.productIds));
     const products2 = rows.filter((product) => product.category !== "test" && product.originalPrice);
     for (const product of products2) {
@@ -6958,7 +6928,7 @@ var productRouter = router({
     await ensureProductsTable();
     await publishDueProducts();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     const rows = await db.select({ id: dbProducts.id, category: dbProducts.category }).from(dbProducts).where(inArray4(dbProducts.id, input.productIds));
     const productIds = rows.filter((product) => product.category !== "test").map((product) => product.id);
     if (productIds.length > 0) {
@@ -6969,7 +6939,7 @@ var productRouter = router({
   remove: adminProcedure.input(z6.object({ id: z6.string() })).mutation(async ({ input }) => {
     await ensureProductsTable();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     await db.delete(dbProducts).where(eq9(dbProducts.id, input.id));
     await db.delete(productInventory).where(eq9(productInventory.productId, input.id));
     await trySyncChatbotKnowledge(() => removeProductKnowledge(input.id));
@@ -6989,7 +6959,7 @@ var productRouter = router({
   seed: adminProcedure.input(z6.array(ProductInputSchema.safeExtend({ id: z6.string() }))).mutation(async ({ input }) => {
     await ensureProductsTable();
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u7121\u6CD5\u9023\u7DDA" });
     let count = 0;
     for (const product of input) {
       const existing = await db.select({ id: dbProducts.id }).from(dbProducts).where(eq9(dbProducts.id, product.id)).limit(1);
@@ -7004,13 +6974,13 @@ var productRouter = router({
 
 // server/routers/adminMembers.ts
 init_schema();
-import { TRPCError as TRPCError7 } from "@trpc/server";
+import { TRPCError as TRPCError8 } from "@trpc/server";
 import { and as and7, desc as desc3, eq as eq10, or as or3, sql as sql7 } from "drizzle-orm";
 import { z as z7 } from "zod";
 var VIP_TIERS = ["none", "vip", "vvip"];
 async function ensureMemberVipColumns() {
   const db = await getDb();
-  if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
   try {
     await db.execute(sql7`ALTER TABLE \`users\` ADD COLUMN \`vipTier\` varchar(32) NOT NULL DEFAULT 'none'`);
   } catch (error) {
@@ -7110,7 +7080,7 @@ var adminMembersRouter = router({
       vipTier: sql7`COALESCE(\`vipTier\`, 'none')`,
       vipNote: sql7`${sql7.raw("`vipNote`")}`
     }).from(users).where(eq10(users.id, input.userId)).limit(1);
-    if (!member) throw new TRPCError7({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u6703\u54E1" });
+    if (!member) throw new TRPCError8({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u6703\u54E1" });
     const history = await db.select({
       id: orders.id,
       merchantTradeNo: orders.merchantTradeNo,
@@ -7164,16 +7134,16 @@ var adminMembersRouter = router({
   }),
   deleteMember: adminProcedure.input(z7.object({ userId: z7.number().int().positive() })).mutation(async ({ ctx, input }) => {
     if (input.userId === ctx.user.id) {
-      throw new TRPCError7({ code: "BAD_REQUEST", message: "\u4E0D\u80FD\u522A\u9664\u76EE\u524D\u767B\u5165\u7684\u7BA1\u7406\u54E1\u5E33\u865F" });
+      throw new TRPCError8({ code: "BAD_REQUEST", message: "\u4E0D\u80FD\u522A\u9664\u76EE\u524D\u767B\u5165\u7684\u7BA1\u7406\u54E1\u5E33\u865F" });
     }
     const db = await ensureMemberVipColumns();
     const [member] = await db.select({
       id: users.id,
       role: users.role
     }).from(users).where(eq10(users.id, input.userId)).limit(1);
-    if (!member) throw new TRPCError7({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u6703\u54E1" });
+    if (!member) throw new TRPCError8({ code: "NOT_FOUND", message: "\u627E\u4E0D\u5230\u6703\u54E1" });
     if (member.role === "admin") {
-      throw new TRPCError7({ code: "BAD_REQUEST", message: "\u4E0D\u80FD\u5F9E\u6703\u54E1\u7BA1\u7406\u522A\u9664\u7BA1\u7406\u54E1\u5E33\u865F" });
+      throw new TRPCError8({ code: "BAD_REQUEST", message: "\u4E0D\u80FD\u5F9E\u6703\u54E1\u7BA1\u7406\u522A\u9664\u7BA1\u7406\u54E1\u5E33\u865F" });
     }
     await db.execute(sql7`UPDATE \`orders\` SET \`userId\` = NULL WHERE \`userId\` = ${input.userId}`);
     await db.execute(sql7`UPDATE \`chatbotLogs\` SET \`userId\` = NULL WHERE \`userId\` = ${input.userId}`);
@@ -7185,7 +7155,7 @@ var adminMembersRouter = router({
 // server/routers/siteSettings.ts
 import { z as z8 } from "zod";
 import { eq as eq11, sql as sql8 } from "drizzle-orm";
-import { TRPCError as TRPCError8 } from "@trpc/server";
+import { TRPCError as TRPCError9 } from "@trpc/server";
 init_schema();
 var DEFAULT_ANNOUNCEMENT_TEXT = "\u4EFB\u9078\u5169\u4EF6\u5546\u54C1\u514D\u904B \xB7 6/1\u20136/10 \u5168\u9762\u4E5D\u6298 \xB7";
 var ANNOUNCEMENT_TEXT_KEY = "announcementText";
@@ -7216,7 +7186,7 @@ async function getSettingValue(key) {
 async function upsertSettingValue(key, value) {
   const db = await getDb();
   if (!db) {
-    throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u5C1A\u672A\u9023\u7DDA\uFF0C\u7121\u6CD5\u5132\u5B58\u7DB2\u7AD9\u8A2D\u5B9A" });
+    throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "\u8CC7\u6599\u5EAB\u5C1A\u672A\u9023\u7DDA\uFF0C\u7121\u6CD5\u5132\u5B58\u7DB2\u7AD9\u8A2D\u5B9A" });
   }
   await ensureSiteSettingsTable();
   await db.insert(siteSettings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
@@ -7295,7 +7265,7 @@ async function createContext(opts) {
 }
 
 // server/lineOAuthRoutes.ts
-import * as crypto5 from "node:crypto";
+import * as crypto6 from "node:crypto";
 import { parse as parseCookieHeader2 } from "cookie";
 var LINE_STATE_COOKIE = "line_oauth_state";
 var LINE_RETURN_TO_COOKIE = "line_oauth_return_to";
@@ -7381,7 +7351,7 @@ function lineOAuthStart(req, res) {
     );
     return;
   }
-  const state = crypto5.randomBytes(24).toString("hex");
+  const state = crypto6.randomBytes(24).toString("hex");
   const callback = lineCallbackUrl(req);
   const returnTo = safeReturnTo(req.query.returnTo);
   const cookieOpts = { ...getSessionCookieOptions(req), maxAge: 6e5 };
@@ -7473,7 +7443,7 @@ function registerLineOAuthRoutes(app2) {
 
 // server/lineWebhookRoutes.ts
 import express from "express";
-import * as crypto6 from "node:crypto";
+import * as crypto7 from "node:crypto";
 function getMessagingChannelSecret() {
   return process.env.LINE_MESSAGING_CHANNEL_SECRET?.trim() || process.env.LINE_WEBHOOK_CHANNEL_SECRET?.trim();
 }
@@ -7481,10 +7451,10 @@ function timingSafeEqualString(a, b) {
   const aBuffer = Buffer.from(a);
   const bBuffer = Buffer.from(b);
   if (aBuffer.length !== bBuffer.length) return false;
-  return crypto6.timingSafeEqual(aBuffer, bBuffer);
+  return crypto7.timingSafeEqual(aBuffer, bBuffer);
 }
 function verifyLineSignature(rawBody, signature, channelSecret) {
-  const expected = crypto6.createHmac("sha256", channelSecret).update(rawBody).digest("base64");
+  const expected = crypto7.createHmac("sha256", channelSecret).update(rawBody).digest("base64");
   return timingSafeEqualString(expected, signature);
 }
 function parseLineWebhookBody(rawBody) {
@@ -7540,15 +7510,47 @@ function registerLineWebhookRoutes(app2) {
   );
 }
 
+// server/_core/httpSecurity.ts
+function setSecurityHeaders(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+}
+function requestOrigin(req) {
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const protocol = forwardedProto || req.protocol;
+  const host = (req.get("x-forwarded-host") || req.get("host") || "").trim();
+  return host ? `${protocol}://${host}` : null;
+}
+function enforceTrustedOrigin(req, res, next) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  const origin = req.get("origin");
+  if (!origin) return next();
+  const configured = process.env.SITE_URL?.trim().replace(/\/$/, "");
+  const allowed = new Set([configured, requestOrigin(req)].filter((value) => Boolean(value)));
+  if (allowed.has(origin.replace(/\/$/, ""))) return next();
+  res.status(403).json({ error: { code: "INVALID_ORIGIN", message: "\u4E0D\u5141\u8A31\u7684\u8ACB\u6C42\u4F86\u6E90" } });
+}
+function publicServerError(err) {
+  if (process.env.NODE_ENV === "development") {
+    return err instanceof Error ? err.stack || err.message : String(err);
+  }
+  return "Internal Server Error";
+}
+
 // server/_entry/trpcHandler.ts
 var app = express2();
+app.use(setSecurityHeaders);
 registerLineWebhookRoutes(app);
-app.use(express2.json({ limit: "50mb" }));
-app.use(express2.urlencoded({ limit: "50mb", extended: true }));
+app.use(express2.json({ limit: "10mb" }));
+app.use(express2.urlencoded({ limit: "10mb", extended: true }));
 app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
   res.json({ ok: true, at: (/* @__PURE__ */ new Date()).toISOString() });
 });
 registerLineOAuthRoutes(app);
+app.use(enforceTrustedOrigin);
 app.use(
   createExpressMiddleware({
     router: appRouter,
@@ -7560,7 +7562,7 @@ app.use((req, res) => {
 });
 app.use(
   (err, _req, res, _next) => {
-    const message = err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/trpc] express error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: { code: "TRPC_EXPRESS_ERROR", message } });
@@ -7580,7 +7582,7 @@ function handler(req, res) {
       res
     );
   } catch (err) {
-    const message = err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/trpc] handler threw:", err);
     writeJson(res, 500, { error: { code: "HANDLER_THREW", message } });
   }

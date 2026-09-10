@@ -1153,17 +1153,33 @@ ${inputs}
   });
 }
 
+// server/_core/httpSecurity.ts
+function setSecurityHeaders(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+}
+function publicServerError(err) {
+  if (process.env.NODE_ENV === "development") {
+    return err instanceof Error ? err.stack || err.message : String(err);
+  }
+  return "Internal Server Error";
+}
+
 // server/_entry/ecpayHandler.ts
 var app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(setSecurityHeaders);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 registerECPayRoutes(app);
 app.use((req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", path: req.url } });
 });
 app.use(
   (err, _req, res, _next) => {
-    const message = err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/ecpay] express error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: { code: "ECPAY_EXPRESS_ERROR", message } });
@@ -1183,7 +1199,7 @@ function handler(req, res) {
       res
     );
   } catch (err) {
-    const message = err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/ecpay] handler threw:", err);
     writeJson(res, 500, { error: { code: "HANDLER_THREW", message } });
   }

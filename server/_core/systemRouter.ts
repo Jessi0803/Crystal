@@ -14,22 +14,21 @@ export const systemRouter = router({
       ok: true,
     })),
 
-  /** 診斷用：確認環境變數是否正確注入（不回傳實際値） */
-  envCheck: publicProcedure.query(() => ({
-    hasResendApiKey: !!ENV.resendApiKey && ENV.resendApiKey.length > 0,
-    resendApiKeyPrefix: ENV.resendApiKey ? ENV.resendApiKey.substring(0, 8) + "..." : "(empty)",
-    nodeEnv: process.env.NODE_ENV ?? "(not set)",
-    // 綠界金流
-    hasEcpayMerchantId: !!process.env.ECPAY_MERCHANT_ID,
-    ecpayMerchantId: process.env.ECPAY_MERCHANT_ID || "(empty)",
-    hasEcpayHashKey: !!process.env.ECPAY_HASH_KEY,
-    ecpayHashKeyPrefix: process.env.ECPAY_HASH_KEY ? process.env.ECPAY_HASH_KEY.substring(0, 6) + "..." : "(empty)",
+  /** 前台及 E2E 只需要知道目前是否為沙盒，不暴露商店識別資料。 */
+  paymentMode: publicProcedure.query(() => ({
     ecpaySandbox: process.env.ECPAY_SANDBOX === "true",
-    // 綠界物流
+    ecpayLogisticsSandbox: process.env.ECPAY_LOGISTICS_SANDBOX === "true",
+  })),
+
+  /** 僅供管理員診斷環境變數是否注入；不回傳值或金鑰前綴。 */
+  envCheck: adminProcedure.query(() => ({
+    hasResendApiKey: !!ENV.resendApiKey && ENV.resendApiKey.length > 0,
+    nodeEnv: process.env.NODE_ENV ?? "(not set)",
+    hasEcpayMerchantId: !!process.env.ECPAY_MERCHANT_ID,
+    hasEcpayHashKey: !!process.env.ECPAY_HASH_KEY,
+    ecpaySandbox: process.env.ECPAY_SANDBOX === "true",
     hasEcpayLogisticsMerchantId: !!process.env.ECPAY_LOGISTICS_MERCHANT_ID,
-    ecpayLogisticsMerchantId: process.env.ECPAY_LOGISTICS_MERCHANT_ID || "(empty)",
     hasEcpayLogisticsHashKey: !!process.env.ECPAY_LOGISTICS_HASH_KEY,
-    ecpayLogisticsHashKeyPrefix: process.env.ECPAY_LOGISTICS_HASH_KEY ? process.env.ECPAY_LOGISTICS_HASH_KEY.substring(0, 6) + "..." : "(empty)",
     hasEcpayLogisticsHashIV: !!process.env.ECPAY_LOGISTICS_HASH_IV,
     ecpayLogisticsSandbox: process.env.ECPAY_LOGISTICS_SANDBOX === "true",
   })),

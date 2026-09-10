@@ -11,6 +11,7 @@ import { appRouter } from "../appRouter";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerECPayRoutes } from "../ecpayRoutes";
+import { enforceTrustedOrigin, setSecurityHeaders } from "./httpSecurity";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -33,6 +34,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   const app = express();
+  app.use(setSecurityHeaders);
   const server = createServer(app);
   const uploadDir = process.env.LOCAL_STORAGE_DIR
     ? path.resolve(process.env.LOCAL_STORAGE_DIR)
@@ -40,8 +42,8 @@ async function startServer() {
   app.use("/uploads", express.static(uploadDir));
   registerLineWebhookRoutes(app);
   // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ limit: "10mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   registerLineOAuthRoutes(app);
@@ -50,6 +52,7 @@ async function startServer() {
   // tRPC API
   app.use(
     "/api/trpc",
+    enforceTrustedOrigin,
     createExpressMiddleware({
       router: appRouter,
       createContext,

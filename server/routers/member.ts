@@ -14,7 +14,7 @@ import * as bcrypt from "bcryptjs";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, rateLimitedProtectedProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
 import { sdk } from "../_core/sdk";
 import * as crypto from "crypto";
 import * as db from "../db";
@@ -32,7 +32,7 @@ const passwordSchema = z.string().min(8, "密碼至少需要 8 個字元");
 
 export const memberRouter = router({
   /** 註冊 */
-  register: publicProcedure
+  register: rateLimitedPublicProcedure({ scope: "member-auth", limit: 20, windowMs: 15 * 60_000 })
     .input(
       z.object({
         email: z.string().email("請輸入有效的 Email"),
@@ -93,7 +93,7 @@ export const memberRouter = router({
     }),
 
   /** 登入 */
-  login: publicProcedure
+  login: rateLimitedPublicProcedure({ scope: "member-auth", limit: 20, windowMs: 15 * 60_000 })
     .input(
       z.object({
         email: z.string().email("請輸入有效的 Email"),
@@ -138,7 +138,7 @@ export const memberRouter = router({
     }),
 
   /** 驗證 Email */
-  verifyEmail: publicProcedure
+  verifyEmail: rateLimitedPublicProcedure({ scope: "member-verify", limit: 20, windowMs: 15 * 60_000 })
     .input(z.object({ token: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const user = await db.getUserByVerifyToken(input.token);
@@ -153,7 +153,7 @@ export const memberRouter = router({
     }),
 
   /** 重新發送驗證信 */
-  resendVerification: protectedProcedure
+  resendVerification: rateLimitedProtectedProcedure({ scope: "member-verification-email", limit: 5, windowMs: 60 * 60_000 })
     .input(z.object({ origin: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user.email) {
@@ -178,7 +178,7 @@ export const memberRouter = router({
     }),
 
   /** 申請重設密碼 */
-  forgotPassword: publicProcedure
+  forgotPassword: rateLimitedPublicProcedure({ scope: "member-password", limit: 5, windowMs: 60 * 60_000 })
     .input(z.object({
       email: z.string().email(),
       origin: z.string().optional(),
@@ -216,7 +216,7 @@ export const memberRouter = router({
     }),
 
   /** 使用 token 重設密碼 */
-  resetPassword: publicProcedure
+  resetPassword: rateLimitedPublicProcedure({ scope: "member-password", limit: 10, windowMs: 60 * 60_000 })
     .input(
       z.object({
         token: z.string().min(1),

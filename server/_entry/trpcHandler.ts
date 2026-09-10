@@ -8,11 +8,13 @@ import { appRouter } from "../appRouter";
 import { createContext } from "../_core/context";
 import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
 import { registerLineWebhookRoutes } from "../lineWebhookRoutes";
+import { enforceTrustedOrigin, publicServerError, setSecurityHeaders } from "../_core/httpSecurity";
 
 const app = express();
+app.use(setSecurityHeaders);
 registerLineWebhookRoutes(app);
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
   res.json({ ok: true, at: new Date().toISOString() });
@@ -21,6 +23,7 @@ app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
 // LINE Login：與本地 server 共用路由，且走已部署的 /api/trpc/* function（單一路徑段）
 registerLineOAuthRoutes(app);
 
+app.use(enforceTrustedOrigin);
 app.use(
   createExpressMiddleware({
     router: appRouter,
@@ -39,8 +42,7 @@ app.use(
     res: express.Response,
     _next: NextFunction
   ) => {
-    const message =
-      err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/trpc] express error:", err);
     if (!res.headersSent) {
       res
@@ -64,7 +66,7 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
       res
     );
   } catch (err) {
-    const message = err instanceof Error ? err.stack || err.message : String(err);
+    const message = publicServerError(err);
     console.error("[api/trpc] handler threw:", err);
     writeJson(res, 500, { error: { code: "HANDLER_THREW", message } });
   }

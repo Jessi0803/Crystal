@@ -2,6 +2,7 @@
  * 訂單資料庫查詢函式
  */
 import { eq, desc, and, gte, sql, inArray, SQL, or } from "drizzle-orm";
+import crypto from "node:crypto";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { getDb } from "./db";
 import {
@@ -993,10 +994,10 @@ export async function updateLogisticsStatus(
     .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
 }
 
-function generateBalanceMerchantTradeNo() {
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `CB${ts}${rand}`.substring(0, 20);
+export function generateBalanceMerchantTradeNo() {
+  // 此編號本身即為客戶尾款頁的 bearer credential；使用 72-bit CSPRNG，
+  // 同時維持綠界 MerchantTradeNo 僅英數字且最多 20 字元的限制。
+  return `CB${crypto.randomBytes(9).toString("hex").toUpperCase()}`;
 }
 
 export async function createOrReplaceBalancePayment(opts: {

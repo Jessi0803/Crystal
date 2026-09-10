@@ -6,8 +6,6 @@ import { z } from "zod";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   getProductAvailability,
-  acquireInventoryLock,
-  releaseSessionLocks,
   upsertProductInventory,
   getProductInventory,
   getDefaultAllowPreorder,
@@ -36,49 +34,6 @@ export const inventoryRouter = router({
         }))
       );
       return results;
-    }),
-
-  /**
-   * 嘗試鎖定庫存（進入結帳時呼叫，保留 10 分鐘）
-   */
-  acquireLock: publicProcedure
-    .input(
-      z.object({
-        items: z.array(
-          z.object({
-            productId: z.string(),
-            quantity: z.number().min(1),
-          })
-        ),
-        sessionToken: z.string(),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const results = [];
-      for (const item of input.items) {
-        const result = await acquireInventoryLock(
-          item.productId,
-          item.quantity,
-          input.sessionToken
-        );
-        results.push({ productId: item.productId, ...result });
-        if (!result.success) {
-          // 鎖定失敗時釋放已鎖定的商品
-          await releaseSessionLocks(input.sessionToken);
-          return { success: false, failedItem: item.productId, reason: result.reason };
-        }
-      }
-      return { success: true };
-    }),
-
-  /**
-   * 釋放庫存鎖定（取消結帳時呼叫）
-   */
-  releaseLock: publicProcedure
-    .input(z.object({ sessionToken: z.string() }))
-    .mutation(async ({ input }) => {
-      await releaseSessionLocks(input.sessionToken);
-      return { success: true };
     }),
 
   /**
