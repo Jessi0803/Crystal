@@ -376,6 +376,25 @@ var logisticsOrders = mysqlTable("logisticsOrders", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
+var operationAuditEvents = mysqlTable("operationAuditEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  source: varchar("source", { length: 32 }).notNull(),
+  category: varchar("category", { length: 32 }).notNull(),
+  action: varchar("action", { length: 96 }).notNull(),
+  outcome: varchar("outcome", { length: 24 }).notNull(),
+  severity: varchar("severity", { length: 16 }).notNull().default("info"),
+  orderId: int("orderId"),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }),
+  actorUserId: int("actorUserId"),
+  summary: varchar("summary", { length: 255 }).notNull(),
+  details: json("details").$type(),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+}, (table) => [
+  index("operation_audit_created_at_idx").on(table.createdAt),
+  index("operation_audit_order_created_at_idx").on(table.orderId, table.createdAt),
+  index("operation_audit_merchant_created_at_idx").on(table.merchantTradeNo, table.createdAt),
+  index("operation_audit_outcome_created_at_idx").on(table.outcome, table.createdAt)
+]);
 var chatbotLogs = mysqlTable("chatbotLogs", {
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("sessionId", { length: 64 }).notNull(),
@@ -950,7 +969,92 @@ async function notifyCustomerOrderPlacedSafely(orderId) {
 }
 
 // server/ecpayRoutes.ts
-import { eq as eq6 } from "drizzle-orm";
+import { eq as eq7 } from "drizzle-orm";
+
+// server/auditDb.ts
+import { and as and4, desc as desc2, eq as eq6, gte as gte2, sql as sql4 } from "drizzle-orm";
+var ensurePromise = null;
+async function ensureAuditTable() {
+  const db = await getDb();
+  if (!db) return null;
+  if (!ensurePromise) {
+    ensurePromise = db.execute(sql4`
+      CREATE TABLE IF NOT EXISTS \`operationAuditEvents\` (
+        \`id\` int AUTO_INCREMENT NOT NULL,
+        \`source\` varchar(32) NOT NULL,
+        \`category\` varchar(32) NOT NULL,
+        \`action\` varchar(96) NOT NULL,
+        \`outcome\` varchar(24) NOT NULL,
+        \`severity\` varchar(16) NOT NULL DEFAULT 'info',
+        \`orderId\` int NULL,
+        \`merchantTradeNo\` varchar(32) NULL,
+        \`actorUserId\` int NULL,
+        \`summary\` varchar(255) NOT NULL,
+        \`details\` json NULL,
+        \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`),
+        INDEX \`operation_audit_created_at_idx\` (\`createdAt\`),
+        INDEX \`operation_audit_order_created_at_idx\` (\`orderId\`, \`createdAt\`),
+        INDEX \`operation_audit_merchant_created_at_idx\` (\`merchantTradeNo\`, \`createdAt\`),
+        INDEX \`operation_audit_outcome_created_at_idx\` (\`outcome\`, \`createdAt\`)
+      )
+    `).then(() => void 0).catch((error) => {
+      ensurePromise = null;
+      throw error;
+    });
+  }
+  await ensurePromise;
+  return db;
+}
+var SENSITIVE_KEY = /(password|secret|hash|token|receipt|image|base64|checkmac|authorization|cookie)/i;
+function sanitizeValue(value, depth) {
+  if (depth > 3) return "[truncated]";
+  if (value === null || value === void 0 || typeof value === "boolean" || typeof value === "number") return value;
+  if (typeof value === "string") return value.length > 300 ? `${value.slice(0, 300)}\u2026` : value;
+  if (Array.isArray(value)) return value.slice(0, 30).map((item) => sanitizeValue(item, depth + 1));
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).slice(0, 50).map(([key, nested]) => [key, SENSITIVE_KEY.test(key) ? "[redacted]" : sanitizeValue(nested, depth + 1)])
+    );
+  }
+  return String(value);
+}
+function sanitizeAuditDetails(value) {
+  const sanitized = sanitizeValue(value, 0);
+  return sanitized && typeof sanitized === "object" && !Array.isArray(sanitized) ? sanitized : null;
+}
+async function recordAuditEvent(event) {
+  const db = await ensureAuditTable();
+  if (!db) return false;
+  await db.insert(operationAuditEvents).values({
+    source: event.source,
+    category: event.category.slice(0, 32),
+    action: event.action.slice(0, 96),
+    outcome: event.outcome,
+    severity: event.severity ?? (event.outcome === "failed" ? "error" : event.outcome === "rejected" ? "warning" : "info"),
+    orderId: event.orderId ?? null,
+    merchantTradeNo: event.merchantTradeNo?.slice(0, 32) ?? null,
+    actorUserId: event.actorUserId ?? null,
+    summary: event.summary.slice(0, 255),
+    details: sanitizeAuditDetails(event.details)
+  });
+  return true;
+}
+async function recordAuditEventSafely(event) {
+  if (process.env.NODE_ENV === "test" && process.env.ENABLE_AUDIT_IN_TESTS !== "true") return false;
+  try {
+    return await recordAuditEvent(event);
+  } catch (error) {
+    console.error("[Audit] Failed to persist event", {
+      action: event.action,
+      outcome: event.outcome,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return false;
+  }
+}
+
+// server/ecpayRoutes.ts
 function mapECPayLogisticsStatus(data) {
   const rtnCode = data.RtnCode ?? "";
   const logisticsSubType = data.LogisticsSubType || data.LogisticsType || "";
@@ -980,13 +1084,41 @@ function safeReturnPath(p) {
   return path;
 }
 async function handleECPayPaymentNotify(notifyData) {
-  console.log("[ECPay Notify]", notifyData);
+  const merchantTradeNo = notifyData.MerchantTradeNo || null;
+  const callbackDetails = {
+    rtnCode: notifyData.RtnCode ?? null,
+    tradeNo: notifyData.TradeNo ?? null,
+    tradeAmount: notifyData.TradeAmt ?? null,
+    paymentType: notifyData.PaymentType ?? null
+  };
+  console.log("[ECPay Notify]", { merchantTradeNo, ...callbackDetails });
   const isValid = verifyCheckMacValue(notifyData);
   if (!isValid) {
     console.error("[ECPay Notify] CheckMacValue verification failed");
+    await recordAuditEventSafely({
+      source: "ecpay",
+      category: "payment",
+      action: "ecpay.payment.callback",
+      outcome: "rejected",
+      severity: "warning",
+      merchantTradeNo,
+      summary: "\u7DA0\u754C\u4ED8\u6B3E\u56DE\u547C\u7C3D\u7AE0\u9A57\u8B49\u5931\u6557",
+      details: callbackDetails
+    });
     return "0|CheckMacValue Error";
   }
-  const merchantTradeNo = notifyData.MerchantTradeNo;
+  if (!merchantTradeNo) {
+    await recordAuditEventSafely({
+      source: "ecpay",
+      category: "payment",
+      action: "ecpay.payment.callback",
+      outcome: "rejected",
+      severity: "warning",
+      summary: "\u7DA0\u754C\u4ED8\u6B3E\u56DE\u547C\u7F3A\u5C11\u4EA4\u6613\u7DE8\u865F",
+      details: callbackDetails
+    });
+    return "0|Order Not Found";
+  }
   const rtnCode = notifyData.RtnCode;
   const tradeNo = notifyData.TradeNo ?? "";
   const status = rtnCode === "1" ? "paid" : "failed";
@@ -994,6 +1126,17 @@ async function handleECPayPaymentNotify(notifyData) {
   if (order) {
     if (!matchesECPayAmount(notifyData.TradeAmt, order.totalAmount)) {
       console.error(`[ECPay Notify] TradeAmt mismatch for ${merchantTradeNo}`);
+      await recordAuditEventSafely({
+        source: "ecpay",
+        category: "payment",
+        action: "ecpay.order.callback",
+        outcome: "rejected",
+        severity: "error",
+        orderId: order.id,
+        merchantTradeNo,
+        summary: "\u7DA0\u754C\u8A02\u55AE\u56DE\u547C\u91D1\u984D\u8207\u8A02\u55AE\u4E0D\u7B26",
+        details: { ...callbackDetails, expectedAmount: order.totalAmount }
+      });
       return "0|TradeAmt Error";
     }
     const claimed = await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
@@ -1002,12 +1145,34 @@ async function handleECPayPaymentNotify(notifyData) {
       await notifyCustomerOrderPlacedSafely(order.id);
     }
     console.log(`[ECPay Notify] Order ${merchantTradeNo} \u2192 ${status}`);
+    await recordAuditEventSafely({
+      source: "ecpay",
+      category: "payment",
+      action: "ecpay.order.callback",
+      outcome: claimed ? status === "paid" ? "success" : "failed" : "duplicate",
+      severity: status === "paid" ? "info" : "warning",
+      orderId: order.id,
+      merchantTradeNo,
+      summary: claimed ? status === "paid" ? "\u7DA0\u754C\u8A02\u55AE\u4ED8\u6B3E\u6210\u529F" : "\u7DA0\u754C\u56DE\u5831\u8A02\u55AE\u4ED8\u6B3E\u5931\u6557" : "\u5DF2\u8655\u7406\u904E\u7684\u7DA0\u754C\u8A02\u55AE\u56DE\u547C\u5DF2\u5FFD\u7565",
+      details: callbackDetails
+    });
     return "1|OK";
   }
   const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
   if (balancePayment) {
     if (!matchesECPayAmount(notifyData.TradeAmt, balancePayment.totalAmount)) {
       console.error(`[ECPay Notify] Balance TradeAmt mismatch for ${merchantTradeNo}`);
+      await recordAuditEventSafely({
+        source: "ecpay",
+        category: "balance",
+        action: "ecpay.balance.callback",
+        outcome: "rejected",
+        severity: "error",
+        orderId: balancePayment.orderId,
+        merchantTradeNo,
+        summary: "\u7DA0\u754C\u5C3E\u6B3E\u56DE\u547C\u91D1\u984D\u8207\u5C3E\u6B3E\u55AE\u4E0D\u7B26",
+        details: { ...callbackDetails, expectedAmount: balancePayment.totalAmount }
+      });
       return "0|TradeAmt Error";
     }
     const claimed = await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
@@ -1015,9 +1180,30 @@ async function handleECPayPaymentNotify(notifyData) {
       await deductInventoryAfterBalancePayment(merchantTradeNo);
     }
     console.log(`[ECPay Notify] Balance ${merchantTradeNo} \u2192 ${status}`);
+    await recordAuditEventSafely({
+      source: "ecpay",
+      category: "balance",
+      action: "ecpay.balance.callback",
+      outcome: claimed ? status === "paid" ? "success" : "failed" : "duplicate",
+      severity: status === "paid" ? "info" : "warning",
+      orderId: balancePayment.orderId,
+      merchantTradeNo,
+      summary: claimed ? status === "paid" ? "\u7DA0\u754C\u5C3E\u6B3E\u4ED8\u6B3E\u6210\u529F" : "\u7DA0\u754C\u56DE\u5831\u5C3E\u6B3E\u4ED8\u6B3E\u5931\u6557" : "\u5DF2\u8655\u7406\u904E\u7684\u7DA0\u754C\u5C3E\u6B3E\u56DE\u547C\u5DF2\u5FFD\u7565",
+      details: callbackDetails
+    });
     return "1|OK";
   }
   console.error("[ECPay Notify] Order not found:", merchantTradeNo);
+  await recordAuditEventSafely({
+    source: "ecpay",
+    category: "payment",
+    action: "ecpay.payment.callback",
+    outcome: "rejected",
+    severity: "warning",
+    merchantTradeNo,
+    summary: "\u7DA0\u754C\u4ED8\u6B3E\u56DE\u547C\u627E\u4E0D\u5230\u5C0D\u61C9\u8A02\u55AE\u6216\u5C3E\u6B3E",
+    details: callbackDetails
+  });
   return "0|Order Not Found";
 }
 function matchesECPayAmount(rawAmount, expectedAmount) {
@@ -1030,6 +1216,17 @@ function registerECPayRoutes(app2) {
       res.send(await handleECPayPaymentNotify(notifyData));
     } catch (err) {
       console.error("[ECPay Notify] Error:", err);
+      const notifyData = req.body;
+      await recordAuditEventSafely({
+        source: "ecpay",
+        category: "payment",
+        action: "ecpay.payment.callback",
+        outcome: "failed",
+        severity: "error",
+        merchantTradeNo: notifyData?.MerchantTradeNo,
+        summary: "\u8655\u7406\u7DA0\u754C\u4ED8\u6B3E\u56DE\u547C\u6642\u767C\u751F\u7CFB\u7D71\u932F\u8AA4",
+        details: { error: err instanceof Error ? err.message : String(err) }
+      });
       res.send("0|Server Error");
     }
   });
@@ -1098,7 +1295,10 @@ ${inputs}
   app2.post("/api/ecpay/cvs-map-reply", async (req, res) => {
     try {
       const data = req.body;
-      console.log("[ECPay CVS Map Reply]", data);
+      console.log("[ECPay CVS Map Reply]", {
+        logisticsSubType: data.LogisticsSubType,
+        hasStoreId: Boolean(data.CVSStoreID)
+      });
       const storeId = data.CVSStoreID || "";
       const storeName = data.CVSStoreName || "";
       const cvsType = data.LogisticsSubType || "";
@@ -1117,10 +1317,24 @@ ${inputs}
   app2.post("/api/ecpay/logistics-notify", async (req, res) => {
     try {
       const data = req.body;
-      console.log("[ECPay Logistics Notify]", data);
+      console.log("[ECPay Logistics Notify]", {
+        merchantTradeNo: data.MerchantTradeNo,
+        rtnCode: data.RtnCode,
+        logisticsType: data.LogisticsSubType ?? data.LogisticsType
+      });
       const isValid = verifyLogisticsCheckMacValue(data);
       if (!isValid) {
         console.error("[ECPay Logistics Notify] CheckMacValue verification failed");
+        await recordAuditEventSafely({
+          source: "logistics",
+          category: "logistics",
+          action: "ecpay.logistics.callback",
+          outcome: "rejected",
+          severity: "warning",
+          merchantTradeNo: data.MerchantTradeNo,
+          summary: "\u7DA0\u754C\u7269\u6D41\u56DE\u547C\u7C3D\u7AE0\u9A57\u8B49\u5931\u6557",
+          details: { rtnCode: data.RtnCode ?? null, logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null }
+        });
         res.send("0|CheckMacValue Error");
         return;
       }
@@ -1134,20 +1348,40 @@ ${inputs}
         pickedUpAt: newStatus === "picked_up" ? /* @__PURE__ */ new Date() : void 0,
         ecpayLogisticsData: data
       });
+      const db = await getDb();
+      const [logistics] = db ? await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq7(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1) : [];
       if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
-        const db = await getDb();
-        if (db) {
-          const [logistics] = await db.select({ orderId: logisticsOrders.orderId }).from(logisticsOrders).where(eq6(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo)).limit(1);
-          if (logistics) {
-            const orderStatus = newStatus === "arrived" ? "arrived" : newStatus === "picked_up" ? "picked_up" : "not_picked";
-            await db.update(orders).set({ orderStatus }).where(eq6(orders.id, logistics.orderId));
-          }
+        if (db && logistics) {
+          const orderStatus = newStatus === "arrived" ? "arrived" : newStatus === "picked_up" ? "picked_up" : "not_picked";
+          await db.update(orders).set({ orderStatus }).where(eq7(orders.id, logistics.orderId));
         }
       }
       console.log(`[ECPay Logistics Notify] ${logisticsMerchantTradeNo} \u2192 ${newStatus}`);
+      await recordAuditEventSafely({
+        source: "logistics",
+        category: "logistics",
+        action: "ecpay.logistics.callback",
+        outcome: newStatus === "failed" ? "failed" : "success",
+        severity: newStatus === "failed" ? "warning" : "info",
+        orderId: logistics?.orderId ?? null,
+        merchantTradeNo: logisticsMerchantTradeNo,
+        summary: `\u7DA0\u754C\u7269\u6D41\u72C0\u614B\u66F4\u65B0\u70BA ${newStatus}`,
+        details: { rtnCode: data.RtnCode ?? null, logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null }
+      });
       res.send("1|OK");
     } catch (err) {
       console.error("[ECPay Logistics Notify] Error:", err);
+      const data = req.body;
+      await recordAuditEventSafely({
+        source: "logistics",
+        category: "logistics",
+        action: "ecpay.logistics.callback",
+        outcome: "failed",
+        severity: "error",
+        merchantTradeNo: data?.MerchantTradeNo,
+        summary: "\u8655\u7406\u7DA0\u754C\u7269\u6D41\u56DE\u547C\u6642\u767C\u751F\u7CFB\u7D71\u932F\u8AA4",
+        details: { error: err instanceof Error ? err.message : String(err) }
+      });
       res.send("0|Server Error");
     }
   });

@@ -283,6 +283,25 @@ var logisticsOrders = mysqlTable("logisticsOrders", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
+var operationAuditEvents = mysqlTable("operationAuditEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  source: varchar("source", { length: 32 }).notNull(),
+  category: varchar("category", { length: 32 }).notNull(),
+  action: varchar("action", { length: 96 }).notNull(),
+  outcome: varchar("outcome", { length: 24 }).notNull(),
+  severity: varchar("severity", { length: 16 }).notNull().default("info"),
+  orderId: int("orderId"),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }),
+  actorUserId: int("actorUserId"),
+  summary: varchar("summary", { length: 255 }).notNull(),
+  details: json("details").$type(),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+}, (table) => [
+  index("operation_audit_created_at_idx").on(table.createdAt),
+  index("operation_audit_order_created_at_idx").on(table.orderId, table.createdAt),
+  index("operation_audit_merchant_created_at_idx").on(table.merchantTradeNo, table.createdAt),
+  index("operation_audit_outcome_created_at_idx").on(table.outcome, table.createdAt)
+]);
 var chatbotLogs = mysqlTable("chatbotLogs", {
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("sessionId", { length: 64 }).notNull(),

@@ -8,6 +8,7 @@ import {
 } from "./orderDb";
 import { deductInventoryAfterPayment } from "./inventoryDb";
 import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
+import { recordAuditEventSafely } from "./auditDb";
 
 vi.mock("./ecpay", () => ({
   verifyCheckMacValue: vi.fn(),
@@ -41,12 +42,15 @@ vi.mock("./customerOrderNotification", () => ({
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
 
+vi.mock("./auditDb", () => ({ recordAuditEventSafely: vi.fn().mockResolvedValue(true) }));
+
 const verifyCheckMacValueMock = vi.mocked(verifyCheckMacValue);
 const getOrderByMerchantTradeNoMock = vi.mocked(getOrderByMerchantTradeNo);
 const getBalancePaymentByMerchantTradeNoMock = vi.mocked(getBalancePaymentByMerchantTradeNo);
 const updateOrderPaymentStatusMock = vi.mocked(updateOrderPaymentStatus);
 const deductInventoryAfterPaymentMock = vi.mocked(deductInventoryAfterPayment);
 const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
+const recordAuditEventSafelyMock = vi.mocked(recordAuditEventSafely);
 
 function paidPayload(overrides: Record<string, string> = {}) {
   return {
@@ -81,6 +85,11 @@ describe("ECPay callback security regression coverage", () => {
 
     expect(updateOrderPaymentStatusMock).not.toHaveBeenCalled();
     expect(deductInventoryAfterPaymentMock).not.toHaveBeenCalled();
+    expect(recordAuditEventSafelyMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: "ecpay.order.callback",
+      outcome: "rejected",
+      orderId: 301,
+    }));
   });
 
   it("claims a simultaneous paid callback only once", async () => {
@@ -95,5 +104,7 @@ describe("ECPay callback security regression coverage", () => {
     expect(updateOrderPaymentStatusMock).toHaveBeenCalledTimes(2);
     expect(deductInventoryAfterPaymentMock).toHaveBeenCalledTimes(1);
     expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledTimes(1);
+    expect(recordAuditEventSafelyMock).toHaveBeenCalledWith(expect.objectContaining({ outcome: "success" }));
+    expect(recordAuditEventSafelyMock).toHaveBeenCalledWith(expect.objectContaining({ outcome: "duplicate" }));
   });
 });

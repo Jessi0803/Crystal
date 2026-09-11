@@ -63,6 +63,7 @@ import {
   notifyCustomerOrderShippedSafely,
 } from "../customerOrderNotification";
 import { storagePut } from "../storage";
+import { recordAuditEventSafely } from "../auditDb";
 import { isOverseasShipCountryCode, OVERSEAS_SHIP_COUNTRY_LABELS } from "@shared/overseasShipping";
 import {
   formatOverseasShippingAddress,
@@ -908,6 +909,12 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單無需 PayPal 扣款" });
       }
       if (order.paymentStatus === "paid" || order.paymentStatus === "confirmed") {
+        await recordAuditEventSafely({
+          source: "paypal", category: "payment", action: "paypal.capture",
+          outcome: "duplicate", orderId: order.id, merchantTradeNo: input.merchantTradeNo,
+          summary: "已付款的 PayPal 訂單重複要求 Capture，已忽略",
+          details: { paypalOrderId: input.paypalOrderId },
+        });
         return { success: true as const, alreadyPaid: true as const };
       }
       if (order.paymentStatus !== "pending") {
@@ -918,6 +925,12 @@ export const orderRouter = router({
         await verifyPayPalOrderBelongsToMerchant(input.paypalOrderId, input.merchantTradeNo);
       } catch (e) {
         console.error("[capturePayPal verify]", e);
+        await recordAuditEventSafely({
+          source: "paypal", category: "payment", action: "paypal.capture.verify",
+          outcome: "rejected", severity: "warning", orderId: order.id, merchantTradeNo: input.merchantTradeNo,
+          summary: "PayPal 訂單歸屬驗證失敗",
+          details: { paypalOrderId: input.paypalOrderId, error: e instanceof Error ? e.message : String(e) },
+        });
         throw new TRPCError({
           code: "FORBIDDEN",
           message:
@@ -938,8 +951,20 @@ export const orderRouter = router({
         await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
         await deductInventoryAfterPayment(input.merchantTradeNo);
         await notifyCustomerOrderPlacedSafely(order.id);
+        await recordAuditEventSafely({
+          source: "paypal", category: "payment", action: "paypal.capture",
+          outcome: "success", orderId: order.id, merchantTradeNo: input.merchantTradeNo,
+          summary: "PayPal 訂單 Capture 成功",
+          details: { paypalOrderId: input.paypalOrderId, captureId: cap.captureId },
+        });
         return { success: true as const, alreadyPaid: false as const };
       } catch (e) {
+        await recordAuditEventSafely({
+          source: "paypal", category: "payment", action: "paypal.capture",
+          outcome: "failed", severity: "error", orderId: order.id, merchantTradeNo: input.merchantTradeNo,
+          summary: "PayPal 訂單 Capture 失敗",
+          details: { paypalOrderId: input.paypalOrderId, error: e instanceof Error ? e.message : String(e) },
+        });
         if (e instanceof TRPCError) throw e;
         console.error("[capturePayPal]", e);
         throw new TRPCError({
@@ -1493,7 +1518,11 @@ export const orderRouter = router({
           });
         }
 
-        console.log("[createLogistics] ECPay result:", ecpayResult);
+        console.log("[createLogistics] ECPay result", {
+          success: ecpayResult.success,
+          allPayLogisticsId: ecpayResult.allPayLogisticsId ?? null,
+          rtnMsg: ecpayResult.rtnMsg ?? null,
+        });
 
         if (ecpayResult.success) {
           // 更新物流訂單：存入取件碼、AllPayLogisticsID 等

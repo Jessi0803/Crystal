@@ -26,6 +26,7 @@ import {
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { recordAuditEventSafely } from "./auditDb";
 
 type LogisticsStatus = "created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed";
 
@@ -68,15 +69,34 @@ function safeReturnPath(p: unknown): string {
 }
 
 export async function handleECPayPaymentNotify(notifyData: Record<string, string>) {
-  console.log("[ECPay Notify]", notifyData);
+  const merchantTradeNo = notifyData.MerchantTradeNo || null;
+  const callbackDetails = {
+    rtnCode: notifyData.RtnCode ?? null,
+    tradeNo: notifyData.TradeNo ?? null,
+    tradeAmount: notifyData.TradeAmt ?? null,
+    paymentType: notifyData.PaymentType ?? null,
+  };
+  console.log("[ECPay Notify]", { merchantTradeNo, ...callbackDetails });
 
   const isValid = verifyCheckMacValue(notifyData);
   if (!isValid) {
     console.error("[ECPay Notify] CheckMacValue verification failed");
+    await recordAuditEventSafely({
+      source: "ecpay", category: "payment", action: "ecpay.payment.callback",
+      outcome: "rejected", severity: "warning", merchantTradeNo,
+      summary: "綠界付款回呼簽章驗證失敗", details: callbackDetails,
+    });
     return "0|CheckMacValue Error";
   }
 
-  const merchantTradeNo = notifyData.MerchantTradeNo;
+  if (!merchantTradeNo) {
+    await recordAuditEventSafely({
+      source: "ecpay", category: "payment", action: "ecpay.payment.callback",
+      outcome: "rejected", severity: "warning",
+      summary: "綠界付款回呼缺少交易編號", details: callbackDetails,
+    });
+    return "0|Order Not Found";
+  }
   const rtnCode = notifyData.RtnCode;
   const tradeNo = notifyData.TradeNo ?? "";
 
@@ -85,6 +105,12 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
   if (order) {
     if (!matchesECPayAmount(notifyData.TradeAmt, order.totalAmount)) {
       console.error(`[ECPay Notify] TradeAmt mismatch for ${merchantTradeNo}`);
+      await recordAuditEventSafely({
+        source: "ecpay", category: "payment", action: "ecpay.order.callback",
+        outcome: "rejected", severity: "error", orderId: order.id, merchantTradeNo,
+        summary: "綠界訂單回呼金額與訂單不符",
+        details: { ...callbackDetails, expectedAmount: order.totalAmount },
+      });
       return "0|TradeAmt Error";
     }
     const claimed = await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
@@ -93,6 +119,15 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
       await notifyCustomerOrderPlacedSafely(order.id);
     }
     console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
+    await recordAuditEventSafely({
+      source: "ecpay", category: "payment", action: "ecpay.order.callback",
+      outcome: claimed ? (status === "paid" ? "success" : "failed") : "duplicate",
+      severity: status === "paid" ? "info" : "warning", orderId: order.id, merchantTradeNo,
+      summary: claimed
+        ? status === "paid" ? "綠界訂單付款成功" : "綠界回報訂單付款失敗"
+        : "已處理過的綠界訂單回呼已忽略",
+      details: callbackDetails,
+    });
     return "1|OK";
   }
 
@@ -100,6 +135,12 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
   if (balancePayment) {
     if (!matchesECPayAmount(notifyData.TradeAmt, balancePayment.totalAmount)) {
       console.error(`[ECPay Notify] Balance TradeAmt mismatch for ${merchantTradeNo}`);
+      await recordAuditEventSafely({
+        source: "ecpay", category: "balance", action: "ecpay.balance.callback",
+        outcome: "rejected", severity: "error", orderId: balancePayment.orderId, merchantTradeNo,
+        summary: "綠界尾款回呼金額與尾款單不符",
+        details: { ...callbackDetails, expectedAmount: balancePayment.totalAmount },
+      });
       return "0|TradeAmt Error";
     }
     const claimed = await updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
@@ -107,10 +148,24 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
       await deductInventoryAfterBalancePayment(merchantTradeNo);
     }
     console.log(`[ECPay Notify] Balance ${merchantTradeNo} → ${status}`);
+    await recordAuditEventSafely({
+      source: "ecpay", category: "balance", action: "ecpay.balance.callback",
+      outcome: claimed ? (status === "paid" ? "success" : "failed") : "duplicate",
+      severity: status === "paid" ? "info" : "warning", orderId: balancePayment.orderId, merchantTradeNo,
+      summary: claimed
+        ? status === "paid" ? "綠界尾款付款成功" : "綠界回報尾款付款失敗"
+        : "已處理過的綠界尾款回呼已忽略",
+      details: callbackDetails,
+    });
     return "1|OK";
   }
 
   console.error("[ECPay Notify] Order not found:", merchantTradeNo);
+  await recordAuditEventSafely({
+    source: "ecpay", category: "payment", action: "ecpay.payment.callback",
+    outcome: "rejected", severity: "warning", merchantTradeNo,
+    summary: "綠界付款回呼找不到對應訂單或尾款", details: callbackDetails,
+  });
   return "0|Order Not Found";
 }
 
@@ -129,6 +184,13 @@ export function registerECPayRoutes(app: Application) {
       res.send(await handleECPayPaymentNotify(notifyData));
     } catch (err) {
       console.error("[ECPay Notify] Error:", err);
+      const notifyData = req.body as Record<string, string>;
+      await recordAuditEventSafely({
+        source: "ecpay", category: "payment", action: "ecpay.payment.callback",
+        outcome: "failed", severity: "error", merchantTradeNo: notifyData?.MerchantTradeNo,
+        summary: "處理綠界付款回呼時發生系統錯誤",
+        details: { error: err instanceof Error ? err.message : String(err) },
+      });
       res.send("0|Server Error");
     }
   });
@@ -233,7 +295,10 @@ ${inputs}
   app.post("/api/ecpay/cvs-map-reply", async (req: Request, res: Response) => {
     try {
       const data = req.body as Record<string, string>;
-      console.log("[ECPay CVS Map Reply]", data);
+      console.log("[ECPay CVS Map Reply]", {
+        logisticsSubType: data.LogisticsSubType,
+        hasStoreId: Boolean(data.CVSStoreID),
+      });
 
       const storeId = data.CVSStoreID || "";
       const storeName = data.CVSStoreName || "";
@@ -264,12 +329,22 @@ ${inputs}
   app.post("/api/ecpay/logistics-notify", async (req: Request, res: Response) => {
     try {
       const data = req.body as Record<string, string>;
-      console.log("[ECPay Logistics Notify]", data);
+      console.log("[ECPay Logistics Notify]", {
+        merchantTradeNo: data.MerchantTradeNo,
+        rtnCode: data.RtnCode,
+        logisticsType: data.LogisticsSubType ?? data.LogisticsType,
+      });
 
       // 驗證 CheckMacValue
       const isValid = verifyLogisticsCheckMacValue(data);
       if (!isValid) {
         console.error("[ECPay Logistics Notify] CheckMacValue verification failed");
+        await recordAuditEventSafely({
+          source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+          outcome: "rejected", severity: "warning", merchantTradeNo: data.MerchantTradeNo,
+          summary: "綠界物流回呼簽章驗證失敗",
+          details: { rtnCode: data.RtnCode ?? null, logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null },
+        });
         res.send("0|CheckMacValue Error");
         return;
       }
@@ -286,35 +361,51 @@ ${inputs}
         ecpayLogisticsData: data,
       });
 
-      // 如果物流狀態已到店、已取貨或退件，同步更新訂單狀態
-      if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
-        const db = await getDb();
-        if (db) {
-          const [logistics] = await db
+      const db = await getDb();
+      const [logistics] = db
+        ? await db
             .select({ orderId: logisticsOrders.orderId })
             .from(logisticsOrders)
             .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo))
-            .limit(1);
+            .limit(1)
+        : [];
 
-          if (logistics) {
-            const orderStatus =
-              newStatus === "arrived"
-                ? "arrived"
-                : newStatus === "picked_up"
-                  ? "picked_up"
-                  : "not_picked";
-            await db
-              .update(orders)
-              .set({ orderStatus })
-              .where(eq(orders.id, logistics.orderId));
-          }
+      // 如果物流狀態已到店、已取貨或退件，同步更新訂單狀態
+      if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
+        if (db && logistics) {
+          const orderStatus =
+            newStatus === "arrived"
+              ? "arrived"
+              : newStatus === "picked_up"
+                ? "picked_up"
+                : "not_picked";
+          await db
+            .update(orders)
+            .set({ orderStatus })
+            .where(eq(orders.id, logistics.orderId));
         }
       }
 
       console.log(`[ECPay Logistics Notify] ${logisticsMerchantTradeNo} → ${newStatus}`);
+      await recordAuditEventSafely({
+        source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+        outcome: newStatus === "failed" ? "failed" : "success",
+        severity: newStatus === "failed" ? "warning" : "info",
+        orderId: logistics?.orderId ?? null,
+        merchantTradeNo: logisticsMerchantTradeNo,
+        summary: `綠界物流狀態更新為 ${newStatus}`,
+        details: { rtnCode: data.RtnCode ?? null, logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null },
+      });
       res.send("1|OK");
     } catch (err) {
       console.error("[ECPay Logistics Notify] Error:", err);
+      const data = req.body as Record<string, string>;
+      await recordAuditEventSafely({
+        source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+        outcome: "failed", severity: "error", merchantTradeNo: data?.MerchantTradeNo,
+        summary: "處理綠界物流回呼時發生系統錯誤",
+        details: { error: err instanceof Error ? err.message : String(err) },
+      });
       res.send("0|Server Error");
     }
   });

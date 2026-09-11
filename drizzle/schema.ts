@@ -272,6 +272,31 @@ export const logisticsOrders = mysqlTable("logisticsOrders", {
 export type LogisticsOrder = typeof logisticsOrders.$inferSelect;
 export type InsertLogisticsOrder = typeof logisticsOrders.$inferInsert;
 
+// ─── 金流監控與管理員操作稽核 ────────────────────────────────────────────────
+// 不設外鍵，讓訂單或會員日後刪除時仍保留事件軌跡。
+export const operationAuditEvents = mysqlTable("operationAuditEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  source: varchar("source", { length: 32 }).notNull(),
+  category: varchar("category", { length: 32 }).notNull(),
+  action: varchar("action", { length: 96 }).notNull(),
+  outcome: varchar("outcome", { length: 24 }).notNull(),
+  severity: varchar("severity", { length: 16 }).notNull().default("info"),
+  orderId: int("orderId"),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }),
+  actorUserId: int("actorUserId"),
+  summary: varchar("summary", { length: 255 }).notNull(),
+  details: json("details").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("operation_audit_created_at_idx").on(table.createdAt),
+  index("operation_audit_order_created_at_idx").on(table.orderId, table.createdAt),
+  index("operation_audit_merchant_created_at_idx").on(table.merchantTradeNo, table.createdAt),
+  index("operation_audit_outcome_created_at_idx").on(table.outcome, table.createdAt),
+]);
+
+export type OperationAuditEvent = typeof operationAuditEvents.$inferSelect;
+export type InsertOperationAuditEvent = typeof operationAuditEvents.$inferInsert;
+
 // ─── AI 客服問答紀錄表 ────────────────────────────────────────────────────────
 export const chatbotLogs = mysqlTable("chatbotLogs", {
   id: int("id").autoincrement().primaryKey(),

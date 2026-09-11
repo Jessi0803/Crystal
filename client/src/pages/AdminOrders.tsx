@@ -28,6 +28,8 @@ import {
   ImageOff,
   Copy,
   ExternalLink,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -832,6 +834,7 @@ export default function AdminOrders() {
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [selectedCancelledOrderIds, setSelectedCancelledOrderIds] = useState<number[]>([]);
   const [selectedMergeOrderIds, setSelectedMergeOrderIds] = useState<number[]>([]);
+  const [showAuditEvents, setShowAuditEvents] = useState(false);
 
   const { data: dashStats, isLoading: dashStatsLoading, isFetching: dashStatsFetching, refetch: refetchDashStats } =
     trpc.order.getStats.useQuery(undefined, {
@@ -842,6 +845,14 @@ export default function AdminOrders() {
     enabled: user?.role === "admin",
     staleTime: 60_000,
   });
+  const { data: auditSummary, refetch: refetchAuditSummary } = trpc.audit.summary.useQuery(
+    { hours: 24 },
+    { enabled: user?.role === "admin", staleTime: 30_000, refetchInterval: 60_000 }
+  );
+  const { data: auditEvents, isFetching: auditEventsFetching, refetch: refetchAuditEvents } = trpc.audit.list.useQuery(
+    { limit: 30 },
+    { enabled: user?.role === "admin" && showAuditEvents, staleTime: 15_000, refetchInterval: showAuditEvents ? 30_000 : false }
+  );
 
   const { data: orders, isLoading, error: ordersError, refetch: refetchOrders, isFetching } = trpc.order.listOrders.useQuery(
     { status: statusFilter, limit: pageSize, offset: (page - 1) * pageSize },
@@ -868,6 +879,8 @@ export default function AdminOrders() {
   const refetchListAndStats = () => {
     void refetchOrders();
     void refetchDashStats();
+    void refetchAuditSummary();
+    if (showAuditEvents) void refetchAuditEvents();
   };
 
   const confirmTransfer = trpc.order.confirmTransfer.useMutation({
@@ -1172,6 +1185,67 @@ export default function AdminOrders() {
             </div>
           ))}
         </div>
+
+        <section className="mb-8 border border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() => setShowAuditEvents((current) => !current)}
+            className="flex w-full flex-col gap-3 px-5 py-4 text-left sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-5 w-5 text-slate-600" />
+              <div>
+                <p className="text-sm font-medium text-slate-900">付款與管理操作監控</p>
+                <p className="mt-0.5 text-xs font-body text-slate-500">最近 24 小時；不包含密碼、token、圖片或收據內容</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-body">
+              <span className="border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">成功 {auditSummary?.success ?? 0}</span>
+              <span className="border border-amber-200 bg-amber-50 px-2 py-1 text-amber-700">拒絕 {auditSummary?.rejected ?? 0}</span>
+              <span className="border border-red-200 bg-red-50 px-2 py-1 text-red-700">失敗 {auditSummary?.failed ?? 0}</span>
+              <span className="border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600">重複 {auditSummary?.duplicate ?? 0}</span>
+              {showAuditEvents ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </div>
+          </button>
+          {showAuditEvents && (
+            <div className="border-t border-slate-100 px-5 py-4">
+              {auditEventsFetching && !auditEvents ? (
+                <p className="text-xs font-body text-slate-500">載入監控紀錄中…</p>
+              ) : !auditEvents || auditEvents.length === 0 ? (
+                <p className="text-xs font-body text-slate-500">目前尚無監控紀錄；完成一次管理操作或收到付款回呼後會顯示於此。</p>
+              ) : (
+                <div className="max-h-96 space-y-2 overflow-y-auto">
+                  {auditEvents.map((event) => {
+                    const tone = event.outcome === "success"
+                      ? "border-emerald-100 bg-emerald-50/60 text-emerald-800"
+                      : event.outcome === "duplicate"
+                        ? "border-slate-200 bg-slate-50 text-slate-700"
+                        : event.outcome === "rejected"
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-red-200 bg-red-50 text-red-800";
+                    return (
+                      <div key={event.id} className={`border px-3 py-2 text-xs font-body ${tone}`}>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-2">
+                            {(event.outcome === "failed" || event.outcome === "rejected") && <AlertTriangle className="h-3.5 w-3.5 shrink-0" />}
+                            <span className="font-medium">{event.summary}</span>
+                          </div>
+                          <time className="shrink-0 text-[11px] opacity-70">{new Date(event.createdAt).toLocaleString("zh-TW")}</time>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">
+                          <span>{event.source} · {event.action}</span>
+                          {event.actorUserId && <span>管理員 #{event.actorUserId}</span>}
+                          {event.orderId && <span>訂單 ID {event.orderId}</span>}
+                          {event.merchantTradeNo && <span className="font-mono">{event.merchantTradeNo}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Filter Tabs */}
         <div className="flex gap-0 mb-6 border-b border-[oklch(0.93_0_0)] overflow-x-auto">
