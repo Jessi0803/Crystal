@@ -633,24 +633,30 @@ async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, noti
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
-  const [balance] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
-  if (!balance) return null;
-  const result = await db.update(orderBalancePayments).set({
-    paymentStatus: status,
-    tradeNo,
-    ecpayNotifyData: notifyData,
-    paidAt: status === "paid" ? /* @__PURE__ */ new Date() : null
-  }).where(
-    and2(
-      eq2(orderBalancePayments.id, balance.id),
-      eq2(orderBalancePayments.paymentStatus, "pending")
-    )
-  );
-  if (getAffectedRows(result) === 0) return null;
-  if (status === "paid") {
-    await db.update(orders).set({ orderStatus: "paid", paymentStatus: "paid", paidAt: /* @__PURE__ */ new Date() }).where(eq2(orders.id, balance.orderId));
-  }
-  return hydrateBalancePayment(balance);
+  return db.transaction(async (tx) => {
+    const [balance] = await tx.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
+    if (!balance) return null;
+    const paidAt = status === "paid" ? /* @__PURE__ */ new Date() : null;
+    const result = await tx.update(orderBalancePayments).set({
+      paymentStatus: status,
+      tradeNo,
+      ecpayNotifyData: notifyData,
+      paidAt
+    }).where(
+      and2(
+        eq2(orderBalancePayments.id, balance.id),
+        eq2(orderBalancePayments.paymentStatus, "pending")
+      )
+    );
+    if (getAffectedRows(result) === 0) return null;
+    if (status === "paid") {
+      const parentResult = await tx.update(orders).set({ orderStatus: "paid", paymentStatus: "paid", paidAt }).where(eq2(orders.id, balance.orderId));
+      if (getAffectedRows(parentResult) === 0) {
+        throw new Error("Balance payment parent order not found");
+      }
+    }
+    return hydrateBalancePayment(balance);
+  });
 }
 
 // server/inventoryDb.ts
