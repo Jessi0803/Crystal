@@ -1,5 +1,21 @@
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
+import AccessoryReferenceGallery, {
+  type AccessoryReferenceImage,
+} from "@/components/AccessoryReferenceGallery";
 import CustomFormPendantCharmField from "@/components/CustomFormPendantCharmField";
+
+const ACCESSORY_REFERENCE_IMAGES: AccessoryReferenceImage[] = [
+  {
+    src: "/bead-frame-1.jpg",
+    alt: "磁扣、銀管與珠框配件位置參考",
+    label: "磁扣、銀管與珠框",
+  },
+  {
+    src: "/bead-frame-2.jpg",
+    alt: "銀管、吊飾與珠框配件位置參考",
+    label: "銀管、吊飾與珠框",
+  },
+];
 
 export interface CustomFormBraceletPreferences {
   fitPreference: "" | "just-right" | "loose";
@@ -8,6 +24,19 @@ export interface CustomFormBraceletPreferences {
   beadFrame: "" | "yes" | "no";
   claspType: "" | "lobster" | "magnet" | "elastic";
   pendantCharm: "" | "yes" | "no";
+}
+
+/** 回傳尚未完成的第一個配件偏好；全部完成時回傳 null。 */
+export function validateCustomBraceletPreferences(
+  value: CustomFormBraceletPreferences
+): string | null {
+  if (!value.fitPreference) return "請選擇手圍的鬆緊偏好";
+  if (!value.metalPreference) return "請選擇金飾／銀飾偏好";
+  if (!value.silverTube) return "請選擇是否加銀管";
+  if (!value.beadFrame) return "請選擇是否加珠框";
+  if (!value.claspType) return "請選擇扣具偏好";
+  if (!value.pendantCharm) return "請選擇是否加吊飾";
+  return null;
 }
 
 interface CustomFormBraceletPreferenceFieldsProps {
@@ -131,18 +160,10 @@ export default function CustomFormBraceletPreferenceFields({
           可分開選擇，以下附上參考圖片
         </p>
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <img
-              src="/bead-frame-1.jpg"
-              alt="珠框銀管參考1"
-              className="w-full h-56 object-cover rounded-sm"
-            />
-            <img
-              src="/bead-frame-2.jpg"
-              alt="珠框銀管參考2"
-              className="w-full h-56 object-cover rounded-sm"
-            />
-          </div>
+          <AccessoryReferenceGallery images={ACCESSORY_REFERENCE_IMAGES} />
+          <p className="-mt-2 text-center text-[0.68rem] font-body text-[oklch(0.58_0_0)]">
+            點擊圖片可查看完整原圖；手機可雙指縮放，電腦可使用滾輪
+          </p>
           <div>
             <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
               銀管

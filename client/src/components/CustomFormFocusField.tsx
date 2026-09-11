@@ -1,4 +1,4 @@
-// 椛˙Crystal — 客製化表單「想調整的面向 / 額外指定功效」單選題
+// 椛˙Crystal — 客製化表單「想調整的面向 / 額外指定功效」選擇題
 
 export const CUSTOM_FOCUS_OPTIONS = [
   { id: "love", label: "感情" },
@@ -13,7 +13,7 @@ export const CUSTOM_FOCUS_OPTIONS = [
 ] as const;
 
 export type CustomFocusId = (typeof CUSTOM_FOCUS_OPTIONS)[number]["id"];
-export type CustomFocusChoice = "" | CustomFocusId;
+export type CustomFocusChoice = CustomFocusId[];
 
 const FOCUS_LABELS: Record<CustomFocusId, string> = CUSTOM_FOCUS_OPTIONS.reduce(
   (acc, opt) => {
@@ -29,8 +29,8 @@ export function validateCustomFocus(
   otherStory: string,
   questionLabel: string
 ): string | null {
-  if (!value) return `請選擇${questionLabel}`;
-  if (value === "other" && !otherStory.trim()) {
+  if (value.length === 0) return `請選擇${questionLabel}`;
+  if (value.includes("other") && !otherStory.trim()) {
     return "選擇「其他」時，請跟我們說明你的故事";
   }
   return null;
@@ -40,18 +40,35 @@ export function formatCustomFocusNote(
   value: CustomFocusChoice,
   otherStory: string
 ): string {
-  if (!value) return "（未填）";
-  if (value === "other") {
-    return `其他：${otherStory.trim() || "（未說明）"}`;
+  if (value.length === 0) return "（未填）";
+  return value
+    .map(choice => choice === "other"
+      ? `其他：${otherStory.trim() || "（未說明）"}`
+      : FOCUS_LABELS[choice])
+    .join("、");
+}
+
+export function toggleCustomFocusChoice(
+  value: CustomFocusChoice,
+  choice: CustomFocusId,
+  multiple: boolean
+): CustomFocusChoice {
+  if (!multiple) return [choice];
+  if (choice === "designer") {
+    return value.includes("designer") ? [] : ["designer"];
   }
-  return FOCUS_LABELS[value];
+  const choicesWithoutDesigner = value.filter(item => item !== "designer");
+  return choicesWithoutDesigner.includes(choice)
+    ? choicesWithoutDesigner.filter(item => item !== choice)
+    : [...choicesWithoutDesigner, choice];
 }
 
 interface CustomFormFocusFieldProps {
   value: CustomFocusChoice;
   otherStory: string;
-  onChange: (value: CustomFocusId) => void;
+  onChange: (value: CustomFocusChoice) => void;
   onOtherStoryChange: (value: string) => void;
+  multiple?: boolean;
 }
 
 export default function CustomFormFocusField({
@@ -59,7 +76,12 @@ export default function CustomFormFocusField({
   otherStory,
   onChange,
   onOtherStoryChange,
+  multiple = false,
 }: CustomFormFocusFieldProps) {
+  const toggleChoice = (choice: CustomFocusId) => {
+    onChange(toggleCustomFocusChoice(value, choice, multiple));
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -67,13 +89,13 @@ export default function CustomFormFocusField({
           <button
             key={opt.id}
             type="button"
-            onClick={() => onChange(opt.id)}
+            onClick={() => toggleChoice(opt.id)}
             className={`px-4 py-3.5 text-sm font-body border-2 transition-colors rounded-sm ${
               opt.id === "designer" || opt.id === "other"
                 ? "col-span-2 sm:col-span-3"
                 : ""
             } ${
-              value === opt.id
+              value.includes(opt.id)
                 ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
                 : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
             }`}
@@ -83,7 +105,7 @@ export default function CustomFormFocusField({
         ))}
       </div>
 
-      {value === "other" && (
+      {value.includes("other") && (
         <div>
           <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
             可以跟我們說明你的故事
