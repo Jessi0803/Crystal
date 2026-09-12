@@ -178,8 +178,12 @@ test("server rejects direct ATM checkout API calls without a transfer receipt", 
 test("double-clicking ATM checkout submits only one create order request", async ({ page }) => {
   const email = `e2e-double-submit-${Date.now()}@example.com`;
   let createRequests = 0;
+  let createRequestBody = "";
   page.on("request", (request) => {
-    if (request.url().includes("/api/trpc/order.createAndPay")) createRequests += 1;
+    if (request.url().includes("/api/trpc/order.createAndPay")) {
+      createRequests += 1;
+      createRequestBody = request.postData() ?? "";
+    }
   });
 
   await fillCheckoutForAtm(page, email);
@@ -188,5 +192,6 @@ test("double-clicking ATM checkout submits only one create order request", async
 
   await expect(page).toHaveURL(/\/order\//);
   expect(createRequests).toBe(1);
+  expect(createRequestBody).toContain('"claspType":"lobster"');
   await expect.poll(() => countOrdersForEmail(email)).toBe(1);
 });

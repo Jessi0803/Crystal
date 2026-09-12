@@ -348,6 +348,16 @@ test("moon clear heart wrist size rules update price and cart line", async ({ pa
 
   await wristSelect.selectOption("18");
   await expect(page.locator("body")).toContainText("NT$ 1,680");
+
+  await wristSelect.selectOption("14");
+  await page.getByRole("button", { name: /彈力繩/ }).click();
+  await expect(page.locator("body")).toContainText("NT$ 1,580");
+  await page.getByRole("button", { name: /龍蝦扣/ }).click();
+  await expect(page.locator("body")).toContainText("NT$ 1,780");
+  await page.getByRole("button", { name: /磁扣/ }).click();
+  await expect(page.locator("body")).toContainText("NT$ 1,780");
+
+  await wristSelect.selectOption("18");
   await page.getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: /加入購物袋/ }).click();
 

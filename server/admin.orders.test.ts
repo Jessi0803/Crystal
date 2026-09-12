@@ -430,6 +430,16 @@ describe("order.createAndPay security regression coverage", () => {
         claspType: "elastic",
       },
       {
+        id: "bracelet-1-medium-lobster",
+        baseProductId: "bracelet-1",
+        name: "通知測試手鍊（手圍 14cm）（龍蝦扣）",
+        price: 999999,
+        quantity: 1,
+        image: "",
+        wristSize: "14",
+        claspType: "lobster",
+      },
+      {
         id: "bracelet-1-large-magnetic",
         baseProductId: "bracelet-1",
         name: "通知測試手鍊（手圍 18cm）（磁扣）",
@@ -444,11 +454,15 @@ describe("order.createAndPay security regression coverage", () => {
     await createPublicCaller().order.createAndPay(input);
 
     expect(createOrderMock).toHaveBeenCalledWith(
-      expect.objectContaining({ totalAmount: 3360 }),
+      expect.objectContaining({ totalAmount: 5140 }),
       expect.arrayContaining([
         expect.objectContaining({ productId: "bracelet-1", unitPrice: 1480, subtotal: 1480 }),
+        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1780, subtotal: 1780 }),
         expect.objectContaining({ productId: "bracelet-1", unitPrice: 1880, subtotal: 1880 }),
       ])
+    );
+    expect(buildCreditPaymentParamsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 5140 })
     );
   });
 
