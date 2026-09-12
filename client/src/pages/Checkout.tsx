@@ -323,6 +323,8 @@ export default function Checkout() {
           purchaseOptionLabel: i.purchaseOptionLabel,
           wristSize: i.wristSize,
           wristSizeSelections: i.wristSizeSelections,
+          claspType: i.claspType,
+          fitPreference: i.fitPreference,
           name: `${i.product.name}${i.purchaseOptionLabel ? `（${i.purchaseOptionLabel}）` : ""}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.wristSizeSelections?.map((selection) => `（${selection.label} ${selection.value}cm）`).join("") ?? ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}${i.fitPreference === "just-right" ? "（剛好）" : i.fitPreference === "loose" ? "（微鬆）" : ""}`,
           price: i.unitPrice,
           quantity: i.quantity,
