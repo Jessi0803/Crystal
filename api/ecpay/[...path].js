@@ -331,6 +331,30 @@ var orderBalancePayments = mysqlTable("orderBalancePayments", {
 }, (table) => [
   index("order_balance_payments_merchant_trade_no_idx").on(table.merchantTradeNo)
 ]);
+var orderBalancePaymentAttempts = mysqlTable("orderBalancePaymentAttempts", {
+  id: int("id").autoincrement().primaryKey(),
+  balancePaymentId: int("balancePaymentId").notNull(),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+  amount: int("amount").notNull(),
+  shippingFee: int("shippingFee").default(0).notNull(),
+  paymentFee: int("paymentFee").default(0).notNull(),
+  totalAmount: int("totalAmount").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["credit"]).default("credit").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", [
+    "pending",
+    "paid",
+    "failed",
+    "superseded"
+  ]).default("pending").notNull(),
+  checkoutData: json("checkoutData"),
+  tradeNo: varchar("tradeNo", { length: 64 }),
+  ecpayNotifyData: json("ecpayNotifyData"),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+}, (table) => [
+  index("order_balance_payment_attempts_balance_id_idx").on(table.balancePaymentId)
+]);
 var logisticsOrders = mysqlTable("logisticsOrders", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull().unique(),
@@ -579,6 +603,33 @@ async function ensureBalancePaymentColumns(db) {
   }
   balancePaymentColumnsEnsured = true;
 }
+var balancePaymentAttemptTableEnsured = false;
+async function ensureBalancePaymentAttemptTable(db) {
+  if (balancePaymentAttemptTableEnsured) return;
+  await db.execute(sql2`
+    CREATE TABLE IF NOT EXISTS \`orderBalancePaymentAttempts\` (
+      \`id\` int AUTO_INCREMENT NOT NULL,
+      \`balancePaymentId\` int NOT NULL,
+      \`merchantTradeNo\` varchar(32) NOT NULL,
+      \`amount\` int NOT NULL,
+      \`shippingFee\` int NOT NULL DEFAULT 0,
+      \`paymentFee\` int NOT NULL DEFAULT 0,
+      \`totalAmount\` int NOT NULL,
+      \`paymentMethod\` enum('credit') NOT NULL DEFAULT 'credit',
+      \`paymentStatus\` enum('pending','paid','failed','superseded') NOT NULL DEFAULT 'pending',
+      \`checkoutData\` json NULL,
+      \`tradeNo\` varchar(64) NULL,
+      \`ecpayNotifyData\` json NULL,
+      \`paidAt\` timestamp NULL,
+      \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`orderBalancePaymentAttempts_merchantTradeNo_unique\` (\`merchantTradeNo\`),
+      KEY \`order_balance_payment_attempts_balance_id_idx\` (\`balancePaymentId\`)
+    )
+  `);
+  balancePaymentAttemptTableEnsured = true;
+}
 async function getOrderByMerchantTradeNo(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -628,6 +679,74 @@ async function getBalancePaymentByMerchantTradeNo(merchantTradeNo) {
   await ensureBalancePaymentColumns(db);
   const [row] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   return hydrateBalancePayment(row);
+}
+async function getBalancePaymentAttemptByMerchantTradeNo(merchantTradeNo) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentAttemptTable(db);
+  const [attempt] = await db.select().from(orderBalancePaymentAttempts).where(eq2(orderBalancePaymentAttempts.merchantTradeNo, merchantTradeNo)).limit(1);
+  if (!attempt) return null;
+  const [balancePayment] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.id, attempt.balancePaymentId)).limit(1);
+  if (!balancePayment) return null;
+  return { ...attempt, balancePayment: hydrateBalancePayment(balancePayment) };
+}
+async function updateBalancePaymentAttemptStatus(merchantTradeNo, status, tradeNo, notifyData) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentAttemptTable(db);
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(orderBalancePaymentAttempts).where(eq2(orderBalancePaymentAttempts.merchantTradeNo, merchantTradeNo)).limit(1);
+    if (!attempt) return null;
+    if (status === "failed") {
+      const result = await tx.update(orderBalancePaymentAttempts).set({ paymentStatus: "failed", tradeNo, ecpayNotifyData: notifyData }).where(and2(
+        eq2(orderBalancePaymentAttempts.id, attempt.id),
+        sql2`${orderBalancePaymentAttempts.paymentStatus} IN ('pending', 'superseded')`
+      ));
+      if (getAffectedRows(result) === 0) return null;
+      const [balance2] = await tx.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.id, attempt.balancePaymentId)).limit(1);
+      return balance2 ? { ...attempt, balancePayment: hydrateBalancePayment(balance2) } : null;
+    }
+    const [balance] = await tx.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq2(orderBalancePayments.id, attempt.balancePaymentId)).limit(1);
+    if (!balance || balance.paymentStatus !== "pending") return null;
+    const now = /* @__PURE__ */ new Date();
+    const balanceResult = await tx.update(orderBalancePayments).set({
+      paymentMethod: "credit",
+      shippingFee: attempt.shippingFee,
+      paymentFee: attempt.paymentFee,
+      totalAmount: attempt.totalAmount,
+      paymentStatus: "paid",
+      tradeNo,
+      ecpayNotifyData: notifyData,
+      paidAt: now
+    }).where(and2(
+      eq2(orderBalancePayments.id, balance.id),
+      eq2(orderBalancePayments.paymentStatus, "pending")
+    ));
+    if (getAffectedRows(balanceResult) === 0) return null;
+    const checkoutData = attempt.checkoutData;
+    const [order] = await tx.select().from(orders).where(eq2(orders.id, balance.orderId)).limit(1);
+    if (!order) throw new Error("Balance payment parent order not found");
+    if (checkoutData?.clearQuartzChipsAddOn) {
+      const addOn = checkoutData.clearQuartzChipsAddOn;
+      const [existingItem] = await tx.select({ id: orderItems.id }).from(orderItems).where(and2(eq2(orderItems.orderId, order.id), eq2(orderItems.productId, addOn.productId))).limit(1);
+      if (existingItem) {
+        await tx.update(orderItems).set(addOn).where(eq2(orderItems.id, existingItem.id));
+      } else {
+        await tx.insert(orderItems).values({ orderId: order.id, ...addOn, isPreorder: false });
+      }
+    }
+    const nextOrderTotal = Math.max(1, order.totalAmount - balance.totalAmount + attempt.totalAmount);
+    await tx.update(orders).set({
+      ...checkoutData?.orderUpdate ?? {},
+      totalAmount: nextOrderTotal,
+      orderStatus: "paid",
+      paymentStatus: "paid",
+      paidAt: now,
+      ...checkoutData?.clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}
+    }).where(eq2(orders.id, balance.orderId));
+    await tx.update(orderBalancePaymentAttempts).set({ paymentStatus: "paid", tradeNo, ecpayNotifyData: notifyData, paidAt: now }).where(eq2(orderBalancePaymentAttempts.id, attempt.id));
+    return { ...attempt, balancePayment: hydrateBalancePayment(balance) };
+  });
 }
 async function updateBalancePaymentStatus(merchantTradeNo, status, tradeNo, notifyData) {
   const db = await getDb();
@@ -1164,6 +1283,40 @@ async function handleECPayPaymentNotify(notifyData) {
     });
     return "1|OK";
   }
+  const balanceAttempt = await getBalancePaymentAttemptByMerchantTradeNo(merchantTradeNo);
+  if (balanceAttempt) {
+    if (!matchesECPayAmount(notifyData.TradeAmt, balanceAttempt.totalAmount)) {
+      console.error(`[ECPay Notify] Balance attempt TradeAmt mismatch for ${merchantTradeNo}`);
+      await recordAuditEventSafely({
+        source: "ecpay",
+        category: "balance",
+        action: "ecpay.balance.callback",
+        outcome: "rejected",
+        severity: "error",
+        orderId: balanceAttempt.balancePayment.orderId,
+        merchantTradeNo,
+        summary: "\u7DA0\u754C\u5C3E\u6B3E\u4ED8\u6B3E\u5617\u8A66\u56DE\u547C\u91D1\u984D\u4E0D\u7B26",
+        details: { ...callbackDetails, expectedAmount: balanceAttempt.totalAmount }
+      });
+      return "0|TradeAmt Error";
+    }
+    const claimed = await updateBalancePaymentAttemptStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (claimed && status === "paid") {
+      await deductInventoryAfterBalancePayment(claimed.balancePayment.merchantTradeNo);
+    }
+    await recordAuditEventSafely({
+      source: "ecpay",
+      category: "balance",
+      action: "ecpay.balance.attempt.callback",
+      outcome: claimed ? status === "paid" ? "success" : "failed" : "duplicate",
+      severity: status === "paid" ? "info" : "warning",
+      orderId: balanceAttempt.balancePayment.orderId,
+      merchantTradeNo,
+      summary: claimed ? status === "paid" ? "\u7DA0\u754C\u5C3E\u6B3E\u4ED8\u6B3E\u6210\u529F" : "\u7DA0\u754C\u56DE\u5831\u5C3E\u6B3E\u4ED8\u6B3E\u5931\u6557\uFF0C\u53EF\u7531\u539F\u9023\u7D50\u91CD\u8A66" : "\u5DF2\u8655\u7406\u6216\u5DF2\u5931\u6548\u7684\u5C3E\u6B3E\u4ED8\u6B3E\u5617\u8A66\u56DE\u547C\u5DF2\u5FFD\u7565",
+      details: { ...callbackDetails, balanceLinkToken: balanceAttempt.balancePayment.merchantTradeNo }
+    });
+    return "1|OK";
+  }
   const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
   if (balancePayment) {
     if (!matchesECPayAmount(notifyData.TradeAmt, balancePayment.totalAmount)) {
@@ -1251,7 +1404,7 @@ function registerECPayRoutes(app2) {
       res.redirect(302, "/");
     }
   });
-  app2.post("/api/ecpay/balance-result", (req, res) => {
+  app2.post("/api/ecpay/balance-result", async (req, res) => {
     try {
       const data = req.body;
       const merchantTradeNo = data?.MerchantTradeNo ?? "";
@@ -1260,7 +1413,9 @@ function registerECPayRoutes(app2) {
         res.redirect(302, "/");
         return;
       }
-      res.redirect(302, `/balance/${encodeURIComponent(merchantTradeNo)}`);
+      const attempt = await getBalancePaymentAttemptByMerchantTradeNo(merchantTradeNo);
+      const linkToken = attempt?.balancePayment.merchantTradeNo ?? merchantTradeNo;
+      res.redirect(302, `/balance/${encodeURIComponent(linkToken)}`);
     } catch (err) {
       console.error("[ECPay BalanceResult] Error:", err);
       res.redirect(302, "/");

@@ -1,8 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { createAtmCustomDepositOrder, login, uploadTransferReceipt } from "./helpers";
+import { generateCheckMacValue } from "../../server/ecpay";
 
 const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
 
@@ -96,6 +97,107 @@ async function getOrderInventoryDeducted(orderNo: string) {
     await connection.end();
   }
 }
+
+async function getBalanceAttemptNumbers(balanceOrderNo: string) {
+  const connection = await connectTestDb();
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      `SELECT a.merchantTradeNo
+       FROM orderBalancePaymentAttempts a
+       JOIN orderBalancePayments b ON b.id = a.balancePaymentId
+       WHERE b.merchantTradeNo = ?
+       ORDER BY a.id`,
+      [balanceOrderNo]
+    );
+    return rows.map((row) => String(row.merchantTradeNo));
+  } finally {
+    await connection.end();
+  }
+}
+
+async function getBalanceState(balanceOrderNo: string) {
+  const connection = await connectTestDb();
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      `SELECT b.merchantTradeNo, b.paymentStatus, o.shippingAddress
+       FROM orderBalancePayments b
+       JOIN orders o ON o.id = b.orderId
+       WHERE b.merchantTradeNo = ? LIMIT 1`,
+      [balanceOrderNo]
+    );
+    return rows[0];
+  } finally {
+    await connection.end();
+  }
+}
+
+async function fillBalanceHomeDelivery(page: Page) {
+  await page.locator('input[placeholder="郵遞區號"]').fill("100");
+  await page.locator('input[placeholder="縣市"]').fill("台北市");
+  await page.locator('input[placeholder="鄉鎮市區"]').fill("中正區");
+  await page.locator('input[placeholder="路名、門牌、樓層"]').fill("重試測試路 1 號");
+}
+
+test("failed credit balance payment keeps the original link and creates a new ECPay attempt on retry", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  const { balanceOrderNo } = await createDirectBalancePayment();
+  const postedAttempts: string[] = [];
+
+  await page.route("https://payment-stage.ecpay.com.tw/**", async (route) => {
+    const body = new URLSearchParams(route.request().postData() ?? "");
+    postedAttempts.push(body.get("MerchantTradeNo") ?? "");
+    await route.fulfill({ status: 200, contentType: "text/html", body: "<p>Mock ECPay checkout</p>" });
+  });
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await fillBalanceHomeDelivery(page);
+  await page.getByRole("button", { name: "前往信用卡付款" }).click();
+  await expect.poll(() => postedAttempts.length).toBe(1);
+  expect(postedAttempts[0]).not.toBe(balanceOrderNo);
+
+  const failedPayload: Record<string, string> = {
+    MerchantID: "3002607",
+    MerchantTradeNo: postedAttempts[0],
+    RtnCode: "10100058",
+    RtnMsg: "Payment failed",
+    TradeNo: "E2EFAILED001",
+    TradeAmt: "830",
+    PaymentType: "Credit_CreditCard",
+  };
+  failedPayload.CheckMacValue = generateCheckMacValue(failedPayload);
+  const callback = await request.post("/api/ecpay/notify", { form: failedPayload });
+  expect(await callback.text()).toBe("1|OK");
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await expect(page.getByRole("heading", { name: "本次信用卡付款未完成" })).toBeVisible();
+  await fillBalanceHomeDelivery(page);
+  await page.getByRole("button", { name: "重新使用信用卡付款" }).click();
+  await expect.poll(() => postedAttempts.length).toBe(2);
+  expect(postedAttempts[1]).not.toBe(postedAttempts[0]);
+
+  await expect.poll(() => getBalanceAttemptNumbers(balanceOrderNo)).toEqual(postedAttempts);
+
+  const paidPayload: Record<string, string> = {
+    MerchantID: "3002607",
+    MerchantTradeNo: postedAttempts[1],
+    RtnCode: "1",
+    RtnMsg: "Paid",
+    TradeNo: "E2EPAID001",
+    TradeAmt: "830",
+    PaymentType: "Credit_CreditCard",
+  };
+  paidPayload.CheckMacValue = generateCheckMacValue(paidPayload);
+  const paidCallback = await request.post("/api/ecpay/notify", { form: paidPayload });
+  expect(await paidCallback.text()).toBe("1|OK");
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await expect(page.getByRole("heading", { name: "尾款已完成付款" })).toBeVisible();
+  await expect.poll(() => getBalanceState(balanceOrderNo)).toMatchObject({
+    merchantTradeNo: balanceOrderNo,
+    paymentStatus: "paid",
+    shippingAddress: "台北市中正區重試測試路 1 號",
+  });
+});
 
 test("custom deposit order can receive a balance payment link and submit ATM balance transfer code", async ({ page }) => {
   test.setTimeout(90_000);

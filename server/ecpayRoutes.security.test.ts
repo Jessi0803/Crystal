@@ -26,7 +26,9 @@ vi.mock("./orderDb", () => ({
   getOrderByMerchantTradeNo: vi.fn(),
   updateOrderPaymentStatus: vi.fn(),
   getBalancePaymentByMerchantTradeNo: vi.fn(),
+  getBalancePaymentAttemptByMerchantTradeNo: vi.fn(),
   updateBalancePaymentStatus: vi.fn(),
+  updateBalancePaymentAttemptStatus: vi.fn(),
   updateLogisticsStatus: vi.fn(),
 }));
 

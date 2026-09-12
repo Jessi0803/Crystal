@@ -764,6 +764,33 @@ function OrderRowCard({
                     : detail.balancePayment.paymentStatus === "failed" ? "❌ 付款失敗"
                     : "待付款"
                   }</p>
+                  {(detail as any).balancePaymentAttempts?.length > 0 && (
+                    <div className="mt-3 border-t border-rose-200 pt-2">
+                      <p className="mb-1 font-medium">信用卡付款嘗試（最近 10 筆）</p>
+                      <div className="space-y-2">
+                        {(detail as any).balancePaymentAttempts.map((attempt: any) => {
+                          const callback = attempt.ecpayNotifyData as Record<string, string> | null;
+                          const statusLabel = attempt.paymentStatus === "paid"
+                            ? "✅ 成功"
+                            : attempt.paymentStatus === "failed"
+                            ? "❌ 失敗"
+                            : attempt.paymentStatus === "superseded"
+                            ? "已由新嘗試取代"
+                            : "處理中";
+                          return (
+                            <div key={attempt.merchantTradeNo} className="rounded-sm bg-white/70 px-2 py-1.5 text-[11px] leading-relaxed">
+                              <div className="flex flex-wrap justify-between gap-x-3">
+                                <span>{new Date(attempt.createdAt).toLocaleString("zh-TW")}</span>
+                                <span>{statusLabel} · NT$ {Number(attempt.totalAmount).toLocaleString()}</span>
+                              </div>
+                              <p className="break-all font-mono text-rose-500">{attempt.merchantTradeNo}</p>
+                              {callback?.RtnCode && <p>綠界回覆：{callback.RtnCode}{callback.RtnMsg ? ` · ${callback.RtnMsg}` : ""}</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   {(detail.balancePayment as any).transferLastFive && (
                     <p>匯款末五碼：<strong>{(detail.balancePayment as any).transferLastFive}</strong></p>
                   )}

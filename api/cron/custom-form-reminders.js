@@ -238,6 +238,30 @@ var orderBalancePayments = mysqlTable("orderBalancePayments", {
 }, (table) => [
   index("order_balance_payments_merchant_trade_no_idx").on(table.merchantTradeNo)
 ]);
+var orderBalancePaymentAttempts = mysqlTable("orderBalancePaymentAttempts", {
+  id: int("id").autoincrement().primaryKey(),
+  balancePaymentId: int("balancePaymentId").notNull(),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+  amount: int("amount").notNull(),
+  shippingFee: int("shippingFee").default(0).notNull(),
+  paymentFee: int("paymentFee").default(0).notNull(),
+  totalAmount: int("totalAmount").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["credit"]).default("credit").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", [
+    "pending",
+    "paid",
+    "failed",
+    "superseded"
+  ]).default("pending").notNull(),
+  checkoutData: json("checkoutData"),
+  tradeNo: varchar("tradeNo", { length: 64 }),
+  ecpayNotifyData: json("ecpayNotifyData"),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+}, (table) => [
+  index("order_balance_payment_attempts_balance_id_idx").on(table.balancePaymentId)
+]);
 var logisticsOrders = mysqlTable("logisticsOrders", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull().unique(),

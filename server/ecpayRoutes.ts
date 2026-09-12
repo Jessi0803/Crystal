@@ -17,7 +17,9 @@ import {
   getOrderByMerchantTradeNo,
   updateLogisticsStatus,
   getBalancePaymentByMerchantTradeNo,
+  getBalancePaymentAttemptByMerchantTradeNo,
   updateBalancePaymentStatus,
+  updateBalancePaymentAttemptStatus,
 } from "./orderDb";
 import { deductInventoryAfterBalancePayment, deductInventoryAfterPayment } from "./inventoryDb";
 import {
@@ -131,6 +133,37 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
     return "1|OK";
   }
 
+  const balanceAttempt = await getBalancePaymentAttemptByMerchantTradeNo(merchantTradeNo);
+  if (balanceAttempt) {
+    if (!matchesECPayAmount(notifyData.TradeAmt, balanceAttempt.totalAmount)) {
+      console.error(`[ECPay Notify] Balance attempt TradeAmt mismatch for ${merchantTradeNo}`);
+      await recordAuditEventSafely({
+        source: "ecpay", category: "balance", action: "ecpay.balance.callback",
+        outcome: "rejected", severity: "error", orderId: balanceAttempt.balancePayment.orderId, merchantTradeNo,
+        summary: "綠界尾款付款嘗試回呼金額不符",
+        details: { ...callbackDetails, expectedAmount: balanceAttempt.totalAmount },
+      });
+      return "0|TradeAmt Error";
+    }
+    const claimed = await updateBalancePaymentAttemptStatus(merchantTradeNo, status, tradeNo, notifyData);
+    if (claimed && status === "paid") {
+      await deductInventoryAfterBalancePayment(claimed.balancePayment.merchantTradeNo);
+    }
+    await recordAuditEventSafely({
+      source: "ecpay", category: "balance", action: "ecpay.balance.attempt.callback",
+      outcome: claimed ? (status === "paid" ? "success" : "failed") : "duplicate",
+      severity: status === "paid" ? "info" : "warning",
+      orderId: balanceAttempt.balancePayment.orderId,
+      merchantTradeNo,
+      summary: claimed
+        ? status === "paid" ? "綠界尾款付款成功" : "綠界回報尾款付款失敗，可由原連結重試"
+        : "已處理或已失效的尾款付款嘗試回呼已忽略",
+      details: { ...callbackDetails, balanceLinkToken: balanceAttempt.balancePayment.merchantTradeNo },
+    });
+    return "1|OK";
+  }
+
+  // 向下相容：部署前已送往綠界、尚未回呼的交易仍以固定連結編號回查舊主記錄。
   const balancePayment = await getBalancePaymentByMerchantTradeNo(merchantTradeNo);
   if (balancePayment) {
     if (!matchesECPayAmount(notifyData.TradeAmt, balancePayment.totalAmount)) {
@@ -217,7 +250,7 @@ export function registerECPayRoutes(app: Application) {
     }
   });
 
-  app.post("/api/ecpay/balance-result", (req: Request, res: Response) => {
+  app.post("/api/ecpay/balance-result", async (req: Request, res: Response) => {
     try {
       const data = req.body as Record<string, string>;
       const merchantTradeNo = data?.MerchantTradeNo ?? "";
@@ -226,7 +259,9 @@ export function registerECPayRoutes(app: Application) {
         res.redirect(302, "/");
         return;
       }
-      res.redirect(302, `/balance/${encodeURIComponent(merchantTradeNo)}`);
+      const attempt = await getBalancePaymentAttemptByMerchantTradeNo(merchantTradeNo);
+      const linkToken = attempt?.balancePayment.merchantTradeNo ?? merchantTradeNo;
+      res.redirect(302, `/balance/${encodeURIComponent(linkToken)}`);
     } catch (err) {
       console.error("[ECPay BalanceResult] Error:", err);
       res.redirect(302, "/");

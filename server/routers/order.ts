@@ -30,6 +30,7 @@ import {
   markOrderPaidPayPal,
   isCustomDepositProduct,
   createOrReplaceBalancePayment,
+  createBalancePaymentAttempt,
   getBalancePaymentDetail,
   updateBalancePaymentTransferCode,
   confirmBalanceTransfer,
@@ -1763,7 +1764,7 @@ export const orderRouter = router({
       if (balancePayment.paymentStatus === "paid") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
       }
-      if (balancePayment.paymentStatus !== "pending") {
+      if (balancePayment.paymentStatus !== "pending" && balancePayment.paymentStatus !== "failed") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "此尾款連結目前不可付款" });
       }
 
@@ -1845,12 +1846,78 @@ export const orderRouter = router({
       });
       const totalAmount = feeSummary.total;
 
+      const orderUpdate = {
+        buyerPhone: input.receiverPhone.trim(),
+        deliveryRegion: isOverseas ? ("overseas" as const) : ("domestic" as const),
+        shippingMethod,
+        cvsStoreId: cvsStoreId ?? null,
+        cvsStoreName: cvsStoreName ?? null,
+        cvsType: cvsType ?? null,
+        shippingAddress: shippingAddress ?? null,
+        receiverZipCode: receiverZipCode ?? null,
+      };
+
+      if (input.paymentMethod === "credit") {
+        let attempt;
+        try {
+          attempt = await createBalancePaymentAttempt({
+            balancePaymentId: balancePayment.id,
+            amount: balancePayment.amount,
+            shippingFee: feeSummary.shippingFee,
+            paymentFee: feeSummary.paymentFee,
+            totalAmount,
+            checkoutData: {
+              orderUpdate,
+              clearQuartzChipsAddOn: clearQuartzChipsAddOn
+                ? {
+                    productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+                    productName: clearQuartzChipsAddOn.name,
+                    productImage: clearQuartzChipsAddOn.image,
+                    quantity: 1,
+                    unitPrice: clearQuartzChipsAddOn.price,
+                    subtotal: clearQuartzChipsAddOn.price,
+                  }
+                : null,
+            },
+          });
+        } catch (error) {
+          if (error instanceof Error && error.message === "Inactive balance payment cannot be retried") {
+            throw new TRPCError({ code: "CONFLICT", message: "尾款狀態已更新，請重新整理頁面" });
+          }
+          throw error;
+        }
+
+        const origin = siteBaseUrl(ctx.req);
+        const paymentParams = buildCreditPaymentParams({
+          merchantTradeNo: attempt.merchantTradeNo,
+          tradeDesc: "椛Crystal客製化尾款",
+          itemName: balanceItems.map((item) => `${item.name} x${item.quantity}`).join("#"),
+          totalAmount,
+          returnURL: `${origin}/api/ecpay/notify`,
+          orderResultURL: `${origin}/api/ecpay/balance-result`,
+          clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
+        });
+
+        return {
+          kind: "credit" as const,
+          paymentURL: ECPAY_CONFIG.PaymentURL,
+          paymentParams,
+          amount: totalAmount,
+          shippingFee: feeSummary.shippingFee,
+          paymentFee: feeSummary.paymentFee,
+        };
+      }
+
       await db.update(orderBalancePayments)
         .set({
           paymentMethod: input.paymentMethod,
           shippingFee: feeSummary.shippingFee,
           paymentFee: feeSummary.paymentFee,
           totalAmount,
+          paymentStatus: "pending",
+          tradeNo: null,
+          ecpayNotifyData: null,
+          paidAt: null,
         })
         .where(eq(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
 
@@ -1887,47 +1954,18 @@ export const orderRouter = router({
 
       await db.update(orders)
         .set({
-          buyerPhone: input.receiverPhone.trim(),
-          deliveryRegion: isOverseas ? "overseas" : "domestic",
-          shippingMethod,
-          cvsStoreId: cvsStoreId ?? null,
-          cvsStoreName: cvsStoreName ?? null,
-          cvsType: cvsType ?? null,
-          shippingAddress: shippingAddress ?? null,
-          receiverZipCode: receiverZipCode ?? null,
+          ...orderUpdate,
           totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount,
           ...(clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}),
         })
         .where(eq(orders.id, balancePayment.orderId));
 
-      if (input.paymentMethod === "atm") {
-        return {
-          kind: "atm" as const,
-          amount: totalAmount,
-          shippingFee: feeSummary.shippingFee,
-          paymentFee: feeSummary.paymentFee,
-          bankInfo: STORE_BANK_INFO,
-        };
-      }
-
-      const origin = siteBaseUrl(ctx.req);
-      const paymentParams = buildCreditPaymentParams({
-        merchantTradeNo: balancePayment.merchantTradeNo,
-        tradeDesc: "椛Crystal客製化尾款",
-        itemName: balanceItems.map((item) => `${item.name} x${item.quantity}`).join("#"),
-        totalAmount,
-        returnURL: `${origin}/api/ecpay/notify`,
-        orderResultURL: `${origin}/api/ecpay/balance-result`,
-        clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
-      });
-
       return {
-        kind: "credit" as const,
-        paymentURL: ECPAY_CONFIG.PaymentURL,
-        paymentParams,
+        kind: "atm" as const,
         amount: totalAmount,
         shippingFee: feeSummary.shippingFee,
         paymentFee: feeSummary.paymentFee,
+        bankInfo: STORE_BANK_INFO,
       };
     }),
 

@@ -10,6 +10,7 @@ import {
   orderItems,
   logisticsOrders,
   orderBalancePayments,
+  orderBalancePaymentAttempts,
   orderMergeGroups,
   orderMergeMembers,
   dbProducts,
@@ -26,6 +27,27 @@ type OrderRow = typeof orders.$inferSelect;
 type OrderItemRow = typeof orderItems.$inferSelect;
 type LogisticsRow = typeof logisticsOrders.$inferSelect;
 type BalancePaymentRow = typeof orderBalancePayments.$inferSelect;
+type BalancePaymentAttemptRow = typeof orderBalancePaymentAttempts.$inferSelect;
+export type BalancePaymentAttemptCheckoutData = {
+  orderUpdate: {
+    buyerPhone: string;
+    deliveryRegion: "domestic" | "overseas";
+    shippingMethod: "cvs_711" | "cvs_family" | "home";
+    cvsStoreId: string | null;
+    cvsStoreName: string | null;
+    cvsType: string | null;
+    shippingAddress: string | null;
+    receiverZipCode: string | null;
+  };
+  clearQuartzChipsAddOn: null | {
+    productId: string;
+    productName: string;
+    productImage: string | null;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+  };
+};
 
 export type OrderMergeInfo = {
   groupId: number;
@@ -86,6 +108,10 @@ export type OrderWithItemsAndLogistics = OrderRow & {
   items: OrderItemRow[];
   logistics: LogisticsRow | null;
   balancePayment?: BalancePaymentRow | null;
+  balancePaymentAttempts?: Pick<BalancePaymentAttemptRow,
+    "merchantTradeNo" | "totalAmount" | "paymentStatus" | "tradeNo" |
+    "ecpayNotifyData" | "paidAt" | "createdAt"
+  >[];
   mergeInfo?: OrderMergeDetail | null;
 };
 
@@ -192,6 +218,34 @@ async function ensureBalancePaymentColumns(db: DbInstance) {
     /* column already exists */
   }
   balancePaymentColumnsEnsured = true;
+}
+
+let balancePaymentAttemptTableEnsured = false;
+async function ensureBalancePaymentAttemptTable(db: DbInstance) {
+  if (balancePaymentAttemptTableEnsured) return;
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS \`orderBalancePaymentAttempts\` (
+      \`id\` int AUTO_INCREMENT NOT NULL,
+      \`balancePaymentId\` int NOT NULL,
+      \`merchantTradeNo\` varchar(32) NOT NULL,
+      \`amount\` int NOT NULL,
+      \`shippingFee\` int NOT NULL DEFAULT 0,
+      \`paymentFee\` int NOT NULL DEFAULT 0,
+      \`totalAmount\` int NOT NULL,
+      \`paymentMethod\` enum('credit') NOT NULL DEFAULT 'credit',
+      \`paymentStatus\` enum('pending','paid','failed','superseded') NOT NULL DEFAULT 'pending',
+      \`checkoutData\` json NULL,
+      \`tradeNo\` varchar(64) NULL,
+      \`ecpayNotifyData\` json NULL,
+      \`paidAt\` timestamp NULL,
+      \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`orderBalancePaymentAttempts_merchantTradeNo_unique\` (\`merchantTradeNo\`),
+      KEY \`order_balance_payment_attempts_balance_id_idx\` (\`balancePaymentId\`)
+    )
+  `);
+  balancePaymentAttemptTableEnsured = true;
 }
 
 async function getMergeInfoForOrderIds(db: DbInstance, orderIds: number[]) {
@@ -779,6 +833,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
+  await ensureBalancePaymentAttemptTable(db);
 
   const [order] = await db
     .select()
@@ -815,6 +870,23 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq(orderBalancePayments.orderId, order.id)).limit(1),
   ]);
 
+  const balanceAttempts = balancePayment[0]
+    ? await db
+        .select({
+          merchantTradeNo: orderBalancePaymentAttempts.merchantTradeNo,
+          totalAmount: orderBalancePaymentAttempts.totalAmount,
+          paymentStatus: orderBalancePaymentAttempts.paymentStatus,
+          tradeNo: orderBalancePaymentAttempts.tradeNo,
+          ecpayNotifyData: orderBalancePaymentAttempts.ecpayNotifyData,
+          paidAt: orderBalancePaymentAttempts.paidAt,
+          createdAt: orderBalancePaymentAttempts.createdAt,
+        })
+        .from(orderBalancePaymentAttempts)
+        .where(eq(orderBalancePaymentAttempts.balancePaymentId, balancePayment[0].id))
+        .orderBy(desc(orderBalancePaymentAttempts.id))
+        .limit(10)
+    : [];
+
   return {
     ...order,
     totalAmount: displayTotalAmount,
@@ -824,6 +896,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
     })),
     logistics: logistics[0] ?? null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
+    balancePaymentAttempts: balanceAttempts,
     mergeInfo,
   };
 }
@@ -1021,7 +1094,8 @@ export async function createOrReplaceBalancePayment(opts: {
     throw new Error("Balance already paid");
   }
 
-  const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
+  // 已建立的 merchantTradeNo 是客戶持有的固定尾款網址，不得因管理員重設尾款而更換。
+  const linkMerchantTradeNo = existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
   const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
   const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
 
@@ -1031,7 +1105,6 @@ export async function createOrReplaceBalancePayment(opts: {
     await db
       .update(orderBalancePayments)
       .set({
-        merchantTradeNo: nextMerchantTradeNo,
         amount: opts.amount,
         shippingFee: 0,
         paymentFee: 0,
@@ -1053,7 +1126,7 @@ export async function createOrReplaceBalancePayment(opts: {
 
   const insertData: InsertOrderBalancePayment = {
     orderId: opts.orderId,
-    merchantTradeNo: nextMerchantTradeNo,
+    merchantTradeNo: linkMerchantTradeNo,
     amount: opts.amount,
     shippingFee: 0,
     paymentFee: 0,
@@ -1066,7 +1139,7 @@ export async function createOrReplaceBalancePayment(opts: {
   const [created] = await db
     .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
-    .where(eq(orderBalancePayments.merchantTradeNo, nextMerchantTradeNo))
+    .where(eq(orderBalancePayments.merchantTradeNo, linkMerchantTradeNo))
     .limit(1);
   return hydrateBalancePayment(created)!;
 }
@@ -1084,10 +1157,195 @@ export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string
   return hydrateBalancePayment(row);
 }
 
+export async function createBalancePaymentAttempt(opts: {
+  balancePaymentId: number;
+  amount: number;
+  shippingFee: number;
+  paymentFee: number;
+  totalAmount: number;
+  checkoutData: BalancePaymentAttemptCheckoutData;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentAttemptTable(db);
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${opts.balancePaymentId} FOR UPDATE`);
+    const [balance] = await tx
+      .select(balancePaymentLegacySelect)
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.id, opts.balancePaymentId))
+      .limit(1);
+    if (!balance) throw new Error("Balance payment not found");
+    if (balance.paymentStatus === "paid" || balance.paymentStatus === "cancelled" || balance.paymentStatus === "transfer_pending") {
+      throw new Error("Inactive balance payment cannot be retried");
+    }
+
+    // 讓舊的尚未完成嘗試停止出現在「進行中」；若其延遲回傳成功，回呼仍會安全處理。
+    await tx
+      .update(orderBalancePaymentAttempts)
+      .set({ paymentStatus: "superseded" })
+      .where(and(
+        eq(orderBalancePaymentAttempts.balancePaymentId, opts.balancePaymentId),
+        eq(orderBalancePaymentAttempts.paymentStatus, "pending"),
+      ));
+
+    const merchantTradeNo = generateBalanceMerchantTradeNo();
+    await tx.insert(orderBalancePaymentAttempts).values({
+      balancePaymentId: opts.balancePaymentId,
+      merchantTradeNo,
+      amount: opts.amount,
+      shippingFee: opts.shippingFee,
+      paymentFee: opts.paymentFee,
+      totalAmount: opts.totalAmount,
+      paymentMethod: "credit",
+      paymentStatus: "pending",
+      checkoutData: opts.checkoutData,
+    });
+
+    // 舊版曾把失敗寫在尾款主記錄；建立新嘗試時恢復成可付款，但固定網址不變。
+    if (balance.paymentStatus === "failed") {
+      await tx
+        .update(orderBalancePayments)
+        .set({ paymentStatus: "pending", tradeNo: null, ecpayNotifyData: null, paidAt: null })
+        .where(and(
+          eq(orderBalancePayments.id, balance.id),
+          eq(orderBalancePayments.paymentStatus, "failed"),
+        ));
+    }
+
+    return { merchantTradeNo };
+  });
+}
+
+export async function getBalancePaymentAttemptByMerchantTradeNo(merchantTradeNo: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentAttemptTable(db);
+
+  const [attempt] = await db
+    .select()
+    .from(orderBalancePaymentAttempts)
+    .where(eq(orderBalancePaymentAttempts.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!attempt) return null;
+
+  const [balancePayment] = await db
+    .select(balancePaymentLegacySelect)
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.id, attempt.balancePaymentId))
+    .limit(1);
+  if (!balancePayment) return null;
+  return { ...attempt, balancePayment: hydrateBalancePayment(balancePayment)! };
+}
+
+export async function updateBalancePaymentAttemptStatus(
+  merchantTradeNo: string,
+  status: "paid" | "failed",
+  tradeNo: string,
+  notifyData: Record<string, string>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentAttemptTable(db);
+
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx
+      .select()
+      .from(orderBalancePaymentAttempts)
+      .where(eq(orderBalancePaymentAttempts.merchantTradeNo, merchantTradeNo))
+      .limit(1);
+    if (!attempt) return null;
+
+    if (status === "failed") {
+      const result = await tx
+        .update(orderBalancePaymentAttempts)
+        .set({ paymentStatus: "failed", tradeNo, ecpayNotifyData: notifyData })
+        .where(and(
+          eq(orderBalancePaymentAttempts.id, attempt.id),
+          sql`${orderBalancePaymentAttempts.paymentStatus} IN ('pending', 'superseded')`,
+        ));
+      if (getAffectedRows(result) === 0) return null;
+      const [balance] = await tx
+        .select(balancePaymentLegacySelect)
+        .from(orderBalancePayments)
+        .where(eq(orderBalancePayments.id, attempt.balancePaymentId))
+        .limit(1);
+      return balance ? { ...attempt, balancePayment: hydrateBalancePayment(balance)! } : null;
+    }
+
+    const [balance] = await tx
+      .select(balancePaymentLegacySelect)
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.id, attempt.balancePaymentId))
+      .limit(1);
+    if (!balance || balance.paymentStatus !== "pending") return null;
+
+    const now = new Date();
+    // 先搶尾款主記錄，確保不同付款嘗試的併發成功回呼也只能完成一次。
+    const balanceResult = await tx
+      .update(orderBalancePayments)
+      .set({
+        paymentMethod: "credit",
+        shippingFee: attempt.shippingFee,
+        paymentFee: attempt.paymentFee,
+        totalAmount: attempt.totalAmount,
+        paymentStatus: "paid",
+        tradeNo,
+        ecpayNotifyData: notifyData,
+        paidAt: now,
+      })
+      .where(and(
+        eq(orderBalancePayments.id, balance.id),
+        eq(orderBalancePayments.paymentStatus, "pending"),
+      ));
+    if (getAffectedRows(balanceResult) === 0) return null;
+
+    const checkoutData = attempt.checkoutData as BalancePaymentAttemptCheckoutData | null;
+    const [order] = await tx.select().from(orders).where(eq(orders.id, balance.orderId)).limit(1);
+    if (!order) throw new Error("Balance payment parent order not found");
+
+    if (checkoutData?.clearQuartzChipsAddOn) {
+      const addOn = checkoutData.clearQuartzChipsAddOn;
+      const [existingItem] = await tx
+        .select({ id: orderItems.id })
+        .from(orderItems)
+        .where(and(eq(orderItems.orderId, order.id), eq(orderItems.productId, addOn.productId)))
+        .limit(1);
+      if (existingItem) {
+        await tx.update(orderItems).set(addOn).where(eq(orderItems.id, existingItem.id));
+      } else {
+        await tx.insert(orderItems).values({ orderId: order.id, ...addOn, isPreorder: false });
+      }
+    }
+
+    const nextOrderTotal = Math.max(1, order.totalAmount - balance.totalAmount + attempt.totalAmount);
+    await tx
+      .update(orders)
+      .set({
+        ...(checkoutData?.orderUpdate ?? {}),
+        totalAmount: nextOrderTotal,
+        orderStatus: "paid",
+        paymentStatus: "paid",
+        paidAt: now,
+        ...(checkoutData?.clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}),
+      })
+      .where(eq(orders.id, balance.orderId));
+
+    await tx
+      .update(orderBalancePaymentAttempts)
+      .set({ paymentStatus: "paid", tradeNo, ecpayNotifyData: notifyData, paidAt: now })
+      .where(eq(orderBalancePaymentAttempts.id, attempt.id));
+
+    return { ...attempt, balancePayment: hydrateBalancePayment(balance)! };
+  });
+}
+
 export async function getBalancePaymentDetail(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
+  await ensureBalancePaymentAttemptTable(db);
 
   const [row] = await db
     .select(balancePaymentLegacySelect)
@@ -1115,6 +1373,15 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     .limit(1);
 
   const originalDomesticFreeShipping = await orderHasDomesticFreeShipping(db, order.id);
+  const [latestAttempt] = await db
+    .select({
+      paymentStatus: orderBalancePaymentAttempts.paymentStatus,
+      createdAt: orderBalancePaymentAttempts.createdAt,
+    })
+    .from(orderBalancePaymentAttempts)
+    .where(eq(orderBalancePaymentAttempts.balancePaymentId, balancePayment.id))
+    .orderBy(desc(orderBalancePaymentAttempts.id))
+    .limit(1);
 
   return {
     ...balancePayment,
@@ -1122,6 +1389,7 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     orderMergeInfo,
     clearQuartzChipsItem: clearQuartzChipsItem ?? null,
     originalDomesticFreeShipping,
+    latestAttempt: latestAttempt ?? null,
   };
 }
 

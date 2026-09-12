@@ -17,6 +17,7 @@ __export(schema_exports, {
   inventoryLocks: () => inventoryLocks,
   logisticsOrders: () => logisticsOrders,
   operationAuditEvents: () => operationAuditEvents,
+  orderBalancePaymentAttempts: () => orderBalancePaymentAttempts,
   orderBalancePayments: () => orderBalancePayments,
   orderItems: () => orderItems,
   orderMergeGroups: () => orderMergeGroups,
@@ -27,7 +28,7 @@ __export(schema_exports, {
   users: () => users
 });
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
-var users, productInventory, inventoryLocks, orders, orderMergeGroups, orderMergeMembers, orderItems, orderBalancePayments, logisticsOrders, operationAuditEvents, chatbotLogs, chatbotKnowledge, siteSettings, dbProducts;
+var users, productInventory, inventoryLocks, orders, orderMergeGroups, orderMergeMembers, orderItems, orderBalancePayments, orderBalancePaymentAttempts, logisticsOrders, operationAuditEvents, chatbotLogs, chatbotKnowledge, siteSettings, dbProducts;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -245,6 +246,30 @@ var init_schema = __esm({
       updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
     }, (table) => [
       index("order_balance_payments_merchant_trade_no_idx").on(table.merchantTradeNo)
+    ]);
+    orderBalancePaymentAttempts = mysqlTable("orderBalancePaymentAttempts", {
+      id: int("id").autoincrement().primaryKey(),
+      balancePaymentId: int("balancePaymentId").notNull(),
+      merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+      amount: int("amount").notNull(),
+      shippingFee: int("shippingFee").default(0).notNull(),
+      paymentFee: int("paymentFee").default(0).notNull(),
+      totalAmount: int("totalAmount").notNull(),
+      paymentMethod: mysqlEnum("paymentMethod", ["credit"]).default("credit").notNull(),
+      paymentStatus: mysqlEnum("paymentStatus", [
+        "pending",
+        "paid",
+        "failed",
+        "superseded"
+      ]).default("pending").notNull(),
+      checkoutData: json("checkoutData"),
+      tradeNo: varchar("tradeNo", { length: 64 }),
+      ecpayNotifyData: json("ecpayNotifyData"),
+      paidAt: timestamp("paidAt"),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+    }, (table) => [
+      index("order_balance_payment_attempts_balance_id_idx").on(table.balancePaymentId)
     ]);
     logisticsOrders = mysqlTable("logisticsOrders", {
       id: int("id").autoincrement().primaryKey(),
@@ -1308,6 +1333,33 @@ async function ensureBalancePaymentColumns(db) {
   }
   balancePaymentColumnsEnsured = true;
 }
+var balancePaymentAttemptTableEnsured = false;
+async function ensureBalancePaymentAttemptTable(db) {
+  if (balancePaymentAttemptTableEnsured) return;
+  await db.execute(sql3`
+    CREATE TABLE IF NOT EXISTS \`orderBalancePaymentAttempts\` (
+      \`id\` int AUTO_INCREMENT NOT NULL,
+      \`balancePaymentId\` int NOT NULL,
+      \`merchantTradeNo\` varchar(32) NOT NULL,
+      \`amount\` int NOT NULL,
+      \`shippingFee\` int NOT NULL DEFAULT 0,
+      \`paymentFee\` int NOT NULL DEFAULT 0,
+      \`totalAmount\` int NOT NULL,
+      \`paymentMethod\` enum('credit') NOT NULL DEFAULT 'credit',
+      \`paymentStatus\` enum('pending','paid','failed','superseded') NOT NULL DEFAULT 'pending',
+      \`checkoutData\` json NULL,
+      \`tradeNo\` varchar(64) NULL,
+      \`ecpayNotifyData\` json NULL,
+      \`paidAt\` timestamp NULL,
+      \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`orderBalancePaymentAttempts_merchantTradeNo_unique\` (\`merchantTradeNo\`),
+      KEY \`order_balance_payment_attempts_balance_id_idx\` (\`balancePaymentId\`)
+    )
+  `);
+  balancePaymentAttemptTableEnsured = true;
+}
 async function getMergeInfoForOrderIds(db, orderIds) {
   if (orderIds.length === 0) return /* @__PURE__ */ new Map();
   const memberRows = await db.select({
@@ -1610,6 +1662,7 @@ async function getAdminOrderDetail(orderId) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
+  await ensureBalancePaymentAttemptTable(db);
   const [order] = await db.select().from(orders).where(eq3(orders.id, orderId)).limit(1);
   if (!order) return null;
   const mergeInfo = await getMergeDetailForOrder(db, order.id);
@@ -1631,6 +1684,15 @@ async function getAdminOrderDetail(orderId) {
     db.select().from(logisticsOrders).where(eq3(logisticsOrders.orderId, order.id)).limit(1),
     db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq3(orderBalancePayments.orderId, order.id)).limit(1)
   ]);
+  const balanceAttempts = balancePayment[0] ? await db.select({
+    merchantTradeNo: orderBalancePaymentAttempts.merchantTradeNo,
+    totalAmount: orderBalancePaymentAttempts.totalAmount,
+    paymentStatus: orderBalancePaymentAttempts.paymentStatus,
+    tradeNo: orderBalancePaymentAttempts.tradeNo,
+    ecpayNotifyData: orderBalancePaymentAttempts.ecpayNotifyData,
+    paidAt: orderBalancePaymentAttempts.paidAt,
+    createdAt: orderBalancePaymentAttempts.createdAt
+  }).from(orderBalancePaymentAttempts).where(eq3(orderBalancePaymentAttempts.balancePaymentId, balancePayment[0].id)).orderBy(desc2(orderBalancePaymentAttempts.id)).limit(10) : [];
   return {
     ...order,
     totalAmount: displayTotalAmount,
@@ -1640,6 +1702,7 @@ async function getAdminOrderDetail(orderId) {
     })),
     logistics: logistics[0] ?? null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
+    balancePaymentAttempts: balanceAttempts,
     mergeInfo
   };
 }
@@ -1750,13 +1813,12 @@ async function createOrReplaceBalancePayment(opts) {
   if (existing?.paymentStatus === "paid") {
     throw new Error("Balance already paid");
   }
-  const nextMerchantTradeNo = generateBalanceMerchantTradeNo();
+  const linkMerchantTradeNo = existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
   const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
   const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
   await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq3(orders.id, opts.orderId));
   if (existing) {
     await db.update(orderBalancePayments).set({
-      merchantTradeNo: nextMerchantTradeNo,
       amount: opts.amount,
       shippingFee: 0,
       paymentFee: 0,
@@ -1771,7 +1833,7 @@ async function createOrReplaceBalancePayment(opts) {
   }
   const insertData = {
     orderId: opts.orderId,
-    merchantTradeNo: nextMerchantTradeNo,
+    merchantTradeNo: linkMerchantTradeNo,
     amount: opts.amount,
     shippingFee: 0,
     paymentFee: 0,
@@ -1779,13 +1841,50 @@ async function createOrReplaceBalancePayment(opts) {
     paymentStatus: "pending"
   };
   await db.insert(orderBalancePayments).values(insertData);
-  const [created] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq3(orderBalancePayments.merchantTradeNo, nextMerchantTradeNo)).limit(1);
+  const [created] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq3(orderBalancePayments.merchantTradeNo, linkMerchantTradeNo)).limit(1);
   return hydrateBalancePayment(created);
+}
+async function createBalancePaymentAttempt(opts) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentAttemptTable(db);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql3`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${opts.balancePaymentId} FOR UPDATE`);
+    const [balance] = await tx.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq3(orderBalancePayments.id, opts.balancePaymentId)).limit(1);
+    if (!balance) throw new Error("Balance payment not found");
+    if (balance.paymentStatus === "paid" || balance.paymentStatus === "cancelled" || balance.paymentStatus === "transfer_pending") {
+      throw new Error("Inactive balance payment cannot be retried");
+    }
+    await tx.update(orderBalancePaymentAttempts).set({ paymentStatus: "superseded" }).where(and3(
+      eq3(orderBalancePaymentAttempts.balancePaymentId, opts.balancePaymentId),
+      eq3(orderBalancePaymentAttempts.paymentStatus, "pending")
+    ));
+    const merchantTradeNo = generateBalanceMerchantTradeNo();
+    await tx.insert(orderBalancePaymentAttempts).values({
+      balancePaymentId: opts.balancePaymentId,
+      merchantTradeNo,
+      amount: opts.amount,
+      shippingFee: opts.shippingFee,
+      paymentFee: opts.paymentFee,
+      totalAmount: opts.totalAmount,
+      paymentMethod: "credit",
+      paymentStatus: "pending",
+      checkoutData: opts.checkoutData
+    });
+    if (balance.paymentStatus === "failed") {
+      await tx.update(orderBalancePayments).set({ paymentStatus: "pending", tradeNo: null, ecpayNotifyData: null, paidAt: null }).where(and3(
+        eq3(orderBalancePayments.id, balance.id),
+        eq3(orderBalancePayments.paymentStatus, "failed")
+      ));
+    }
+    return { merchantTradeNo };
+  });
 }
 async function getBalancePaymentDetail(merchantTradeNo) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
+  await ensureBalancePaymentAttemptTable(db);
   const [row] = await db.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq3(orderBalancePayments.merchantTradeNo, merchantTradeNo)).limit(1);
   const balancePayment = hydrateBalancePayment(row);
   if (!balancePayment) return null;
@@ -1797,12 +1896,17 @@ async function getBalancePaymentDetail(merchantTradeNo) {
     eq3(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
   )).limit(1);
   const originalDomesticFreeShipping = await orderHasDomesticFreeShipping(db, order.id);
+  const [latestAttempt] = await db.select({
+    paymentStatus: orderBalancePaymentAttempts.paymentStatus,
+    createdAt: orderBalancePaymentAttempts.createdAt
+  }).from(orderBalancePaymentAttempts).where(eq3(orderBalancePaymentAttempts.balancePaymentId, balancePayment.id)).orderBy(desc2(orderBalancePaymentAttempts.id)).limit(1);
   return {
     ...balancePayment,
     order,
     orderMergeInfo,
     clearQuartzChipsItem: clearQuartzChipsItem ?? null,
-    originalDomesticFreeShipping
+    originalDomesticFreeShipping,
+    latestAttempt: latestAttempt ?? null
   };
 }
 async function updateBalancePaymentTransferCode(merchantTradeNo, lastFive, transferReceiptUrl) {
@@ -4541,7 +4645,7 @@ var orderRouter = router({
     if (balancePayment.paymentStatus === "paid") {
       throw new TRPCError4({ code: "BAD_REQUEST", message: "\u5C3E\u6B3E\u5DF2\u4ED8\u6B3E" });
     }
-    if (balancePayment.paymentStatus !== "pending") {
+    if (balancePayment.paymentStatus !== "pending" && balancePayment.paymentStatus !== "failed") {
       throw new TRPCError4({ code: "BAD_REQUEST", message: "\u6B64\u5C3E\u6B3E\u9023\u7D50\u76EE\u524D\u4E0D\u53EF\u4ED8\u6B3E" });
     }
     const db = await getDb();
@@ -4604,11 +4708,71 @@ var orderRouter = router({
       forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !forceBalanceFreeShipping)
     });
     const totalAmount = feeSummary.total;
+    const orderUpdate = {
+      buyerPhone: input.receiverPhone.trim(),
+      deliveryRegion: isOverseas ? "overseas" : "domestic",
+      shippingMethod,
+      cvsStoreId: cvsStoreId ?? null,
+      cvsStoreName: cvsStoreName ?? null,
+      cvsType: cvsType ?? null,
+      shippingAddress: shippingAddress ?? null,
+      receiverZipCode: receiverZipCode ?? null
+    };
+    if (input.paymentMethod === "credit") {
+      let attempt;
+      try {
+        attempt = await createBalancePaymentAttempt({
+          balancePaymentId: balancePayment.id,
+          amount: balancePayment.amount,
+          shippingFee: feeSummary.shippingFee,
+          paymentFee: feeSummary.paymentFee,
+          totalAmount,
+          checkoutData: {
+            orderUpdate,
+            clearQuartzChipsAddOn: clearQuartzChipsAddOn ? {
+              productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+              productName: clearQuartzChipsAddOn.name,
+              productImage: clearQuartzChipsAddOn.image,
+              quantity: 1,
+              unitPrice: clearQuartzChipsAddOn.price,
+              subtotal: clearQuartzChipsAddOn.price
+            } : null
+          }
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === "Inactive balance payment cannot be retried") {
+          throw new TRPCError4({ code: "CONFLICT", message: "\u5C3E\u6B3E\u72C0\u614B\u5DF2\u66F4\u65B0\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u9801\u9762" });
+        }
+        throw error;
+      }
+      const origin = siteBaseUrl(ctx.req);
+      const paymentParams = buildCreditPaymentParams({
+        merchantTradeNo: attempt.merchantTradeNo,
+        tradeDesc: "\u691BCrystal\u5BA2\u88FD\u5316\u5C3E\u6B3E",
+        itemName: balanceItems.map((item) => `${item.name} x${item.quantity}`).join("#"),
+        totalAmount,
+        returnURL: `${origin}/api/ecpay/notify`,
+        orderResultURL: `${origin}/api/ecpay/balance-result`,
+        clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`
+      });
+      return {
+        kind: "credit",
+        paymentURL: ECPAY_CONFIG.PaymentURL,
+        paymentParams,
+        amount: totalAmount,
+        shippingFee: feeSummary.shippingFee,
+        paymentFee: feeSummary.paymentFee
+      };
+    }
     await db.update(orderBalancePayments).set({
       paymentMethod: input.paymentMethod,
       shippingFee: feeSummary.shippingFee,
       paymentFee: feeSummary.paymentFee,
-      totalAmount
+      totalAmount,
+      paymentStatus: "pending",
+      tradeNo: null,
+      ecpayNotifyData: null,
+      paidAt: null
     }).where(eq7(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
     const [existingClearQuartzItem] = await db.select().from(orderItems).where(and5(
       eq7(orderItems.orderId, balancePayment.orderId),
@@ -4634,43 +4798,16 @@ var orderRouter = router({
       }
     }
     await db.update(orders).set({
-      buyerPhone: input.receiverPhone.trim(),
-      deliveryRegion: isOverseas ? "overseas" : "domestic",
-      shippingMethod,
-      cvsStoreId: cvsStoreId ?? null,
-      cvsStoreName: cvsStoreName ?? null,
-      cvsType: cvsType ?? null,
-      shippingAddress: shippingAddress ?? null,
-      receiverZipCode: receiverZipCode ?? null,
+      ...orderUpdate,
       totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount,
       ...clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}
     }).where(eq7(orders.id, balancePayment.orderId));
-    if (input.paymentMethod === "atm") {
-      return {
-        kind: "atm",
-        amount: totalAmount,
-        shippingFee: feeSummary.shippingFee,
-        paymentFee: feeSummary.paymentFee,
-        bankInfo: STORE_BANK_INFO
-      };
-    }
-    const origin = siteBaseUrl(ctx.req);
-    const paymentParams = buildCreditPaymentParams({
-      merchantTradeNo: balancePayment.merchantTradeNo,
-      tradeDesc: "\u691BCrystal\u5BA2\u88FD\u5316\u5C3E\u6B3E",
-      itemName: balanceItems.map((item) => `${item.name} x${item.quantity}`).join("#"),
-      totalAmount,
-      returnURL: `${origin}/api/ecpay/notify`,
-      orderResultURL: `${origin}/api/ecpay/balance-result`,
-      clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`
-    });
     return {
-      kind: "credit",
-      paymentURL: ECPAY_CONFIG.PaymentURL,
-      paymentParams,
+      kind: "atm",
       amount: totalAmount,
       shippingFee: feeSummary.shippingFee,
-      paymentFee: feeSummary.paymentFee
+      paymentFee: feeSummary.paymentFee,
+      bankInfo: STORE_BANK_INFO
     };
   }),
   submitBalanceTransferCode: rateLimitedPublicProcedure({ scope: "balance-write", limit: 20, windowMs: 15 * 6e4 }).input(z2.object({

@@ -230,6 +230,35 @@ export const orderBalancePayments = mysqlTable("orderBalancePayments", {
 export type OrderBalancePayment = typeof orderBalancePayments.$inferSelect;
 export type InsertOrderBalancePayment = typeof orderBalancePayments.$inferInsert;
 
+// 每次送往綠界的尾款付款嘗試。orderBalancePayments.merchantTradeNo 保留作為
+// 客戶固定連結，實際送給綠界的唯一 MerchantTradeNo 則存放於此表。
+export const orderBalancePaymentAttempts = mysqlTable("orderBalancePaymentAttempts", {
+  id: int("id").autoincrement().primaryKey(),
+  balancePaymentId: int("balancePaymentId").notNull(),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+  amount: int("amount").notNull(),
+  shippingFee: int("shippingFee").default(0).notNull(),
+  paymentFee: int("paymentFee").default(0).notNull(),
+  totalAmount: int("totalAmount").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["credit"]).default("credit").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", [
+    "pending",
+    "paid",
+    "failed",
+    "superseded",
+  ]).default("pending").notNull(),
+  checkoutData: json("checkoutData"),
+  tradeNo: varchar("tradeNo", { length: 64 }),
+  ecpayNotifyData: json("ecpayNotifyData"),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("order_balance_payment_attempts_balance_id_idx").on(table.balancePaymentId),
+]);
+
+export type OrderBalancePaymentAttempt = typeof orderBalancePaymentAttempts.$inferSelect;
+
 // ─── 物流訂單表 ───────────────────────────────────────────────────────────────
 export const logisticsOrders = mysqlTable("logisticsOrders", {
   id: int("id").autoincrement().primaryKey(),

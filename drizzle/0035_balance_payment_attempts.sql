@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `orderBalancePaymentAttempts` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `balancePaymentId` int NOT NULL,
+  `merchantTradeNo` varchar(32) NOT NULL,
+  `amount` int NOT NULL,
+  `shippingFee` int NOT NULL DEFAULT 0,
+  `paymentFee` int NOT NULL DEFAULT 0,
+  `totalAmount` int NOT NULL,
+  `paymentMethod` enum('credit') NOT NULL DEFAULT 'credit',
+  `paymentStatus` enum('pending','paid','failed','superseded') NOT NULL DEFAULT 'pending',
+  `checkoutData` json,
+  `tradeNo` varchar(64),
+  `ecpayNotifyData` json,
+  `paidAt` timestamp NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `orderBalancePaymentAttempts_id` PRIMARY KEY(`id`),
+  CONSTRAINT `orderBalancePaymentAttempts_merchantTradeNo_unique` UNIQUE(`merchantTradeNo`),
+  KEY `order_balance_payment_attempts_balance_id_idx` (`balancePaymentId`)
+);

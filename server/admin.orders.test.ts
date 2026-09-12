@@ -40,6 +40,7 @@ vi.mock("./orderDb", () => ({
   createLogisticsOrder: vi.fn(),
   isCustomDepositProduct: vi.fn(),
   createOrReplaceBalancePayment: vi.fn(),
+  createBalancePaymentAttempt: vi.fn(),
   getBalancePaymentDetail: vi.fn(),
   updateBalancePaymentTransferCode: vi.fn(),
   confirmBalanceTransfer: vi.fn(),
@@ -93,6 +94,7 @@ import {
   getAdminOrderSummaries,
   getOrderWithItems,
   getBalancePaymentDetail,
+  createBalancePaymentAttempt,
   confirmBalanceTransfer,
   settleZeroBalancePayment,
 } from "./orderDb";
@@ -103,6 +105,7 @@ import {
   capturePayPalOrder,
   verifyPayPalOrderBelongsToMerchant,
 } from "./_core/paypal";
+import { buildCreditPaymentParams } from "./ecpay";
 import { storagePut } from "./storage";
 import { notifyCustomerOrderPlacedSafely, notifyCustomerOrderShippedSafely } from "./customerOrderNotification";
 
@@ -110,6 +113,8 @@ const getAdminOrderSummariesMock = vi.mocked(getAdminOrderSummaries);
 const createOrderMock = vi.mocked(createOrder);
 const getOrderWithItemsMock = vi.mocked(getOrderWithItems);
 const getBalancePaymentDetailMock = vi.mocked(getBalancePaymentDetail);
+const createBalancePaymentAttemptMock = vi.mocked(createBalancePaymentAttempt);
+const buildCreditPaymentParamsMock = vi.mocked(buildCreditPaymentParams);
 const confirmBalanceTransferMock = vi.mocked(confirmBalanceTransfer);
 const settleZeroBalancePaymentMock = vi.mocked(settleZeroBalancePayment);
 const getDbMock = vi.mocked(getDb);
@@ -812,6 +817,7 @@ describe("order.updateFreeShippingOverride (admin procedure)", () => {
 describe("order.getBalancePaymentCheckout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createBalancePaymentAttemptMock.mockResolvedValue({ merchantTradeNo: "CBATTEMPT001" });
   });
 
   it("rejects a cancelled legacy member balance before changing checkout data", async () => {
@@ -899,15 +905,18 @@ describe("order.getBalancePaymentCheckout", () => {
       shippingFee: 0,
       paymentFee: 0,
     });
-    expect(db.updateChain.set).toHaveBeenNthCalledWith(1, {
-      paymentMethod: "credit",
+    expect(createBalancePaymentAttemptMock).toHaveBeenCalledWith(expect.objectContaining({
+      balancePaymentId: 1,
+      amount: 1300,
       shippingFee: 0,
       paymentFee: 0,
       totalAmount: 1300,
-    });
-    expect(db.updateChain.set).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      totalAmount: 3960,
     }));
+    expect(buildCreditPaymentParamsMock).toHaveBeenCalledWith(expect.objectContaining({
+      merchantTradeNo: "CBATTEMPT001",
+      clientBackURL: expect.stringContaining("/balance/CBALANCE001"),
+    }));
+    expect(db.update).not.toHaveBeenCalled();
   });
 
   it("keeps an original clear-quartz chips item when balance checkout does not add another one", async () => {
