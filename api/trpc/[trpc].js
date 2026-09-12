@@ -3456,6 +3456,8 @@ var CartItemSchema = z2.object({
     label: z2.string(),
     value: z2.string()
   })).optional(),
+  claspType: z2.enum(["elastic", "lobster", "magnetic"]).optional(),
+  fitPreference: z2.enum(["just-right", "loose"]).optional(),
   name: z2.string(),
   // 價格欄位只保留向下相容；實際成交價一律由伺服器依商品資料重算。
   price: z2.number().finite(),
@@ -3493,6 +3495,29 @@ function getWristSizeRulePrice(product, wristSize) {
   if (!rules?.length) return null;
   return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
 }
+var DEFAULT_CLASP_OPTIONS = ["elastic", "lobster", "magnetic"];
+var CLASP_SURCHARGE = 200;
+function getValidatedWristSize(item, product) {
+  const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
+  if (!Number.isFinite(wristSize) || !Number.isInteger(wristSize * 2) || wristSize < product.wristSizeMin || wristSize > product.wristSizeMax) {
+    throw new TRPCError4({
+      code: "BAD_REQUEST",
+      message: `\u8ACB\u91CD\u65B0\u9078\u64C7\u300C${product.name}\u300D\u7684\u624B\u570D\u5C3A\u5BF8\u5F8C\u518D\u7D50\u5E33\u3002`
+    });
+  }
+  return wristSize;
+}
+function getClaspSurcharge(item, product) {
+  if (product.category === "custom" || item.claspType == null) return 0;
+  const allowedOptions = product.claspOptions ?? [...DEFAULT_CLASP_OPTIONS];
+  if (!allowedOptions.includes(item.claspType)) {
+    throw new TRPCError4({
+      code: "BAD_REQUEST",
+      message: `\u8ACB\u91CD\u65B0\u9078\u64C7\u300C${product.name}\u300D\u7684\u6263\u5177\u5F8C\u518D\u7D50\u5E33\u3002`
+    });
+  }
+  return item.claspType === "elastic" ? 0 : CLASP_SURCHARGE;
+}
 async function normalizePurchaseOptionItems(items) {
   const db = await getDb();
   if (!db) {
@@ -3506,6 +3531,10 @@ async function normalizePurchaseOptionItems(items) {
     price: dbProducts.price,
     image: dbProducts.image,
     active: dbProducts.active,
+    category: dbProducts.category,
+    claspOptions: dbProducts.claspOptions,
+    wristSizeMin: dbProducts.wristSizeMin,
+    wristSizeMax: dbProducts.wristSizeMax,
     wristSizePriceRules: dbProducts.wristSizePriceRules,
     purchaseOptions: dbProducts.purchaseOptions
   }).from(dbProducts).where(inArray2(dbProducts.id, productIds));
@@ -3541,13 +3570,23 @@ async function normalizePurchaseOptionItems(items) {
     if (!product || product.active === false) {
       throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
     }
+    const claspSurcharge = getClaspSurcharge(item, product);
     if (!item.purchaseOptionId) {
+      const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
+      const wristSize2 = hasWristSizePriceRules ? getValidatedWristSize(item, product) : null;
+      const wristSizePrice = wristSize2 == null ? null : getWristSizeRulePrice(product, wristSize2);
+      if (hasWristSizePriceRules && wristSizePrice == null) {
+        throw new TRPCError4({
+          code: "BAD_REQUEST",
+          message: `\u300C${product.name}\u300D\u5C1A\u672A\u8A2D\u5B9A\u6B64\u624B\u570D\u5C3A\u5BF8\u7684\u50F9\u683C\u3002`
+        });
+      }
       return {
         ...item,
         id: product.id,
         baseProductId: product.id,
         name: product.name,
-        price: product.price,
+        price: (wristSizePrice ?? product.price) + claspSurcharge,
         image: product.image || item.image
       };
     }
@@ -3578,7 +3617,7 @@ async function normalizePurchaseOptionItems(items) {
       return {
         ...item,
         name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-        price,
+        price: price + claspSurcharge,
         image: item.image || product.image,
         purchaseOptionLabel: option.label,
         purchaseOptionUsesOwnStock: option.stock != null
@@ -3592,7 +3631,7 @@ async function normalizePurchaseOptionItems(items) {
     return {
       ...item,
       name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-      price: optionWristSizeRulePrice ?? option.price + wristSizePriceDelta,
+      price: (optionWristSizeRulePrice ?? option.price + wristSizePriceDelta) + claspSurcharge,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null

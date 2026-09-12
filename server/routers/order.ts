@@ -269,6 +269,8 @@ const CartItemSchema = z.object({
     label: z.string(),
     value: z.string(),
   })).optional(),
+  claspType: z.enum(["elastic", "lobster", "magnetic"]).optional(),
+  fitPreference: z.enum(["just-right", "loose"]).optional(),
   name: z.string(),
   // 價格欄位只保留向下相容；實際成交價一律由伺服器依商品資料重算。
   price: z.number().finite(),
@@ -328,6 +330,47 @@ function getWristSizeRulePrice(
   return rules.find((rule) => wristSize <= rule.maxWristSize)?.price ?? rules[rules.length - 1].price;
 }
 
+const DEFAULT_CLASP_OPTIONS = ["elastic", "lobster", "magnetic"] as const;
+const CLASP_SURCHARGE = 200;
+
+function getValidatedWristSize(
+  item: CheckoutItem,
+  product: { name: string; wristSizeMin: number; wristSizeMax: number }
+) {
+  const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
+  if (
+    !Number.isFinite(wristSize) ||
+    !Number.isInteger(wristSize * 2) ||
+    wristSize < product.wristSizeMin ||
+    wristSize > product.wristSizeMax
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `請重新選擇「${product.name}」的手圍尺寸後再結帳。`,
+    });
+  }
+  return wristSize;
+}
+
+function getClaspSurcharge(
+  item: CheckoutItem,
+  product: {
+    name: string;
+    category: string;
+    claspOptions: ("elastic" | "lobster" | "magnetic")[] | null;
+  }
+) {
+  if (product.category === "custom" || item.claspType == null) return 0;
+  const allowedOptions = product.claspOptions ?? [...DEFAULT_CLASP_OPTIONS];
+  if (!allowedOptions.includes(item.claspType)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `請重新選擇「${product.name}」的扣具後再結帳。`,
+    });
+  }
+  return item.claspType === "elastic" ? 0 : CLASP_SURCHARGE;
+}
+
 async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
   const db = await getDb();
   if (!db) {
@@ -344,6 +387,10 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
       price: dbProducts.price,
       image: dbProducts.image,
       active: dbProducts.active,
+      category: dbProducts.category,
+      claspOptions: dbProducts.claspOptions,
+      wristSizeMin: dbProducts.wristSizeMin,
+      wristSizeMax: dbProducts.wristSizeMax,
       wristSizePriceRules: dbProducts.wristSizePriceRules,
       purchaseOptions: dbProducts.purchaseOptions,
     })
@@ -384,13 +431,23 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
     if (!product || product.active === false) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `「${item.name}」已不存在或不可購買。` });
     }
+    const claspSurcharge = getClaspSurcharge(item, product);
     if (!item.purchaseOptionId) {
+      const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
+      const wristSize = hasWristSizePriceRules ? getValidatedWristSize(item, product) : null;
+      const wristSizePrice = wristSize == null ? null : getWristSizeRulePrice(product, wristSize);
+      if (hasWristSizePriceRules && wristSizePrice == null) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `「${product.name}」尚未設定此手圍尺寸的價格。`,
+        });
+      }
       return {
         ...item,
         id: product.id,
         baseProductId: product.id,
         name: product.name,
-        price: product.price,
+        price: (wristSizePrice ?? product.price) + claspSurcharge,
         image: product.image || item.image,
       };
     }
@@ -421,7 +478,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
       return {
         ...item,
         name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-        price,
+        price: price + claspSurcharge,
         image: item.image || product.image,
         purchaseOptionLabel: option.label,
         purchaseOptionUsesOwnStock: option.stock != null,
@@ -439,7 +496,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
     return {
       ...item,
       name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
-      price: optionWristSizeRulePrice ?? option.price + wristSizePriceDelta,
+      price: (optionWristSizeRulePrice ?? option.price + wristSizePriceDelta) + claspSurcharge,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null,

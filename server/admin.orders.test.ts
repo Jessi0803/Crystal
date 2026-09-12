@@ -394,6 +394,64 @@ describe("order.createAndPay security regression coverage", () => {
     );
   });
 
+  it("recalculates wrist-size tiers and clasp surcharge from server product settings", async () => {
+    const db = createMutationMockDb([
+      [{
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1580,
+        image: "",
+        active: true,
+        category: "healing",
+        claspOptions: ["elastic", "lobster", "magnetic"],
+        wristSizeMin: 13,
+        wristSizeMax: 19,
+        wristSizePriceRules: [
+          { maxWristSize: 13.5, price: 1480 },
+          { maxWristSize: 17, price: 1580 },
+          { maxWristSize: 19, price: 1680 },
+        ],
+        purchaseOptions: [],
+      }],
+      [{ id: "bracelet-1", twoItemFreeShippingEligible: true }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const input = checkoutInput("credit");
+    input.items = [
+      {
+        id: "bracelet-1-small",
+        baseProductId: "bracelet-1",
+        name: "通知測試手鍊（手圍 13cm）",
+        price: 1,
+        quantity: 1,
+        image: "",
+        wristSize: "13",
+        claspType: "elastic",
+      },
+      {
+        id: "bracelet-1-large-magnetic",
+        baseProductId: "bracelet-1",
+        name: "通知測試手鍊（手圍 18cm）（磁扣）",
+        price: 1,
+        quantity: 1,
+        image: "",
+        wristSize: "18",
+        claspType: "magnetic",
+      },
+    ] as typeof input.items;
+
+    await createPublicCaller().order.createAndPay(input);
+
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 3360 }),
+      expect.arrayContaining([
+        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1480, subtotal: 1480 }),
+        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1880, subtotal: 1880 }),
+      ])
+    );
+  });
+
   it("rejects zero, negative, fractional, and unreasonably large quantities", async () => {
     getDbMock.mockResolvedValue(null as any);
     const caller = createPublicCaller();
