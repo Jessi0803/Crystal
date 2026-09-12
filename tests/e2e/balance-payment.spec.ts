@@ -2,7 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import { createAtmCustomDepositOrder, login, uploadTransferReceipt } from "./helpers";
+import {
+  createAtmCustomDepositOrder,
+  fillPureCustomOrderForm,
+  login,
+  uploadTransferReceipt,
+} from "./helpers";
 import { generateCheckMacValue } from "../../server/ecpay";
 
 const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
@@ -203,7 +208,7 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
   test.setTimeout(90_000);
   const depositOrderNo = await createAtmCustomDepositOrder(page, `e2e-balance-${Date.now()}@example.com`);
 
-  await expect(page.getByRole("heading", { name: "等待轉帳確認" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "接下來，告訴我們你的故事。" })).toBeVisible();
   await expect(page.locator("body")).toContainText("客製化商品");
 
   await login(page, "e2e-admin@example.com");
@@ -214,11 +219,11 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
   await expect(page.locator("body")).toContainText("產生尾款連結");
 
   await page.goto(`/order/${depositOrderNo}`);
-  await expect(page.getByRole("heading", { name: "訂金付款成功" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("已付訂金");
+  await fillPureCustomOrderForm(page, depositOrderNo);
 
   await page.goto("/admin/orders");
   await page.locator("button").filter({ hasText: depositOrderNo }).click();
+  await expect(page.locator("body")).toContainText("【純客製水晶手鍊諮詢表單】");
 
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("請輸入尾款金額");
@@ -261,10 +266,10 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
   await page.locator("button").filter({ hasText: depositOrderNo }).click();
   await expect(page.locator("body")).toContainText("67890");
   page.once("dialog", async dialog => {
-    expect(dialog.message()).toContain("確認已收到尾款轉帳");
+    expect(dialog.message()).toContain("確認已收到尾款");
     await dialog.accept();
   });
-  await page.getByRole("button", { name: "確認收到尾款" }).click();
+  await page.getByRole("button", { name: "人工確認尾款已收" }).click();
   await expect(page.locator("body")).toContainText("尾款已確認收款");
   await expect(page.locator("body")).toContainText("已付款");
 
