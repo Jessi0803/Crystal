@@ -464,6 +464,15 @@ describe("order.createAndPay security regression coverage", () => {
           productName: "通知測試手鍊（手圍 13cm）（微鬆）",
           unitPrice: 1480,
           subtotal: 1480,
+          configurationSnapshot: {
+            version: 1,
+            baseProductName: "通知測試手鍊",
+            purchaseOption: null,
+            wristSizes: [{ key: "wrist", label: "手圍", value: 13, unit: "cm" }],
+            clasp: { code: "elastic", label: "彈力繩", surcharge: 0 },
+            fitPreference: { code: "loose", label: "微鬆" },
+            pricing: { basePrice: 1480, claspSurcharge: 0, unitPrice: 1480 },
+          },
         }),
         expect.objectContaining({
           productId: "bracelet-1",

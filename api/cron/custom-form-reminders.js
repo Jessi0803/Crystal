@@ -207,6 +207,7 @@ var orderItems = mysqlTable("orderItems", {
   unitPrice: int("unitPrice").notNull(),
   subtotal: int("subtotal").notNull(),
   purchaseOptionId: varchar("purchaseOptionId", { length: 64 }),
+  configurationSnapshot: json("configurationSnapshot").$type(),
   // 是否為預購商品
   isPreorder: boolean("isPreorder").default(false).notNull()
 }, (table) => [

@@ -172,6 +172,39 @@ type CustomFormLink = {
   url: string;
 };
 
+function getOrderItemConfigurationDisplay(snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const value = snapshot as {
+    version?: unknown;
+    baseProductName?: unknown;
+    purchaseOption?: { label?: unknown } | null;
+    wristSizes?: { label?: unknown; value?: unknown; unit?: unknown }[];
+    clasp?: { label?: unknown } | null;
+    fitPreference?: { label?: unknown } | null;
+  };
+  if (value.version !== 1 || typeof value.baseProductName !== "string") return null;
+
+  const details: string[] = [];
+  if (value.purchaseOption && typeof value.purchaseOption.label === "string") {
+    details.push(`方案：${value.purchaseOption.label}`);
+  }
+  for (const wristSize of Array.isArray(value.wristSizes) ? value.wristSizes : []) {
+    if (typeof wristSize.label !== "string" || typeof wristSize.value !== "number") continue;
+    details.push(`${wristSize.label} ${wristSize.value} ${wristSize.unit === "cm" ? "cm" : ""}`.trim());
+  }
+  if (value.clasp && typeof value.clasp.label === "string") {
+    details.push(value.clasp.label);
+  }
+  if (value.fitPreference && typeof value.fitPreference.label === "string") {
+    details.push(value.fitPreference.label);
+  }
+
+  return {
+    productName: value.baseProductName,
+    details: details.join(" ・ "),
+  };
+}
+
 function getAdminCustomFormLinks(detail: any): CustomFormLink[] {
   if (!detail?.merchantTradeNo) return [];
   const origin = typeof window === "undefined" ? "" : window.location.origin;
@@ -420,21 +453,33 @@ function OrderRowCard({
                 <div>
                   <p className="text-xs tracking-[0.15em] font-body text-[oklch(0.5_0_0)] mb-3">商品明細</p>
                   <div className="space-y-4">
-                    {detail.items.map((item) => (
-                      <div key={item.id}>
-                        <div className="min-w-0">
-                          <p className="text-sm font-body text-[oklch(0.1_0_0)] break-words">{item.productName}</p>
-                          <p className="text-xs font-body text-[oklch(0.5_0_0)]">x{item.quantity} · NT$ {item.subtotal.toLocaleString()}</p>
+                    {detail.items.map((item) => {
+                      const configuration = getOrderItemConfigurationDisplay(item.configurationSnapshot);
+                      return (
+                        <div key={item.id}>
+                          <div className="min-w-0">
+                            <p className="text-sm font-body text-[oklch(0.1_0_0)] break-words">
+                              {configuration?.productName ?? item.productName}
+                            </p>
+                            <p className="text-xs font-body text-[oklch(0.5_0_0)]">
+                              x{item.quantity} {configuration ? "・" : "·"} NT$ {item.subtotal.toLocaleString()}
+                            </p>
+                            {configuration?.details && (
+                              <p className="mt-1 text-xs font-body text-[oklch(0.45_0_0)] break-words">
+                                {configuration.details}
+                              </p>
+                            )}
+                          </div>
+                          {item.productImage && (
+                            <ProductThumbnail
+                              src={item.productImage}
+                              alt={configuration?.productName ?? item.productName}
+                              className="mt-3 h-48 w-48 max-w-full"
+                            />
+                          )}
                         </div>
-                        {item.productImage && (
-                          <ProductThumbnail
-                            src={item.productImage}
-                            alt={item.productName}
-                            className="mt-3 h-48 w-48 max-w-full"
-                          />
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

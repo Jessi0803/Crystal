@@ -52,7 +52,16 @@ import {
 } from "../ecpayLogistics";
 import { getDb } from "../db";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
-import { dbProducts, orders, orderItems, logisticsOrders, orderBalancePayments, orderMergeGroups, orderMergeMembers } from "../../drizzle/schema";
+import {
+  dbProducts,
+  orders,
+  orderItems,
+  logisticsOrders,
+  orderBalancePayments,
+  orderMergeGroups,
+  orderMergeMembers,
+  type OrderItemConfigurationSnapshot,
+} from "../../drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
@@ -282,6 +291,9 @@ const CartItemSchema = z.object({
 });
 
 type CheckoutItem = z.infer<typeof CartItemSchema>;
+type NormalizedCheckoutItem = CheckoutItem & {
+  configurationSnapshot: OrderItemConfigurationSnapshot | null;
+};
 
 const OrderAccessSchema = z.object({
   merchantTradeNo: z.string().min(1),
@@ -396,14 +408,64 @@ function buildOrderItemName(input: {
   return `${input.productName}${details.map((detail) => `（${detail}）`).join("")}`;
 }
 
-async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
+function buildOrderItemConfigurationSnapshot(input: {
+  productName: string;
+  purchaseOption?: { id: string; label: string } | null;
+  wristSizes?: { key: string; label: string; value: number }[];
+  claspType?: CheckoutItem["claspType"];
+  fitPreference?: CheckoutItem["fitPreference"];
+  basePrice: number;
+  claspSurcharge: number;
+}): OrderItemConfigurationSnapshot {
+  const claspLabels = {
+    elastic: "彈力繩",
+    lobster: "龍蝦扣",
+    magnetic: "磁扣",
+  } as const;
+  const fitPreferenceLabels = {
+    "just-right": "剛好",
+    loose: "微鬆",
+  } as const;
+
+  return {
+    version: 1,
+    baseProductName: input.productName,
+    purchaseOption: input.purchaseOption ?? null,
+    wristSizes: (input.wristSizes ?? []).map((wristSize) => ({
+      ...wristSize,
+      unit: "cm" as const,
+    })),
+    clasp: input.claspType
+      ? {
+          code: input.claspType,
+          label: claspLabels[input.claspType],
+          surcharge: input.claspSurcharge,
+        }
+      : null,
+    fitPreference: input.fitPreference
+      ? {
+          code: input.fitPreference,
+          label: fitPreferenceLabels[input.fitPreference],
+        }
+      : null,
+    pricing: {
+      basePrice: input.basePrice,
+      claspSurcharge: input.claspSurcharge,
+      unitPrice: input.basePrice + input.claspSurcharge,
+    },
+  };
+}
+
+async function normalizePurchaseOptionItems(items: CheckoutItem[]): Promise<NormalizedCheckoutItem[]> {
   const db = await getDb();
   if (!db) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "目前無法確認商品價格，請稍後再試。" });
   }
 
   const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
-  if (productIds.length === 0) return items;
+  if (productIds.length === 0) {
+    return items.map((item) => ({ ...item, configurationSnapshot: null }));
+  }
 
   const products = await db
     .select({
@@ -452,6 +514,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
         image: item.image || product.image,
         purchaseOptionLabel: topic.label,
         purchaseOptionUsesOwnStock: false,
+        configurationSnapshot: null,
       };
     }
     if (!product || product.active === false) {
@@ -473,6 +536,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
           message: `「${product.name}」尚未設定此手圍尺寸的價格。`,
         });
       }
+      const basePrice = wristSizePrice ?? product.price;
       return {
         ...item,
         id: product.id,
@@ -483,8 +547,16 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
           claspType: item.claspType,
           fitPreference,
         }),
-        price: (wristSizePrice ?? product.price) + claspSurcharge,
+        price: basePrice + claspSurcharge,
         image: product.image || item.image,
+        configurationSnapshot: buildOrderItemConfigurationSnapshot({
+          productName: product.name,
+          wristSizes: wristSize == null ? [] : [{ key: "wrist", label: "手圍", value: wristSize }],
+          claspType: item.claspType,
+          fitPreference,
+          basePrice,
+          claspSurcharge,
+        }),
       };
     }
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
@@ -512,7 +584,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
         if (groupPrice == null) {
           throw new TRPCError({ code: "BAD_REQUEST", message: `「${optionProductName}」缺少 ${group.label} 的價格。` });
         }
-        return { label: group.label, wristSize, price: groupPrice };
+        return { key: group.id, label: group.label, wristSize, price: groupPrice };
       });
       const price = validatedSelections.reduce((sum, selection) => sum + selection.price, 0);
       return {
@@ -528,6 +600,19 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
         image: item.image || product.image,
         purchaseOptionLabel: option.label,
         purchaseOptionUsesOwnStock: option.stock != null,
+        configurationSnapshot: buildOrderItemConfigurationSnapshot({
+          productName: product.name,
+          purchaseOption: { id: option.id, label: option.label },
+          wristSizes: validatedSelections.map((selection) => ({
+            key: selection.key,
+            label: selection.label,
+            value: selection.wristSize,
+          })),
+          claspType: item.claspType,
+          fitPreference,
+          basePrice: price,
+          claspSurcharge,
+        }),
       };
     }
     const wristSize = item.wristSize == null ? null : getValidatedWristSize(item, product);
@@ -539,6 +624,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
       : null;
     const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
     const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
+    const basePrice = optionWristSizeRulePrice ?? option.price + wristSizePriceDelta;
     return {
       ...item,
       name: buildOrderItemName({
@@ -548,10 +634,19 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]) {
         claspType: item.claspType,
         fitPreference,
       }),
-      price: (optionWristSizeRulePrice ?? option.price + wristSizePriceDelta) + claspSurcharge,
+      price: basePrice + claspSurcharge,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
       purchaseOptionUsesOwnStock: option.stock != null,
+      configurationSnapshot: buildOrderItemConfigurationSnapshot({
+        productName: product.name,
+        purchaseOption: { id: option.id, label: option.label },
+        wristSizes: wristSize == null ? [] : [{ key: "wrist", label: "手圍", value: wristSize }],
+        claspType: item.claspType,
+        fitPreference,
+        basePrice,
+        claspSurcharge,
+      }),
     };
   });
 }
@@ -775,10 +870,10 @@ export const orderRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await ensureOrdersColumns();
-      let submittedItems = input.items.filter((item) => {
+      let submittedItems: NormalizedCheckoutItem[] = input.items.filter((item) => {
         const productId = item.baseProductId ?? item.id;
         return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
-      });
+      }).map((item) => ({ ...item, configurationSnapshot: null }));
       submittedItems = await normalizePurchaseOptionItems(submittedItems);
       if (submittedItems.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "購物車沒有可結帳商品" });
@@ -865,6 +960,7 @@ export const orderRouter = router({
           price: feeSummary.shippingFee,
           quantity: 1,
           image: "",
+          configurationSnapshot: null,
         });
       }
       const orderItems = submittedItems.concat(feeItems);
@@ -926,6 +1022,7 @@ export const orderRouter = router({
           unitPrice: item.price,
           subtotal: item.price * item.quantity,
           purchaseOptionId: item.purchaseOptionId ?? null,
+          configurationSnapshot: item.configurationSnapshot,
           isPreorder: item.isPreorder ?? false,
         }))
       );

@@ -216,6 +216,7 @@ var init_schema = __esm({
       unitPrice: int("unitPrice").notNull(),
       subtotal: int("subtotal").notNull(),
       purchaseOptionId: varchar("purchaseOptionId", { length: 64 }),
+      configurationSnapshot: json("configurationSnapshot").$type(),
       // 是否為預購商品
       isPreorder: boolean("isPreorder").default(false).notNull()
     }, (table) => [
@@ -1676,6 +1677,7 @@ async function getAdminOrderDetail(orderId) {
       productName: orderItems.productName,
       productImage: sql3`COALESCE(NULLIF(${orderItems.productImage}, ''), ${dbProducts.image})`,
       purchaseOptionId: orderItems.purchaseOptionId,
+      configurationSnapshot: orderItems.configurationSnapshot,
       quantity: orderItems.quantity,
       unitPrice: orderItems.unitPrice,
       subtotal: orderItems.subtotal,
@@ -3533,13 +3535,49 @@ function buildOrderItemName(input) {
   ].filter((detail) => Boolean(detail));
   return `${input.productName}${details.map((detail) => `\uFF08${detail}\uFF09`).join("")}`;
 }
+function buildOrderItemConfigurationSnapshot(input) {
+  const claspLabels = {
+    elastic: "\u5F48\u529B\u7E69",
+    lobster: "\u9F8D\u8766\u6263",
+    magnetic: "\u78C1\u6263"
+  };
+  const fitPreferenceLabels = {
+    "just-right": "\u525B\u597D",
+    loose: "\u5FAE\u9B06"
+  };
+  return {
+    version: 1,
+    baseProductName: input.productName,
+    purchaseOption: input.purchaseOption ?? null,
+    wristSizes: (input.wristSizes ?? []).map((wristSize) => ({
+      ...wristSize,
+      unit: "cm"
+    })),
+    clasp: input.claspType ? {
+      code: input.claspType,
+      label: claspLabels[input.claspType],
+      surcharge: input.claspSurcharge
+    } : null,
+    fitPreference: input.fitPreference ? {
+      code: input.fitPreference,
+      label: fitPreferenceLabels[input.fitPreference]
+    } : null,
+    pricing: {
+      basePrice: input.basePrice,
+      claspSurcharge: input.claspSurcharge,
+      unitPrice: input.basePrice + input.claspSurcharge
+    }
+  };
+}
 async function normalizePurchaseOptionItems(items) {
   const db = await getDb();
   if (!db) {
     throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "\u76EE\u524D\u7121\u6CD5\u78BA\u8A8D\u5546\u54C1\u50F9\u683C\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002" });
   }
   const productIds = Array.from(new Set(items.map((item) => item.baseProductId ?? item.id)));
-  if (productIds.length === 0) return items;
+  if (productIds.length === 0) {
+    return items.map((item) => ({ ...item, configurationSnapshot: null }));
+  }
   const products2 = await db.select({
     id: dbProducts.id,
     name: dbProducts.name,
@@ -3582,7 +3620,8 @@ async function normalizePurchaseOptionItems(items) {
         price: getTarotDepositPrice(product.price, topic),
         image: item.image || product.image,
         purchaseOptionLabel: topic.label,
-        purchaseOptionUsesOwnStock: false
+        purchaseOptionUsesOwnStock: false,
+        configurationSnapshot: null
       };
     }
     if (!product || product.active === false) {
@@ -3600,6 +3639,7 @@ async function normalizePurchaseOptionItems(items) {
           message: `\u300C${product.name}\u300D\u5C1A\u672A\u8A2D\u5B9A\u6B64\u624B\u570D\u5C3A\u5BF8\u7684\u50F9\u683C\u3002`
         });
       }
+      const basePrice2 = wristSizePrice ?? product.price;
       return {
         ...item,
         id: product.id,
@@ -3610,8 +3650,16 @@ async function normalizePurchaseOptionItems(items) {
           claspType: item.claspType,
           fitPreference
         }),
-        price: (wristSizePrice ?? product.price) + claspSurcharge,
-        image: product.image || item.image
+        price: basePrice2 + claspSurcharge,
+        image: product.image || item.image,
+        configurationSnapshot: buildOrderItemConfigurationSnapshot({
+          productName: product.name,
+          wristSizes: wristSize2 == null ? [] : [{ key: "wrist", label: "\u624B\u570D", value: wristSize2 }],
+          claspType: item.claspType,
+          fitPreference,
+          basePrice: basePrice2,
+          claspSurcharge
+        })
       };
     }
     const option = product?.purchaseOptions?.find((candidate) => candidate.id === item.purchaseOptionId);
@@ -3639,7 +3687,7 @@ async function normalizePurchaseOptionItems(items) {
         if (groupPrice == null) {
           throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u7F3A\u5C11 ${group.label} \u7684\u50F9\u683C\u3002` });
         }
-        return { label: group.label, wristSize: wristSize2, price: groupPrice };
+        return { key: group.id, label: group.label, wristSize: wristSize2, price: groupPrice };
       });
       const price = validatedSelections.reduce((sum, selection) => sum + selection.price, 0);
       return {
@@ -3654,7 +3702,20 @@ async function normalizePurchaseOptionItems(items) {
         price: price + claspSurcharge,
         image: item.image || product.image,
         purchaseOptionLabel: option.label,
-        purchaseOptionUsesOwnStock: option.stock != null
+        purchaseOptionUsesOwnStock: option.stock != null,
+        configurationSnapshot: buildOrderItemConfigurationSnapshot({
+          productName: product.name,
+          purchaseOption: { id: option.id, label: option.label },
+          wristSizes: validatedSelections.map((selection) => ({
+            key: selection.key,
+            label: selection.label,
+            value: selection.wristSize
+          })),
+          claspType: item.claspType,
+          fitPreference,
+          basePrice: price,
+          claspSurcharge
+        })
       };
     }
     const wristSize = item.wristSize == null ? null : getValidatedWristSize(item, product);
@@ -3662,6 +3723,7 @@ async function normalizePurchaseOptionItems(items) {
     const productWristSizeRulePrice = wristSize != null ? getWristSizeRulePrice(product, wristSize) : null;
     const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
     const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
+    const basePrice = optionWristSizeRulePrice ?? option.price + wristSizePriceDelta;
     return {
       ...item,
       name: buildOrderItemName({
@@ -3671,10 +3733,19 @@ async function normalizePurchaseOptionItems(items) {
         claspType: item.claspType,
         fitPreference
       }),
-      price: (optionWristSizeRulePrice ?? option.price + wristSizePriceDelta) + claspSurcharge,
+      price: basePrice + claspSurcharge,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
-      purchaseOptionUsesOwnStock: option.stock != null
+      purchaseOptionUsesOwnStock: option.stock != null,
+      configurationSnapshot: buildOrderItemConfigurationSnapshot({
+        productName: product.name,
+        purchaseOption: { id: option.id, label: option.label },
+        wristSizes: wristSize == null ? [] : [{ key: "wrist", label: "\u624B\u570D", value: wristSize }],
+        claspType: item.claspType,
+        fitPreference,
+        basePrice,
+        claspSurcharge
+      })
     };
   });
 }
@@ -3859,7 +3930,7 @@ var orderRouter = router({
     let submittedItems = input.items.filter((item) => {
       const productId = item.baseProductId ?? item.id;
       return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
-    });
+    }).map((item) => ({ ...item, configurationSnapshot: null }));
     submittedItems = await normalizePurchaseOptionItems(submittedItems);
     if (submittedItems.length === 0) {
       throw new TRPCError4({ code: "BAD_REQUEST", message: "\u8CFC\u7269\u8ECA\u6C92\u6709\u53EF\u7D50\u5E33\u5546\u54C1" });
@@ -3930,7 +4001,8 @@ var orderRouter = router({
         name: isOverseas ? `\u6D77\u5916\u904B\u8CBB - ${OVERSEAS_SHIP_COUNTRY_LABELS[overseasCountry]}` : shippingMethod === "home" ? "\u904B\u8CBB - \u9ED1\u8C93\u5B85\u6025\u4FBF" : shippingMethod === "cvs_711" ? "\u904B\u8CBB - 7-11\u5E97\u5230\u5E97" : "\u904B\u8CBB - \u5168\u5BB6\u5E97\u5230\u5E97",
         price: feeSummary.shippingFee,
         quantity: 1,
-        image: ""
+        image: "",
+        configurationSnapshot: null
       });
     }
     const orderItems2 = submittedItems.concat(feeItems);
@@ -3987,6 +4059,7 @@ var orderRouter = router({
         unitPrice: item.price,
         subtotal: item.price * item.quantity,
         purchaseOptionId: item.purchaseOptionId ?? null,
+        configurationSnapshot: item.configurationSnapshot,
         isPreorder: item.isPreorder ?? false
       }))
     );

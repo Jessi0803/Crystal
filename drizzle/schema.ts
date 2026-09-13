@@ -180,6 +180,32 @@ export const orderMergeMembers = mysqlTable("orderMergeMembers", {
 export type OrderMergeMember = typeof orderMergeMembers.$inferSelect;
 export type InsertOrderMergeMember = typeof orderMergeMembers.$inferInsert;
 
+export type OrderItemConfigurationSnapshot = {
+  version: 1;
+  baseProductName: string;
+  purchaseOption: { id: string; label: string } | null;
+  wristSizes: {
+    key: string;
+    label: string;
+    value: number;
+    unit: "cm";
+  }[];
+  clasp: {
+    code: "elastic" | "lobster" | "magnetic";
+    label: "彈力繩" | "龍蝦扣" | "磁扣";
+    surcharge: number;
+  } | null;
+  fitPreference: {
+    code: "just-right" | "loose";
+    label: "剛好" | "微鬆";
+  } | null;
+  pricing: {
+    basePrice: number;
+    claspSurcharge: number;
+    unitPrice: number;
+  };
+};
+
 // ─── 訂單商品明細表 ───────────────────────────────────────────────────────────
 export const orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),
@@ -191,6 +217,7 @@ export const orderItems = mysqlTable("orderItems", {
   unitPrice: int("unitPrice").notNull(),
   subtotal: int("subtotal").notNull(),
   purchaseOptionId: varchar("purchaseOptionId", { length: 64 }),
+  configurationSnapshot: json("configurationSnapshot").$type<OrderItemConfigurationSnapshot>(),
   // 是否為預購商品
   isPreorder: boolean("isPreorder").default(false).notNull(),
 }, (table) => [

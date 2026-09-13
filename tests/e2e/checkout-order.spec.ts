@@ -47,7 +47,7 @@ test("checkout blocks convenience-store delivery until a store is selected", asy
 test("ATM home-delivery checkout creates an order and accepts transfer last five", async ({ page }) => {
   const orderEmail = `e2e-atm-${Date.now()}@example.com`;
 
-  await createAtmHomeDeliveryOrder(page, orderEmail);
+  const merchantTradeNo = await createAtmHomeDeliveryOrder(page, orderEmail);
 
   await expect(page).toHaveURL(/\/order\//);
   await expect(page.locator("body")).toContainText("等待轉帳確認");
@@ -57,6 +57,13 @@ test("ATM home-delivery checkout creates an order and accepts transfer last five
   );
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
   await expect(page.locator("body")).toContainText("54321");
+
+  await login(page, "e2e-admin@example.com");
+  await expect(page).toHaveURL(/\/admin\/orders/);
+  await page.locator("button").filter({ hasText: merchantTradeNo }).click();
+  await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
+  await expect(page.locator("body")).toContainText("x1 ・ NT$ 1,400");
+  await expect(page.locator("body")).toContainText("手圍 14 cm ・ 龍蝦扣 ・ 剛好");
 });
 
 test("ATM checkout requires last five and transfer receipt before submit", async ({ page }) => {
