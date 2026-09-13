@@ -422,12 +422,13 @@ describe("order.createAndPay security regression coverage", () => {
       {
         id: "bracelet-1-small",
         baseProductId: "bracelet-1",
-        name: "通知測試手鍊（手圍 13cm）",
+        name: "偽造商品名稱（任意前端文字）",
         price: 1,
         quantity: 1,
         image: "",
         wristSize: "13",
         claspType: "elastic",
+        fitPreference: "loose",
       },
       {
         id: "bracelet-1-medium-lobster",
@@ -438,6 +439,7 @@ describe("order.createAndPay security regression coverage", () => {
         image: "",
         wristSize: "14",
         claspType: "lobster",
+        fitPreference: "just-right",
       },
       {
         id: "bracelet-1-large-magnetic",
@@ -448,6 +450,7 @@ describe("order.createAndPay security regression coverage", () => {
         image: "",
         wristSize: "18",
         claspType: "magnetic",
+        fitPreference: "loose",
       },
     ] as typeof input.items;
 
@@ -456,13 +459,148 @@ describe("order.createAndPay security regression coverage", () => {
     expect(createOrderMock).toHaveBeenCalledWith(
       expect.objectContaining({ totalAmount: 5140 }),
       expect.arrayContaining([
-        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1480, subtotal: 1480 }),
-        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1780, subtotal: 1780 }),
-        expect.objectContaining({ productId: "bracelet-1", unitPrice: 1880, subtotal: 1880 }),
+        expect.objectContaining({
+          productId: "bracelet-1",
+          productName: "通知測試手鍊（手圍 13cm）（微鬆）",
+          unitPrice: 1480,
+          subtotal: 1480,
+        }),
+        expect.objectContaining({
+          productId: "bracelet-1",
+          productName: "通知測試手鍊（手圍 14cm）（龍蝦扣）（剛好）",
+          unitPrice: 1780,
+          subtotal: 1780,
+        }),
+        expect.objectContaining({
+          productId: "bracelet-1",
+          productName: "通知測試手鍊（手圍 18cm）（磁扣）（微鬆）",
+          unitPrice: 1880,
+          subtotal: 1880,
+        }),
       ])
     );
     expect(buildCreditPaymentParamsMock).toHaveBeenCalledWith(
       expect.objectContaining({ totalAmount: 5140 })
+    );
+  });
+
+  it("builds a purchase-option item name only from server labels and validated selections", async () => {
+    const db = createMutationMockDb([
+      [{
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1000,
+        image: "",
+        active: true,
+        category: "healing",
+        claspOptions: ["elastic", "lobster", "magnetic"],
+        wristSizeMin: 13,
+        wristSizeMax: 19,
+        showFitPreference: true,
+        wristSizePriceRules: [],
+        purchaseOptions: [{
+          id: "single",
+          label: "單條方案",
+          price: 1200,
+          active: true,
+          wristSizePriceRules: [
+            { maxWristSize: 13.5, price: 1100 },
+            { maxWristSize: 19, price: 1300 },
+          ],
+        }],
+      }],
+      [{ id: "bracelet-1", twoItemFreeShippingEligible: true }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const input = checkoutInput("credit");
+    input.items = [{
+      id: "forged-cart-id",
+      baseProductId: "bracelet-1",
+      purchaseOptionId: "single",
+      purchaseOptionLabel: "偽造方案名稱",
+      name: "偽造商品名稱（偽造規格）",
+      price: 1,
+      quantity: 1,
+      image: "",
+      wristSize: "13.5",
+      claspType: "lobster",
+      fitPreference: "loose",
+    }] as typeof input.items;
+
+    await createPublicCaller().order.createAndPay(input);
+
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.arrayContaining([
+        expect.objectContaining({
+          productId: "bracelet-1",
+          productName: "通知測試手鍊（單條方案）（手圍 13.5cm）（龍蝦扣）（微鬆）",
+          unitPrice: 1300,
+        }),
+      ])
+    );
+  });
+
+  it("uses server group labels when building a combo item name", async () => {
+    const db = createMutationMockDb([
+      [{
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1000,
+        image: "",
+        active: true,
+        category: "healing",
+        claspOptions: ["elastic", "lobster", "magnetic"],
+        wristSizeMin: 13,
+        wristSizeMax: 19,
+        showFitPreference: true,
+        wristSizePriceRules: [],
+        purchaseOptions: [{
+          id: "pair",
+          label: "雙人方案",
+          type: "combo",
+          price: 2200,
+          active: true,
+          wristSizeGroups: [
+            { id: "first", label: "第一條手圍", wristSizePriceRules: [{ maxWristSize: 19, price: 1100 }] },
+            { id: "second", label: "第二條手圍", wristSizePriceRules: [{ maxWristSize: 19, price: 1200 }] },
+          ],
+        }],
+      }],
+      [{ id: "bracelet-1", twoItemFreeShippingEligible: true }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const input = checkoutInput("credit");
+    input.items = [{
+      id: "forged-combo-id",
+      baseProductId: "bracelet-1",
+      purchaseOptionId: "pair",
+      purchaseOptionLabel: "偽造雙人方案",
+      name: "偽造商品名稱",
+      price: 1,
+      quantity: 1,
+      image: "",
+      wristSizeSelections: [
+        { id: "first", label: "偽造欄位一", value: "13" },
+        { id: "second", label: "偽造欄位二", value: "14.5" },
+      ],
+      claspType: "elastic",
+      fitPreference: "just-right",
+    }] as typeof input.items;
+
+    await createPublicCaller().order.createAndPay(input);
+
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.arrayContaining([
+        expect.objectContaining({
+          productId: "bracelet-1",
+          productName: "通知測試手鍊（雙人方案）（第一條手圍 13cm）（第二條手圍 14.5cm）（剛好）",
+          unitPrice: 2300,
+        }),
+      ])
     );
   });
 

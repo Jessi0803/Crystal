@@ -52,7 +52,9 @@ test("ATM home-delivery checkout creates an order and accepts transfer last five
   await expect(page).toHaveURL(/\/order\//);
   await expect(page.locator("body")).toContainText("等待轉帳確認");
   await expect(page.locator("body")).toContainText("轉帳資訊");
-  await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
+  await expect(page.locator("body")).toContainText(
+    "E2E 現貨手鍊（手圍 14cm）（龍蝦扣）（剛好）"
+  );
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
   await expect(page.locator("body")).toContainText("54321");
 });

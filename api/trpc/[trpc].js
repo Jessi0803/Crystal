@@ -3518,6 +3518,21 @@ function getClaspSurcharge(item, product) {
   }
   return item.claspType === "elastic" ? 0 : CLASP_SURCHARGE;
 }
+function formatOrderItemWristSize(wristSize) {
+  return Number.isInteger(wristSize) ? String(wristSize) : wristSize.toFixed(1);
+}
+function buildOrderItemName(input) {
+  const details = [
+    input.purchaseOptionLabel,
+    input.wristSize == null ? null : `\u624B\u570D ${formatOrderItemWristSize(input.wristSize)}cm`,
+    ...(input.wristSizeSelections ?? []).map(
+      (selection) => `${selection.label} ${formatOrderItemWristSize(selection.wristSize)}cm`
+    ),
+    input.claspType === "lobster" ? "\u9F8D\u8766\u6263" : input.claspType === "magnetic" ? "\u78C1\u6263" : null,
+    input.fitPreference === "just-right" ? "\u525B\u597D" : input.fitPreference === "loose" ? "\u5FAE\u9B06" : null
+  ].filter((detail) => Boolean(detail));
+  return `${input.productName}${details.map((detail) => `\uFF08${detail}\uFF09`).join("")}`;
+}
 async function normalizePurchaseOptionItems(items) {
   const db = await getDb();
   if (!db) {
@@ -3535,6 +3550,7 @@ async function normalizePurchaseOptionItems(items) {
     claspOptions: dbProducts.claspOptions,
     wristSizeMin: dbProducts.wristSizeMin,
     wristSizeMax: dbProducts.wristSizeMax,
+    showFitPreference: dbProducts.showFitPreference,
     wristSizePriceRules: dbProducts.wristSizePriceRules,
     purchaseOptions: dbProducts.purchaseOptions
   }).from(dbProducts).where(inArray2(dbProducts.id, productIds));
@@ -3557,10 +3573,12 @@ async function normalizePurchaseOptionItems(items) {
           message: "\u8ACB\u91CD\u65B0\u9078\u64C7\u5854\u7F85\u5360\u535C\u4E3B\u984C\u5F8C\u518D\u7D50\u5E33\u3002"
         });
       }
-      const optionProductName2 = `${product.name}\uFF08${topic.label}\uFF09`;
       return {
         ...item,
-        name: item.name.startsWith(optionProductName2) ? item.name : item.name.replace(product.name, optionProductName2),
+        name: buildOrderItemName({
+          productName: product.name,
+          purchaseOptionLabel: topic.label
+        }),
         price: getTarotDepositPrice(product.price, topic),
         image: item.image || product.image,
         purchaseOptionLabel: topic.label,
@@ -3571,9 +3589,10 @@ async function normalizePurchaseOptionItems(items) {
       throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${item.name}\u300D\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u53EF\u8CFC\u8CB7\u3002` });
     }
     const claspSurcharge = getClaspSurcharge(item, product);
+    const fitPreference = product.category !== "custom" && product.showFitPreference !== false ? item.fitPreference : void 0;
     if (!item.purchaseOptionId) {
       const hasWristSizePriceRules = Boolean(product.wristSizePriceRules?.length);
-      const wristSize2 = hasWristSizePriceRules ? getValidatedWristSize(item, product) : null;
+      const wristSize2 = hasWristSizePriceRules || item.wristSize != null ? getValidatedWristSize(item, product) : null;
       const wristSizePrice = wristSize2 == null ? null : getWristSizeRulePrice(product, wristSize2);
       if (hasWristSizePriceRules && wristSizePrice == null) {
         throw new TRPCError4({
@@ -3585,7 +3604,12 @@ async function normalizePurchaseOptionItems(items) {
         ...item,
         id: product.id,
         baseProductId: product.id,
-        name: product.name,
+        name: buildOrderItemName({
+          productName: product.name,
+          wristSize: wristSize2,
+          claspType: item.claspType,
+          fitPreference
+        }),
         price: (wristSizePrice ?? product.price) + claspSurcharge,
         image: product.image || item.image
       };
@@ -3605,32 +3629,48 @@ async function normalizePurchaseOptionItems(items) {
         throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u5C1A\u672A\u8A2D\u5B9A\u7D44\u5408\u624B\u570D\u50F9\u683C\u3002` });
       }
       const selections = item.wristSizeSelections ?? [];
-      const price = groups.reduce((sum, group) => {
+      const validatedSelections = groups.map((group) => {
         const selected = selections.find((selection) => selection.id === group.id);
-        const wristSize2 = selected == null ? NaN : Number(selected.value);
-        const groupPrice = Number.isFinite(wristSize2) ? getWristSizeRulePrice(group, wristSize2) : null;
+        const wristSize2 = getValidatedWristSize(
+          { ...item, wristSize: selected?.value },
+          product
+        );
+        const groupPrice = getWristSizeRulePrice(group, wristSize2);
         if (groupPrice == null) {
           throw new TRPCError4({ code: "BAD_REQUEST", message: `\u300C${optionProductName}\u300D\u7F3A\u5C11 ${group.label} \u7684\u50F9\u683C\u3002` });
         }
-        return sum + groupPrice;
-      }, 0);
+        return { label: group.label, wristSize: wristSize2, price: groupPrice };
+      });
+      const price = validatedSelections.reduce((sum, selection) => sum + selection.price, 0);
       return {
         ...item,
-        name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+        name: buildOrderItemName({
+          productName: product.name,
+          purchaseOptionLabel: option.label,
+          wristSizeSelections: validatedSelections,
+          claspType: item.claspType,
+          fitPreference
+        }),
         price: price + claspSurcharge,
         image: item.image || product.image,
         purchaseOptionLabel: option.label,
         purchaseOptionUsesOwnStock: option.stock != null
       };
     }
-    const wristSize = item.wristSize == null ? NaN : Number(item.wristSize);
-    const optionWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(option, wristSize) : null;
-    const productWristSizeRulePrice = Number.isFinite(wristSize) ? getWristSizeRulePrice(product, wristSize) : null;
+    const wristSize = item.wristSize == null ? null : getValidatedWristSize(item, product);
+    const optionWristSizeRulePrice = wristSize != null ? getWristSizeRulePrice(option, wristSize) : null;
+    const productWristSizeRulePrice = wristSize != null ? getWristSizeRulePrice(product, wristSize) : null;
     const wristSizeRulePrice = optionWristSizeRulePrice ?? productWristSizeRulePrice;
     const wristSizePriceDelta = wristSizeRulePrice == null ? 0 : wristSizeRulePrice - product.price;
     return {
       ...item,
-      name: item.name.startsWith(optionProductName) ? item.name : item.name.replace(product.name, optionProductName),
+      name: buildOrderItemName({
+        productName: product.name,
+        purchaseOptionLabel: option.label,
+        wristSize,
+        claspType: item.claspType,
+        fitPreference
+      }),
       price: (optionWristSizeRulePrice ?? option.price + wristSizePriceDelta) + claspSurcharge,
       image: item.image || product.image,
       purchaseOptionLabel: option.label,
