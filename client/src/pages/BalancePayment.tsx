@@ -109,6 +109,11 @@ export default function BalancePayment() {
 
   const startCheckout = trpc.order.getBalancePaymentCheckout.useMutation({
     onSuccess: (result) => {
+      if (result.kind === "no_payment") {
+        toast.success("配送資料已確認，訂單可進入出貨流程");
+        refetch();
+        return;
+      }
       if (result.kind === "atm") {
         refetch();
         return;
@@ -329,6 +334,7 @@ export default function BalancePayment() {
     buyerEmail: data.order.buyerEmail,
     forceFreeShipping: data.order.freeShippingOverride || data.originalDomesticFreeShipping,
     forcePaidShipping: Boolean((data as any).orderMergeInfo && !(data.order.freeShippingOverride || data.originalDomesticFreeShipping)),
+    chargeShippingWhenSubtotalZero: data.amount === 0,
   });
   const payableAmount = feeSummary.total;
 
@@ -457,11 +463,18 @@ export default function BalancePayment() {
             )}
             <p className="text-xs tracking-[0.16em] text-[oklch(0.5_0_0)] font-body mb-2">客製化尾款</p>
             <h1 className="text-2xl text-[oklch(0.12_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
-              {isPaid ? "尾款已完成付款" : isTransferPending ? "等待轉帳確認" : isCancelled ? "尾款連結已失效" : latestCreditFailed ? "本次信用卡付款未完成" : "請完成客製化尾款"}
+              {isPaid
+                ? data.totalAmount === 0 ? "配送資料已確認" : "尾款已完成付款"
+                : isTransferPending ? "等待轉帳確認"
+                : isCancelled ? "尾款連結已失效"
+                : latestCreditFailed ? "本次信用卡付款未完成"
+                : data.amount === 0 ? "請確認配送資料" : "請完成客製化尾款"}
             </h1>
             <p className="text-sm font-body text-[oklch(0.5_0_0)] mt-3">
               {isPaid
-                ? "感謝您的付款，訂單已轉為已付款並會進入出貨流程。"
+                ? data.totalAmount === 0
+                  ? "已完成配送資料確認，訂單將進入出貨流程。"
+                  : "感謝您的付款，訂單已轉為已付款並會進入出貨流程。"
                 : isTransferPending
                 ? "老闆確認收款後將更新訂單狀態，請耐心等候。"
                 : isCancelled
@@ -753,8 +766,10 @@ export default function BalancePayment() {
                 </div>
               )}
 
-              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇付款方式</p>
-              <div className="grid grid-cols-2 gap-3 mb-5">
+              {payableAmount > 0 && (
+                <>
+                  <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇付款方式</p>
+                  <div className="grid grid-cols-2 gap-3 mb-5">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("credit")}
@@ -795,7 +810,9 @@ export default function BalancePayment() {
                     {paymentMethod === "atm" && <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />}
                   </div>
                 </button>
-              </div>
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={startBalanceCheckout}
@@ -804,6 +821,8 @@ export default function BalancePayment() {
               >
                 {startCheckout.isPending
                   ? "處理中..."
+                  : payableAmount === 0
+                  ? "確認配送資料"
                   : paymentMethod === "credit"
                   ? latestCreditFailed ? "重新使用信用卡付款" : "前往信用卡付款"
                   : "確認使用轉帳"}

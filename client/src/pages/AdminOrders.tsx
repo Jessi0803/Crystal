@@ -292,9 +292,9 @@ function OrderRowCard({
       await utils.order.getStats.invalidate();
       try {
         await navigator.clipboard.writeText(data.paymentLink);
-        toast.success(`尾款連結已產生並複製，金額 NT$ ${data.amount.toLocaleString()}`);
+        toast.success(`尾款／配送連結已產生並複製，商品尾款 NT$ ${data.amount.toLocaleString()}`);
       } catch {
-        toast.success(`尾款連結已產生：${data.paymentLink}`);
+        toast.success(`尾款／配送連結已產生：${data.paymentLink}`);
       }
     },
     onError: (err) => toast.error(err.message || "產生尾款連結失敗"),
@@ -313,7 +313,7 @@ function OrderRowCard({
       await utils.order.getOrderDetail.invalidate({ orderId: order.id });
       await utils.order.listOrders.invalidate();
       await utils.order.getStats.invalidate();
-      toast.success("已確認尾款為 0，訂單可進入出貨流程");
+      toast.success("已設定整筆免收，訂單可進入出貨流程");
     },
     onError: (err) => toast.error(err.message || "確認零尾款失敗"),
   });
@@ -624,11 +624,14 @@ function OrderRowCard({
                   <button
                     onClick={() => {
                       const defaultAmount = detail.balancePayment?.amount?.toString() ?? "";
-                      const raw = window.prompt("請輸入尾款金額", defaultAmount);
-                      if (!raw) return;
+                      const raw = window.prompt(
+                        "請輸入商品尾款金額（可輸入 0；客人仍需透過連結填寫配送資料，運費會另外計算）",
+                        defaultAmount,
+                      );
+                      if (raw === null || raw.trim() === "") return;
                       const amount = Number(raw);
-                      if (!Number.isInteger(amount) || amount < 1) {
-                        toast.error("請輸入大於 0 的整數金額");
+                      if (!Number.isInteger(amount) || amount < 0) {
+                        toast.error("請輸入 0 或大於 0 的整數金額");
                         return;
                       }
                       createBalancePaymentLink.mutate({ orderId: detail.id, amount });
@@ -637,7 +640,7 @@ function OrderRowCard({
                     className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 text-white text-xs font-body hover:bg-rose-700 transition-colors disabled:opacity-60"
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    {createBalancePaymentLink.isPending ? "產生中..." : "產生尾款連結"}
+                    {createBalancePaymentLink.isPending ? "產生中..." : "產生尾款／配送連結"}
                   </button>
                 )}
 
@@ -647,7 +650,10 @@ function OrderRowCard({
                   <button
                     type="button"
                     onClick={() => {
-                      const note = window.prompt("請確認此客製訂單確實無需收取尾款。可填寫備註：", "無需補尾款");
+                      const note = window.prompt(
+                        "此操作會將商品尾款與運費都設為 NT$0，且不要求客人填寫配送資料。請確認由管理員另行處理配送；可填寫備註：",
+                        "整筆免收，配送資料另行處理",
+                      );
                       if (note === null) return;
                       settleZeroBalance.mutate({ orderId: detail.id, note });
                     }}
@@ -655,7 +661,7 @@ function OrderRowCard({
                     className="flex items-center gap-1.5 px-4 py-2 border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-body hover:bg-emerald-100 transition-colors disabled:opacity-60"
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
-                    {settleZeroBalance.isPending ? "確認中..." : "確認尾款為 0"}
+                    {settleZeroBalance.isPending ? "確認中..." : "整筆免收並完成"}
                   </button>
                 )}
 
@@ -802,12 +808,16 @@ function OrderRowCard({
                   <p className="font-medium mb-1">尾款資訊</p>
                   <p>尾款編號：{detail.balancePayment.merchantTradeNo}</p>
                   <p>尾款金額：NT$ {detail.balancePayment.amount.toLocaleString()}</p>
-                  <p>付款方式：{detail.balancePayment.amount === 0 ? "免尾款" : (detail.balancePayment as any).paymentMethod === "atm" ? "轉帳" : "信用卡"}</p>
+                  <p>付款方式：{
+                    detail.balancePayment.amount === 0 && detail.balancePayment.totalAmount === 0
+                      ? "商品尾款 NT$0（待確認配送或整筆免收）"
+                      : (detail.balancePayment as any).paymentMethod === "atm" ? "轉帳" : "信用卡"
+                  }</p>
                   <p>尾款狀態：{
-                    detail.balancePayment.paymentStatus === "paid" ? detail.balancePayment.amount === 0 ? "✅ 已確認免尾款" : "✅ 已付款"
+                    detail.balancePayment.paymentStatus === "paid" ? detail.balancePayment.totalAmount === 0 ? "✅ 零尾款配送已完成／整筆免收" : "✅ 已付款"
                     : (detail.balancePayment.paymentStatus as string) === "transfer_pending" ? "⏳ 轉帳待確認"
                     : detail.balancePayment.paymentStatus === "failed" ? "❌ 付款失敗"
-                    : "待付款"
+                    : detail.balancePayment.amount === 0 ? "待填配送／確認運費" : "待付款"
                   }</p>
                   {(detail as any).balancePaymentAttempts?.length > 0 && (
                     <div className="mt-3 border-t border-rose-200 pt-2">
@@ -855,7 +865,7 @@ function OrderRowCard({
                     </a>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {detail.balancePayment.amount > 0 && (detail.balancePayment.paymentStatus as string) !== "transfer_pending" && detail.balancePayment.paymentStatus !== "paid" && (
+                    {(detail.balancePayment.paymentStatus as string) !== "transfer_pending" && detail.balancePayment.paymentStatus !== "paid" && (
                     <button
                       onClick={async () => {
                         const link = `${window.location.origin}/balance/${encodeURIComponent(detail.balancePayment!.merchantTradeNo)}`;
@@ -869,10 +879,10 @@ function OrderRowCard({
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors"
                     >
                       <CreditCard className="w-3.5 h-3.5" />
-                      複製尾款連結
+                      複製尾款／配送連結
                     </button>
                     )}
-                    {detail.balancePayment.amount > 0 && detail.balancePayment.paymentStatus !== "paid" && (
+                    {detail.balancePayment.totalAmount > 0 && detail.balancePayment.paymentStatus !== "paid" && (
                       <button
                         onClick={() => {
                           const note = window.prompt("確認已收到尾款？可填寫收款來源或備註：", "LINE 管理員確認");

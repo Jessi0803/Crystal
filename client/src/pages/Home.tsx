@@ -4,7 +4,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Gem,
+  Sparkles,
+  Star,
+  UsersRound,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -264,40 +273,52 @@ export default function Home() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 items-stretch gap-x-3 mt-9 pt-6 sm:flex sm:items-stretch sm:gap-8 sm:mt-12 sm:pt-8 border-t border-[oklch(0.93_0_0)]">
-            {[
-              { num: "10,000+", label: "滿意顧客" },
-              { num: "4.9", label: "平均評分" },
-              { num: "100%", label: "天然水晶", note: "無染色・無酸洗・無加工・有合作檢定廠商" },
-            ].map((s) => {
-              const content = (
-                <>
-                  <div className="text-xl sm:text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{s.num}</div>
-                  <div className="eyebrow mt-0.5">{s.label}</div>
-                  {"note" in s && s.note && (
-                    <div className="text-[0.58rem] font-body text-[oklch(0.55_0_0)] mt-0.5 leading-relaxed">（{s.note}）</div>
-                  )}
-                </>
-              );
+          <div className="mt-9 border-t border-[oklch(0.93_0_0)] pt-6 sm:mt-12 sm:pt-8">
+            <div className="grid border-y border-[#eee9e4] bg-[#fcfaf7] sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setIsReviewsOpen(true)}
+                className="group relative flex min-h-[126px] flex-col p-4 text-left transition-colors duration-300 hover:bg-white/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#cdb9a8] sm:px-5"
+                aria-label="查看顧客好評照片"
+              >
+                <span className="mb-4 flex items-center gap-2 text-[0.58rem] tracking-[0.18em] text-[#b49378]">
+                  <UsersRound className="h-3.5 w-3.5" aria-hidden="true" />
+                  COMMUNITY
+                </span>
+                <span className="text-2xl font-medium leading-none text-[oklch(0.16_0_0)] sm:text-[1.65rem]" style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                  10,000+
+                </span>
+                <span className="mt-2 text-xs font-medium tracking-[0.13em] text-[oklch(0.38_0_0)]">滿意顧客</span>
+                <span className="mt-auto flex items-center gap-1 pt-2 text-[0.66rem] font-body text-[#a38269]">
+                  查看真實回饋
+                  <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
+                </span>
+              </button>
 
-              if (s.label === "滿意顧客") {
-                return (
-                  <button
-                    key={s.label}
-                    type="button"
-                    onClick={() => setIsReviewsOpen(true)}
-                    className="group -m-2 flex min-h-[84px] rounded-md p-2 text-left transition-colors hover:bg-[oklch(0.985_0.008_75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.72_0.09_70)]"
-                    aria-label="查看顧客好評照片"
-                  >
-                    <span className="block min-h-[68px] transition-transform duration-300 group-hover:-translate-y-0.5">
-                      {content}
-                    </span>
-                  </button>
-                );
-              }
+              <div className="flex min-h-[126px] flex-col border-t border-[#eee9e4] p-4 sm:border-l sm:border-t-0 sm:px-5">
+                <span className="mb-4 flex items-center gap-2 text-[0.58rem] tracking-[0.18em] text-[#b49378]">
+                  <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                  RATING
+                </span>
+                <span className="text-2xl font-medium leading-none text-[oklch(0.16_0_0)] sm:text-[1.65rem]" style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                  4.9
+                </span>
+                <span className="mt-2 text-xs font-medium tracking-[0.13em] text-[oklch(0.38_0_0)]">平均評分</span>
+                <span className="mt-auto pt-2 text-[0.66rem] font-body leading-relaxed text-[oklch(0.52_0_0)]">用心製作，累積真實口碑</span>
+              </div>
 
-              return <div key={s.label} className="min-h-[84px]">{content}</div>;
-            })}
+              <div className="flex min-h-[126px] flex-col border-t border-[#eee9e4] p-4 sm:border-l sm:border-t-0 sm:px-5">
+                <span className="mb-4 flex items-center gap-2 text-[0.58rem] tracking-[0.18em] text-[#b49378]">
+                  <Gem className="h-3.5 w-3.5" aria-hidden="true" />
+                  NATURAL
+                </span>
+                <span className="text-2xl font-medium leading-none text-[oklch(0.16_0_0)] sm:text-[1.65rem]" style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                  100%
+                </span>
+                <span className="mt-2 text-xs font-medium tracking-[0.13em] text-[oklch(0.38_0_0)]">天然水晶</span>
+                <span className="mt-auto pt-2 text-[0.66rem] font-body leading-relaxed text-[oklch(0.52_0_0)]">無染色・無酸洗<br />合作檢定廠商把關</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>

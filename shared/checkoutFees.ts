@@ -70,12 +70,14 @@ export function calcCheckoutFees(params: {
   buyerEmail?: string | null;
   forceFreeShipping?: boolean;
   forcePaidShipping?: boolean;
+  /** 客製商品尾款為 0 時，仍須依配送方式計算運費。其他結帳流程預設不啟用。 */
+  chargeShippingWhenSubtotalZero?: boolean;
 }) {
   const subtotal = params.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const chargeableSubtotal = params.items
     .filter((item) => !isCheckoutFeeExemptProduct(item))
     .reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const appliesFees = chargeableSubtotal > 0;
+  const appliesFees = chargeableSubtotal > 0 || params.chargeShippingWhenSubtotalZero === true;
   const domesticFreeShipping = params.checkoutRegion === "domestic" && calcFreeShippingQuantity(params.items) >= 2;
   const emailFreeShipping = isFreeShippingEmail(params.buyerEmail);
   const forcedFreeShipping = params.forceFreeShipping === true;

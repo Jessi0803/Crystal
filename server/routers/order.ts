@@ -62,7 +62,7 @@ import {
   orderMergeMembers,
   type OrderItemConfigurationSnapshot,
 } from "../../drizzle/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
   verifyPayPalOrderBelongsToMerchant,
@@ -242,7 +242,7 @@ async function assertReadyForFulfillment(
   if (!mainBalance) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "客製訂單尚未設定尾款；若無需尾款，請先使用「確認尾款為 0」",
+      message: "客製訂單尚未設定尾款；若商品尾款為 0，請先產生配送連結或使用「整筆免收並完成」",
     });
   }
   // A merged group has one authoritative balance on its main order. Older
@@ -1589,7 +1589,7 @@ export const orderRouter = router({
     .input(
       z.object({
         orderId: z.number(),
-        amount: z.number().int().min(1),
+        amount: z.number().int().min(0),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -2049,6 +2049,7 @@ export const orderRouter = router({
         buyerEmail: balancePayment.order.buyerEmail,
         forceFreeShipping: forceBalanceFreeShipping,
         forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !forceBalanceFreeShipping),
+        chargeShippingWhenSubtotalZero: balancePayment.amount === 0,
       });
       const totalAmount = feeSummary.total;
 
@@ -2062,6 +2063,63 @@ export const orderRouter = router({
         shippingAddress: shippingAddress ?? null,
         receiverZipCode: receiverZipCode ?? null,
       };
+
+      // 商品尾款與運費皆為 0 時，不建立金流交易；只確認配送資料並完成尾款。
+      // 舊的已付款零尾款記錄會在上方被擋下，不會被這段回溯修改。
+      if (totalAmount === 0) {
+        const now = new Date();
+        const completed = await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balancePayment.id} FOR UPDATE`);
+          const [currentBalance] = await tx
+            .select({ paymentStatus: orderBalancePayments.paymentStatus })
+            .from(orderBalancePayments)
+            .where(eq(orderBalancePayments.id, balancePayment.id))
+            .limit(1);
+          if (!currentBalance || !["pending", "failed"].includes(currentBalance.paymentStatus)) return false;
+
+          await tx
+            .update(orderBalancePayments)
+            .set({
+              paymentMethod: input.paymentMethod,
+              shippingFee: 0,
+              paymentFee: 0,
+              totalAmount: 0,
+              paymentStatus: "paid",
+              tradeNo: "NO_PAYMENT_REQUIRED",
+              ecpayNotifyData: {
+                source: "zero_balance_shipping_confirmation",
+                confirmedAt: now.toISOString(),
+              },
+              paidAt: now,
+            })
+            .where(eq(orderBalancePayments.id, balancePayment.id));
+
+          await tx
+            .update(orders)
+            .set({
+              ...orderUpdate,
+              orderStatus: "paid",
+              paymentStatus: "confirmed",
+              confirmedAt: now,
+              paidAt: now,
+              totalAmount: Math.max(
+                1,
+                balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount),
+              ),
+            })
+            .where(eq(orders.id, balancePayment.orderId));
+          return true;
+        });
+        if (!completed) {
+          throw new TRPCError({ code: "CONFLICT", message: "尾款狀態已更新，請重新整理頁面" });
+        }
+        return {
+          kind: "no_payment" as const,
+          amount: 0,
+          shippingFee: 0,
+          paymentFee: 0,
+        };
+      }
 
       if (input.paymentMethod === "credit") {
         let attempt;

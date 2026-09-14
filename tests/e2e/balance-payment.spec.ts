@@ -25,7 +25,7 @@ async function connectTestDb() {
   });
 }
 
-async function createDirectBalancePayment() {
+async function createDirectBalancePayment(options: { amount?: number; freeShippingOverride?: boolean } = {}) {
   const connection = await connectTestDb();
   try {
     const suffix = Date.now().toString(36).toUpperCase();
@@ -36,10 +36,10 @@ async function createDirectBalancePayment() {
       `INSERT INTO orders (
         merchantTradeNo, paymentStatus, paymentMethod, deliveryRegion, shippingMethod,
         orderStatus, isCustomOrder, totalAmount, buyerName, buyerEmail, buyerPhone,
-        shippingAddress, receiverZipCode, confirmedAt, createdAt, updatedAt
+        shippingAddress, receiverZipCode, freeShippingOverride, confirmedAt, createdAt, updatedAt
       ) VALUES (?, 'confirmed', 'atm', 'domestic', 'home', 'deposit_paid', true, 1200,
-        'E2E 尾款測試', ?, '0912345678', '台北市中正區測試路 1 號', '100', NOW(), NOW(), NOW())`,
-      [orderNo, `${orderNo.toLowerCase()}@example.com`]
+        'E2E 尾款測試', ?, '0912345678', '台北市中正區測試路 1 號', '100', ?, NOW(), NOW(), NOW())`,
+      [orderNo, `${orderNo.toLowerCase()}@example.com`, options.freeShippingOverride === true]
     );
     const [rows] = await connection.execute<RowDataPacket[]>(
       "SELECT id FROM orders WHERE merchantTradeNo = ? LIMIT 1",
@@ -55,11 +55,25 @@ async function createDirectBalancePayment() {
       `INSERT INTO orderBalancePayments (
         orderId, merchantTradeNo, amount, shippingFee, paymentFee, totalAmount,
         paymentMethod, paymentStatus, createdAt, updatedAt
-      ) VALUES (?, ?, 700, 0, 700, 1400, 'atm', 'pending', NOW(), NOW())`,
-      [orderId, balanceOrderNo]
+      ) VALUES (?, ?, ?, 0, 0, ?, 'atm', 'pending', NOW(), NOW())`,
+      [orderId, balanceOrderNo, options.amount ?? 700, options.amount ?? 700]
     );
 
     return { orderNo, balanceOrderNo };
+  } finally {
+    await connection.end();
+  }
+}
+
+async function getOrderDeliveryState(orderNo: string) {
+  const connection = await connectTestDb();
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      `SELECT paymentStatus, orderStatus, shippingMethod, shippingAddress, receiverZipCode
+       FROM orders WHERE merchantTradeNo = ? LIMIT 1`,
+      [orderNo]
+    );
+    return rows[0];
   } finally {
     await connection.end();
   }
@@ -204,6 +218,42 @@ test("failed credit balance payment keeps the original link and creates a new EC
   });
 });
 
+test("zero product balance still charges the selected shipping fee", async ({ page }) => {
+  const { balanceOrderNo } = await createDirectBalancePayment({ amount: 0 });
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await expect(page.getByRole("heading", { name: "請確認配送資料" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("運費");
+  await expect(page.locator("body")).toContainText("應付總額");
+  await expect(page.locator("body")).toContainText("NT$ 130");
+  await expect(page.getByRole("button", { name: "前往信用卡付款" })).toBeVisible();
+});
+
+test("free-shipping zero balance confirms delivery without opening a payment flow", async ({ page }) => {
+  const { orderNo, balanceOrderNo } = await createDirectBalancePayment({
+    amount: 0,
+    freeShippingOverride: true,
+  });
+
+  await page.goto(`/balance/${balanceOrderNo}`);
+  await expect(page.getByRole("heading", { name: "請確認配送資料" })).toBeVisible();
+  await expect(page.getByText("選擇付款方式")).toHaveCount(0);
+  await page.locator('input[placeholder="郵遞區號"]').fill("100");
+  await page.locator('input[placeholder="縣市"]').fill("台北市");
+  await page.locator('input[placeholder="鄉鎮市區"]').fill("中正區");
+  await page.locator('input[placeholder="路名、門牌、樓層"]').fill("零尾款測試路 3 號");
+  await page.getByRole("button", { name: "確認配送資料" }).click();
+
+  await expect(page.getByRole("heading", { name: "配送資料已確認" })).toBeVisible();
+  await expect.poll(() => getOrderDeliveryState(orderNo)).toMatchObject({
+    paymentStatus: "confirmed",
+    orderStatus: "paid",
+    shippingMethod: "home",
+    shippingAddress: "台北市中正區零尾款測試路 3 號",
+    receiverZipCode: "100",
+  });
+});
+
 test("custom deposit order can receive a balance payment link and submit ATM balance transfer code", async ({ page }) => {
   test.setTimeout(90_000);
   const depositOrderNo = await createAtmCustomDepositOrder(page, `e2e-balance-${Date.now()}@example.com`);
@@ -216,7 +266,7 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
 
   await page.locator("button").filter({ hasText: depositOrderNo }).click();
   await page.getByRole("button", { name: "確認收款" }).click();
-  await expect(page.locator("body")).toContainText("產生尾款連結");
+  await expect(page.locator("body")).toContainText("產生尾款／配送連結");
 
   await page.goto(`/order/${depositOrderNo}`);
   await fillPureCustomOrderForm(page, depositOrderNo);
@@ -226,10 +276,10 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
   await expect(page.locator("body")).toContainText("【純客製水晶手鍊諮詢表單】");
 
   page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("請輸入尾款金額");
+    expect(dialog.message()).toContain("請輸入商品尾款金額");
     await dialog.accept("700");
   });
-  await page.getByRole("button", { name: "產生尾款連結" }).click();
+  await page.getByRole("button", { name: "產生尾款／配送連結" }).click();
   await expect(page.locator("body")).toContainText("尾款編號：");
 
   const pageText = await page.locator("body").innerText();

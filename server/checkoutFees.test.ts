@@ -85,6 +85,54 @@ describe("checkout fee calculation", () => {
     expect(fees.total).toBe(1930);
   });
 
+  it("charges shipping for a zero product balance only when the balance flow opts in", () => {
+    const zeroBalanceItem = [{
+      id: "custom-balance-payment",
+      name: "客製化商品尾款",
+      price: 0,
+      quantity: 1,
+      twoItemFreeShippingEligible: false,
+    }];
+
+    const legacyFees = calcCheckoutFees({
+      items: zeroBalanceItem,
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+    });
+    const zeroBalanceDeliveryFees = calcCheckoutFees({
+      items: zeroBalanceItem,
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+      chargeShippingWhenSubtotalZero: true,
+    });
+
+    expect(legacyFees.total).toBe(0);
+    expect(zeroBalanceDeliveryFees.shippingFee).toBe(130);
+    expect(zeroBalanceDeliveryFees.total).toBe(130);
+  });
+
+  it("keeps a zero product balance at zero when its order is explicitly free shipping", () => {
+    const fees = calcCheckoutFees({
+      items: [{
+        id: "custom-balance-payment",
+        name: "客製化商品尾款",
+        price: 0,
+        quantity: 1,
+        twoItemFreeShippingEligible: false,
+      }],
+      checkoutRegion: "domestic",
+      shippingMethod: "home",
+      paymentMethod: "credit",
+      chargeShippingWhenSubtotalZero: true,
+      forceFreeShipping: true,
+    });
+
+    expect(fees.shippingFee).toBe(0);
+    expect(fees.total).toBe(0);
+  });
+
   it("adds overseas shipping without PayPal fee for normal products", () => {
     const fees = calcCheckoutFees({
       items: [{ id: "d002-honey-realm", name: "蜜光之境手鍊", price: 1580, quantity: 1 }],

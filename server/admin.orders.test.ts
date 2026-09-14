@@ -97,6 +97,7 @@ import {
   createBalancePaymentAttempt,
   confirmBalanceTransfer,
   settleZeroBalancePayment,
+  createOrReplaceBalancePayment,
 } from "./orderDb";
 import { getDb } from "./db";
 import { appRouter } from "./appRouter";
@@ -117,6 +118,7 @@ const createBalancePaymentAttemptMock = vi.mocked(createBalancePaymentAttempt);
 const buildCreditPaymentParamsMock = vi.mocked(buildCreditPaymentParams);
 const confirmBalanceTransferMock = vi.mocked(confirmBalanceTransfer);
 const settleZeroBalancePaymentMock = vi.mocked(settleZeroBalancePayment);
+const createOrReplaceBalancePaymentMock = vi.mocked(createOrReplaceBalancePayment);
 const getDbMock = vi.mocked(getDb);
 const getProductAvailabilityMock = vi.mocked(getProductAvailability);
 const verifyPayPalOrderBelongsToMerchantMock = vi.mocked(verifyPayPalOrderBelongsToMerchant);
@@ -175,15 +177,18 @@ function createMutationMockDb(selectResults: unknown[]) {
     where: vi.fn().mockResolvedValue(undefined),
   };
 
-  return {
+  const db: any = {
     select: vi.fn(() => createQueryChain(queue.shift() ?? [])),
     insert: vi.fn(() => insertChain),
     update: vi.fn(() => updateChain),
     delete: vi.fn(() => deleteChain),
+    execute: vi.fn().mockResolvedValue(undefined),
     insertChain,
     updateChain,
     deleteChain,
   };
+  db.transaction = vi.fn(async (callback: (tx: typeof db) => unknown) => callback(db));
+  return db;
 }
 
 function createPublicCaller() {
@@ -762,6 +767,32 @@ describe("order fulfillment first-phase rules", () => {
     });
   });
 
+  it("allows an admin to create a delivery link with a zero product balance", async () => {
+    const db = createMutationMockDb([[]]);
+    getDbMock.mockResolvedValue(db as any);
+    createOrReplaceBalancePaymentMock.mockResolvedValue({
+      merchantTradeNo: "CBZERODELIVERY001",
+      amount: 0,
+    } as any);
+    const caller = appRouter.createCaller({
+      user: { id: 7, role: "admin" } as any,
+      req: {
+        get: (name: string) => (name === "host" ? "example.test" : undefined),
+        protocol: "https",
+      } as any,
+      res: {} as any,
+    });
+
+    const result = await caller.order.createBalancePaymentLink({ orderId: 91, amount: 0 });
+
+    expect(createOrReplaceBalancePaymentMock).toHaveBeenCalledWith({ orderId: 91, amount: 0 });
+    expect(result).toMatchObject({
+      merchantTradeNo: "CBZERODELIVERY001",
+      amount: 0,
+      paymentLink: "https://example.test/balance/CBZERODELIVERY001",
+    });
+  });
+
   it("allows an admin to confirm a pending balance without a receipt or last-five code", async () => {
     confirmBalanceTransferMock.mockResolvedValue(undefined);
 
@@ -1062,6 +1093,96 @@ describe("order.getBalancePaymentCheckout", () => {
     })).rejects.toThrow("此尾款連結目前不可付款");
 
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("charges only domestic shipping when the product balance is zero", async () => {
+    getBalancePaymentDetailMock.mockResolvedValue({
+      id: 5,
+      orderId: 105,
+      merchantTradeNo: "CBZEROSHIPPING001",
+      amount: 0,
+      shippingFee: 0,
+      paymentFee: 0,
+      totalAmount: 0,
+      paymentStatus: "pending",
+      clearQuartzChipsItem: null,
+      orderMergeInfo: null,
+      order: {
+        id: 105,
+        merchantTradeNo: "CORDERZERO001",
+        buyerEmail: "zero@example.com",
+        freeShippingOverride: false,
+        totalAmount: 500,
+      },
+    } as any);
+    const db = createMutationMockDb([[]]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const result = await createPublicCaller().order.getBalancePaymentCheckout({
+      merchantTradeNo: "CBZEROSHIPPING001",
+      paymentMethod: "credit",
+      checkoutRegion: "domestic",
+      receiverPhone: "0912345678",
+      shippingMethod: "home",
+      shippingAddress: "台北市測試路 1 號",
+      receiverZipCode: "100",
+      origin: "https://example.test",
+    });
+
+    expect(result).toMatchObject({ kind: "credit", amount: 130, shippingFee: 130 });
+    expect(createBalancePaymentAttemptMock).toHaveBeenCalledWith(expect.objectContaining({
+      balancePaymentId: 5,
+      amount: 0,
+      shippingFee: 130,
+      totalAmount: 130,
+    }));
+  });
+
+  it("confirms delivery without creating a payment attempt when zero balance is free shipping", async () => {
+    getBalancePaymentDetailMock.mockResolvedValue({
+      id: 6,
+      orderId: 106,
+      merchantTradeNo: "CBZEROFREE001",
+      amount: 0,
+      shippingFee: 0,
+      paymentFee: 0,
+      totalAmount: 0,
+      paymentStatus: "pending",
+      clearQuartzChipsItem: null,
+      orderMergeInfo: null,
+      order: {
+        id: 106,
+        merchantTradeNo: "CORDERZERO002",
+        buyerEmail: "free@example.com",
+        freeShippingOverride: true,
+        totalAmount: 500,
+      },
+    } as any);
+    const db = createMutationMockDb([
+      [],
+      [{ paymentStatus: "pending" }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const result = await createPublicCaller().order.getBalancePaymentCheckout({
+      merchantTradeNo: "CBZEROFREE001",
+      paymentMethod: "credit",
+      checkoutRegion: "domestic",
+      receiverPhone: "0912345678",
+      shippingMethod: "home",
+      shippingAddress: "台北市測試路 2 號",
+      receiverZipCode: "100",
+      origin: "https://example.test",
+    });
+
+    expect(result).toEqual({ kind: "no_payment", amount: 0, shippingFee: 0, paymentFee: 0 });
+    expect(createBalancePaymentAttemptMock).not.toHaveBeenCalled();
+    expect(db.updateChain.set).toHaveBeenCalledWith(expect.objectContaining({
+      paymentStatus: "confirmed",
+      orderStatus: "paid",
+      shippingMethod: "home",
+      shippingAddress: "台北市測試路 2 號",
+    }));
   });
 
   it("waives balance-payment shipping when the original order already qualifies for domestic free shipping", async () => {
