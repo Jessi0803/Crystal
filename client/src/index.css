@@ -458,6 +458,19 @@
     display: none;
   }
 
+  /* Keep horizontal navigation touch/trackpad scrolling without showing a native bar. */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   .scroll-item {
     flex-shrink: 0;
     scroll-snap-align: start;

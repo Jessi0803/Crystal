@@ -179,7 +179,18 @@ export default function Register() {
             </button>
 
             <p className="text-[0.65rem] text-[oklch(0.6_0_0)] font-body text-center leading-relaxed">
-              註冊即表示您同意我們的服務條款與隱私政策
+              註冊即表示您同意我們的
+              <Link href="/terms">
+                <span className="mx-1 cursor-pointer text-[oklch(0.42_0.03_55)] underline underline-offset-4 transition-colors hover:text-[oklch(0.25_0.04_55)]">
+                  服務條款
+                </span>
+              </Link>
+              與
+              <Link href="/privacy">
+                <span className="ml-1 cursor-pointer text-[oklch(0.42_0.03_55)] underline underline-offset-4 transition-colors hover:text-[oklch(0.25_0.04_55)]">
+                  隱私政策
+                </span>
+              </Link>
             </p>
           </form>
         </div>

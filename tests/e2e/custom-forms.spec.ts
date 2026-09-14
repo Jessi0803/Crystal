@@ -47,8 +47,9 @@ test("pure custom flow pays first, submits the form, and exposes it to admin", a
   const orderNo = await createCustomDepositOrder(page, customProducts[0], "e2e-pure-custom");
   await expect(page.getByRole("heading", { name: "接下來，告訴我們你的故事。" })).toBeVisible();
 
-  await fillPureCustomOrderForm(page, orderNo);
+  await fillPureCustomOrderForm(page, orderNo, { focusChoices: ["感情", "工作"] });
   await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶手鍊諮詢表單】");
+  await expect(page.locator("body")).toContainText("這次最想為自己調整的是：感情、工作");
   await expect(page.locator("body")).toContainText("Instagram 帳號 / LINE ID：e2e_line_id");
 });
 

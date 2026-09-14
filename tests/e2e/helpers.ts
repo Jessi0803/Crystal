@@ -179,15 +179,22 @@ export async function openPendingCustomOrderForm(page: Page, orderNo: string, pr
 export async function fillPureCustomOrderForm(
   page: Page,
   orderNo: string,
-  options: { wristSize?: string; expectedValidationError?: string } = {},
+  options: {
+    wristSize?: string;
+    expectedValidationError?: string;
+    focusChoices?: string[];
+  } = {},
 ) {
   await openPendingCustomOrderForm(page, orderNo, "客製化商品");
   await expect(page.getByRole("heading", { name: "這次最想為自己調整的是？" })).toBeVisible({ timeout: 30_000 });
-  await selectCustomFormChoice(page
+  const focusSection = page
     .locator("section")
-    .filter({ hasText: "這次最想為自己調整的是？" })
-    .getByRole("button", { name: "沒有想法，交給設計師", exact: true })
-  );
+    .filter({ hasText: "這次最想為自己調整的是？" });
+  for (const choice of options.focusChoices ?? ["沒有想法，交給設計師"]) {
+    await selectCustomFormChoice(
+      focusSection.getByRole("button", { name: choice, exact: true })
+    );
+  }
   await selectCustomFormChoice(page
     .locator("section")
     .filter({ hasText: "希望整體設計？" })

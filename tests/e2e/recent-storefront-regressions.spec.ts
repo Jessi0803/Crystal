@@ -36,3 +36,29 @@ test("home hero exposes all three product slides, advances automatically and lin
   await hero.getByRole("link", { name: "查看全部商品" }).click({ position: { x: 20, y: 20 } });
   await expect(page).toHaveURL(/\/products$/);
 });
+
+test("home trust cards keep customer reviews available from the satisfaction card", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByText("用心製作，累積真實口碑")).toBeVisible();
+  await expect(page.getByText("合作檢定廠商把關")).toBeVisible();
+  await page.getByRole("button", { name: "查看顧客好評照片" }).click();
+
+  const reviews = page.getByRole("dialog");
+  await expect(reviews).toBeVisible();
+  await expect(reviews.getByRole("heading", { name: "來自顧客的真實回饋" })).toBeVisible();
+  await expect(reviews.locator('img[alt^="顧客好評截圖"]')).toHaveCount(15);
+});
+
+test("registration links open the service terms and privacy policy", async ({ page }) => {
+  await page.goto("/register");
+
+  await page.getByRole("link", { name: "服務條款", exact: true }).click();
+  await expect(page).toHaveURL(/\/terms$/);
+  await expect(page.getByRole("heading", { name: "服務條款", level: 1 })).toBeVisible();
+
+  await page.goto("/register");
+  await page.getByRole("link", { name: "隱私政策", exact: true }).click();
+  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page.getByRole("heading", { name: "隱私政策", level: 1 })).toBeVisible();
+});

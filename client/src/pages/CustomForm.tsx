@@ -82,7 +82,7 @@ export default function CustomForm() {
   const steps = [
     {
       title: "這次最想為自己調整的是？",
-      subtitle: "選一個目前最想被照顧到的面向，設計師會以此為主軸挑選水晶",
+      subtitle: "可選擇多個想被照顧到的面向，設計師會綜合挑選適合的水晶",
       required: true,
       field: (
         <CustomFormFocusField
@@ -90,6 +90,7 @@ export default function CustomForm() {
           otherStory={form.focusStory}
           onChange={focus => setForm({ ...form, focus })}
           onOtherStoryChange={focusStory => setForm({ ...form, focusStory })}
+          multiple
         />
       ),
     },
