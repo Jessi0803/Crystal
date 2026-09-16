@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft,
-  CalendarDays,
   ChevronDown,
   ChevronUp,
   CreditCard,
@@ -19,11 +18,9 @@ import {
   RefreshCw,
   Save,
   Search,
-  ShoppingBag,
   Trash2,
   Truck,
   UserRound,
-  Users,
   X,
   XCircle,
 } from "lucide-react";
@@ -387,8 +384,11 @@ export default function AdminMembers() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
           <div>
             <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">MEMBER MANAGEMENT</p>
-            <h1 className="mt-1 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
-              會員管理
+            <h1 className="mt-1 flex items-baseline gap-2 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+              <span>會員管理</span>
+              <span className="text-xs font-body text-[oklch(0.52_0_0)]">
+                {isLoading ? "載入中" : search ? `${total.toLocaleString()} 筆結果` : `${total.toLocaleString()} 位`}
+              </span>
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -408,45 +408,6 @@ export default function AdminMembers() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-            <div className="flex items-center gap-2 mb-2 text-[oklch(0.4_0_0)]">
-              <Users className="w-4 h-4" />
-              <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">會員總數</span>
-            </div>
-            <div className="text-2xl font-medium text-[oklch(0.18_0_0)]" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {isLoading ? "…" : total.toLocaleString()}
-            </div>
-          </div>
-          <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-            <div className="flex items-center gap-2 mb-2 text-amber-600">
-              <Crown className="w-4 h-4" />
-              <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">目前選取</span>
-            </div>
-            <div className="text-2xl font-medium text-amber-700" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {getVipLabel(selectedMember?.vipTier)}
-            </div>
-          </div>
-          <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-            <div className="flex items-center gap-2 mb-2 text-blue-600">
-              <ShoppingBag className="w-4 h-4" />
-              <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">購買紀錄</span>
-            </div>
-            <div className="text-2xl font-medium text-blue-700" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {detailLoading ? "…" : `${detail?.orders.length ?? 0} 筆`}
-            </div>
-          </div>
-          <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-            <div className="flex items-center gap-2 mb-2 text-emerald-600">
-              <CalendarDays className="w-4 h-4" />
-              <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">累計消費</span>
-            </div>
-            <div className="text-2xl font-medium text-emerald-700" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {formatMoney(totalDetailSpent)}
-            </div>
-          </div>
-        </div>
-
         <div className="grid gap-6 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.45fr)]">
           <section className="bg-white border border-[oklch(0.93_0_0)]">
             <div className="p-5 border-b border-[oklch(0.93_0_0)]">
@@ -606,24 +567,31 @@ export default function AdminMembers() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex self-start items-center gap-1.5 text-xs font-body border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1.5">
-                        <Crown className="w-3.5 h-3.5" />
+                  </div>
+
+                  <div className="grid grid-cols-3 divide-x divide-[oklch(0.9_0_0)] border-y border-[oklch(0.9_0_0)] py-3">
+                    <div className="min-w-0 px-2 first:pl-0 sm:px-4 sm:first:pl-0">
+                      <p className="text-[10px] tracking-widest font-body text-[oklch(0.55_0_0)]">會員等級</p>
+                      <p className="mt-1 flex items-center gap-1 truncate text-xs font-medium text-amber-700 sm:text-sm">
+                        <Crown className="h-3.5 w-3.5 shrink-0" />
                         {getVipLabel(selectedMember.vipTier)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleDeleteMember}
-                        disabled={deleteMember.isPending}
-                        className="inline-flex items-center justify-center gap-1.5 border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-body text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        {deleteMember.isPending ? "刪除中" : "刪除會員"}
-                      </button>
+                      </p>
+                    </div>
+                    <div className="min-w-0 px-2 sm:px-4">
+                      <p className="text-[10px] tracking-widest font-body text-[oklch(0.55_0_0)]">購買紀錄</p>
+                      <p className="mt-1 text-xs font-medium text-[oklch(0.2_0_0)] sm:text-sm">
+                        {detail?.orders.length ?? 0} 筆
+                      </p>
+                    </div>
+                    <div className="min-w-0 px-2 sm:px-4">
+                      <p className="text-[10px] tracking-widest font-body text-[oklch(0.55_0_0)]">累計消費</p>
+                      <p className="mt-1 truncate text-xs font-medium text-[oklch(0.2_0_0)] sm:text-sm">
+                        {formatMoney(totalDetailSpent)}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="border-t border-[oklch(0.93_0_0)] pt-5 grid gap-4 md:grid-cols-[160px_1fr_auto] md:items-end">
+                  <div className="grid gap-4 md:grid-cols-[160px_1fr_auto] md:items-end">
                     <label className="block">
                       <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">VIP 等級</span>
                       <select
@@ -645,15 +613,26 @@ export default function AdminMembers() {
                         className="w-full border border-[oklch(0.86_0_0)] px-3 py-2.5 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                       />
                     </label>
-                    <button
-                      type="button"
-                      onClick={saveVip}
-                      disabled={updateVip.isPending}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      {updateVip.isPending ? "儲存中" : "儲存"}
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={saveVip}
+                        disabled={updateVip.isPending}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        {updateVip.isPending ? "儲存中" : "儲存"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteMember}
+                        disabled={deleteMember.isPending}
+                        className="inline-flex items-center justify-center gap-1.5 border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-body text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deleteMember.isPending ? "刪除中" : "刪除會員"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
