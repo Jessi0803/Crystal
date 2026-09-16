@@ -30,7 +30,7 @@ test("regular members cannot access protected admin workspaces", async ({ page }
   await login(page, "e2e-user@example.com");
   await expect(page).toHaveURL(/\/products/);
 
-  for (const path of ["/admin/products", "/admin/revenue", "/admin/chatbot"]) {
+  for (const path of ["/admin/products", "/admin/revenue", "/admin/chatbot", "/admin/monitoring"]) {
     await page.goto(path);
     await expect(page.locator("body")).toContainText("此頁面僅限管理員存取");
   }

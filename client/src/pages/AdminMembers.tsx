@@ -3,7 +3,7 @@
  * 路由：/admin/members
  * 僅限 admin 角色存取
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import {
   Truck,
   UserRound,
   Users,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -205,6 +206,11 @@ export default function AdminMembers() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<"profile" | "orders">("profile");
+  const detailCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const lastMemberTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const detailWasOpenRef = useRef(false);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [vipTier, setVipTier] = useState<(typeof VIP_OPTIONS)[number]["value"]>("none");
   const [vipNote, setVipNote] = useState("");
@@ -244,6 +250,7 @@ export default function AdminMembers() {
       toast.success("會員已刪除，資料庫已同步");
       if (selectedUserId === result.deletedUserId) {
         setSelectedUserId(null);
+        setDetailOpen(false);
       }
       await utils.adminMembers.list.invalidate();
       await utils.adminMembers.detail.invalidate();
@@ -278,6 +285,38 @@ export default function AdminMembers() {
   }, [selectedUserId]);
 
   useEffect(() => {
+    const wideLayout = window.matchMedia("(min-width: 1280px)");
+    const handleLayoutChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setDetailOpen(false);
+    };
+    wideLayout.addEventListener("change", handleLayoutChange);
+    return () => wideLayout.removeEventListener("change", handleLayoutChange);
+  }, []);
+
+  useEffect(() => {
+    if (!detailOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDetailOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [detailOpen]);
+
+  useEffect(() => {
+    if (detailOpen) {
+      window.requestAnimationFrame(() => detailCloseButtonRef.current?.focus());
+    } else if (detailWasOpenRef.current) {
+      window.requestAnimationFrame(() => lastMemberTriggerRef.current?.focus());
+    }
+    detailWasOpenRef.current = detailOpen;
+  }, [detailOpen]);
+
+  useEffect(() => {
     if (!selectedMember) return;
     const nextTier = VIP_OPTIONS.some((option) => option.value === selectedMember.vipTier) ? selectedMember.vipTier : "none";
     setVipTier(nextTier);
@@ -308,7 +347,21 @@ export default function AdminMembers() {
     event.preventDefault();
     setPage(1);
     setSelectedUserId(null);
+    setDetailOpen(false);
     setSearch(searchInput.trim());
+  };
+
+  const selectMember = (memberId: number, trigger: HTMLButtonElement) => {
+    lastMemberTriggerRef.current = trigger;
+    setSelectedUserId(memberId);
+    setDetailTab("profile");
+    if (!window.matchMedia("(min-width: 1280px)").matches) setDetailOpen(true);
+  };
+
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    setSelectedUserId(null);
+    setDetailOpen(false);
   };
 
   const saveVip = () => {
@@ -330,32 +383,15 @@ export default function AdminMembers() {
 
   return (
     <div className="min-h-screen bg-[oklch(0.97_0_0)]">
-      <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-0 z-10">
+      <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-14 lg:top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
           <div>
-            <button
-              onClick={() => setLocation("/admin/orders")}
-              className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors mb-1 flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3 h-3" /> 訂單管理
-            </button>
-            <h1 className="text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+            <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">MEMBER MANAGEMENT</p>
+            <h1 className="mt-1 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
               會員管理
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setLocation("/admin/products")}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              商品管理
-            </button>
-            <button
-              onClick={() => setLocation("/admin/revenue")}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              營收報表
-            </button>
             <button
               onClick={() => {
                 void refetch();
@@ -411,7 +447,7 @@ export default function AdminMembers() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.45fr)]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.45fr)]">
           <section className="bg-white border border-[oklch(0.93_0_0)]">
             <div className="p-5 border-b border-[oklch(0.93_0_0)]">
               <form onSubmit={submitSearch} className="relative">
@@ -436,7 +472,7 @@ export default function AdminMembers() {
                   <button
                     key={member.id}
                     type="button"
-                    onClick={() => setSelectedUserId(member.id)}
+                    onClick={(event) => selectMember(member.id, event.currentTarget)}
                     className={`w-full text-left p-4 transition-colors ${
                       selectedUserId === member.id
                         ? "bg-[oklch(0.95_0.01_95)]"
@@ -470,7 +506,7 @@ export default function AdminMembers() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  onClick={() => changePage(Math.max(1, page - 1))}
                   disabled={currentPage <= 1}
                   className="border border-[oklch(0.86_0_0)] px-3 py-2 disabled:opacity-40"
                 >
@@ -478,7 +514,7 @@ export default function AdminMembers() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  onClick={() => changePage(Math.min(totalPages, page + 1))}
                   disabled={currentPage >= totalPages}
                   className="border border-[oklch(0.86_0_0)] px-3 py-2 disabled:opacity-40"
                 >
@@ -488,8 +524,64 @@ export default function AdminMembers() {
             </div>
           </section>
 
-          <section className="space-y-6">
-            <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
+          {detailOpen && (
+            <button
+              type="button"
+              aria-label="關閉會員詳細資料"
+              className="fixed inset-0 z-[60] hidden bg-black/35 sm:block xl:hidden"
+              onClick={() => setDetailOpen(false)}
+            />
+          )}
+
+          <section
+            role={detailOpen ? "dialog" : undefined}
+            aria-modal={detailOpen ? true : undefined}
+            aria-label={detailOpen ? "會員詳細資料" : undefined}
+            className={`${detailOpen ? "fixed" : "hidden"} inset-y-0 left-0 right-0 z-[70] overflow-y-auto bg-[oklch(0.97_0_0)] sm:left-auto sm:w-[min(92vw,640px)] sm:shadow-2xl xl:sticky xl:top-24 xl:z-auto xl:block xl:max-h-[calc(100vh-7rem)] xl:w-auto xl:self-start xl:bg-transparent xl:shadow-none`}
+          >
+            <div className="sticky top-0 z-20 border-b border-[oklch(0.9_0_0)] bg-white xl:hidden">
+              <div className="flex min-h-16 items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                <button
+                  type="button"
+                  onClick={() => setDetailOpen(false)}
+                  className="flex h-10 items-center gap-2 text-sm font-body text-[oklch(0.4_0_0)] sm:hidden"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  返回清單
+                </button>
+                <div className="hidden min-w-0 sm:block">
+                  <p className="text-[10px] tracking-[0.18em] text-[oklch(0.58_0_0)]">MEMBER DETAIL</p>
+                  <p className="mt-0.5 truncate text-sm font-medium text-[oklch(0.15_0_0)]">{selectedMember?.name || selectedMember?.email || "會員詳細資料"}</p>
+                </div>
+                <button
+                  ref={detailCloseButtonRef}
+                  type="button"
+                  onClick={() => setDetailOpen(false)}
+                  className="ml-auto flex h-10 w-10 items-center justify-center text-[oklch(0.45_0_0)]"
+                  aria-label="關閉會員詳細資料"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setDetailTab("profile")}
+                  className={`border-b-2 px-4 py-3 text-xs font-body ${detailTab === "profile" ? "border-[oklch(0.18_0_0)] text-[oklch(0.18_0_0)]" : "border-transparent text-[oklch(0.55_0_0)]"}`}
+                >
+                  會員資料
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailTab("orders")}
+                  className={`border-b-2 px-4 py-3 text-xs font-body ${detailTab === "orders" ? "border-[oklch(0.18_0_0)] text-[oklch(0.18_0_0)]" : "border-transparent text-[oklch(0.55_0_0)]"}`}
+                >
+                  購買紀錄 {detail?.orders.length ? `(${detail.orders.length})` : ""}
+                </button>
+              </div>
+            </div>
+
+            <div className={`${detailTab === "profile" ? "block" : "hidden"} m-4 bg-white border border-[oklch(0.93_0_0)] p-5 sm:block sm:m-5 xl:m-0 xl:mb-6`}>
               {detailLoading ? (
                 <div className="py-10 text-center text-sm font-body text-[oklch(0.5_0_0)]">載入會員明細中...</div>
               ) : selectedMember ? (
@@ -569,7 +661,7 @@ export default function AdminMembers() {
               )}
             </div>
 
-            <div className="bg-white border border-[oklch(0.93_0_0)]">
+            <div className={`${detailTab === "orders" ? "block" : "hidden"} m-4 bg-white border border-[oklch(0.93_0_0)] sm:block sm:m-5 xl:m-0`}>
               <div className="p-5 border-b border-[oklch(0.93_0_0)] flex items-center justify-between">
                 <div>
                   <p className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)] mb-1">PURCHASE HISTORY</p>

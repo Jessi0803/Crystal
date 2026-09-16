@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createAtmHomeDeliveryOrder, login } from "./helpers";
+import { createAtmHomeDeliveryOrder, login, loginAsAdminByCookie } from "./helpers";
 
 test("admin revenue dashboard shows confirmed order metrics and top products", async ({ page }) => {
   test.setTimeout(60_000);
@@ -79,6 +79,58 @@ test("legacy admin inventory route redirects admins to product management", asyn
 
   await expect(page).toHaveURL(/\/admin\/products/);
   await expect(page.getByRole("heading", { name: "商品管理" })).toBeVisible();
+});
+
+test("admin shell keeps navigation consistent and exposes monitoring as its own page", async ({ page }) => {
+  await loginAsAdminByCookie(page);
+  await expect(page).toHaveURL(/\/admin\/orders/);
+
+  const navigation = page.locator('nav[aria-label="後台功能導覽"]:visible');
+  await expect(navigation.getByRole("link", { name: "訂單管理" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "商品與庫存" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "操作監控" })).toBeVisible();
+
+  await navigation.getByRole("link", { name: "操作監控" }).click();
+  await expect(page).toHaveURL(/\/admin\/monitoring/);
+  await expect(page.getByRole("heading", { name: "操作監控" })).toBeVisible();
+  await expect(page.getByRole("combobox")).toHaveCount(3);
+  await expect(page.locator("body")).toContainText("付款回呼與管理員操作紀錄");
+});
+
+test("admin navigation uses a drawer on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAsAdminByCookie(page);
+  await expect(page).toHaveURL(/\/admin\/orders/);
+
+  await expect(page.getByRole("button", { name: "開啟後台選單" })).toBeVisible();
+  await page.getByRole("button", { name: "開啟後台選單" }).click();
+  const navigation = page.locator('nav[aria-label="後台功能導覽"]:visible');
+  await expect(navigation.getByRole("link", { name: "營收報表" })).toBeVisible();
+  await navigation.getByRole("link", { name: "營收報表" }).click();
+  await expect(page).toHaveURL(/\/admin\/revenue/);
+  await expect(page.getByRole("heading", { name: "營收報表" })).toBeVisible();
+});
+
+test("member detail opens as a mobile workspace and returns to the list", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAsAdminByCookie(page);
+  await page.goto("/admin/members");
+
+  const search = page.getByPlaceholder("搜尋姓名、Email 或會員 ID");
+  const memberList = search.locator("xpath=ancestor::section");
+  const firstMember = memberList.locator("button").filter({ hasText: "@" }).first();
+  await expect(firstMember).toBeVisible();
+  await firstMember.click();
+
+  const detail = page.getByRole("dialog", { name: "會員詳細資料" });
+  await expect(detail).toBeVisible();
+  await expect(detail.getByRole("button", { name: "會員資料" })).toBeVisible();
+  await detail.getByRole("button", { name: /購買紀錄/ }).click();
+  await expect(detail.getByRole("heading", { name: "購買紀錄" })).toBeVisible();
+
+  await detail.getByRole("button", { name: "返回清單" }).click();
+  await expect(detail).toBeHidden();
+  await expect(firstMember).toBeFocused();
 });
 
 test("admin revenue removes a paid test order after it is cancelled", async ({ page }) => {

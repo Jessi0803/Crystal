@@ -32,6 +32,8 @@ import AdminInventory from "./pages/AdminInventory";
 import AdminProducts from "./pages/AdminProducts";
 import AdminMembers from "./pages/AdminMembers";
 import AdminSettings from "./pages/AdminSettings";
+import AdminMonitoring from "./pages/AdminMonitoring";
+import AdminLayout from "./components/AdminLayout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -158,6 +160,7 @@ function Router() {
       <Route path="/admin/products" component={AdminProducts} />
       <Route path="/admin/members" component={AdminMembers} />
       <Route path="/admin/settings" component={AdminSettings} />
+      <Route path="/admin/monitoring" component={AdminMonitoring} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
@@ -184,7 +187,7 @@ function App() {
             <RouteScrollManager />
             <Toaster position="top-right" />
             {isAdminPage ? (
-              <Router />
+              <AdminLayout><Router /></AdminLayout>
             ) : (
               <div className="flex flex-col min-h-screen">
                 <Navbar />

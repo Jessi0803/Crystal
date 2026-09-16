@@ -11,10 +11,8 @@ import {
   Package,
   ShoppingBag,
   XCircle,
-  ArrowLeft,
   RefreshCw,
   Crown,
-  Users,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -64,39 +62,15 @@ export default function AdminRevenue() {
   return (
     <div className="min-h-screen bg-[oklch(0.97_0_0)]">
       {/* Header */}
-      <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-0 z-10">
+      <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-14 lg:top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
-            <button
-              onClick={() => setLocation("/admin/orders")}
-              className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors mb-1 flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3 h-3" /> 訂單管理
-            </button>
-            <h1 className="text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+            <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">REVENUE REPORT</p>
+            <h1 className="mt-1 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
               營收報表
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setLocation("/admin/chatbot")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              AI 客服
-            </button>
-            <button
-              onClick={() => setLocation("/admin/inventory")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              庫存管理
-            </button>
-            <button
-              onClick={() => setLocation("/admin/members")}
-              className="flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              <Users className="w-3.5 h-3.5" />
-              會員管理
-            </button>
             <button
               onClick={refetchAll}
               disabled={isLoading}

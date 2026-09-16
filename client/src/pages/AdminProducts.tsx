@@ -1,8 +1,8 @@
 import { useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
-  ArrowLeft, Package, Plus, Search, Save, X, Upload, ImageIcon,
-  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Users, Percent, Truck
+  Package, Plus, Search, Save, X, Upload, ImageIcon,
+  Eye, EyeOff, Pencil, ChevronDown, ChevronUp, CalendarClock, Trash2, Percent, Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -364,6 +364,10 @@ function ProductRow({
 }) {
   const utils = trpc.useUtils();
   const isScheduled = !product.active && product.scheduledPublishAt && new Date(product.scheduledPublishAt).getTime() > Date.now();
+  const isDiscounted = Boolean(product.originalPrice && product.originalPrice > product.price);
+  const discountRate = isDiscounted && product.originalPrice
+    ? Math.round((product.price / product.originalPrice) * 100) / 10
+    : null;
   const toggleActive = trpc.product.toggleActive.useMutation({
     onSuccess: async () => {
       toast.success(product.active ? "商品已下架" : "商品已上架");
@@ -469,11 +473,20 @@ function ProductRow({
                 月限
               </span>
             )}
-            {product.twoItemFreeShippingEligible && (
-              <span className="inline-block text-[10px] tracking-widest px-2 py-0.5 font-body bg-sky-50 text-sky-700 border border-sky-200">
-                兩件免運
-              </span>
-            )}
+            <span className={`inline-block text-[10px] tracking-widest px-2 py-0.5 font-body border ${
+              isDiscounted
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-[oklch(0.88_0_0)] bg-[oklch(0.97_0_0)] text-[oklch(0.55_0_0)]"
+            }`}>
+              {isDiscounted ? `${discountRate} 折中` : "無折扣"}
+            </span>
+            <span className={`inline-block text-[10px] tracking-widest px-2 py-0.5 font-body border ${
+              product.twoItemFreeShippingEligible
+                ? "border-sky-200 bg-sky-50 text-sky-700"
+                : "border-[oklch(0.88_0_0)] bg-[oklch(0.97_0_0)] text-[oklch(0.55_0_0)]"
+            }`}>
+              {product.twoItemFreeShippingEligible ? "可計入兩件免運" : "不計入兩件免運"}
+            </span>
           </div>
         </div>
 
@@ -1928,6 +1941,8 @@ export default function AdminProducts() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [bulkDiscountRate, setBulkDiscountRate] = useState("9");
+  const [discountFilter, setDiscountFilter] = useState<"all" | "discounted" | "regular">("all");
+  const [freeShippingFilter, setFreeShippingFilter] = useState<"all" | "eligible" | "ineligible">("all");
 
   const utils = trpc.useUtils();
   const { data: dbProductList = [], isLoading } = trpc.product.adminList.useQuery();
@@ -1994,24 +2009,34 @@ export default function AdminProducts() {
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) return dbProductList;
-    return dbProductList.filter(
-      (p) =>
-        p.name.toLowerCase().includes(keyword) ||
-        getProductCategoryLabels(p).join("、").toLowerCase().includes(keyword)
-    );
-  }, [dbProductList, query]);
+    return dbProductList.filter((product) => {
+      const matchesKeyword = !keyword ||
+        product.name.toLowerCase().includes(keyword) ||
+        getProductCategoryLabels(product).join("、").toLowerCase().includes(keyword);
+      const discounted = Boolean(product.originalPrice && product.originalPrice > product.price);
+      const matchesDiscount = discountFilter === "all" ||
+        (discountFilter === "discounted" ? discounted : !discounted);
+      const matchesFreeShipping = freeShippingFilter === "all" ||
+        (freeShippingFilter === "eligible"
+          ? product.twoItemFreeShippingEligible
+          : !product.twoItemFreeShippingEligible);
+      return matchesKeyword && matchesDiscount && matchesFreeShipping;
+    });
+  }, [dbProductList, discountFilter, freeShippingFilter, query]);
 
   const selectableFilteredIds = useMemo(
     () => filtered.filter((product) => product.category !== "test").map((product) => product.id),
     [filtered]
   );
-  const selectableAllIds = useMemo(
-    () => dbProductList.filter((product) => product.category !== "test").map((product) => product.id),
-    [dbProductList]
-  );
-  const selectedAllCount = selectedProductIds.filter((id) => selectableAllIds.includes(id)).length;
-  const allProductsSelected = selectableAllIds.length > 0 && selectedAllCount === selectableAllIds.length;
+  const selectedFilteredCount = selectedProductIds.filter((id) => selectableFilteredIds.includes(id)).length;
+  const allFilteredProductsSelected = selectableFilteredIds.length > 0 && selectedFilteredCount === selectableFilteredIds.length;
+  const selectedProducts = dbProductList.filter((product) => selectedProductIds.includes(product.id));
+  const selectedDiscountedCount = selectedProducts.filter(
+    (product) => product.originalPrice && product.originalPrice > product.price
+  ).length;
+  const selectedFreeShippingCount = selectedProducts.filter(
+    (product) => product.twoItemFreeShippingEligible
+  ).length;
   const bulkPending = bulkApplyDiscount.isPending || bulkClearDiscount.isPending || bulkSetTwoItemFreeShipping.isPending;
 
   const openCreate = () => { setEditingProduct(null); setModalOpen(true); };
@@ -2032,10 +2057,10 @@ export default function AdminProducts() {
   };
   const toggleSelectAllProducts = () => {
     setSelectedProductIds((current) => {
-      if (allProductsSelected) {
-        return current.filter((id) => !selectableAllIds.includes(id));
+      if (allFilteredProductsSelected) {
+        return current.filter((id) => !selectableFilteredIds.includes(id));
       }
-      return Array.from(new Set([...current, ...selectableAllIds]));
+      return Array.from(new Set([...current, ...selectableFilteredIds]));
     });
   };
   const applyBulkDiscount = () => {
@@ -2093,45 +2118,15 @@ export default function AdminProducts() {
   return (
     <div className="min-h-screen bg-[oklch(0.97_0_0)]">
       {/* Sticky header */}
-      <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-0 z-10">
+      <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-14 lg:top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
           <div>
-            <button
-              onClick={() => setLocation("/admin/orders")}
-              className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors mb-1 flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3 h-3" /> 訂單管理
-            </button>
-            <h1 className="text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+            <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">PRODUCT &amp; INVENTORY</p>
+            <h1 className="mt-1 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
               商品管理
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setLocation("/admin/revenue")}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              營收報表
-            </button>
-            <button
-              onClick={() => setLocation("/admin/chatbot")}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              AI 客服
-            </button>
-            <button
-              onClick={() => setLocation("/admin/members")}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              <Users className="w-3.5 h-3.5" />
-              會員管理
-            </button>
-            <button
-              onClick={() => setLocation("/admin/settings")}
-              className="hidden sm:flex items-center gap-2 text-xs font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] border border-[oklch(0.88_0_0)] px-3 py-2"
-            >
-              網站設定
-            </button>
             <button
               onClick={openCreate}
               className="flex items-center gap-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white px-4 py-2 hover:bg-[oklch(0.25_0_0)]"
@@ -2162,61 +2157,100 @@ export default function AdminProducts() {
           </div>
         )}
 
-        {/* Toolbar */}
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center bg-[oklch(0.94_0_0)]">
-                <Package className="w-5 h-5 text-[oklch(0.25_0_0)]" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-[oklch(0.12_0_0)]">商品與庫存管理</p>
-                <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  點「編輯」修改商品資訊，點庫存數字調整庫存，也可設定預約上架時間。
-                </p>
-              </div>
-            </div>
-            <div className="relative w-full md:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[oklch(0.55_0_0)]" />
+        {/* Search, filters and batch entry */}
+        <div className="border border-[oklch(0.93_0_0)] bg-white p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_210px_auto]">
+            <label className="relative block">
+              <span className="sr-only">搜尋商品</span>
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[oklch(0.55_0_0)]" />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(event) => setQuery(event.target.value)}
+                disabled={selectionMode}
                 placeholder="搜尋商品名稱或分類"
-                className="w-full border border-[oklch(0.86_0_0)] pl-9 pr-3 py-2.5 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+                className="h-11 w-full border border-[oklch(0.86_0_0)] pl-9 pr-3 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] disabled:bg-[oklch(0.97_0_0)] disabled:text-[oklch(0.62_0_0)]"
               />
-            </div>
+            </label>
+            <label>
+              <span className="sr-only">折扣狀態</span>
+              <select
+                aria-label="折扣狀態"
+                value={discountFilter}
+                onChange={(event) => setDiscountFilter(event.target.value as typeof discountFilter)}
+                disabled={selectionMode}
+                className="h-11 w-full border border-[oklch(0.86_0_0)] bg-white px-3 text-sm font-body disabled:bg-[oklch(0.97_0_0)] disabled:text-[oklch(0.62_0_0)]"
+              >
+                <option value="all">全部折扣狀態</option>
+                <option value="discounted">折扣中</option>
+                <option value="regular">無折扣</option>
+              </select>
+            </label>
+            <label>
+              <span className="sr-only">兩件免運資格</span>
+              <select
+                aria-label="兩件免運資格"
+                value={freeShippingFilter}
+                onChange={(event) => setFreeShippingFilter(event.target.value as typeof freeShippingFilter)}
+                disabled={selectionMode}
+                className="h-11 w-full border border-[oklch(0.86_0_0)] bg-white px-3 text-sm font-body disabled:bg-[oklch(0.97_0_0)] disabled:text-[oklch(0.62_0_0)]"
+              >
+                <option value="all">全部免運資格</option>
+                <option value="eligible">可計入兩件免運</option>
+                <option value="ineligible">不計入兩件免運</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              aria-label={selectionMode ? "完成批次操作" : "開始選取商品"}
+              onClick={selectionMode ? cancelSelection : startSelection}
+              disabled={selectableFilteredIds.length === 0 || bulkPending}
+              className={`h-11 px-4 text-xs font-body disabled:opacity-50 ${selectionMode ? "border border-[oklch(0.82_0_0)] bg-white text-[oklch(0.35_0_0)]" : "bg-[oklch(0.15_0_0)] text-white"}`}
+            >
+              {selectionMode ? "完成批次操作" : "批次操作"}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-body text-[oklch(0.52_0_0)]">
+            <span>顯示 {filtered.length} / {dbProductList.length} 件商品</span>
+            <span>點「編輯」修改商品，點庫存數字可快速調整。</span>
           </div>
         </div>
 
-        {/* Bulk discount */}
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center bg-[oklch(0.94_0_0)]">
-                <Percent className="w-5 h-5 text-[oklch(0.25_0_0)]" />
-              </div>
+        {selectionMode && (
+          <div className="sticky top-[8.5rem] z-20 border border-[oklch(0.84_0_0)] bg-[oklch(0.985_0_0)] p-4 shadow-sm lg:top-24">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-[oklch(0.12_0_0)]">批次折扣</p>
-                <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  {selectionMode
-                    ? `已選 ${selectedProductIds.length} 件；全部商品可選 ${selectableAllIds.length} 件。`
-                    : "先進入選取模式，再勾選要套用折扣的商品。"}
+                <p className="text-sm font-medium text-[oklch(0.15_0_0)]">已選 {selectedProductIds.length} 件商品</p>
+                <p className="mt-1 text-[11px] font-body text-[oklch(0.52_0_0)]">
+                  {selectedDiscountedCount} 件折扣中 · {selectedFreeShippingCount} 件可計入兩件免運
                 </p>
               </div>
-            </div>
-
-            {selectionMode ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_128px_auto_auto_auto] lg:justify-end">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={toggleSelectAllProducts}
-                  disabled={selectableAllIds.length === 0 || bulkPending}
-                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
+                  disabled={selectableFilteredIds.length === 0 || bulkPending}
+                  className="border border-[oklch(0.84_0_0)] bg-white px-3 py-2 text-xs font-body disabled:opacity-50"
                 >
-                  {allProductsSelected ? "取消全選全部商品" : "全選全部商品"}
+                  {allFilteredProductsSelected ? "取消全選目前列表" : "全選目前列表"}
                 </button>
-                <label className="flex items-center border border-[oklch(0.86_0_0)] bg-white focus-within:border-[oklch(0.2_0_0)]">
-                  <span className="pl-3 text-xs font-body text-[oklch(0.45_0_0)]">折扣</span>
+                <button
+                  type="button"
+                  onClick={cancelSelection}
+                  disabled={bulkPending}
+                  className="border border-[oklch(0.84_0_0)] bg-white px-3 py-2 text-xs font-body disabled:opacity-50"
+                >
+                  完成
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3 xl:grid-cols-2">
+              <div className="flex flex-col gap-2 border border-[oklch(0.9_0_0)] bg-white p-3 sm:flex-row sm:items-center">
+                <div className="flex min-w-28 items-center gap-2 text-xs font-body text-[oklch(0.3_0_0)]">
+                  <Percent className="h-4 w-4" />
+                  批次折扣
+                </div>
+                <label className="flex h-10 min-w-28 flex-1 items-center border border-[oklch(0.86_0_0)]">
+                  <span className="pl-3 text-xs font-body text-[oklch(0.5_0_0)]">折扣</span>
                   <input
                     type="number"
                     min={0.1}
@@ -2224,114 +2258,25 @@ export default function AdminProducts() {
                     step={0.1}
                     value={bulkDiscountRate}
                     disabled={bulkPending}
-                    onChange={(e) => setBulkDiscountRate(e.target.value)}
-                    className="min-w-0 flex-1 border-0 px-2 py-2 text-sm font-body outline-none disabled:bg-[oklch(0.96_0_0)]"
-                    placeholder="9"
+                    onChange={(event) => setBulkDiscountRate(event.target.value)}
+                    className="min-w-0 flex-1 border-0 px-2 text-sm font-body outline-none"
                   />
-                  <span className="pr-3 text-xs font-body text-[oklch(0.45_0_0)]">折</span>
+                  <span className="pr-3 text-xs font-body text-[oklch(0.5_0_0)]">折</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={applyBulkDiscount}
-                  disabled={selectedProductIds.length === 0 || bulkPending}
-                  className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
-                >
-                  套用折扣
-                </button>
-                <button
-                  type="button"
-                  onClick={clearBulkDiscount}
-                  disabled={selectedProductIds.length === 0 || bulkPending}
-                  className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  清除折扣
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelSelection}
-                  disabled={bulkPending}
-                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
-                >
-                  完成選取
-                </button>
+                <button type="button" aria-label="套用折扣" onClick={applyBulkDiscount} disabled={selectedProductIds.length === 0 || bulkPending} className="h-10 bg-[oklch(0.15_0_0)] px-3 text-xs font-body text-white disabled:opacity-50">套用</button>
+                <button type="button" aria-label="清除折扣" onClick={clearBulkDiscount} disabled={selectedProductIds.length === 0 || bulkPending} className="h-10 border border-red-200 px-3 text-xs font-body text-red-600 disabled:opacity-50">清除</button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={startSelection}
-                disabled={selectableFilteredIds.length === 0 || bulkPending}
-                className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
-              >
-                開始選取商品
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Bulk free shipping */}
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center bg-[oklch(0.94_0_0)]">
-                <Truck className="w-5 h-5 text-[oklch(0.25_0_0)]" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-[oklch(0.12_0_0)]">兩件免運規則</p>
-                <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
-                  {selectionMode
-                    ? `已選 ${selectedProductIds.length} 件；可一次套用或取消兩件免運。`
-                    : "先進入選取模式，再勾選要納入兩件免運的商品。"}
-                </p>
+              <div className="flex flex-col gap-2 border border-[oklch(0.9_0_0)] bg-white p-3 sm:flex-row sm:items-center">
+                <div className="flex min-w-28 items-center gap-2 text-xs font-body text-[oklch(0.3_0_0)]">
+                  <Truck className="h-4 w-4" />
+                  兩件免運資格
+                </div>
+                <button type="button" aria-label="套用兩件免運" onClick={() => setBulkTwoItemFreeShipping(true)} disabled={selectedProductIds.length === 0 || bulkPending} className="h-10 flex-1 bg-[oklch(0.15_0_0)] px-3 text-xs font-body text-white disabled:opacity-50">設為可計入</button>
+                <button type="button" aria-label="取消兩件免運" onClick={() => setBulkTwoItemFreeShipping(false)} disabled={selectedProductIds.length === 0 || bulkPending} className="h-10 flex-1 border border-red-200 px-3 text-xs font-body text-red-600 disabled:opacity-50">設為不計入</button>
               </div>
             </div>
-
-            {selectionMode ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto_auto_auto] lg:justify-end">
-                <button
-                  type="button"
-                  onClick={toggleSelectAllProducts}
-                  disabled={selectableAllIds.length === 0 || bulkPending}
-                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
-                >
-                  {allProductsSelected ? "取消全選全部商品" : "全選全部商品"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBulkTwoItemFreeShipping(true)}
-                  disabled={selectedProductIds.length === 0 || bulkPending}
-                  className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
-                >
-                  套用兩件免運
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBulkTwoItemFreeShipping(false)}
-                  disabled={selectedProductIds.length === 0 || bulkPending}
-                  className="px-4 py-2 text-xs font-body border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  取消兩件免運
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelSelection}
-                  disabled={bulkPending}
-                  className="px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.2_0_0)] disabled:opacity-50"
-                >
-                  完成選取
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={startSelection}
-                disabled={selectableFilteredIds.length === 0 || bulkPending}
-                className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
-              >
-                開始選取商品
-              </button>
-            )}
           </div>
-        </div>
+        )}
 
         {/* Product list */}
         {isLoading ? (

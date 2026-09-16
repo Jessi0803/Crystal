@@ -114,6 +114,7 @@ export async function listAuditEvents(input: {
   limit?: number;
   orderId?: number;
   outcome?: AuditOutcome;
+  source?: AuditEventInput["source"];
   since?: Date;
 }) {
   const db = await ensureAuditTable();
@@ -121,6 +122,7 @@ export async function listAuditEvents(input: {
   const conditions: SQL[] = [];
   if (input.orderId) conditions.push(eq(operationAuditEvents.orderId, input.orderId));
   if (input.outcome) conditions.push(eq(operationAuditEvents.outcome, input.outcome));
+  if (input.source) conditions.push(eq(operationAuditEvents.source, input.source));
   if (input.since) conditions.push(gte(operationAuditEvents.createdAt, input.since));
   return db
     .select()
