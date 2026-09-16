@@ -908,6 +908,7 @@ export async function getOrderStats() {
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   /** 單次聚合，避免載入整張 orders 表（訂單多時後台／營收頁會極慢） */
   const [row] = await db
@@ -921,7 +922,8 @@ export async function getOrderStats() {
       shipped: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} = 'shipped' THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       completed: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('picked_up', 'completed') THEN 1 ELSE 0 END), 0) AS SIGNED)`,
       totalRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
-      monthRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
+      monthRevenue: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} AND ${orders.paidAt} < ${nextMonthStart} THEN ${orders.totalAmount} ELSE 0 END), 0) AS SIGNED)`,
+      monthOrders: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${orders.orderStatus} IN ('paid', 'processing', 'shipped', 'arrived', 'picked_up', 'completed') AND ${orders.paidAt} IS NOT NULL AND ${orders.paidAt} >= ${monthStart} AND ${orders.paidAt} < ${nextMonthStart} THEN 1 ELSE 0 END), 0) AS SIGNED)`,
     })
     .from(orders)
     .where(visibleOrdersOnlyWhere());
@@ -939,6 +941,7 @@ export async function getOrderStats() {
     completed: n(row?.completed),
     totalRevenue: n(row?.totalRevenue),
     monthRevenue: n(row?.monthRevenue),
+    monthOrders: n(row?.monthOrders),
   };
 }
 
@@ -952,15 +955,17 @@ export async function getMonthlyRevenue(months = 6) {
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
 
     const monthOrders = await db
       .select()
       .from(orders)
       .where(
-        and(
-          gte(orders.paidAt, start),
-          sql`${orders.paidAt} <= ${end}`
+        visibleOrdersOnlyWhere(
+          and(
+            gte(orders.paidAt, start),
+            sql`${orders.paidAt} < ${end}`
+          )
         )
       );
 

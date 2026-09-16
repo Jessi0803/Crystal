@@ -133,7 +133,7 @@ export default function AdminRevenue() {
               },
               {
                 label: "本月訂單",
-                value: stats?.paid ?? 0,
+                value: stats?.monthOrders ?? 0,
                 icon: <Package className="w-4 h-4" />,
                 color: "text-blue-600",
                 suffix: " 筆",
@@ -199,25 +199,26 @@ export default function AdminRevenue() {
           ) : (
             <div className="space-y-4">
               {/* 長條圖 */}
-              <div className="flex items-end gap-2 h-48">
+              <div className="flex items-end gap-2 h-56 pt-6">
                 {monthlyRevenue.map((m, i) => {
                   const heightPct = maxRevenue > 0 ? (m.revenue / maxRevenue) * 100 : 0;
                   const isCurrentMonth = i === monthlyRevenue.length - 1;
                   return (
-                    <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5 group">
-                      <div className="relative w-full flex flex-col items-center">
+                    <div key={m.month} className="h-full min-w-0 flex-1 flex flex-col items-center gap-1.5 group">
+                      <div className="relative w-full flex-1 flex items-end">
                         {/* 金額 tooltip */}
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[oklch(0.1_0_0)] text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-[oklch(0.1_0_0)] text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
                           NT$ {m.revenue.toLocaleString()}
                         </div>
                         {/* 長條 */}
                         <div
-                          className={`w-full transition-all duration-500 ${
+                          aria-label={`${m.month} 營收 NT$ ${m.revenue.toLocaleString()}`}
+                          className={`relative w-full transition-all duration-500 ${
                             isCurrentMonth
                               ? "bg-[oklch(0.72_0.09_70)]"
                               : "bg-[oklch(0.88_0_0)] group-hover:bg-[oklch(0.75_0_0)]"
                           }`}
-                          style={{ height: `${Math.max(heightPct, 2)}%`, minHeight: "4px" }}
+                          style={{ height: `${Math.max(heightPct, 3)}%`, minHeight: "6px" }}
                         />
                       </div>
                       <span className="text-[10px] font-body text-[oklch(0.55_0_0)] whitespace-nowrap">

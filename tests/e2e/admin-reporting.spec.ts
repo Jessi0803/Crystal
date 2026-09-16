@@ -19,6 +19,26 @@ test("admin revenue dashboard shows confirmed order metrics and top products", a
   await expect(page.locator("body")).toContainText("熱銷商品排行");
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
 
+  const currentMonth = new Intl.DateTimeFormat("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date()).replace("年", "/").replace("月", "");
+  const currentMonthRow = page.getByRole("row").filter({ hasText: currentMonth });
+  const currentMonthOrderCount = Number(
+    ((await currentMonthRow.getByRole("cell").nth(1).innerText()).match(/\d+/)?.[0]) ?? "0"
+  );
+  const monthOrderCard = page
+    .getByText("本月訂單", { exact: true })
+    .locator("xpath=ancestor::div[contains(@class,'border')][1]");
+  await expect(monthOrderCard).toContainText(`${currentMonthOrderCount} 筆`);
+
+  const chartBars = page.locator('[aria-label*="營收 NT$"]');
+  await expect(chartBars).toHaveCount(6);
+  const currentMonthBarHeight = await chartBars.last().evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).height)
+  );
+  expect(currentMonthBarHeight).toBeGreaterThan(6);
+
   const reportPeriod = page.locator("select").filter({ has: page.locator('option[value="3"]') });
   await reportPeriod.selectOption("3");
   await expect(reportPeriod).toHaveValue("3");
