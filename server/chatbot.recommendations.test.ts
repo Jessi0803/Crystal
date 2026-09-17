@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// 未連資料庫：只有固定問答，沒有資料庫的商品知識
+vi.mock("./db", () => ({ getDb: vi.fn(async () => null) }));
 import {
   buildProductKnowledgeChunk,
   knowledgeChunks,
   searchKnowledge,
-  selectStaticKnowledgeForSearch,
   type ScoredChunk,
 } from "./crystalKnowledge";
 import { selectRelatedProductIds } from "./routers/chatbot";
@@ -12,6 +14,19 @@ function recommendationChunk(id: string) {
   const chunk = knowledgeChunks.find((entry) => entry.id === id);
   expect(chunk).toBeDefined();
   return chunk!;
+}
+
+/** 資料庫商品知識的最小形狀（固定問答已不含商品） */
+function productChunk(productId: string) {
+  return {
+    id: `product-${productId}`,
+    question: `${productId}適合什麼需求？`,
+    answer: "",
+    embedText: "",
+    keywords: [],
+    category: "商品推薦",
+    relatedProductIds: [productId],
+  };
 }
 
 describe("chatbot product recommendations", () => {
@@ -69,8 +84,8 @@ describe("chatbot product recommendations", () => {
         relatedProductIds: ["d001-moon-secret", "d005-moon-clear-heart", "d004-morning-whisper"],
         score: 0.8,
       },
-      { ...recommendationChunk("product-prod-1780212635593"), score: 0.68 },
-      { ...recommendationChunk("product-prod-1780213098870"), score: 0.66 },
+      { ...productChunk("prod-1780212635593"), score: 0.68 },
+      { ...productChunk("prod-1780213098870"), score: 0.66 },
       {
         id: "manual-confidence",
         question: "confidence",
@@ -89,20 +104,18 @@ describe("chatbot product recommendations", () => {
     ]);
   });
 
-  it("moves legacy static products behind newer product matches when enough newer options match", () => {
+  it("keeps the highest-scoring product first even when many products match", () => {
     const chunks = [
-      { ...recommendationChunk("product-d001-moon-secret"), score: 0.8 },
-      { ...recommendationChunk("product-d005-moon-clear-heart"), score: 0.78 },
-      { ...recommendationChunk("product-prod-1780213098870"), score: 0.7 },
-      { ...recommendationChunk("product-prod-1780212635593"), score: 0.68 },
+      { ...productChunk("d001-moon-secret"), score: 0.75 },
+      ...["a", "b", "c", "d", "e", "f"].map((suffix, index) => ({
+        ...productChunk(`prod-${suffix}`),
+        score: 0.7 - index * 0.01,
+      })),
     ] as ScoredChunk[];
 
-    expect(selectRelatedProductIds(chunks)).toEqual([
-      "prod-1780213098870",
-      "prod-1780212635593",
-      "d001-moon-secret",
-      "d005-moon-clear-heart",
-    ]);
+    const ids = selectRelatedProductIds(chunks);
+    expect(ids).toHaveLength(6);
+    expect(ids[0]).toBe("d001-moon-secret");
   });
 
   it("does not recommend products from weak matches", () => {
@@ -122,77 +135,17 @@ describe("chatbot product recommendations", () => {
     expect(selectRelatedProductIds(chunks)).toEqual([]);
   });
 
-  it("has standalone knowledge for each limited design product", () => {
-    const productKnowledge = [
-      ["product-d001-moon-secret", "d001-moon-secret"],
-      ["product-d002-honey-realm", "d002-honey-realm"],
-      ["product-d003-venus", "d003-venus"],
-      ["product-d004-morning-whisper", "d004-morning-whisper"],
-      ["product-d005-moon-clear-heart", "d005-moon-clear-heart"],
-    ] as const;
-
-    for (const [chunkId, productId] of productKnowledge) {
-      expect(recommendationChunk(chunkId)).toMatchObject({
-        category: "商品推薦",
-        relatedProductIds: [productId],
-      });
-    }
+  it("keeps product recommendations out of the static FAQ so delisted products are never suggested", () => {
+    expect(knowledgeChunks.filter((chunk) => chunk.category === "商品推薦")).toEqual([]);
+    expect(knowledgeChunks.filter((chunk) => chunk.id.startsWith("product-"))).toEqual([]);
+    expect(knowledgeChunks.some((chunk) => chunk.relatedProductIds?.length)).toBe(false);
   });
 
-  it("skips static product knowledge when the same product exists in dynamic knowledge", () => {
-    const dynamicProduct = buildProductKnowledgeChunk({
-      id: "d001-moon-secret",
-      name: "月下密語手鍊",
-      subtitle: "DB 商品知識",
-      category: "healing",
-      categoryLabel: "療癒系列",
-      categories: ["healing"],
-      categoryLabels: ["療癒系列"],
-      price: 1580,
-      priceRange: null,
-      tags: ["淨化"],
-      description: "",
-      story: "",
-      benefits: ["安撫情緒與壓力"],
-      suitableFor: [],
-      crystalType: "白幽靈、藍月光",
-      active: true,
-      isMonthlyLimited: false,
-    });
+  it("does not return any product from static knowledge when no product knowledge is loaded", async () => {
+    const results = await searchKnowledge("限定款有哪些 每月限量手鍊 潛月之境 月下密語", Array(768).fill(1), 10, 0.3);
 
-    const searchable = selectStaticKnowledgeForSearch(knowledgeChunks, [dynamicProduct]);
-    const ids = searchable.map((chunk) => chunk.id);
-
-    expect(ids).not.toContain("product-d001-moon-secret");
-    expect(ids).toContain("rec-healing");
-    expect(ids).toContain("product-d002-honey-realm");
-  });
-
-  it("finds limited design products for limited-edition questions", async () => {
-    const results = await searchKnowledge("限定款有哪些 每月限量手鍊", Array(768).fill(1), 5, 0.45);
-    const resultIds = results.map((chunk) => chunk.id);
-
-    expect(resultIds).toHaveLength(5);
-    expect(resultIds).toEqual(
-      expect.arrayContaining([
-        "product-prod-1780212635593",
-        "product-prod-1780212866677",
-        "product-prod-1780212957392",
-        "product-prod-1780213098870",
-        "product-prod-1780213199030",
-      ])
-    );
-  });
-
-  it("does not classify regular design products as limited editions", async () => {
-    const results = await searchKnowledge("限定款有哪些 每月限量手鍊", Array(768).fill(1), 10, 0.45);
-    const resultIds = results.map((chunk) => chunk.id);
-
-    expect(resultIds).not.toContain("product-d001-moon-secret");
-    expect(resultIds).not.toContain("product-d002-honey-realm");
-    expect(resultIds).not.toContain("product-d003-venus");
-    expect(resultIds).not.toContain("product-d004-morning-whisper");
-    expect(resultIds).not.toContain("product-d005-moon-clear-heart");
+    expect(results.filter((chunk) => chunk.category === "商品推薦")).toEqual([]);
+    expect(selectRelatedProductIds(results)).toEqual([]);
   });
 
   it("builds searchable recommendation knowledge from an admin product", () => {

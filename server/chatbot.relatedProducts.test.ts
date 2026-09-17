@@ -62,4 +62,24 @@ describe("loadRelatedProducts", () => {
       }),
     ]);
   });
+
+  it("does not show a delisted product from the static catalog when the database is available", async () => {
+    // 資料庫只回傳上架中的商品；d001 已下架所以查不到
+    getDbMock.mockResolvedValue({ select: vi.fn(() => createQueryChain([])) } as any);
+
+    await expect(loadRelatedProducts(["d001-moon-secret"])).resolves.toEqual([]);
+  });
+
+  it("falls back to the static catalog when the database query fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    getDbMock.mockResolvedValue({
+      select: vi.fn(() => {
+        throw new Error("connection lost");
+      }),
+    } as any);
+
+    await expect(loadRelatedProducts(["d001-moon-secret"])).resolves.toEqual([
+      expect.objectContaining({ id: "d001-moon-secret" }),
+    ]);
+  });
 });

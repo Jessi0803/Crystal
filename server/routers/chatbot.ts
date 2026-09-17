@@ -160,14 +160,6 @@ type RelatedProductForChat = {
   image: string;
 };
 
-const LEGACY_STATIC_PRODUCT_IDS = new Set([
-  "d001-moon-secret",
-  "d002-honey-realm",
-  "d003-venus",
-  "d004-morning-whisper",
-  "d005-moon-clear-heart",
-]);
-
 function uniqueProductIdsFromChunks(chunks: ScoredChunk[]): string[] {
   return Array.from(new Set(chunks.flatMap((chunk) => chunk.relatedProductIds ?? [])));
 }
@@ -190,12 +182,8 @@ export function selectRelatedProductIds(
   const fallbackRecommendationChunks = matchingChunks.filter((chunk) => !chunk.id.startsWith("product-"));
   const standaloneProductIds = uniqueProductIdsFromChunks(standaloneProductChunks);
   if (standaloneProductIds.length >= 2) {
-    const newerProductIds = standaloneProductIds.filter((id) => !LEGACY_STATIC_PRODUCT_IDS.has(id));
-    const legacyProductIds = standaloneProductIds.filter((id) => LEGACY_STATIC_PRODUCT_IDS.has(id));
-    const idsToUse = newerProductIds.length >= 2
-      ? [...newerProductIds, ...legacyProductIds]
-      : standaloneProductIds;
-    return idsToUse.slice(0, maxProducts);
+    // 依分數排序，顧客點名的商品分數最高，不會被其他商品擠出上限
+    return standaloneProductIds.slice(0, maxProducts);
   }
 
   return uniqueProductIdsFromChunks([...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)])
@@ -216,6 +204,8 @@ export async function loadRelatedProducts(productIds: string[]): Promise<Related
 
   const byId = new Map<string, RelatedProductForChat>();
   const db = await getDb();
+  // 只有資料庫無法使用時才改用前端內建的商品資料；否則已下架的商品會被備援資料重新顯示
+  let useStaticCatalog = !db;
 
   if (db) {
     try {
@@ -245,10 +235,11 @@ export async function loadRelatedProducts(productIds: string[]): Promise<Related
       }
     } catch (error) {
       console.warn("[chatbot] failed to load related products from DB:", error);
+      useStaticCatalog = true;
     }
   }
 
-  for (const id of productIds) {
+  for (const id of useStaticCatalog ? productIds : []) {
     if (byId.has(id)) continue;
     const product = products.find((p) => p.id === id && p.category !== "test");
     if (!product) continue;
