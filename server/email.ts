@@ -10,6 +10,10 @@ const FROM_ADDRESS = "service@goodaytarot.com";
 const BRAND_NAME = "椛 · Crystal";
 const ADMIN_ORDER_NOTIFICATION_EMAIL = process.env.ADMIN_ORDER_NOTIFICATION_EMAIL ?? "goodaytarot@gmail.com";
 
+function getSiteUrl() {
+  return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
+}
+
 function getResend() {
   if (!ENV.resendApiKey) throw new Error("RESEND_API_KEY 未設定");
   return new Resend(ENV.resendApiKey);
@@ -358,6 +362,8 @@ export async function sendOrderConfirmEmail(payload: OrderConfirmPayload) {
     shippingMethod === "home"
       ? `<p style="margin:4px 0;font-size:13px;color:#555;">配送地址：${receiverAddress ?? "—"}</p>`
       : `<p style="margin:4px 0;font-size:13px;color:#555;">取貨門市：${cvsStoreName ?? "—"}</p>`;
+  const orderUrl = `${getSiteUrl()}/order/${encodeURIComponent(merchantTradeNo)}`;
+  const safeOrderUrl = escapeHtml(orderUrl);
 
   const html = `
 <!DOCTYPE html>
@@ -409,7 +415,22 @@ export async function sendOrderConfirmEmail(payload: OrderConfirmPayload) {
               </tr>
             </table>
 
-            <p style="margin:24px 0 0;font-size:12px;color:#999;line-height:1.8;">
+            <table cellpadding="0" cellspacing="0" style="margin:28px 0 18px;">
+              <tr>
+                <td style="background:#1a1a1a;">
+                  <a href="${safeOrderUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:12px;letter-spacing:0.15em;">
+                    查看訂單
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 20px;font-size:11px;color:#999;line-height:1.7;">
+              若按鈕無法點擊，請複製以下連結貼到瀏覽器：<br>
+              <a href="${safeOrderUrl}" style="color:#b8936a;word-break:break-all;">${safeOrderUrl}</a><br>
+              若您使用不同裝置開啟，系統會請您輸入訂購時使用的 Email 進行驗證。
+            </p>
+
+            <p style="margin:0;font-size:12px;color:#999;line-height:1.8;">
               若您有任何問題，歡迎透過官網聯絡我們。<br>
               感謝您選擇 ${BRAND_NAME}，祝您能量滿滿 ✨
             </p>
