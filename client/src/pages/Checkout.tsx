@@ -1618,8 +1618,24 @@ export default function Checkout() {
                         <span className="flex-1 min-w-0">
                           <span className="flex justify-between gap-2">
                             <span>{coupon.name}</span>
-                            <span className="shrink-0">-NT$ {coupon.discountAmount.toLocaleString()}</span>
+                            <span className="shrink-0 text-right">
+                              {preview.ok && preview.discount < coupon.discountAmount ? (
+                                <>
+                                  折 NT$ {preview.discount.toLocaleString()}
+                                  <span className="block text-xs text-[oklch(0.55_0_0)]">
+                                    面額 {coupon.discountAmount.toLocaleString()}
+                                  </span>
+                                </>
+                              ) : (
+                                `折 NT$ ${coupon.discountAmount.toLocaleString()}`
+                              )}
+                            </span>
                           </span>
+                          {preview.ok && preview.discount < coupon.discountAmount && (
+                            <span className="block text-xs text-amber-700">
+                              商品金額低於面額，只折抵 NT$ {preview.discount.toLocaleString()}，差額不退回
+                            </span>
+                          )}
                           <span className="block text-xs text-[oklch(0.55_0_0)]">
                             有效期限 {formatCouponDate(coupon.expiresAt)}
                             {coupon.minOrderAmount > 0 ? `・${formatCouponMinimum(coupon.minOrderAmount)}` : ""}
