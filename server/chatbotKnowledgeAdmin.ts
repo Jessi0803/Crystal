@@ -16,7 +16,7 @@ import {
 
 export class KnowledgeAdminError extends Error {
   constructor(
-    public readonly code: "NOT_FOUND" | "READ_ONLY" | "NOT_MIGRATED",
+    public readonly code: "NOT_FOUND" | "READ_ONLY",
     message: string
   ) {
     super(message);
@@ -98,17 +98,6 @@ export async function saveFaq(input: FaqInput & { id?: string }) {
   const db = await requireDb();
   const embedText = buildFaqEmbedText(input.question, input.keywords);
   const existing = input.id ? await getFaq(input.id) : null;
-  if (!existing) {
-    // 資料庫一有問答，AI 就不再使用內建問答；必須先把內建問答搬進資料庫
-    const [anyFaq] = await db
-      .select({ id: chatbotKnowledge.id })
-      .from(chatbotKnowledge)
-      .where(eq(chatbotKnowledge.sourceType, "faq"))
-      .limit(1);
-    if (!anyFaq) {
-      throw new KnowledgeAdminError("NOT_MIGRATED", "內建問答尚未搬進資料庫，暫時無法新增問答");
-    }
-  }
 
   let vector = existing && existing.embedText === embedText ? existing.vector : null;
   if (!vector) vector = await embedKnowledgeText(embedText);

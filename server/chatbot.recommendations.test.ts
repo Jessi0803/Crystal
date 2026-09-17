@@ -1,20 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-// 未連資料庫：只有固定問答，沒有資料庫的商品知識
+// 未連資料庫：沒有任何知識
 vi.mock("./db", () => ({ getDb: vi.fn(async () => null) }));
-import {
-  buildProductKnowledgeChunk,
-  knowledgeChunks,
-  searchKnowledge,
-  type ScoredChunk,
-} from "./crystalKnowledge";
+import { buildProductKnowledgeChunk, searchKnowledge, type ScoredChunk } from "./crystalKnowledge";
 import { selectRelatedProductIds } from "./routers/chatbot";
-
-function recommendationChunk(id: string) {
-  const chunk = knowledgeChunks.find((entry) => entry.id === id);
-  expect(chunk).toBeDefined();
-  return chunk!;
-}
 
 /** 資料庫商品知識的最小形狀（固定問答已不含商品） */
 function productChunk(productId: string) {
@@ -30,15 +19,6 @@ function productChunk(productId: string) {
 }
 
 describe("chatbot product recommendations", () => {
-  it("uses broad need knowledge as guidance instead of hard-coded product bundles", () => {
-    expect(recommendationChunk("rec-confidence")).toMatchObject({ category: "選購需求" });
-    expect(recommendationChunk("rec-healing")).toMatchObject({ category: "選購需求" });
-    expect(recommendationChunk("rec-protection")).toMatchObject({ category: "選購需求" });
-    expect(recommendationChunk("rec-confidence").relatedProductIds).toBeUndefined();
-    expect(recommendationChunk("rec-healing").relatedProductIds).toBeUndefined();
-    expect(recommendationChunk("rec-protection").relatedProductIds).toBeUndefined();
-  });
-
   it("merges two relevant recommendation matches without duplicate or excessive cards", () => {
     const chunks = [
       {
@@ -135,13 +115,7 @@ describe("chatbot product recommendations", () => {
     expect(selectRelatedProductIds(chunks)).toEqual([]);
   });
 
-  it("keeps product recommendations out of the static FAQ so delisted products are never suggested", () => {
-    expect(knowledgeChunks.filter((chunk) => chunk.category === "商品推薦")).toEqual([]);
-    expect(knowledgeChunks.filter((chunk) => chunk.id.startsWith("product-"))).toEqual([]);
-    expect(knowledgeChunks.some((chunk) => chunk.relatedProductIds?.length)).toBe(false);
-  });
-
-  it("does not return any product from static knowledge when no product knowledge is loaded", async () => {
+  it("does not return any product when no product knowledge is loaded", async () => {
     const results = await searchKnowledge("限定款有哪些 每月限量手鍊 潛月之境 月下密語", Array(768).fill(1), 10, 0.3);
 
     expect(results.filter((chunk) => chunk.category === "商品推薦")).toEqual([]);

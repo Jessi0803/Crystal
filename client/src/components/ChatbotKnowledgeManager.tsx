@@ -352,9 +352,6 @@ export default function ChatbotKnowledgeManager() {
             <button
               type="button"
               onClick={() => setDraft({ ...EMPTY_DRAFT })}
-              // 內建問答尚未搬進資料庫時，新增第一則會讓 AI 不再使用內建問答
-              disabled={isLoading || counts.faq === 0}
-              title={counts.faq === 0 ? "請先將內建問答搬進資料庫" : undefined}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-40"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -413,9 +410,7 @@ export default function ChatbotKnowledgeManager() {
           <p className="p-10 text-center text-sm font-body text-red-600">載入知識庫失敗，請稍後再試</p>
         ) : visible.length === 0 ? (
           <p className="p-10 text-center text-sm font-body text-[oklch(0.5_0_0)]">
-            {source === "faq" && counts.faq === 0
-              ? "資料庫還沒有問答，AI 目前使用程式內建的問答。內建問答搬進資料庫後，才能在這裡新增與編輯。"
-              : "沒有符合條件的知識"}
+            {source === "faq" && counts.faq === 0 ? "還沒有任何問答，按「新增問答」開始建立。" : "沒有符合條件的知識"}
           </p>
         ) : (
           <ul className="divide-y divide-[oklch(0.93_0_0)]">

@@ -97,7 +97,7 @@ describe("keyword and embed text helpers", () => {
 
 describe("saveFaq", () => {
   it("creates a managed FAQ with a fresh vector", async () => {
-    const db = fakeDb([existingFaq]);
+    const db = fakeDb([]);
 
     const result = await saveFaq(faqInput);
 
@@ -111,7 +111,7 @@ describe("saveFaq", () => {
   });
 
   it("still saves when the vector cannot be generated", async () => {
-    const db = fakeDb([existingFaq]);
+    const db = fakeDb([]);
     embedMock.mockResolvedValue(null);
 
     const result = await saveFaq(faqInput);
@@ -144,14 +144,6 @@ describe("saveFaq", () => {
     await expect(saveFaq({ ...faqInput, id: "product-p1" })).rejects.toMatchObject({ code: "READ_ONLY" });
     await expect(setFaqActive("product-p1", false)).rejects.toMatchObject({ code: "READ_ONLY" });
     await expect(deleteFaq("product-p1")).rejects.toMatchObject({ code: "READ_ONLY" });
-  });
-
-  it("refuses to add the first FAQ before the bundled FAQ are migrated", async () => {
-    const db = fakeDb([]);
-
-    await expect(saveFaq(faqInput)).rejects.toMatchObject({ code: "NOT_MIGRATED" });
-    expect(db.calls).toHaveLength(0);
-    expect(embedMock).not.toHaveBeenCalled();
   });
 
   it("reports a missing entry", async () => {
@@ -212,7 +204,7 @@ describe("chatbot knowledge admin procedures", () => {
   });
 
   it("normalizes keywords before saving", async () => {
-    const db = fakeDb([existingFaq]);
+    const db = fakeDb([]);
 
     await admin.knowledgeSave({ ...faqInput, keywords: [" 維修 ", "維修", "", "斷掉"] });
 
