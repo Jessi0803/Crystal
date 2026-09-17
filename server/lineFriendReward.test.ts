@@ -59,7 +59,11 @@ function mockLineApis(opts: { friendFlag?: boolean | "error"; botProfileStatus?:
       return jsonResponse(200, { access_token: "login-access-token" });
     }
     if (url.endsWith("/v2/profile")) {
-      return jsonResponse(200, { userId: LINE_USER_ID, displayName: "LINE 會員" });
+      return jsonResponse(200, {
+        userId: LINE_USER_ID,
+        displayName: "LINE 會員",
+        pictureUrl: "https://profile.line-scdn.net/abc",
+      });
     }
     if (url.includes("/friendship/v1/status")) {
       if (opts.friendFlag === "error" || opts.friendFlag === undefined) return jsonResponse(403, { message: "not linked" });
@@ -243,7 +247,13 @@ describe("LINE OAuth callback friend reward", () => {
 
     await lineOAuthCallback(createCallbackRequest({ line_oauth_mode: "link", line_oauth_return_to: "/member" }), res);
 
-    expect(bindLineToUserMock).toHaveBeenCalledWith({ userId: 42, lineOpenId: `line:${LINE_USER_ID}`, lineEmail: null });
+    expect(bindLineToUserMock).toHaveBeenCalledWith({
+      userId: 42,
+      lineOpenId: `line:${LINE_USER_ID}`,
+      lineEmail: null,
+      lineDisplayName: "LINE 會員",
+      linePictureUrl: "https://profile.line-scdn.net/abc",
+    });
     expect(upsertLineUserAsPrimaryMock).not.toHaveBeenCalled();
     expect(grantLineFriendRewardMock).toHaveBeenCalledWith({ userId: 42, lineUserId: LINE_USER_ID });
     expect(res.captured.cookies.app_session_id).toBe("session-token");
@@ -292,7 +302,11 @@ describe("LINE OAuth callback friend reward", () => {
 
     await lineOAuthCallback(createCallbackRequest({ line_oauth_return_to: "/checkout?step=2" }), res);
 
-    expect(upsertLineUserAsPrimaryMock).toHaveBeenCalled();
+    expect(upsertLineUserAsPrimaryMock).toHaveBeenCalledWith(expect.objectContaining({
+      openId: `line:${LINE_USER_ID}`,
+      lineDisplayName: "LINE 會員",
+      linePictureUrl: "https://profile.line-scdn.net/abc",
+    }));
     expect(grantLineFriendRewardMock).toHaveBeenCalledTimes(1);
     expect(res.captured.redirectedTo).toBe("/checkout?step=2&lineReward=granted");
   });

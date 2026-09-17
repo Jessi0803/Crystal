@@ -43,7 +43,7 @@ const fake = vi.hoisted(() => {
 
 vi.mock("drizzle-orm/mysql2", () => ({ drizzle: () => fake.db }));
 
-import { bindLineToUser, upsertLineUserAsPrimary } from "./db";
+import { bindLineToUser, normalizeLineProfile, upsertLineUserAsPrimary } from "./db";
 
 const LINE_OPEN_ID = "line:Unew";
 
@@ -91,6 +91,29 @@ describe("upsertLineUserAsPrimary email matching", () => {
     expect(insert?.values).not.toHaveProperty("email");
   });
 
+  it("stores the LINE profile for a new LINE member", async () => {
+    fake.state.selectQueue = [[], []];
+
+    await upsertLineUserAsPrimary({
+      openId: LINE_OPEN_ID,
+      name: "小明",
+      lineDisplayName: "小明",
+      linePictureUrl: "https://profile.line-scdn.net/p2",
+    });
+
+    const insert = fake.state.calls.find((call) => call.op === "insert");
+    expect(insert?.values).toMatchObject({ lineDisplayName: "小明", linePictureUrl: "https://profile.line-scdn.net/p2" });
+  });
+
+  it("keeps a stored picture when LINE does not return one", async () => {
+    fake.state.selectQueue = [[user({ id: 5, openId: LINE_OPEN_ID, loginMethod: "line" })], []];
+
+    await upsertLineUserAsPrimary({ openId: LINE_OPEN_ID, lineDisplayName: "小明" });
+
+    expect(updates()[0].values).toMatchObject({ lineDisplayName: "小明" });
+    expect(updates()[0].values).not.toHaveProperty("linePictureUrl");
+  });
+
   it("still links a LINE login to an email-only member with the same email", async () => {
     fake.state.selectQueue = [[], [user({ id: 3, passwordHash: "hash" })]];
 
@@ -116,26 +139,49 @@ describe("upsertLineUserAsPrimary email matching", () => {
 
   it("keeps the login email of an email member who bound this LINE and records the LINE email", async () => {
     fake.state.selectQueue = [
-      [user({ id: 9, openId: LINE_OPEN_ID, email: "a@x.com", passwordHash: "hash" })],
+      [user({ id: 9, openId: LINE_OPEN_ID, email: "a@x.com", name: "網站姓名", passwordHash: "hash" })],
     ];
 
-    await upsertLineUserAsPrimary({ openId: LINE_OPEN_ID, email: "b@y.com" });
+    await upsertLineUserAsPrimary({
+      openId: LINE_OPEN_ID,
+      email: "b@y.com",
+      name: "LINE 名稱",
+      lineDisplayName: "LINE 名稱",
+      linePictureUrl: "https://profile.line-scdn.net/p1",
+    });
 
     expect(updates()).toHaveLength(1);
-    expect(updates()[0].values).toMatchObject({ lineEmail: "b@y.com" });
+    expect(updates()[0].values).toMatchObject({
+      name: "網站姓名",
+      lineEmail: "b@y.com",
+      lineDisplayName: "LINE 名稱",
+      linePictureUrl: "https://profile.line-scdn.net/p1",
+    });
     expect(updates()[0].values).not.toHaveProperty("email");
     expect(updates()[0].values).not.toHaveProperty("openId");
   });
 });
 
 describe("bindLineToUser", () => {
-  it("records the LINE email when binding", async () => {
+  it("records the LINE email and profile when binding", async () => {
     fake.state.selectQueue = [[user({ id: 3, passwordHash: "hash" })], []];
 
     await expect(
-      bindLineToUser({ userId: 3, lineOpenId: LINE_OPEN_ID, lineEmail: "b@y.com" })
+      bindLineToUser({
+        userId: 3,
+        lineOpenId: LINE_OPEN_ID,
+        lineEmail: "b@y.com",
+        lineDisplayName: "LINE 名稱",
+        linePictureUrl: "https://profile.line-scdn.net/p3",
+      })
     ).resolves.toBe("bound");
-    expect(updates()[0].values).toMatchObject({ openId: LINE_OPEN_ID, lineEmail: "b@y.com" });
+    expect(updates()[0].values).toMatchObject({
+      openId: LINE_OPEN_ID,
+      lineEmail: "b@y.com",
+      lineDisplayName: "LINE 名稱",
+      linePictureUrl: "https://profile.line-scdn.net/p3",
+    });
+    expect(updates()[0].values).not.toHaveProperty("name");
     expect(updates()[0].values).not.toHaveProperty("email");
   });
 
@@ -151,5 +197,25 @@ describe("bindLineToUser", () => {
 
     await expect(bindLineToUser({ userId: 3, lineOpenId: LINE_OPEN_ID })).resolves.toBe("user_has_other_line");
     expect(updates()).toHaveLength(0);
+  });
+});
+
+describe("normalizeLineProfile", () => {
+  it("keeps a trimmed name and an https picture", () => {
+    expect(normalizeLineProfile({ lineDisplayName: "  小明  ", linePictureUrl: "https://profile.line-scdn.net/x" })).toEqual({
+      lineDisplayName: "小明",
+      linePictureUrl: "https://profile.line-scdn.net/x",
+    });
+  });
+
+  it("drops empty values and non-https pictures so stored data is not overwritten", () => {
+    expect(normalizeLineProfile({ lineDisplayName: "  ", linePictureUrl: "http://example.com/a.png" })).toEqual({});
+    expect(normalizeLineProfile({ linePictureUrl: "javascript:alert(1)" })).toEqual({});
+    expect(normalizeLineProfile({})).toEqual({});
+  });
+
+  it("limits long values", () => {
+    expect(normalizeLineProfile({ lineDisplayName: "名".repeat(150) }).lineDisplayName).toHaveLength(100);
+    expect(normalizeLineProfile({ linePictureUrl: `https://a.test/${"x".repeat(1100)}` })).toEqual({});
   });
 });

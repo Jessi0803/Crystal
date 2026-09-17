@@ -95,7 +95,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod", "lineEmail"] as const;
+    const textFields = ["name", "email", "loginMethod", "lineEmail", "lineDisplayName", "linePictureUrl"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -177,6 +177,7 @@ async function mergeDuplicateMemberIntoPrimary(opts: {
   lineOpenId: string;
   email: string;
   lineEmail: string | null;
+  lineProfile: { lineDisplayName?: string; linePictureUrl?: string };
   name?: string | null;
   lastSignedIn: Date;
 }) {
@@ -209,6 +210,7 @@ async function mergeDuplicateMemberIntoPrimary(opts: {
       name: opts.name?.trim() || primary.name || duplicate.name,
       email: opts.email,
       lineEmail: opts.lineEmail ?? primary.lineEmail,
+      ...opts.lineProfile,
       passwordHash: primary.passwordHash ?? duplicate.passwordHash,
       emailVerified: true,
       verifyToken: null,
@@ -248,7 +250,7 @@ export async function upsertLineUserAsPrimary(data: {
   email?: string | null;
   name?: string | null;
   lastSignedIn?: Date;
-}) {
+} & LineProfileFields) {
   if (!data.openId.startsWith("line:")) {
     throw new Error("LINE openId is required");
   }
@@ -261,6 +263,7 @@ export async function upsertLineUserAsPrimary(data: {
 
   const email = data.email ? normalizeOrderEmail(data.email) : null;
   const lastSignedIn = data.lastSignedIn ?? new Date();
+  const lineProfile = normalizeLineProfile(data);
   const name = data.name?.trim() || null;
 
   const [lineUser] = await db.select().from(users).where(eq(users.openId, data.openId)).limit(1);
@@ -292,6 +295,7 @@ export async function upsertLineUserAsPrimary(data: {
       lineOpenId: data.openId,
       email: email!,
       lineEmail: email,
+      lineProfile,
       name,
       lastSignedIn,
     });
@@ -304,6 +308,7 @@ export async function upsertLineUserAsPrimary(data: {
       .set({
         name: lineUser.name || name,
         lineEmail: email ?? lineUser.lineEmail,
+        ...lineProfile,
         role:
           shouldGrantAdminRole(data.openId, lineUser.email, lineUser.emailVerified === true) || lineUser.role === "admin"
             ? "admin"
@@ -322,6 +327,7 @@ export async function upsertLineUserAsPrimary(data: {
         name: name || lineUser.name,
         email: assignableEmail ?? lineUser.email,
         lineEmail: email ?? lineUser.lineEmail,
+        ...lineProfile,
         loginMethod: "line",
         emailVerified: true,
         verifyToken: null,
@@ -342,6 +348,7 @@ export async function upsertLineUserAsPrimary(data: {
         name: name || sameEmailUser.name,
         email,
         lineEmail: email,
+        ...lineProfile,
         loginMethod: "line",
         emailVerified: true,
         verifyToken: null,
@@ -362,10 +369,26 @@ export async function upsertLineUserAsPrimary(data: {
     name: name ?? undefined,
     email: assignableEmail ?? undefined,
     lineEmail: email ?? undefined,
+    ...lineProfile,
     loginMethod: "line",
     lastSignedIn,
     emailVerified: true,
   });
+}
+
+export type LineProfileFields = {
+  lineDisplayName?: string | null;
+  linePictureUrl?: string | null;
+};
+
+/** 只保留合理長度的名稱與 https 大頭貼網址；未提供時回傳空物件，不覆蓋既有資料 */
+export function normalizeLineProfile(profile: LineProfileFields) {
+  const fields: { lineDisplayName?: string; linePictureUrl?: string } = {};
+  const name = profile.lineDisplayName?.trim();
+  if (name) fields.lineDisplayName = name.slice(0, 100);
+  const picture = profile.linePictureUrl?.trim();
+  if (picture && picture.startsWith("https://") && picture.length <= 1024) fields.linePictureUrl = picture;
+  return fields;
 }
 
 export type BindLineResult = "bound" | "already_bound" | "line_in_use" | "user_has_other_line";
@@ -378,16 +401,18 @@ export async function bindLineToUser(opts: {
   userId: number;
   lineOpenId: string;
   lineEmail?: string | null;
-}): Promise<BindLineResult> {
+} & LineProfileFields): Promise<BindLineResult> {
   if (!opts.lineOpenId.startsWith("line:")) throw new Error("LINE openId is required");
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const [current] = await db.select().from(users).where(eq(users.id, opts.userId)).limit(1);
   if (!current) throw new Error("User not found");
+  const lineProfile = normalizeLineProfile(opts);
   if (current.openId === opts.lineOpenId) {
-    if (opts.lineEmail) {
-      await db.update(users).set({ lineEmail: opts.lineEmail }).where(eq(users.id, current.id));
+    const updates = { ...(opts.lineEmail ? { lineEmail: opts.lineEmail } : {}), ...lineProfile };
+    if (Object.keys(updates).length > 0) {
+      await db.update(users).set(updates).where(eq(users.id, current.id));
     }
     return "already_bound";
   }
@@ -402,6 +427,8 @@ export async function bindLineToUser(opts: {
       .set({
         openId: opts.lineOpenId,
         lineEmail: opts.lineEmail ?? null,
+        lineDisplayName: lineProfile.lineDisplayName ?? null,
+        linePictureUrl: lineProfile.linePictureUrl ?? null,
         lastSignedIn: new Date(),
         updatedAt: new Date(),
       })

@@ -104,6 +104,8 @@ export const adminMembersRouter = router({
           email: users.email,
           loginMethod: users.loginMethod,
           lineBound: sql<number>`CASE WHEN ${users.openId} LIKE 'line:%' THEN 1 ELSE 0 END`,
+          lineDisplayName: users.lineDisplayName,
+          linePictureUrl: users.linePictureUrl,
           role: users.role,
           createdAt: users.createdAt,
           lastSignedIn: users.lastSignedIn,
@@ -132,6 +134,8 @@ export const adminMembersRouter = router({
           users.email,
           users.loginMethod,
           users.openId,
+          users.lineDisplayName,
+          users.linePictureUrl,
           users.role,
           users.createdAt,
           users.lastSignedIn,
@@ -143,7 +147,16 @@ export const adminMembersRouter = router({
         .offset(input.offset);
 
       return {
-        items: rows.map((row) => ({ ...row, lineBound: Number(row.lineBound) === 1 })),
+        items: rows.map((row) => {
+          const lineBound = Number(row.lineBound) === 1;
+          // 解除綁定後殘留的 LINE 資料不顯示
+          return {
+            ...row,
+            lineBound,
+            lineDisplayName: lineBound ? row.lineDisplayName : null,
+            linePictureUrl: lineBound ? row.linePictureUrl : null,
+          };
+        }),
         total: Number(totalRow?.count ?? 0),
       };
     }),
@@ -160,6 +173,8 @@ export const adminMembersRouter = router({
           loginMethod: users.loginMethod,
           openId: users.openId,
           lineEmail: users.lineEmail,
+          lineDisplayName: users.lineDisplayName,
+          linePictureUrl: users.linePictureUrl,
           birthYear: users.birthYear,
           birthMonth: users.birthMonth,
           birthDay: users.birthDay,
@@ -217,7 +232,16 @@ export const adminMembersRouter = router({
         .limit(100);
 
       const { openId, ...memberFields } = member;
-      return { member: { ...memberFields, lineBound: openId.startsWith("line:") }, orders: history };
+      const lineBound = openId.startsWith("line:");
+      return {
+        member: {
+          ...memberFields,
+          lineBound,
+          lineDisplayName: lineBound ? memberFields.lineDisplayName : null,
+          linePictureUrl: lineBound ? memberFields.linePictureUrl : null,
+        },
+        orders: history,
+      };
     }),
 
   /** 客服代會員修改生日；birthday 為 null 表示清除，讓會員重新填寫 */

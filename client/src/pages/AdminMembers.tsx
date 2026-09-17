@@ -202,6 +202,32 @@ function MemberOrderDetail({ orderId }: { orderId: number }) {
   );
 }
 
+/** 會員頭像：有 LINE 大頭貼就顯示，載入失敗或沒有時顯示預設圖示 */
+function MemberAvatar({ pictureUrl, name, size }: { pictureUrl?: string | null; name: string; size: "sm" | "md" }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [pictureUrl]);
+  const box = size === "sm" ? "w-9 h-9" : "w-12 h-12";
+  const icon = size === "sm" ? "w-4 h-4" : "w-5 h-5";
+
+  if (pictureUrl && !failed) {
+    return (
+      <img
+        src={pictureUrl}
+        alt={`${name} 的 LINE 大頭貼`}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className={`${box} shrink-0 rounded-full object-cover bg-[oklch(0.94_0_0)]`}
+      />
+    );
+  }
+  return (
+    <div className={`${box} shrink-0 rounded-full bg-[oklch(0.94_0_0)] flex items-center justify-center`}>
+      <UserRound className={`${icon} text-[oklch(0.28_0_0)]`} />
+    </div>
+  );
+}
+
 function MemberBirthdayEditor({ userId, birthday }: { userId: number; birthday: Birthday | null }) {
   const utils = trpc.useUtils();
   const [editing, setEditing] = useState(false);
@@ -674,13 +700,16 @@ export default function AdminMembers() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-[oklch(0.12_0_0)] truncate">
-                          {member.name || "未填姓名"}
-                        </p>
-                        <p className="text-xs text-[oklch(0.5_0_0)] font-body mt-1 truncate">
-                          {member.email || "無 Email"}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <MemberAvatar pictureUrl={member.linePictureUrl} name={member.name || "會員"} size="sm" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[oklch(0.12_0_0)] truncate">
+                            {member.name || "未填姓名"}
+                          </p>
+                          <p className="text-xs text-[oklch(0.5_0_0)] font-body mt-1 truncate">
+                            {member.email || "無 Email"}
+                          </p>
+                        </div>
                       </div>
                       <span className="shrink-0 text-[11px] font-body border border-[oklch(0.86_0_0)] px-2 py-1 text-[oklch(0.42_0_0)]">
                         {getVipLabel(member.vipTier)}
@@ -688,7 +717,11 @@ export default function AdminMembers() {
                     </div>
                     <div className="flex items-center gap-3 mt-3 text-[11px] font-body text-[oklch(0.55_0_0)]">
                       <span>#{member.id}</span>
-                      {member.lineBound && <span className="text-[#06a04a]">LINE</span>}
+                      {member.lineBound && (
+                        <span className="min-w-0 truncate text-[#06a04a]">
+                          LINE{member.lineDisplayName && member.lineDisplayName !== member.name ? `：${member.lineDisplayName}` : ""}
+                        </span>
+                      )}
                       <span>{member.orderCount} 筆訂單</span>
                       <span>{formatMoney(member.totalSpent)}</span>
                     </div>
@@ -783,9 +816,7 @@ export default function AdminMembers() {
                 <div className="space-y-5">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-[oklch(0.94_0_0)] flex items-center justify-center shrink-0">
-                        <UserRound className="w-5 h-5 text-[oklch(0.28_0_0)]" />
-                      </div>
+                      <MemberAvatar pictureUrl={selectedMember.linePictureUrl} name={selectedMember.name || "會員"} size="md" />
                       <div className="min-w-0">
                         <h2 className="text-base font-medium text-[oklch(0.12_0_0)] truncate">
                           {selectedMember.name || "未填姓名"}
@@ -798,6 +829,9 @@ export default function AdminMembers() {
                           <p>註冊方式：{selectedMember.loginMethod || "未紀錄"}</p>
                           <p>
                             LINE：{selectedMember.lineBound ? "已綁定" : "未綁定"}
+                            {selectedMember.lineBound && selectedMember.lineDisplayName
+                              ? `・LINE 名稱：${selectedMember.lineDisplayName}`
+                              : ""}
                             {selectedMember.lineBound && selectedMember.lineEmail && selectedMember.lineEmail !== selectedMember.email
                               ? `（LINE 信箱：${selectedMember.lineEmail}）`
                               : ""}

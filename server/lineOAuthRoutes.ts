@@ -212,7 +212,13 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
           res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo ?? "/member")}`);
           return;
         }
-        const bindResult = await db.bindLineToUser({ userId: currentUser.id, lineOpenId: openId, lineEmail: email });
+        const bindResult = await db.bindLineToUser({
+          userId: currentUser.id,
+          lineOpenId: openId,
+          lineEmail: email,
+          lineDisplayName: profile.displayName,
+          linePictureUrl: profile.pictureUrl,
+        });
         if (bindResult === "line_in_use" || bindResult === "user_has_other_line") {
           clearStateCookie();
           res.redirect(302, withQuery(returnTo ?? "/member", { line: bindResult }));
@@ -223,6 +229,8 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
           openId,
           name: name ?? undefined,
           email: email ?? undefined,
+          lineDisplayName: profile.displayName,
+          linePictureUrl: profile.pictureUrl,
           lastSignedIn: new Date(),
         });
       }

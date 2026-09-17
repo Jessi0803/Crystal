@@ -18,6 +18,9 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   // LINE Login 提供的信箱（僅供後台參考，不參與登入與訂單比對）
   lineEmail: varchar("lineEmail", { length: 320 }),
+  // LINE 名稱與大頭貼（僅供後台辨識會員，LINE 登入或綁定時更新）
+  lineDisplayName: varchar("lineDisplayName", { length: 100 }),
+  linePictureUrl: varchar("linePictureUrl", { length: 1024 }),
   // 生日（年份選填）；會員填寫後不可自行修改，需由管理員調整
   birthYear: smallint("birthYear"),
   birthMonth: tinyint("birthMonth"),

@@ -106,6 +106,8 @@ describe("adminMembers router", () => {
           loginMethod: "email",
           openId: "line:Ubuyer",
           lineEmail: "buyer-line@example.com",
+          lineDisplayName: "買家 LINE",
+          linePictureUrl: "https://profile.line-scdn.net/buyer",
           role: "user",
           createdAt: new Date("2026-06-01T00:00:00Z"),
           updatedAt: new Date("2026-06-01T00:00:00Z"),
@@ -144,6 +146,8 @@ describe("adminMembers router", () => {
       vipTier: "vvip",
       lineBound: true,
       lineEmail: "buyer-line@example.com",
+      lineDisplayName: "買家 LINE",
+      linePictureUrl: "https://profile.line-scdn.net/buyer",
     });
     // 只提供是否綁定，不把 LINE userId 傳到前端
     expect(result.member).not.toHaveProperty("openId");
