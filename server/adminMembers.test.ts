@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MySqlDialect } from "drizzle-orm/mysql-core";
 import { TRPCError } from "@trpc/server";
 
 vi.mock("./db", () => ({
@@ -6,7 +7,7 @@ vi.mock("./db", () => ({
 }));
 
 import { getDb } from "./db";
-import { adminMembersRouter } from "./routers/adminMembers";
+import { adminMembersRouter, buildMemberSearchWhere } from "./routers/adminMembers";
 
 const getDbMock = vi.mocked(getDb);
 
@@ -221,5 +222,40 @@ describe("adminMembers router", () => {
       code: "BAD_REQUEST",
     });
     expect(db.execute).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("buildMemberSearchWhere", () => {
+  const dialect = new MySqlDialect();
+  const compile = (search?: string) => {
+    const where = buildMemberSearchWhere(search);
+    return where ? dialect.sqlToQuery(where) : undefined;
+  };
+
+  it("matches case-insensitively across name, email, LINE email and id", () => {
+    const query = compile("  GMAIL  ")!;
+    expect(query.params).toEqual(["%gmail%", "%gmail%", "%gmail%", "%gmail%"]);
+    expect(query.sql).toContain("LOWER(`users`.`name`) LIKE ?");
+    expect(query.sql).toContain("LOWER(`users`.`email`) LIKE ?");
+    expect(query.sql).toContain("LOWER(`users`.`lineEmail`) LIKE ?");
+    expect(query.sql).toContain("CAST(`users`.`id` AS CHAR) LIKE ?");
+  });
+
+  it("requires every keyword to match", () => {
+    const query = compile("Chun Gmail")!;
+    expect(query.params).toEqual([
+      "%chun%", "%chun%", "%chun%", "%chun%",
+      "%gmail%", "%gmail%", "%gmail%", "%gmail%",
+    ]);
+    expect(query.sql).toMatch(/\) and \(/);
+  });
+
+  it("treats wildcard characters as plain text", () => {
+    expect(compile("50%_off!")!.params[0]).toBe("%50!%!_off!!%");
+  });
+
+  it("returns no filter for a blank search", () => {
+    expect(compile("   ")).toBeUndefined();
+    expect(compile(undefined)).toBeUndefined();
   });
 });

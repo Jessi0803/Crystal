@@ -546,7 +546,7 @@ export default function AdminMembers() {
                 <input
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="搜尋姓名、Email 或會員 ID"
+                  placeholder="搜尋姓名、Email、LINE 信箱或會員 ID（不分大小寫）"
                   className="w-full border border-[oklch(0.86_0_0)] pl-9 pr-3 py-2.5 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
                 />
               </form>

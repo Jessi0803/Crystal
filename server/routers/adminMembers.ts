@@ -26,6 +26,35 @@ async function ensureMemberVipColumns() {
   return db;
 }
 
+const MAX_SEARCH_TOKENS = 5;
+
+/**
+ * 會員搜尋：不分大小寫的部分比對（users 欄位為 utf8mb4_bin，需自行轉小寫）。
+ * 以空白拆成多個關鍵字，每個關鍵字都要命中姓名、Email、LINE 信箱或會員 ID 其中之一；
+ * 使用者輸入的 % 與 _ 視為一般字元。
+ */
+export function buildMemberSearchWhere(search?: string) {
+  const tokens = (search ?? "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, MAX_SEARCH_TOKENS);
+  if (tokens.length === 0) return undefined;
+
+  return and(
+    ...tokens.map((token) => {
+      const pattern = `%${token.replace(/[!%_]/g, (char) => `!${char}`)}%`;
+      return or(
+        sql`LOWER(${users.name}) LIKE ${pattern} ESCAPE '!'`,
+        sql`LOWER(${users.email}) LIKE ${pattern} ESCAPE '!'`,
+        sql`LOWER(${users.lineEmail}) LIKE ${pattern} ESCAPE '!'`,
+        sql`CAST(${users.id} AS CHAR) LIKE ${pattern} ESCAPE '!'`
+      );
+    })
+  );
+}
+
 function memberOrderMatch(userId: number, email?: string | null) {
   const conditions = [eq(orders.userId, userId)];
   const normalizedEmail = email?.trim().toLowerCase();
@@ -61,14 +90,7 @@ export const adminMembersRouter = router({
     )
     .query(async ({ input }) => {
       const db = await ensureMemberVipColumns();
-      const term = input.search ? `%${input.search}%` : undefined;
-      const where = term
-        ? or(
-            sql`${users.name} LIKE ${term}`,
-            sql`${users.email} LIKE ${term}`,
-            sql`CAST(${users.id} AS CHAR) LIKE ${term}`
-          )
-        : undefined;
+      const where = buildMemberSearchWhere(input.search);
 
       const [totalRow] = where
         ? await db.select({ count: sql<number>`CAST(COUNT(*) AS SIGNED)` }).from(users).where(where)
