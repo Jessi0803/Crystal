@@ -10,6 +10,13 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
+import ChatbotKnowledgeManager from "@/components/ChatbotKnowledgeManager";
+
+type ChatbotTab = "logs" | "knowledge";
+
+function initialTab(): ChatbotTab {
+  return new URLSearchParams(window.location.search).get("tab") === "knowledge" ? "knowledge" : "logs";
+}
 
 const PAGE_SIZE = 20;
 
@@ -54,6 +61,7 @@ function normalizeJsonArray(value: unknown): string[] {
 export default function AdminChatbot() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
+  const [tab, setTab] = useState<ChatbotTab>(initialTab);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -176,10 +184,10 @@ export default function AdminChatbot() {
           <div>
             <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">AI CUSTOMER SERVICE</p>
             <h1 className="mt-1 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
-              AI 客服紀錄
+              AI 客服
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${tab === "logs" ? "" : "hidden"}`}>
             <button
               onClick={() => refetch()}
               disabled={isFetching}
@@ -192,7 +200,42 @@ export default function AdminChatbot() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="flex gap-0 border-b border-[oklch(0.9_0_0)]" role="tablist">
+          {(
+            [
+              ["logs", "對話紀錄"],
+              ["knowledge", "知識庫"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => {
+                setTab(key);
+                window.history.replaceState(null, "", key === "logs" ? window.location.pathname : `${window.location.pathname}?tab=${key}`);
+              }}
+              className={`px-5 py-3 text-sm font-body border-b-2 -mb-px transition-colors ${
+                tab === key
+                  ? "border-[oklch(0.15_0_0)] text-[oklch(0.15_0_0)]"
+                  : "border-transparent text-[oklch(0.55_0_0)] hover:text-[oklch(0.35_0_0)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "knowledge" && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <ChatbotKnowledgeManager />
+        </div>
+      )}
+
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${tab === "logs" ? "" : "hidden"}`}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white border border-[oklch(0.93_0_0)] p-5">
             <div className="flex items-center gap-2 text-[oklch(0.4_0_0)] mb-2">

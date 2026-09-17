@@ -7,6 +7,22 @@ import { searchKnowledge, type ScoredChunk } from "../crystalKnowledge";
 import { ENV } from "../_core/env";
 import { products } from "../../client/src/lib/data";
 import { chatbotLogs, dbProducts } from "../../drizzle/schema";
+import {
+  FAQ_ANSWER_MAX,
+  FAQ_CATEGORIES,
+  FAQ_KEYWORD_LENGTH_MAX,
+  FAQ_KEYWORD_MAX,
+  FAQ_QUESTION_MAX,
+  parseKeywords,
+} from "@shared/chatbotKnowledge";
+import {
+  deleteFaq,
+  KnowledgeAdminError,
+  listKnowledgeEntries,
+  refreshKnowledgeVector,
+  saveFaq,
+  setFaqActive,
+} from "../chatbotKnowledgeAdmin";
 
 const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，名叫「椛小助」。
 
@@ -286,6 +302,32 @@ async function saveChatbotLog(params: {
   }
 }
 
+const faqInputSchema = z.object({
+  question: z.string().trim().min(1, "請輸入問題").max(FAQ_QUESTION_MAX, `問題最多 ${FAQ_QUESTION_MAX} 字`),
+  answer: z.string().trim().min(1, "請輸入回答").max(FAQ_ANSWER_MAX, `回答最多 ${FAQ_ANSWER_MAX} 字`),
+  keywords: z
+    .array(z.string())
+    .transform((keywords) => parseKeywords(keywords))
+    .pipe(
+      z
+        .array(z.string().max(FAQ_KEYWORD_LENGTH_MAX, `每個關鍵字最多 ${FAQ_KEYWORD_LENGTH_MAX} 字`))
+        .max(FAQ_KEYWORD_MAX, `關鍵字最多 ${FAQ_KEYWORD_MAX} 個`)
+    ),
+  category: z.enum(FAQ_CATEGORIES),
+  active: z.boolean(),
+});
+
+async function withKnowledgeErrors<T>(run: () => Promise<T>) {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof KnowledgeAdminError) {
+      throw new TRPCError({ code: error.code === "NOT_FOUND" ? "NOT_FOUND" : "BAD_REQUEST", message: error.message });
+    }
+    throw error;
+  }
+}
+
 export const chatbotRouter = router({
   chat: rateLimitedPublicProcedure({ scope: "chatbot", limit: 20, windowMs: 5 * 60_000 })
     .input(
@@ -323,7 +365,11 @@ export const chatbotRouter = router({
         queryVector = await embedQuery(queryText);
       } catch (e) {
         console.error("[chatbot] embed error:", e);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Embed failed: ${e instanceof Error ? e.message : String(e)}` });
+        throw new TRPCError({
+          code: "SERVICE_UNAVAILABLE",
+          message: "AI 客服暫時無法使用，請稍後再試，或透過 LINE 聯繫客服",
+          cause: e,
+        });
       }
 
       // 2. RAG 檢索
@@ -492,5 +538,48 @@ export const chatbotRouter = router({
       const ids = Array.from(new Set(input.ids));
       await db.delete(chatbotLogs).where(inArray(chatbotLogs.id, ids));
       return { success: true, deletedCount: ids.length };
+    }),
+  // ─── 後台知識庫管理 ─────────────────────────────────────────────────────────
+  knowledgeList: adminProcedure.query(() => listKnowledgeEntries()),
+
+  knowledgeSave: adminProcedure
+    .input(faqInputSchema.extend({ id: z.string().max(128).optional() }))
+    .mutation(({ input }) => withKnowledgeErrors(() => saveFaq(input))),
+
+  knowledgeSetActive: adminProcedure
+    .input(z.object({ id: z.string().max(128), active: z.boolean() }))
+    .mutation(({ input }) => withKnowledgeErrors(() => setFaqActive(input.id, input.active))),
+
+  knowledgeDelete: adminProcedure
+    .input(z.object({ id: z.string().max(128) }))
+    .mutation(({ input }) => withKnowledgeErrors(() => deleteFaq(input.id))),
+
+  knowledgeRefreshVector: adminProcedure
+    .input(z.object({ id: z.string().max(128) }))
+    .mutation(({ input }) => withKnowledgeErrors(() => refreshKnowledgeVector(input.id))),
+
+  /** 模擬顧客提問，顯示 AI 會讀到哪些知識與分數（不產生回答、不寫入紀錄） */
+  knowledgeTestSearch: adminProcedure
+    .input(z.object({ question: z.string().trim().min(1).max(CHATBOT_MAX_MESSAGE_LENGTH) }))
+    .mutation(async ({ input }) => {
+      let vector: number[];
+      try {
+        vector = await embedQuery(input.question);
+      } catch (error) {
+        throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "暫時無法產生向量，請稍後再試", cause: error });
+      }
+      const chunks = await searchKnowledge(input.question, vector, 10, 0.45);
+      const productIds = selectRelatedProductIds(chunks, 0.55);
+      const products = await loadRelatedProducts(productIds);
+      return {
+        results: chunks.map((chunk) => ({
+          id: chunk.id,
+          question: chunk.question,
+          category: chunk.category,
+          score: Math.round(chunk.score * 100) / 100,
+        })),
+        products: products.map((product) => ({ id: product.id, name: product.name })),
+        usesFallback: !chunks.some((chunk) => chunk.score >= 0.5),
+      };
     }),
 });

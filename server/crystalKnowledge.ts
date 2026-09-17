@@ -117,7 +117,7 @@ export function buildProductKnowledgeChunk(product: ProductKnowledgeSource): Kno
   };
 }
 
-async function ensureChatbotKnowledgeTable() {
+export async function ensureChatbotKnowledgeTable() {
   if (chatbotKnowledgeTableEnsured) return;
   const db = await getDb();
   if (!db) return;
@@ -148,7 +148,7 @@ async function ensureChatbotKnowledgeTable() {
   chatbotKnowledgeTableEnsured = true;
 }
 
-async function embedKnowledgeText(text: string): Promise<number[] | null> {
+export async function embedKnowledgeText(text: string): Promise<number[] | null> {
   if (!ENV.geminiApiKey) return null;
   try {
     const res = await fetch(
@@ -237,6 +237,19 @@ export async function removeProductKnowledge(productId: string) {
   if (!db) return;
   await ensureChatbotKnowledgeTable();
   await db.delete(chatbotKnowledge).where(eq(chatbotKnowledge.id, `product-${productId}`));
+}
+
+/** 後台是否已開始管理問答；有的話就不再使用程式內建的固定問答 */
+async function hasManagedFaq(): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await ensureChatbotKnowledgeTable();
+  const rows = await db
+    .select({ id: chatbotKnowledge.id })
+    .from(chatbotKnowledge)
+    .where(eq(chatbotKnowledge.sourceType, "faq"))
+    .limit(1);
+  return rows.length > 0;
 }
 
 async function loadDynamicKnowledgeChunks(): Promise<DynamicKnowledgeChunk[]> {
@@ -730,7 +743,7 @@ export async function searchKnowledge(
 ): Promise<ScoredChunk[]> {
   const embeddings = loadEmbeddings();
   const vectorById = new Map(embeddings.map((e) => [e.id, e.vector]));
-  const dynamicChunks = await loadDynamicKnowledgeChunks();
+  const [dynamicChunks, managedFaq] = await Promise.all([loadDynamicKnowledgeChunks(), hasManagedFaq()]);
 
   const scoreChunk = (chunk: KnowledgeChunk, vector?: number[] | null): ScoredChunk => {
     const vecScore = vector ? cosineSimilarity(queryVector, vector) : 0;
@@ -740,8 +753,10 @@ export async function searchKnowledge(
     return { ...chunk, score };
   };
 
-  // 商品推薦只來自資料庫的商品知識（隨商品上下架同步），固定問答不含任何商品
-  const staticScored = knowledgeChunks.map((chunk) => scoreChunk(chunk, vectorById.get(chunk.id)));
+  // 商品推薦只來自資料庫的商品知識（隨商品上下架同步），固定問答不含任何商品。
+  // 問答搬進資料庫（後台管理）後，內建的固定問答只在資料庫還沒有任何問答時作為備援。
+  const staticChunks = managedFaq ? [] : knowledgeChunks;
+  const staticScored = staticChunks.map((chunk) => scoreChunk(chunk, vectorById.get(chunk.id)));
   const dynamicScored = dynamicChunks.map((chunk) => scoreChunk(chunk, chunk.vector));
 
   return [...staticScored, ...dynamicScored]
