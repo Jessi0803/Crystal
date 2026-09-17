@@ -4,6 +4,7 @@ import { z } from "zod";
 import { users, orders, orderItems } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { adminProcedure, router } from "../_core/trpc";
+import { birthdaySchema } from "./member";
 
 const VIP_TIERS = ["none", "vip", "vvip"] as const;
 
@@ -159,6 +160,9 @@ export const adminMembersRouter = router({
           loginMethod: users.loginMethod,
           openId: users.openId,
           lineEmail: users.lineEmail,
+          birthYear: users.birthYear,
+          birthMonth: users.birthMonth,
+          birthDay: users.birthDay,
           role: users.role,
           createdAt: users.createdAt,
           updatedAt: users.updatedAt,
@@ -214,6 +218,25 @@ export const adminMembersRouter = router({
 
       const { openId, ...memberFields } = member;
       return { member: { ...memberFields, lineBound: openId.startsWith("line:") }, orders: history };
+    }),
+
+  /** 客服代會員修改生日；birthday 為 null 表示清除，讓會員重新填寫 */
+  updateBirthday: adminProcedure
+    .input(z.object({ userId: z.number().int().positive(), birthday: birthdaySchema.nullable() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [member] = await db.select({ id: users.id }).from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "找不到會員" });
+      await db
+        .update(users)
+        .set({
+          birthYear: input.birthday?.year ?? null,
+          birthMonth: input.birthday?.month ?? null,
+          birthDay: input.birthday?.day ?? null,
+        })
+        .where(eq(users.id, input.userId));
+      return { success: true };
     }),
 
   updateVip: adminProcedure

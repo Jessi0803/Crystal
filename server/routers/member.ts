@@ -6,7 +6,7 @@
  * - me: 取得目前登入會員資訊
  * - forgotPassword: 申請重設密碼（回傳 token，實際發信由前端提示）
  * - resetPassword: 使用 token 重設密碼
- * - updateProfile: 更新姓名
+ * - updateProfile: 更新會員資料（姓名、生日；生日只能填寫一次）
  * - myOrders: 查詢自己的訂單
  */
 import { TRPCError } from "@trpc/server";
@@ -19,9 +19,23 @@ import { sdk } from "../_core/sdk";
 import * as crypto from "crypto";
 import * as db from "../db";
 import { getOrdersForMember } from "../orderDb";
+import { birthdayFromUser, validateBirthday } from "@shared/birthday";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
 
 const SALT_ROUNDS = 10;
+
+const BIRTHDAY_LOCKED_MESSAGE = "生日已填寫，如需修改請聯絡客服";
+
+export const birthdaySchema = z
+  .object({
+    year: z.number().int().nullable(),
+    month: z.number().int(),
+    day: z.number().int(),
+  })
+  .superRefine((birthday, ctx) => {
+    const error = validateBirthday(birthday);
+    if (error) ctx.addIssue({ code: "custom", message: error });
+  });
 
 function trustedSiteOrigin() {
   return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
@@ -238,15 +252,50 @@ export const memberRouter = router({
       return { success: true, message: "密碼已重設，請重新登入" };
     }),
 
-  /** 更新會員姓名 */
+  /** 更新會員資料：姓名可隨時修改；生日只能填寫一次，之後需由客服（管理員）修改 */
   updateProfile: protectedProcedure
-    .input(z.object({ name: z.string().min(1).max(50) }))
+    .input(
+      z.object({
+        name: z.string().min(1).max(50),
+        birthday: birthdaySchema.optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       const db2 = await db.getDb();
       if (!db2) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { users } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-      await db2.update(users).set({ name: input.name }).where(eq(users.openId, ctx.user.openId));
+      const { and, eq, isNull } = await import("drizzle-orm");
+
+      if (input.birthday) {
+        const current = birthdayFromUser(ctx.user);
+        const same =
+          current &&
+          current.year === input.birthday.year &&
+          current.month === input.birthday.month &&
+          current.day === input.birthday.day;
+        if (current && !same) {
+          throw new TRPCError({ code: "FORBIDDEN", message: BIRTHDAY_LOCKED_MESSAGE });
+        }
+        if (!current) {
+          // 條件式更新：同時送出的請求只有第一個能寫入生日
+          const result = await db2
+            .update(users)
+            .set({
+              name: input.name,
+              birthYear: input.birthday.year,
+              birthMonth: input.birthday.month,
+              birthDay: input.birthday.day,
+            })
+            .where(and(eq(users.id, ctx.user.id), isNull(users.birthMonth)));
+          const affected = (Array.isArray(result) ? result[0] : result) as { affectedRows?: number };
+          if (!affected?.affectedRows) {
+            throw new TRPCError({ code: "FORBIDDEN", message: BIRTHDAY_LOCKED_MESSAGE });
+          }
+          return { success: true };
+        }
+      }
+
+      await db2.update(users).set({ name: input.name }).where(eq(users.id, ctx.user.id));
       return { success: true };
     }),
 

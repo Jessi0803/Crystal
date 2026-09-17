@@ -3,6 +3,9 @@ import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { lineLinkUrl, MemberCouponList } from "@/components/MemberCoupons";
+import BirthdayFields, { EMPTY_BIRTHDAY_DRAFT, parseBirthdayDraft, type BirthdayDraft } from "@/components/BirthdayFields";
+import { CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
+import { birthdayFromUser, formatBirthday } from "@shared/birthday";
 
 type MemberTab = "orders" | "coupons" | "profile";
 
@@ -80,6 +83,7 @@ export default function MemberCenter() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<MemberTab>(initialTab);
   const [profileName, setProfileName] = useState("");
+  const [birthdayDraft, setBirthdayDraft] = useState<BirthdayDraft>(EMPTY_BIRTHDAY_DRAFT);
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
 
   // 取得目前登入用戶
@@ -106,11 +110,21 @@ export default function MemberCenter() {
   });
 
   const updateProfileMutation = trpc.member.updateProfile.useMutation({
-    onSuccess: () => {
-      toast.success("姓名已更新");
+    onSuccess: (_result, variables) => {
+      toast.success(variables.birthday ? "會員資料已更新，生日已儲存" : "會員資料已更新");
+      setBirthdayDraft(EMPTY_BIRTHDAY_DRAFT);
       utils.auth.me.invalidate();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => {
+      // zod 驗證錯誤的訊息是 JSON 字串
+      let message = err.message;
+      try {
+        message = (JSON.parse(err.message) as { message?: string }[])[0]?.message ?? message;
+      } catch {
+        /* 一般錯誤訊息 */
+      }
+      toast.error(message);
+    },
   });
 
   useEffect(() => {
@@ -146,6 +160,8 @@ export default function MemberCenter() {
   }
 
   if (!user) return null;
+
+  const savedBirthday = birthdayFromUser(user);
 
   return (
     <div className="min-h-screen bg-[oklch(0.98_0.005_60)]">
@@ -344,7 +360,7 @@ export default function MemberCenter() {
               className="text-base font-medium text-[oklch(0.15_0_0)] mb-6"
               style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
             >
-              修改姓名
+              會員資料
             </h2>
             <div className="space-y-5">
               <div>
@@ -370,11 +386,54 @@ export default function MemberCenter() {
                   className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body outline-none focus:border-[oklch(0.6_0.08_60)]"
                 />
               </div>
+              <div>
+                <p className="block text-xs tracking-[0.08em] text-[oklch(0.4_0_0)] mb-1.5 font-body">生日</p>
+                {savedBirthday ? (
+                  <>
+                    <p className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body bg-[oklch(0.96_0_0)] text-[oklch(0.35_0_0)]">
+                      {formatBirthday(savedBirthday)}
+                    </p>
+                    <p className="mt-1.5 text-xs font-body text-[oklch(0.55_0_0)] leading-relaxed">
+                      生日填寫後無法自行修改，如需更正請
+                      <a href={CUSTOM_LINE_URL} target="_blank" rel="noopener noreferrer" className="underline mx-0.5">
+                        聯絡客服
+                      </a>
+                      。
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <BirthdayFields
+                      value={birthdayDraft}
+                      onChange={setBirthdayDraft}
+                      disabled={updateProfileMutation.isPending}
+                      inputClassName="w-full min-w-0 border border-[oklch(0.88_0_0)] bg-white px-3 py-3 text-sm font-body outline-none focus:border-[oklch(0.6_0.08_60)]"
+                    />
+                    <p className="mt-1.5 text-xs font-body text-[oklch(0.55_0_0)] leading-relaxed">
+                      未來將規劃生日月份的會員生日禮優惠。出生年份可不填；生日儲存後無法自行修改，請確認後再送出。
+                    </p>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => {
-                  const name = profileName || user?.name || "";
-                  if (!name) return;
-                  updateProfileMutation.mutate({ name });
+                  const name = (profileName || user?.name || "").trim();
+                  if (!name) {
+                    toast.error("請輸入姓名");
+                    return;
+                  }
+                  const parsed = savedBirthday ? { birthday: null, error: null } : parseBirthdayDraft(birthdayDraft);
+                  if (parsed.error) {
+                    toast.error(parsed.error);
+                    return;
+                  }
+                  if (
+                    parsed.birthday &&
+                    !window.confirm(`生日將儲存為 ${formatBirthday(parsed.birthday)}，儲存後無法自行修改，確定嗎？`)
+                  ) {
+                    return;
+                  }
+                  updateProfileMutation.mutate({ name, birthday: parsed.birthday ?? undefined });
                 }}
                 disabled={updateProfileMutation.isPending}
                 className="bg-[oklch(0.15_0_0)] text-white px-6 py-2.5 text-sm font-body hover:bg-[oklch(0.25_0_0)] transition-colors disabled:opacity-60"

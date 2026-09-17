@@ -33,6 +33,8 @@ import { trpc } from "@/lib/trpc";
 import { formatCustomConsultationNoteForDisplay } from "@shared/customConsultationNote";
 import { COUPON_SOURCE_LABELS, MEMBER_COUPON_STATUS_LABELS, type CouponSource } from "@shared/coupons";
 import { COUPON_STATUS_BADGE_CLASS, formatCouponDate, formatCouponMinimum } from "@/lib/coupons";
+import BirthdayFields, { birthdayToDraft, parseBirthdayDraft, type BirthdayDraft } from "@/components/BirthdayFields";
+import { birthdayFromUser, formatBirthday, type Birthday } from "@shared/birthday";
 
 const PAGE_SIZE = 50;
 
@@ -194,6 +196,107 @@ function MemberOrderDetail({ orderId }: { orderId: number }) {
           <p>尾款金額：{formatMoney(detail.balancePayment.amount)}</p>
           <p>尾款狀態：{detail.balancePayment.paymentStatus}</p>
           {(detail.balancePayment as any).transferLastFive && <p>尾款匯款末五碼：{(detail.balancePayment as any).transferLastFive}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MemberBirthdayEditor({ userId, birthday }: { userId: number; birthday: Birthday | null }) {
+  const utils = trpc.useUtils();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<BirthdayDraft>(() => birthdayToDraft(birthday));
+  const updateBirthday = trpc.adminMembers.updateBirthday.useMutation({
+    onSuccess: async (_result, variables) => {
+      toast.success(variables.birthday ? "生日已更新" : "已清除生日，會員可重新填寫");
+      setEditing(false);
+      await utils.adminMembers.detail.invalidate({ userId });
+    },
+    onError: (err) => toast.error(err.message || "更新生日失敗"),
+  });
+
+  useEffect(() => {
+    setEditing(false);
+    setDraft(birthdayToDraft(birthday));
+  }, [userId, birthday?.year, birthday?.month, birthday?.day]);
+
+  const save = () => {
+    const parsed = parseBirthdayDraft(draft);
+    if (parsed.error) {
+      toast.error(parsed.error);
+      return;
+    }
+    if (!parsed.birthday) {
+      toast.error("請選擇生日的月份與日期；若要清除請按「清除生日」");
+      return;
+    }
+    updateBirthday.mutate({ userId, birthday: parsed.birthday });
+  };
+
+  const clear = () => {
+    if (!window.confirm("確定清除此會員的生日？清除後會員可以重新填寫一次。")) return;
+    updateBirthday.mutate({ userId, birthday: null });
+  };
+
+  return (
+    <div className="border-t border-[oklch(0.9_0_0)] pt-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">生日</p>
+          <p className="mt-1 text-sm font-body text-[oklch(0.2_0_0)]">
+            {birthday ? formatBirthday(birthday) : "未填寫"}
+          </p>
+        </div>
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(birthdayToDraft(birthday));
+              setEditing(true);
+            }}
+            className="shrink-0 border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body text-[oklch(0.25_0_0)] hover:bg-[oklch(0.96_0_0)]"
+          >
+            修改生日
+          </button>
+        )}
+      </div>
+      {editing && (
+        <div className="mt-3 space-y-3 border border-[oklch(0.9_0_0)] bg-[oklch(0.985_0_0)] p-4">
+          <p className="text-xs font-body text-[oklch(0.45_0_0)]">會員無法自行修改生日，由客服在此代為更正。出生年份可留空。</p>
+          <BirthdayFields
+            value={draft}
+            onChange={setDraft}
+            disabled={updateBirthday.isPending}
+            inputClassName="w-full min-w-0 border border-[oklch(0.86_0_0)] bg-white px-3 py-2.5 text-sm font-body"
+          />
+          <div className="flex flex-wrap justify-between gap-2">
+            <button
+              type="button"
+              onClick={clear}
+              disabled={updateBirthday.isPending || !birthday}
+              className="px-3 py-2 text-xs font-body text-red-700 disabled:opacity-40"
+            >
+              清除生日
+            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={updateBirthday.isPending}
+                className="px-3 py-2 text-xs font-body text-[oklch(0.4_0_0)]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={updateBirthday.isPending}
+                className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
+              >
+                {updateBirthday.isPending ? "儲存中" : "儲存生日"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -771,6 +874,8 @@ export default function AdminMembers() {
                       </button>
                     </div>
                   </div>
+
+                  <MemberBirthdayEditor userId={selectedMember.id} birthday={birthdayFromUser(selectedMember)} />
 
                   <MemberCouponsPanel userId={selectedMember.id} />
                 </div>

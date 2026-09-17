@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal, smallint, tinyint } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -18,6 +18,10 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   // LINE Login 提供的信箱（僅供後台參考，不參與登入與訂單比對）
   lineEmail: varchar("lineEmail", { length: 320 }),
+  // 生日（年份選填）；會員填寫後不可自行修改，需由管理員調整
+  birthYear: smallint("birthYear"),
+  birthMonth: tinyint("birthMonth"),
+  birthDay: tinyint("birthDay"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
