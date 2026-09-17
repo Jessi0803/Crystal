@@ -6,14 +6,24 @@ import { getDb } from "../db";
 import { dbProducts, productInventory, type DbProduct } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import { removeProductKnowledge, syncProductKnowledge, syncProductKnowledgeById } from "../crystalKnowledge";
+import { recordAuditEventSafely } from "../auditDb";
 
 let tableEnsured = false;
 
-async function trySyncChatbotKnowledge(action: () => Promise<void>) {
+async function trySyncChatbotKnowledge(action: () => Promise<void>, productIds: string[] = []) {
   try {
     await action();
   } catch (error) {
     console.warn("[products] failed to sync chatbot product knowledge:", error);
+    await recordAuditEventSafely({
+      source: "system",
+      category: "chatbot",
+      action: "chatbot.knowledge.sync",
+      outcome: "failed",
+      severity: "warning",
+      summary: "商品的 AI 客服知識同步失敗，AI 可能查不到最新的商品資訊",
+      details: { productIds, error: error instanceof Error ? error.message : String(error) },
+    });
   }
 }
 
@@ -211,13 +221,24 @@ async function ensureProductsTable() {
   tableEnsured = true;
 }
 
-async function publishDueProducts() {
+export async function publishDueProducts() {
   const db = await getDb();
   if (!db) return;
+  const dueWhere = and(
+    eq(dbProducts.active, false),
+    sql`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`
+  );
+  const due = await db.select({ id: dbProducts.id }).from(dbProducts).where(dueWhere);
+  if (due.length === 0) return;
+  const ids = due.map((product) => product.id);
   await db
     .update(dbProducts)
     .set({ active: true, scheduledPublishAt: null })
-    .where(and(eq(dbProducts.active, false), sql`${dbProducts.scheduledPublishAt} IS NOT NULL AND ${dbProducts.scheduledPublishAt} <= NOW()`));
+    .where(and(inArray(dbProducts.id, ids), dueWhere));
+  // 排程上架也要把 AI 客服的商品知識改為啟用，否則 AI 查不到新上架的商品
+  for (const id of ids) {
+    await trySyncChatbotKnowledge(() => syncProductKnowledgeById(id), [id]);
+  }
 }
 
 function toFrontendProduct(p: DbProduct) {
@@ -411,7 +432,7 @@ export const productRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const id = `prod-${Date.now()}`;
       await db.insert(dbProducts).values({ id, ...input });
-      await trySyncChatbotKnowledge(() => syncProductKnowledge({ id, ...input }));
+      await trySyncChatbotKnowledge(() => syncProductKnowledge({ id, ...input }), [id]);
       return { id };
     }),
 
@@ -424,7 +445,7 @@ export const productRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       const { id, ...data } = input;
       await db.update(dbProducts).set(data).where(eq(dbProducts.id, id));
-      await trySyncChatbotKnowledge(() => syncProductKnowledgeById(id));
+      await trySyncChatbotKnowledge(() => syncProductKnowledgeById(id), [id]);
       return { success: true };
     }),
 
@@ -436,7 +457,7 @@ export const productRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       await db.update(dbProducts).set({ active: input.active, scheduledPublishAt: null }).where(eq(dbProducts.id, input.id));
-      await trySyncChatbotKnowledge(() => syncProductKnowledgeById(input.id));
+      await trySyncChatbotKnowledge(() => syncProductKnowledgeById(input.id), [input.id]);
       return { success: true };
     }),
 
@@ -471,7 +492,7 @@ export const productRouter = router({
 
       await trySyncChatbotKnowledge(async () => {
         await Promise.all(products.map((product) => syncProductKnowledgeById(product.id)));
-      });
+      }, products.map((product) => product.id));
 
       return { count: products.length };
     }),
@@ -504,7 +525,7 @@ export const productRouter = router({
 
       await trySyncChatbotKnowledge(async () => {
         await Promise.all(products.map((product) => syncProductKnowledgeById(product.id)));
-      });
+      }, products.map((product) => product.id));
 
       return { count: products.length };
     }),
@@ -543,7 +564,7 @@ export const productRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "資料庫無法連線" });
       await db.delete(dbProducts).where(eq(dbProducts.id, input.id));
       await db.delete(productInventory).where(eq(productInventory.productId, input.id));
-      await trySyncChatbotKnowledge(() => removeProductKnowledge(input.id));
+      await trySyncChatbotKnowledge(() => removeProductKnowledge(input.id), [input.id]);
       return { success: true };
     }),
 
