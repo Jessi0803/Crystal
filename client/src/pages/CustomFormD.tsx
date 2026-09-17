@@ -85,7 +85,9 @@ const ACCENT = "oklch(0.68 0.11 30)";
 
 export default function CustomFormD() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const formSubmission = useCustomFormSubmission("numerology-crystal-deposit-product");
+  const formSubmission = useCustomFormSubmission(
+    "numerology-crystal-deposit-product"
+  );
 
   const steps = [
     {
@@ -133,7 +135,8 @@ export default function CustomFormD() {
     },
     {
       title: "有沒有特別喜歡／不喜歡的顏色？",
-      subtitle: "例如：喜歡粉色、紫色、透明；不喜歡太深、太亮……沒有特別指定也可以留空",
+      subtitle:
+        "例如：喜歡粉色、紫色、透明；不喜歡太深、太亮……沒有特別指定也可以留空",
       required: false,
       field: (
         <textarea
@@ -313,7 +316,9 @@ export default function CustomFormD() {
     try {
       await formSubmission.submitCustomNote(customConsultationNote);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試");
+      toast.error(
+        err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試"
+      );
     }
   };
 
@@ -346,61 +351,61 @@ export default function CustomFormD() {
         canFillForm={formSubmission.canFillForm}
         hasExistingNote={formSubmission.hasExistingNote}
       >
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="space-y-5 mb-8">
-          <CustomFormOrderingIntro />
-          {steps.map((item, index) => (
-            <section
-              key={item.title}
-              className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
-            >
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <h2
-                  className="text-lg font-medium text-[oklch(0.1_0_0)]"
-                  style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-                >
-                  {index + 1}. {item.title}
-                </h2>
-                {!item.required &&
-                  item.title !== "完成！付完訂金後記得加入 LINE" && (
-                    <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
-                      選填
-                    </span>
-                  )}
-              </div>
-              {item.subtitle && (
-                <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
-                  {item.subtitle}
-                </p>
-              )}
-              {item.field}
-            </section>
-          ))}
-        </div>
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="space-y-5 mb-8">
+            <CustomFormOrderingIntro />
+            {steps.map((item, index) => (
+              <section
+                key={item.title}
+                className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
+              >
+                <div className="flex items-start justify-between gap-4 mb-2">
+                  <h2
+                    className="text-lg font-medium text-[oklch(0.1_0_0)]"
+                    style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
+                  >
+                    {index + 1}. {item.title}
+                  </h2>
+                  {!item.required &&
+                    item.title !== "完成！付完訂金後記得加入 LINE" && (
+                      <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
+                        選填
+                      </span>
+                    )}
+                </div>
+                {item.subtitle && (
+                  <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
+                    {item.subtitle}
+                  </p>
+                )}
+                {item.field}
+              </section>
+            ))}
+          </div>
 
-        <div className="flex items-center justify-between">
-          <Link href="/custom">
+          <div className="flex items-center justify-between">
+            <Link href="/custom">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                返回方案頁
+              </button>
+            </Link>
+
             <button
               type="button"
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
+              onClick={handleSubmit}
+              disabled={formSubmission.isSubmitting}
+              className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
+              style={{ backgroundColor: ACCENT }}
             >
-              <ArrowLeft className="w-4 h-4" />
-              返回方案頁
+              <Check className="w-4 h-4" />
+              {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
             </button>
-          </Link>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={formSubmission.isSubmitting}
-            className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-            style={{ backgroundColor: ACCENT }}
-          >
-            <Check className="w-4 h-4" />
-            {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
-          </button>
+          </div>
         </div>
-      </div>
       </CustomFormAccessGate>
     </div>
   );

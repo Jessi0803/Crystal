@@ -322,10 +322,7 @@ const EMPTY_BRACELET: BraceletData = {
   igHandle: "",
 };
 
-function buildNote(
-  tarot: TarotData,
-  bracelet: BraceletData
-): string {
+function buildNote(tarot: TarotData, bracelet: BraceletData): string {
   const tarotLines = [
     "【塔羅 × 水晶手鍊諮詢表單】",
     "",
@@ -394,24 +391,30 @@ function buildNote(
 export default function CustomFormB() {
   const [tarot, setTarot] = useState<TarotData>(EMPTY_TAROT);
   const [bracelet, setBracelet] = useState<BraceletData>(EMPTY_BRACELET);
-  const formSubmission = useCustomFormSubmission("tarot-crystal-deposit-product");
+  const formSubmission = useCustomFormSubmission(
+    "tarot-crystal-deposit-product"
+  );
   const paidTopic = getTarotTopicByOptionId(
     formSubmission.matchingOrderItem?.purchaseOptionId
   );
   const paidTopicFormOption = paidTopic
-    ? tarotTopics.find(t => t.label.replace(/\s+/g, "") === paidTopic.label.replace(/\s+/g, ""))
+    ? tarotTopics.find(
+        t => t.label.replace(/\s+/g, "") === paidTopic.label.replace(/\s+/g, "")
+      )
     : undefined;
   const isTopicLocked = Boolean(paidTopicFormOption);
 
   useEffect(() => {
     if (!paidTopicFormOption) return;
-    setTarot(current => current.topic === paidTopicFormOption.label
-      ? current
-      : {
-          ...current,
-          topic: paidTopicFormOption.label,
-          group: paidTopicFormOption.group,
-        });
+    setTarot(current =>
+      current.topic === paidTopicFormOption.label
+        ? current
+        : {
+            ...current,
+            topic: paidTopicFormOption.label,
+            group: paidTopicFormOption.group,
+          }
+    );
   }, [paidTopicFormOption?.label, paidTopicFormOption?.group]);
 
   // ── 塔羅資料欄位（依主題動態產生）────────────────────────────────────────
@@ -666,7 +669,8 @@ export default function CustomFormB() {
     },
     {
       title: "有沒有特別喜歡／不喜歡的顏色？",
-      subtitle: "例如：喜歡粉色、紫色、透明；不喜歡太深、太亮……沒有特別指定也可以留空",
+      subtitle:
+        "例如：喜歡粉色、紫色、透明；不喜歡太深、太亮……沒有特別指定也可以留空",
       required: false,
       field: (
         <textarea
@@ -913,7 +917,9 @@ export default function CustomFormB() {
     try {
       await formSubmission.submitCustomNote(customConsultationNote);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試");
+      toast.error(
+        err instanceof Error ? err.message : "客製需求送出失敗，請稍後再試"
+      );
     }
   }
 
@@ -950,194 +956,207 @@ export default function CustomFormB() {
         canFillForm={formSubmission.canFillForm}
         hasExistingNote={formSubmission.hasExistingNote}
       >
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="space-y-5 mb-8">
-          <CustomFormOrderingIntro />
-          <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
-            <h2
-              className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3"
-              style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-            >
-              1. 占卜主題
-            </h2>
-            {isTopicLocked ? (
-              <div className="mb-5 border border-[oklch(0.82_0.04_290)] bg-[oklch(0.97_0.01_290)] px-4 py-4">
-                <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-1">付款前已選擇</p>
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-xl font-medium text-[oklch(0.15_0_0)]">{paidTopicFormOption?.label}</p>
-                  {formSubmission.matchingOrderItem?.unitPrice != null && (
-                    <p className="text-sm font-body text-[oklch(0.4_0_0)]">
-                      已付訂金 NT$ {Number(formSubmission.matchingOrderItem.unitPrice).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-                <p className="mt-2 text-xs font-body text-[oklch(0.55_0_0)]">此主題已隨訂單確認，表單內不可更換。</p>
-              </div>
-            ) : (
-              <>
-                <p className="mb-4 text-sm font-body leading-relaxed text-amber-700">
-                  這是舊版訂單，付款時尚未保存占卜主題，請在此補選。
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {tarotTopics.map(t => {
-                const hasImage = !!TOPIC_CONTENT[t.label];
-                const isSelected = tarot.topic === t.label;
-                return (
-                  <button
-                    key={t.label}
-                    type="button"
-                    onClick={() =>
-                      setTarot({
-                        ...EMPTY_TAROT,
-                        topic: t.label,
-                        group: t.group,
-                      })
-                    }
-                    className={`px-3 py-2.5 text-sm font-body border-2 transition-colors rounded-sm text-center ${
-                      isSelected
-                        ? "border-[oklch(0.65_0.12_290)] bg-[oklch(0.97_0_0)] font-semibold text-[oklch(0.1_0_0)]"
-                        : t.group === "single_q"
-                          ? "border-[oklch(0.88_0_0)] text-[oklch(0.6_0_0)] hover:border-[oklch(0.6_0_0)]"
-                          : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
-                    }`}
-                  >
-                    <span className="block">{t.label}</span>
-                    {hasImage && !isSelected && (
-                      <span className="block text-[0.6rem] mt-1 text-[oklch(0.65_0.12_290)] font-normal">
-                        點選查看內容 ↓
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-                </div>
-              </>
-            )}
-
-            {/* 主題說明文字預覽 */}
-            {tarot.topic && TOPIC_CONTENT[tarot.topic] && (
-              <div className="mt-5 p-5 rounded-sm border border-[oklch(0.88_0.04_290)] bg-[oklch(0.97_0.01_290)]">
-                <p className="text-xs font-body font-semibold text-[oklch(0.55_0.12_290)] tracking-widest uppercase mb-3">
-                  {tarot.topic} ── 占卜內容
-                </p>
-                {TOPIC_CONTENT[tarot.topic].desc && (
-                  <p className="text-sm font-body text-[oklch(0.4_0_0)] leading-relaxed mb-3">
-                    {TOPIC_CONTENT[tarot.topic].desc}
-                  </p>
-                )}
-                <ul className="space-y-1.5">
-                  {TOPIC_CONTENT[tarot.topic].items.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-start gap-2 text-sm font-body text-[oklch(0.25_0_0)]"
-                    >
-                      <span className="text-[oklch(0.65_0.12_290)] mt-0.5 shrink-0">
-                        ·
-                      </span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 單題制提示 */}
-            {tarot.group === "single_q" && (
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-sm">
-                <p className="text-sm font-body text-amber-800 mb-3">
-                  單題制（題數制）需要直接聯絡官方小編預約，無法透過此表單下單，謝謝！
-                </p>
-                <a
-                  href={LINE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-                  style={{ backgroundColor: "#06C755" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.630 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                  </svg>
-                  聯繫 LINE 客服
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            )}
-          </section>
-
-          {canShowDetails && (
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="space-y-5 mb-8">
+            <CustomFormOrderingIntro />
             <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
               <h2
-                className="text-xl font-medium text-[oklch(0.1_0_0)] mb-1"
+                className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
               >
-                2. {tarot.topic} — 占卜所需資料
+                1. 占卜主題
               </h2>
-              <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">
-                請填寫以下資料，讓老闆為您進行解析
-              </p>
-              {tarotDataFields()}
-            </section>
-          )}
-
-          {canShowDetails &&
-            braceletSteps.map((item, index) => (
-              <section
-                key={item.title}
-                className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
-              >
-                <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase mb-2">
-                  水晶手鍊偏好
-                </p>
-                <div className="flex items-start justify-between gap-4 mb-2">
-                  <h2
-                    className="text-lg font-medium text-[oklch(0.1_0_0)]"
-                    style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
-                  >
-                    {index + 3}. {item.title}
-                  </h2>
-                  {!item.required &&
-                    item.title !== "完成！付完訂金後記得加入 LINE" && (
-                      <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
-                        選填
-                      </span>
-                    )}
-                </div>
-                {item.subtitle && (
-                  <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
-                    {item.subtitle}
+              {isTopicLocked ? (
+                <div className="mb-5 border border-[oklch(0.82_0.04_290)] bg-[oklch(0.97_0.01_290)] px-4 py-4">
+                  <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-1">
+                    付款前已選擇
                   </p>
-                )}
-                {item.field}
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-xl font-medium text-[oklch(0.15_0_0)]">
+                      {paidTopicFormOption?.label}
+                    </p>
+                    {formSubmission.matchingOrderItem?.unitPrice != null && (
+                      <p className="text-sm font-body text-[oklch(0.4_0_0)]">
+                        已付訂金 NT${" "}
+                        {Number(
+                          formSubmission.matchingOrderItem.unitPrice
+                        ).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs font-body text-[oklch(0.55_0_0)]">
+                    此主題已隨訂單確認，表單內不可更換。
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-4 text-sm font-body leading-relaxed text-amber-700">
+                    這是舊版訂單，付款時尚未保存占卜主題，請在此補選。
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {tarotTopics.map(t => {
+                      const hasImage = !!TOPIC_CONTENT[t.label];
+                      const isSelected = tarot.topic === t.label;
+                      return (
+                        <button
+                          key={t.label}
+                          type="button"
+                          onClick={() =>
+                            setTarot({
+                              ...EMPTY_TAROT,
+                              topic: t.label,
+                              group: t.group,
+                            })
+                          }
+                          className={`px-3 py-2.5 text-sm font-body border-2 transition-colors rounded-sm text-center ${
+                            isSelected
+                              ? "border-[oklch(0.65_0.12_290)] bg-[oklch(0.97_0_0)] font-semibold text-[oklch(0.1_0_0)]"
+                              : t.group === "single_q"
+                                ? "border-[oklch(0.88_0_0)] text-[oklch(0.6_0_0)] hover:border-[oklch(0.6_0_0)]"
+                                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+                          }`}
+                        >
+                          <span className="block">{t.label}</span>
+                          {hasImage && !isSelected && (
+                            <span className="block text-[0.6rem] mt-1 text-[oklch(0.65_0.12_290)] font-normal">
+                              點選查看內容 ↓
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* 主題說明文字預覽 */}
+              {tarot.topic && TOPIC_CONTENT[tarot.topic] && (
+                <div className="mt-5 p-5 rounded-sm border border-[oklch(0.88_0.04_290)] bg-[oklch(0.97_0.01_290)]">
+                  <p className="text-xs font-body font-semibold text-[oklch(0.55_0.12_290)] tracking-widest uppercase mb-3">
+                    {tarot.topic} ── 占卜內容
+                  </p>
+                  {TOPIC_CONTENT[tarot.topic].desc && (
+                    <p className="text-sm font-body text-[oklch(0.4_0_0)] leading-relaxed mb-3">
+                      {TOPIC_CONTENT[tarot.topic].desc}
+                    </p>
+                  )}
+                  <ul className="space-y-1.5">
+                    {TOPIC_CONTENT[tarot.topic].items.map((item, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-2 text-sm font-body text-[oklch(0.25_0_0)]"
+                      >
+                        <span className="text-[oklch(0.65_0.12_290)] mt-0.5 shrink-0">
+                          ·
+                        </span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* 單題制提示 */}
+              {tarot.group === "single_q" && (
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-sm">
+                  <p className="text-sm font-body text-amber-800 mb-3">
+                    單題制（題數制）需要直接聯絡官方小編預約，無法透過此表單下單，謝謝！
+                  </p>
+                  <a
+                    href={LINE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
+                    style={{ backgroundColor: "#06C755" }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                    >
+                      <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.630 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+                    </svg>
+                    聯繫 LINE 客服
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+            </section>
+
+            {canShowDetails && (
+              <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
+                <h2
+                  className="text-xl font-medium text-[oklch(0.1_0_0)] mb-1"
+                  style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
+                >
+                  2. {tarot.topic} — 占卜所需資料
+                </h2>
+                <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">
+                  請填寫以下資料，讓老闆為您進行解析
+                </p>
+                {tarotDataFields()}
               </section>
-            ))}
+            )}
 
+            {canShowDetails &&
+              braceletSteps.map((item, index) => (
+                <section
+                  key={item.title}
+                  className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
+                >
+                  <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase mb-2">
+                    水晶手鍊偏好
+                  </p>
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <h2
+                      className="text-lg font-medium text-[oklch(0.1_0_0)]"
+                      style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
+                    >
+                      {index + 3}. {item.title}
+                    </h2>
+                    {!item.required &&
+                      item.title !== "完成！付完訂金後記得加入 LINE" && (
+                        <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
+                          選填
+                        </span>
+                      )}
+                  </div>
+                  {item.subtitle && (
+                    <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
+                      {item.subtitle}
+                    </p>
+                  )}
+                  {item.field}
+                </section>
+              ))}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Link href="/custom">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                返回方案頁
+              </button>
+            </Link>
+
+            {tarot.group !== "single_q" && (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={formSubmission.isSubmitting}
+                className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
+                style={{ backgroundColor: "oklch(0.65 0.12 290)" }}
+              >
+                <Check className="w-4 h-4" />
+                {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
+              </button>
+            )}
+          </div>
         </div>
-
-        <div className="flex items-center justify-between">
-          <Link href="/custom">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              返回方案頁
-            </button>
-          </Link>
-
-          {tarot.group !== "single_q" && (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={formSubmission.isSubmitting}
-              className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-              style={{ backgroundColor: "oklch(0.65 0.12 290)" }}
-            >
-              <Check className="w-4 h-4" />
-              {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}
-            </button>
-          )}
-        </div>
-      </div>
       </CustomFormAccessGate>
     </div>
   );

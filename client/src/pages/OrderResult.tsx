@@ -5,11 +5,23 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
-import { CheckCircle, Clock, XCircle, ArrowRight, Package, Banknote, Truck, Sparkles } from "lucide-react";
+import {
+  CheckCircle,
+  Clock,
+  XCircle,
+  ArrowRight,
+  Package,
+  Banknote,
+  Truck,
+  Sparkles,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
-import { CUSTOM_DEPOSIT_PRODUCT_IDS, getCustomFormPath } from "@/lib/customOrderingContent";
+import {
+  CUSTOM_DEPOSIT_PRODUCT_IDS,
+  getCustomFormPath,
+} from "@/lib/customOrderingContent";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +32,11 @@ import {
   RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS,
   getRecentCustomFormSubmissionKey,
 } from "@/lib/customFormSubmission";
-import { getSavedOrderAccess, saveOrderAccess, type SavedOrderAccess } from "@/lib/orderAccess";
+import {
+  getSavedOrderAccess,
+  saveOrderAccess,
+  type SavedOrderAccess,
+} from "@/lib/orderAccess";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -47,9 +63,16 @@ function getCustomConsultationStartMarker(item: CustomDepositItemInstance) {
   return `【客製需求開始：${item.productId}:${item.id}:${item.itemIndex}】`;
 }
 
-function hasCustomConsultationNote(customerNote: string | null | undefined, item: CustomDepositItemInstance) {
-  if (customerNote?.includes(getCustomConsultationStartMarker(item))) return true;
-  return item.itemIndex === 1 && Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`));
+function hasCustomConsultationNote(
+  customerNote: string | null | undefined,
+  item: CustomDepositItemInstance
+) {
+  if (customerNote?.includes(getCustomConsultationStartMarker(item)))
+    return true;
+  return (
+    item.itemIndex === 1 &&
+    Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`))
+  );
 }
 
 function wasCustomFormRecentlySubmitted(
@@ -76,7 +99,7 @@ function wasCustomFormRecentlySubmitted(
   }
 
   const now = Date.now();
-  return keys.some((key) => {
+  return keys.some(key => {
     const submittedAt = Number(sessionStorage.getItem(key) ?? "");
     if (!submittedAt) return false;
     if (now - submittedAt > RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS) {
@@ -87,15 +110,20 @@ function wasCustomFormRecentlySubmitted(
   });
 }
 
-function expandCustomDepositItemInstances(items: any[]): CustomDepositItemInstance[] {
+function expandCustomDepositItemInstances(
+  items: any[]
+): CustomDepositItemInstance[] {
   return items.flatMap((item: any) =>
-    Array.from({ length: Math.max(1, Number(item.quantity) || 1) }, (_, index) => ({
-      id: item.id,
-      productId: item.productId,
-      productName: item.productName,
-      itemIndex: index + 1,
-      quantity: Math.max(1, Number(item.quantity) || 1),
-    }))
+    Array.from(
+      { length: Math.max(1, Number(item.quantity) || 1) },
+      (_, index) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName,
+        itemIndex: index + 1,
+        quantity: Math.max(1, Number(item.quantity) || 1),
+      })
+    )
   );
 }
 
@@ -105,13 +133,20 @@ export default function OrderResult() {
   const search = useSearch();
   const paypalCaptureStarted = useRef(false);
   const [isCustomReminderOpen, setIsCustomReminderOpen] = useState(false);
-  const [dismissedCustomReminderOrderNo, setDismissedCustomReminderOrderNo] = useState("");
+  const [dismissedCustomReminderOrderNo, setDismissedCustomReminderOrderNo] =
+    useState("");
   const [orderAccess, setOrderAccess] = useState<SavedOrderAccess>(() =>
     getSavedOrderAccess(merchantTradeNo)
   );
   const [accessEmail, setAccessEmail] = useState("");
 
-  const { data: order, isLoading, isError, error, refetch } = trpc.order.getOrder.useQuery(
+  const {
+    data: order,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = trpc.order.getOrder.useQuery(
     {
       merchantTradeNo: merchantTradeNo ?? "",
       accessToken: orderAccess.accessToken,
@@ -128,7 +163,7 @@ export default function OrderResult() {
   }, [merchantTradeNo]);
 
   const capturePayPal = trpc.order.capturePayPal.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       refetch();
       if (merchantTradeNo) {
         window.history.replaceState({}, "", `/order/${merchantTradeNo}`);
@@ -137,7 +172,7 @@ export default function OrderResult() {
         toast.success("付款完成");
       }
     },
-    onError: (e) => {
+    onError: e => {
       paypalCaptureStarted.current = false;
       toast.error(e.message || "PayPal 扣款失敗");
     },
@@ -167,7 +202,10 @@ export default function OrderResult() {
       return {
         icon: <XCircle className="w-12 h-12 text-red-400" />,
         title: order.paymentStatus === "failed" ? "付款失敗" : "訂單已取消",
-        desc: order.paymentStatus === "failed" ? "付款未成功，請重新嘗試或選擇其他付款方式。" : "此訂單已取消。",
+        desc:
+          order.paymentStatus === "failed"
+            ? "付款未成功，請重新嘗試或選擇其他付款方式。"
+            : "此訂單已取消。",
         color: "text-red-600",
         bg: "bg-red-50",
       };
@@ -181,7 +219,10 @@ export default function OrderResult() {
         bg: "bg-blue-50",
       };
     }
-    if ((order.paymentStatus === "confirmed" || order.paymentStatus === "paid") && order.orderStatus === "deposit_paid") {
+    if (
+      (order.paymentStatus === "confirmed" || order.paymentStatus === "paid") &&
+      order.orderStatus === "deposit_paid"
+    ) {
       return {
         icon: <CheckCircle className="w-12 h-12 text-rose-500" />,
         title: "訂金付款成功",
@@ -267,10 +308,13 @@ export default function OrderResult() {
     ...((order as any)?.bankInfo ?? {}),
   };
   const customDepositItems =
-    order?.items?.filter((item: any) => CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)) ?? [];
-  const customDepositItemInstances = expandCustomDepositItemInstances(customDepositItems);
+    order?.items?.filter((item: any) =>
+      CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)
+    ) ?? [];
+  const customDepositItemInstances =
+    expandCustomDepositItemInstances(customDepositItems);
   const pendingCustomDepositItems = customDepositItemInstances.filter(
-    (item) =>
+    item =>
       !hasCustomConsultationNote(order?.customerNote, item) &&
       !wasCustomFormRecentlySubmitted(order?.merchantTradeNo, item)
   );
@@ -279,13 +323,23 @@ export default function OrderResult() {
     (order?.paymentStatus === "paid" ||
       order?.paymentStatus === "confirmed" ||
       order?.paymentStatus === "transfer_pending");
-  const shouldPromptForCustomForm = canFillCustomForm && pendingCustomDepositItems.length > 0;
+  const shouldPromptForCustomForm =
+    canFillCustomForm && pendingCustomDepositItems.length > 0;
 
   useEffect(() => {
     const orderNo = order?.merchantTradeNo ?? "";
-    if (!shouldPromptForCustomForm || !orderNo || dismissedCustomReminderOrderNo === orderNo) return;
+    if (
+      !shouldPromptForCustomForm ||
+      !orderNo ||
+      dismissedCustomReminderOrderNo === orderNo
+    )
+      return;
     setIsCustomReminderOpen(true);
-  }, [shouldPromptForCustomForm, dismissedCustomReminderOrderNo, order?.merchantTradeNo]);
+  }, [
+    shouldPromptForCustomForm,
+    dismissedCustomReminderOrderNo,
+    order?.merchantTradeNo,
+  ]);
 
   const handleCustomReminderOpenChange = (open: boolean) => {
     setIsCustomReminderOpen(open);
@@ -296,8 +350,10 @@ export default function OrderResult() {
 
   const getShippingMethodLabel = () => {
     if (!order) return "";
-    if (order.shippingMethod === "cvs_711") return `7-11 超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
-    if (order.shippingMethod === "cvs_family") return `全家超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
+    if (order.shippingMethod === "cvs_711")
+      return `7-11 超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
+    if (order.shippingMethod === "cvs_family")
+      return `全家超商取貨${order.cvsStoreName ? `（${order.cvsStoreName}）` : ""}`;
     if (order.shippingMethod === "home") {
       const addr = order.shippingAddress?.replace(/\n/g, " ") ?? "";
       return `宅配${addr ? `（${addr}）` : ""}`;
@@ -310,7 +366,9 @@ export default function OrderResult() {
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-body text-[oklch(0.5_0_0)]">查詢訂單中...</p>
+          <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+            查詢訂單中...
+          </p>
         </div>
       </div>
     );
@@ -321,17 +379,23 @@ export default function OrderResult() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <XCircle className="w-12 h-12 text-red-400 mb-4" />
-        <p className="text-xl mb-2" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+        <p
+          className="text-xl mb-2"
+          style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
+        >
           {requiresVerification ? "驗證訪客訂單" : "查詢訂單失敗"}
         </p>
         <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
           訂單編號：{merchantTradeNo}
-          <br />{requiresVerification ? "請輸入建立訂單時使用的 Email。" : "伺服器暫時無法取得訂單資訊，請稍後重試。"}
+          <br />
+          {requiresVerification
+            ? "請輸入建立訂單時使用的 Email。"
+            : "伺服器暫時無法取得訂單資訊，請稍後重試。"}
         </p>
         {requiresVerification && (
           <form
             className="w-full max-w-sm mb-6"
-            onSubmit={(event) => {
+            onSubmit={event => {
               event.preventDefault();
               const buyerEmail = accessEmail.trim();
               if (!buyerEmail || !merchantTradeNo) return;
@@ -343,15 +407,21 @@ export default function OrderResult() {
               type="email"
               required
               value={accessEmail}
-              onChange={(event) => setAccessEmail(event.target.value)}
+              onChange={event => setAccessEmail(event.target.value)}
               placeholder="訂購 Email"
               className="w-full border border-black/20 px-4 py-3 mb-3"
             />
-            <button className="btn-primary w-full" type="submit">驗證並查看訂單</button>
+            <button className="btn-primary w-full" type="submit">
+              驗證並查看訂單
+            </button>
           </form>
         )}
         <div className="flex gap-3">
-          {!requiresVerification && <button className="btn-primary" onClick={() => refetch()}>重新查詢</button>}
+          {!requiresVerification && (
+            <button className="btn-primary" onClick={() => refetch()}>
+              重新查詢
+            </button>
+          )}
           <button className="btn-outline" onClick={() => setLocation("/")}>
             返回首頁
           </button>
@@ -364,10 +434,15 @@ export default function OrderResult() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <XCircle className="w-12 h-12 text-red-400 mb-4" />
-        <p className="text-xl mb-2" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+        <p
+          className="text-xl mb-2"
+          style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
+        >
           找不到訂單
         </p>
-        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">訂單編號：{merchantTradeNo}</p>
+        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
+          訂單編號：{merchantTradeNo}
+        </p>
         <button className="btn-primary" onClick={() => setLocation("/")}>
           返回首頁
         </button>
@@ -382,7 +457,9 @@ export default function OrderResult() {
       {/* Header */}
       <div className="border-b border-[oklch(0.93_0_0)] py-4 px-4 sm:px-8">
         <div className="max-w-2xl mx-auto">
-          <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">訂單確認</span>
+          <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">
+            訂單確認
+          </span>
         </div>
       </div>
 
@@ -401,15 +478,21 @@ export default function OrderResult() {
           >
             {statusConfig.title}
           </h1>
-          <p className="text-sm font-body text-[oklch(0.5_0_0)]">{statusConfig.desc}</p>
-          {(order.paymentStatus === "pending" || order.paymentStatus === "transfer_pending") && (
+          <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+            {statusConfig.desc}
+          </p>
+          {(order.paymentStatus === "pending" ||
+            order.paymentStatus === "transfer_pending") && (
             <p className="text-xs font-body text-[oklch(0.6_0_0)] mt-3">
               頁面每 5 秒自動更新訂單狀態
             </p>
           )}
         </div>
 
-        <Dialog open={isCustomReminderOpen && shouldPromptForCustomForm} onOpenChange={handleCustomReminderOpenChange}>
+        <Dialog
+          open={isCustomReminderOpen && shouldPromptForCustomForm}
+          onOpenChange={handleCustomReminderOpenChange}
+        >
           <DialogContent className="max-w-2xl border border-rose-100 bg-[oklch(0.995_0.012_20)] p-0 shadow-2xl shadow-black/12">
             <div className="border-b border-rose-100 px-6 pb-5 pt-7 sm:px-8 sm:pt-8">
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-700 shadow-sm ring-1 ring-rose-100">
@@ -428,7 +511,7 @@ export default function OrderResult() {
               </div>
             </div>
             <div className="space-y-3 px-6 py-5 sm:px-8 sm:py-6">
-              {pendingCustomDepositItems.map((item) => {
+              {pendingCustomDepositItems.map(item => {
                 const customFormPath = getCustomFormPath(item.productId);
                 if (!customFormPath) return null;
                 return (
@@ -446,7 +529,8 @@ export default function OrderResult() {
                         填寫客製需求
                       </span>
                       <span className="block text-sm font-body font-medium leading-relaxed text-[oklch(0.16_0_0)]">
-                        {item.productName}{item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
+                        {item.productName}
+                        {item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
                       </span>
                     </span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-[oklch(0.4_0_0)] transition-transform group-hover:translate-x-1" />
@@ -458,46 +542,59 @@ export default function OrderResult() {
         </Dialog>
 
         {/* 轉帳資訊 */}
-        {order.paymentMethod === "atm" && order.paymentStatus === "transfer_pending" && (
-          <div className="border border-blue-200 bg-blue-50 p-5 mb-6">
-            <div className="flex items-start gap-3">
-              <Banknote className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-              <div className="w-full">
-                <p className="text-sm font-body font-medium text-blue-800 mb-3">轉帳資訊</p>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm font-body">
-                    <span className="text-blue-700">銀行</span>
-                    <span className="font-medium text-blue-900">{bankInfo.bankName}</span>
-                  </div>
-                  {bankInfo.accountName && (
+        {order.paymentMethod === "atm" &&
+          order.paymentStatus === "transfer_pending" && (
+            <div className="border border-blue-200 bg-blue-50 p-5 mb-6">
+              <div className="flex items-start gap-3">
+                <Banknote className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="w-full">
+                  <p className="text-sm font-body font-medium text-blue-800 mb-3">
+                    轉帳資訊
+                  </p>
+                  <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm font-body">
-                      <span className="text-blue-700">戶名</span>
-                      <span className="font-medium text-blue-900">{bankInfo.accountName}</span>
+                      <span className="text-blue-700">銀行</span>
+                      <span className="font-medium text-blue-900">
+                        {bankInfo.bankName}
+                      </span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm font-body">
-                    <span className="text-blue-700">帳號</span>
-                    <span className="font-medium text-blue-900 tracking-wider">{bankInfo.accountNumber}</span>
+                    {bankInfo.accountName && (
+                      <div className="flex justify-between text-sm font-body">
+                        <span className="text-blue-700">戶名</span>
+                        <span className="font-medium text-blue-900">
+                          {bankInfo.accountName}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-body">
+                      <span className="text-blue-700">帳號</span>
+                      <span className="font-medium text-blue-900 tracking-wider">
+                        {bankInfo.accountNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm font-body border-t border-blue-200 pt-2 mt-2">
+                      <span className="text-blue-700">轉帳金額</span>
+                      <span className="font-bold text-blue-900">
+                        NT$ {order.totalAmount.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm font-body border-t border-blue-200 pt-2 mt-2">
-                    <span className="text-blue-700">轉帳金額</span>
-                    <span className="font-bold text-blue-900">NT$ {order.totalAmount.toLocaleString()}</span>
-                  </div>
-                </div>
 
-                <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
-                  {order.transferLastFive ? (
-                    <>
-                      已收到您的匯款末五碼：<strong>{order.transferLastFive}</strong>，老闆確認後將更新訂單狀態。
-                    </>
-                  ) : (
-                    "此訂單正在等待轉帳確認，若需要補充匯款資訊請聯繫客服。"
-                  )}
+                  <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
+                    {order.transferLastFive ? (
+                      <>
+                        已收到您的匯款末五碼：
+                        <strong>{order.transferLastFive}</strong>
+                        ，老闆確認後將更新訂單狀態。
+                      </>
+                    ) : (
+                      "此訂單正在等待轉帳確認，若需要補充匯款資訊請聯繫客服。"
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Order Info */}
         <div className="border border-[oklch(0.93_0_0)] p-6 mb-6">
@@ -512,30 +609,45 @@ export default function OrderResult() {
               {
                 label: "付款狀態",
                 value:
-                  order.paymentStatus === "paid" || order.paymentStatus === "confirmed"
+                  order.paymentStatus === "paid" ||
+                  order.paymentStatus === "confirmed"
                     ? "✅ 已付款"
                     : order.paymentStatus === "transfer_pending"
-                    ? "⏳ 轉帳待確認"
-                    : order.paymentStatus === "pending"
-                    ? "⏳ 待付款"
-                    : order.paymentStatus === "failed"
-                    ? "❌ 付款失敗"
-                    : "已取消",
+                      ? "⏳ 轉帳待確認"
+                      : order.paymentStatus === "pending"
+                        ? "⏳ 待付款"
+                        : order.paymentStatus === "failed"
+                          ? "❌ 付款失敗"
+                          : "已取消",
               },
               {
                 label: "訂單狀態",
-                value: ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus,
+                value:
+                  ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus,
               },
-              { label: "訂單金額", value: `NT$ ${order.totalAmount.toLocaleString()}` },
+              {
+                label: "訂單金額",
+                value: `NT$ ${order.totalAmount.toLocaleString()}`,
+              },
               { label: "購買人", value: order.buyerName },
               { label: "Email", value: order.buyerEmail },
               { label: "手機", value: order.buyerPhone },
-              ...(order.isPreorder ? [{ label: "備註", value: "預購商品" }] : []),
-              ...(order.paidAt
-                ? [{ label: "付款時間", value: new Date(order.paidAt).toLocaleString("zh-TW") }]
+              ...(order.isPreorder
+                ? [{ label: "備註", value: "預購商品" }]
                 : []),
-            ].map((row) => (
-              <div key={row.label} className="flex justify-between text-sm font-body">
+              ...(order.paidAt
+                ? [
+                    {
+                      label: "付款時間",
+                      value: new Date(order.paidAt).toLocaleString("zh-TW"),
+                    },
+                  ]
+                : []),
+            ].map(row => (
+              <div
+                key={row.label}
+                className="flex justify-between text-sm font-body"
+              >
                 <span className="text-[oklch(0.5_0_0)]">{row.label}</span>
                 <span className="text-[oklch(0.1_0_0)] font-medium text-right max-w-[60%] break-all">
                   {row.value}
@@ -553,20 +665,35 @@ export default function OrderResult() {
             </h2>
             <div className="space-y-3">
               {order.items.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center text-sm font-body">
+                <div
+                  key={item.id}
+                  className="flex justify-between items-center text-sm font-body"
+                >
                   <div className="flex items-center gap-3">
                     {item.productImage && (
-                      <img src={item.productImage} alt={item.productName} className="w-10 h-10 object-cover" />
+                      <img
+                        src={item.productImage}
+                        alt={item.productName}
+                        className="w-10 h-10 object-cover"
+                      />
                     )}
                     <div>
                       <p className="text-[oklch(0.1_0_0)]">
                         {item.productName}
-                        {item.isPreorder && <span className="text-[oklch(0.58_0_0)]">（預購）</span>}
+                        {item.isPreorder && (
+                          <span className="text-[oklch(0.58_0_0)]">
+                            （預購）
+                          </span>
+                        )}
                       </p>
-                      <p className="text-xs text-[oklch(0.5_0_0)]">x {item.quantity}</p>
+                      <p className="text-xs text-[oklch(0.5_0_0)]">
+                        x {item.quantity}
+                      </p>
                     </div>
                   </div>
-                  <p className="font-medium">NT$ {item.subtotal.toLocaleString()}</p>
+                  <p className="font-medium">
+                    NT$ {item.subtotal.toLocaleString()}
+                  </p>
                 </div>
               ))}
             </div>
@@ -592,7 +719,9 @@ export default function OrderResult() {
         {/* Sandbox Note */}
         {order.paymentMethod === "credit" && order.paymentSandbox && (
           <div className="mt-8 p-4 bg-[oklch(0.97_0_0)] border border-[oklch(0.93_0_0)]">
-            <p className="text-xs font-body text-[oklch(0.5_0_0)] font-medium mb-1">🧪 沙盒測試環境</p>
+            <p className="text-xs font-body text-[oklch(0.5_0_0)] font-medium mb-1">
+              🧪 沙盒測試環境
+            </p>
             <p className="text-xs font-body text-[oklch(0.6_0_0)]">
               目前為綠界沙盒測試模式，所有交易均為模擬，不會產生真實扣款。
               正式上線前請替換為正式商店憑證。

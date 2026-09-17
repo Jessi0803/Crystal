@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useLocation } from "wouter";
-import { CheckCircle, CreditCard, Banknote, XCircle, Home, Store, MapPin, Globe, ImageUp, X } from "lucide-react";
+import {
+  CheckCircle,
+  CreditCard,
+  Banknote,
+  XCircle,
+  Home,
+  Store,
+  MapPin,
+  Globe,
+  ImageUp,
+  X,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import ClearQuartzAddonOption, { useClearQuartzChipsProduct } from "@/components/ClearQuartzAddonOption";
+import ClearQuartzAddonOption, {
+  useClearQuartzChipsProduct,
+} from "@/components/ClearQuartzAddonOption";
 import {
   AU_STATE_OPTIONS,
   OVERSEAS_COUNTRY_EN,
@@ -16,7 +29,11 @@ import {
   OVERSEAS_SHIP_COUNTRY_OPTIONS,
   isOverseasShipCountryCode,
 } from "@shared/overseasShipping";
-import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES, type CheckoutFeeItem } from "@shared/checkoutFees";
+import {
+  calcCheckoutFees,
+  OVERSEAS_SHIPPING_FEES,
+  type CheckoutFeeItem,
+} from "@shared/checkoutFees";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 
 type PaymentMethod = "credit" | "atm";
@@ -27,7 +44,9 @@ type CheckoutRegion = "domestic" | "overseas";
 // 不支援 popup + window.close，必須整頁跳轉）。
 const BALANCE_FORM_KEY = "balance_form_state";
 
-function compressTransferReceipt(file: File): Promise<{ dataBase64: string; contentType: string }> {
+function compressTransferReceipt(
+  file: File
+): Promise<{ dataBase64: string; contentType: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -49,7 +68,10 @@ function compressTransferReceipt(file: File): Promise<{ dataBase64: string; cont
       canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-      resolve({ dataBase64: dataUrl.split(",")[1] ?? "", contentType: "image/jpeg" });
+      resolve({
+        dataBase64: dataUrl.split(",")[1] ?? "",
+        contentType: "image/jpeg",
+      });
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -63,7 +85,8 @@ export default function BalancePayment() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
-  const [checkoutRegion, setCheckoutRegion] = useState<CheckoutRegion>("domestic");
+  const [checkoutRegion, setCheckoutRegion] =
+    useState<CheckoutRegion>("domestic");
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("home");
   const [includeClearQuartzChips, setIncludeClearQuartzChips] = useState(false);
   const [form, setForm] = useState({
@@ -79,7 +102,11 @@ export default function BalancePayment() {
     intlState: "",
     intlPostalCode: "",
   });
-  const [cvsStore, setCvsStore] = useState<{ storeId: string; storeName: string; cvsType: string } | null>(null);
+  const [cvsStore, setCvsStore] = useState<{
+    storeId: string;
+    storeName: string;
+    cvsType: string;
+  } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [transferCode, setTransferCode] = useState("");
   const [transferReceipt, setTransferReceipt] = useState<{
@@ -104,11 +131,15 @@ export default function BalancePayment() {
   useEffect(() => {
     const buyerPhone = data?.order.buyerPhone?.trim();
     if (!buyerPhone) return;
-    setForm((current) => current.receiverPhone ? current : { ...current, receiverPhone: buyerPhone });
+    setForm(current =>
+      current.receiverPhone
+        ? current
+        : { ...current, receiverPhone: buyerPhone }
+    );
   }, [data?.order.buyerPhone]);
 
   const startCheckout = trpc.order.getBalancePaymentCheckout.useMutation({
-    onSuccess: (result) => {
+    onSuccess: result => {
       if (result.kind === "no_payment") {
         toast.success("配送資料已確認，訂單可進入出貨流程");
         refetch();
@@ -132,7 +163,7 @@ export default function BalancePayment() {
       document.body.appendChild(hiddenForm);
       hiddenForm.submit();
     },
-    onError: (err) => toast.error(err.message || "建立尾款付款失敗"),
+    onError: err => toast.error(err.message || "建立尾款付款失敗"),
   });
 
   const submitCode = trpc.order.submitBalanceTransferCode.useMutation({
@@ -141,22 +172,24 @@ export default function BalancePayment() {
       toast.success("已送出匯款末五碼，老闆確認後將更新狀態");
       refetch();
     },
-    onError: (err) => toast.error(err.message || "送出失敗，請重試"),
+    onError: err => toast.error(err.message || "送出失敗，請重試"),
   });
 
-  const applyStore = useRef((payload: { storeId?: string; storeName?: string; cvsType?: string }) => {
-    if (!payload?.storeId && !payload?.storeName) return;
-    setCvsStore({
-      storeId: payload.storeId ?? "",
-      storeName: payload.storeName ?? "",
-      cvsType: payload.cvsType ?? "",
-    });
-    setShippingMethod("cvs_711");
-    toast.success(`已選擇門市：${payload.storeName ?? ""}`);
-    if (cvsWindowRef.current && !cvsWindowRef.current.closed) {
-      cvsWindowRef.current.close();
+  const applyStore = useRef(
+    (payload: { storeId?: string; storeName?: string; cvsType?: string }) => {
+      if (!payload?.storeId && !payload?.storeName) return;
+      setCvsStore({
+        storeId: payload.storeId ?? "",
+        storeName: payload.storeName ?? "",
+        cvsType: payload.cvsType ?? "",
+      });
+      setShippingMethod("cvs_711");
+      toast.success(`已選擇門市：${payload.storeName ?? ""}`);
+      if (cvsWindowRef.current && !cvsWindowRef.current.closed) {
+        cvsWindowRef.current.close();
+      }
     }
-  }).current;
+  ).current;
 
   // 同分頁跳轉回來：綠界選完門市後 cvs-map-reply 會 302 導回本頁並把門市資訊帶在
   // query string。不依賴 popup / opener / window.close，全裝置通用。
@@ -176,7 +209,7 @@ export default function BalancePayment() {
         if (typeof saved.includeClearQuartzChips === "boolean") {
           setIncludeClearQuartzChips(saved.includeClearQuartzChips);
         }
-        if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
+        if (saved.form) setForm(f => ({ ...f, ...saved.form }));
       }
     } catch {
       /* ignore */
@@ -200,7 +233,7 @@ export default function BalancePayment() {
     let channel: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       channel = new BroadcastChannel("cvs_store_selected");
-      channel.onmessage = (event) => {
+      channel.onmessage = event => {
         if (event.data?.type === "CVS_STORE_SELECTED") applyStore(event.data);
       };
     }
@@ -218,7 +251,7 @@ export default function BalancePayment() {
     }
     if (!transferReceipt) {
       toast.error("請上傳轉帳成功截圖");
-      setErrors((prev) => ({ ...prev, transferReceipt: "請上傳轉帳成功截圖" }));
+      setErrors(prev => ({ ...prev, transferReceipt: "請上傳轉帳成功截圖" }));
       return;
     }
     submitCode.mutate({
@@ -230,7 +263,9 @@ export default function BalancePayment() {
     });
   };
 
-  const handleTransferReceiptChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleTransferReceiptChange = async (
+    e: ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -245,7 +280,7 @@ export default function BalancePayment() {
     }
     try {
       const compressed = await compressTransferReceipt(file);
-      setTransferReceipt((previous) => {
+      setTransferReceipt(previous => {
         if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl);
         return {
           ...compressed,
@@ -253,33 +288,43 @@ export default function BalancePayment() {
           previewUrl: URL.createObjectURL(file),
         };
       });
-      setErrors((prev) => {
+      setErrors(prev => {
         const next = { ...prev };
         delete next.transferReceipt;
         return next;
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "截圖讀取失敗，請重新選擇圖片");
+      toast.error(
+        err instanceof Error ? err.message : "截圖讀取失敗，請重新選擇圖片"
+      );
       e.target.value = "";
     }
   };
 
   const clearTransferReceipt = () => {
-    if (transferReceipt?.previewUrl) URL.revokeObjectURL(transferReceipt.previewUrl);
+    if (transferReceipt?.previewUrl)
+      URL.revokeObjectURL(transferReceipt.previewUrl);
     setTransferReceipt(null);
-    if (transferReceiptInputRef.current) transferReceiptInputRef.current.value = "";
+    if (transferReceiptInputRef.current)
+      transferReceiptInputRef.current.value = "";
   };
 
-  useEffect(() => () => {
-    if (transferReceipt?.previewUrl) URL.revokeObjectURL(transferReceipt.previewUrl);
-  }, [transferReceipt?.previewUrl]);
+  useEffect(
+    () => () => {
+      if (transferReceipt?.previewUrl)
+        URL.revokeObjectURL(transferReceipt.previewUrl);
+    },
+    [transferReceipt?.previewUrl]
+  );
 
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-body text-[oklch(0.5_0_0)]">載入尾款資訊中...</p>
+          <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+            載入尾款資訊中...
+          </p>
         </div>
       </div>
     );
@@ -289,11 +334,19 @@ export default function BalancePayment() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <XCircle className="w-12 h-12 text-red-400 mb-4" />
-        <p className="text-xl mb-2" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+        <p
+          className="text-xl mb-2"
+          style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
+        >
           找不到尾款連結
         </p>
-        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">請確認連結是否正確，或聯繫客服協助。</p>
-        <button className="btn-primary" onClick={() => setLocation("/products")}>
+        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
+          請確認連結是否正確，或聯繫客服協助。
+        </p>
+        <button
+          className="btn-primary"
+          onClick={() => setLocation("/products")}
+        >
           返回商品頁
         </button>
       </div>
@@ -303,9 +356,15 @@ export default function BalancePayment() {
   const isPaid = data.paymentStatus === "paid";
   const isTransferPending = data.paymentStatus === "transfer_pending";
   const isCancelled = data.paymentStatus === "cancelled";
-  const latestCreditFailed = data.latestAttempt?.paymentStatus === "failed" || data.paymentStatus === "failed";
-  const showPaymentChoice = (data.paymentStatus === "pending" || data.paymentStatus === "failed") && !startCheckout.isSuccess;
-  const overseasCode = isOverseasShipCountryCode(form.intlCountry) ? form.intlCountry : null;
+  const latestCreditFailed =
+    data.latestAttempt?.paymentStatus === "failed" ||
+    data.paymentStatus === "failed";
+  const showPaymentChoice =
+    (data.paymentStatus === "pending" || data.paymentStatus === "failed") &&
+    !startCheckout.isSuccess;
+  const overseasCode = isOverseasShipCountryCode(form.intlCountry)
+    ? form.intlCountry
+    : null;
   const balanceItems: CheckoutFeeItem[] = [
     {
       id: "custom-balance-payment",
@@ -322,7 +381,8 @@ export default function BalancePayment() {
       name: clearQuartzChipsProduct.name,
       price: clearQuartzChipsProduct.price,
       quantity: 1,
-      twoItemFreeShippingEligible: clearQuartzChipsProduct.twoItemFreeShippingEligible,
+      twoItemFreeShippingEligible:
+        clearQuartzChipsProduct.twoItemFreeShippingEligible,
     });
   }
   const feeSummary = calcCheckoutFees({
@@ -332,8 +392,12 @@ export default function BalancePayment() {
     paymentMethod,
     overseasCountry: overseasCode,
     buyerEmail: data.order.buyerEmail,
-    forceFreeShipping: data.order.freeShippingOverride || data.originalDomesticFreeShipping,
-    forcePaidShipping: Boolean((data as any).orderMergeInfo && !(data.order.freeShippingOverride || data.originalDomesticFreeShipping)),
+    forceFreeShipping:
+      data.order.freeShippingOverride || data.originalDomesticFreeShipping,
+    forcePaidShipping: Boolean(
+      (data as any).orderMergeInfo &&
+        !(data.order.freeShippingOverride || data.originalDomesticFreeShipping)
+    ),
     chargeShippingWhenSubtotalZero: data.amount === 0,
   });
   const payableAmount = feeSummary.total;
@@ -348,16 +412,21 @@ export default function BalancePayment() {
   const receiverPhoneField = (
     <div className="mb-5">
       <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
-        {checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"} <span className="text-red-400">*</span>
+        {checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"}{" "}
+        <span className="text-red-400">*</span>
       </label>
       <input
         type="tel"
-        placeholder={checkoutRegion === "domestic" ? "09xxxxxxxx" : "含國碼或當地號碼"}
+        placeholder={
+          checkoutRegion === "domestic" ? "09xxxxxxxx" : "含國碼或當地號碼"
+        }
         value={form.receiverPhone}
-        onChange={(e) => setForm((f) => ({ ...f, receiverPhone: e.target.value }))}
+        onChange={e => setForm(f => ({ ...f, receiverPhone: e.target.value }))}
         className={inputClass("receiverPhone")}
       />
-      {errors.receiverPhone && <p className="text-xs text-red-400 mt-1">{errors.receiverPhone}</p>}
+      {errors.receiverPhone && (
+        <p className="text-xs text-red-400 mt-1">{errors.receiverPhone}</p>
+      )}
     </div>
   );
 
@@ -377,15 +446,20 @@ export default function BalancePayment() {
       if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
         nextErrors.receiverPhone = "請輸入有效的手機號碼（09xxxxxxxx）";
       }
-      if (shippingMethod === "cvs_711" && !cvsStore) nextErrors.cvsStore = "請選擇超商門市";
+      if (shippingMethod === "cvs_711" && !cvsStore)
+        nextErrors.cvsStore = "請選擇超商門市";
       if (shippingMethod === "home") {
-        if (!form.shippingZip.trim() || !/^\d{3,6}$/.test(form.shippingZip)) nextErrors.shippingZip = "請輸入有效郵遞區號";
+        if (!form.shippingZip.trim() || !/^\d{3,6}$/.test(form.shippingZip))
+          nextErrors.shippingZip = "請輸入有效郵遞區號";
         if (!form.shippingCity.trim()) nextErrors.shippingCity = "請輸入縣市";
-        if (!form.shippingDistrict.trim()) nextErrors.shippingDistrict = "請輸入鄉鎮市區";
-        if (!form.shippingDetail.trim()) nextErrors.shippingDetail = "請輸入詳細地址（路名門牌）";
+        if (!form.shippingDistrict.trim())
+          nextErrors.shippingDistrict = "請輸入鄉鎮市區";
+        if (!form.shippingDetail.trim())
+          nextErrors.shippingDetail = "請輸入詳細地址（路名門牌）";
       }
     } else {
-      if (receiverPhone.length < 8) nextErrors.receiverPhone = "請輸入聯絡電話（至少 8 碼）";
+      if (receiverPhone.length < 8)
+        nextErrors.receiverPhone = "請輸入聯絡電話（至少 8 碼）";
       for (const it of validateOverseasAddress({
         intlCountry: form.intlCountry,
         intlAddrLine1: form.intlAddrLine1,
@@ -407,7 +481,13 @@ export default function BalancePayment() {
     try {
       sessionStorage.setItem(
         BALANCE_FORM_KEY,
-        JSON.stringify({ paymentMethod, checkoutRegion, shippingMethod, includeClearQuartzChips, form })
+        JSON.stringify({
+          paymentMethod,
+          checkoutRegion,
+          shippingMethod,
+          includeClearQuartzChips,
+          form,
+        })
       );
     } catch {
       /* 暫存失敗仍可繼續 */
@@ -424,24 +504,32 @@ export default function BalancePayment() {
     startCheckout.mutate({
       merchantTradeNo: data.merchantTradeNo,
       paymentMethod,
-      includeClearQuartzChips: includeClearQuartzChips && hasLiveClearQuartzChipsProduct,
+      includeClearQuartzChips:
+        includeClearQuartzChips && hasLiveClearQuartzChipsProduct,
       checkoutRegion,
       receiverPhone: form.receiverPhone,
       shippingMethod: checkoutRegion === "overseas" ? "home" : shippingMethod,
       cvsStoreId: checkoutRegion === "domestic" ? cvsStore?.storeId : undefined,
-      cvsStoreName: checkoutRegion === "domestic" ? cvsStore?.storeName : undefined,
+      cvsStoreName:
+        checkoutRegion === "domestic" ? cvsStore?.storeName : undefined,
       cvsType: checkoutRegion === "domestic" ? cvsStore?.cvsType : undefined,
       shippingAddress:
         checkoutRegion === "domestic" && shippingMethod === "home"
           ? `${form.shippingCity}${form.shippingDistrict}${form.shippingDetail}`
           : undefined,
-      receiverZipCode: checkoutRegion === "domestic" && shippingMethod === "home" ? form.shippingZip : undefined,
+      receiverZipCode:
+        checkoutRegion === "domestic" && shippingMethod === "home"
+          ? form.shippingZip
+          : undefined,
       intlCountry: checkoutRegion === "overseas" ? form.intlCountry : undefined,
-      intlAddrLine1: checkoutRegion === "overseas" ? form.intlAddrLine1 : undefined,
-      intlAddrLine2: checkoutRegion === "overseas" ? form.intlAddrLine2 : undefined,
+      intlAddrLine1:
+        checkoutRegion === "overseas" ? form.intlAddrLine1 : undefined,
+      intlAddrLine2:
+        checkoutRegion === "overseas" ? form.intlAddrLine2 : undefined,
       intlCity: checkoutRegion === "overseas" ? form.intlCity : undefined,
       intlState: checkoutRegion === "overseas" ? form.intlState : undefined,
-      intlPostalCode: checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
+      intlPostalCode:
+        checkoutRegion === "overseas" ? form.intlPostalCode : undefined,
       origin: window.location.origin,
     });
   };
@@ -461,14 +549,26 @@ export default function BalancePayment() {
             ) : (
               <CreditCard className="w-14 h-14 text-rose-500 mx-auto mb-4" />
             )}
-            <p className="text-xs tracking-[0.16em] text-[oklch(0.5_0_0)] font-body mb-2">客製化尾款</p>
-            <h1 className="text-2xl text-[oklch(0.12_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+            <p className="text-xs tracking-[0.16em] text-[oklch(0.5_0_0)] font-body mb-2">
+              客製化尾款
+            </p>
+            <h1
+              className="text-2xl text-[oklch(0.12_0_0)]"
+              style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
+            >
               {isPaid
-                ? data.totalAmount === 0 ? "配送資料已確認" : "尾款已完成付款"
-                : isTransferPending ? "等待轉帳確認"
-                : isCancelled ? "尾款連結已失效"
-                : latestCreditFailed ? "本次信用卡付款未完成"
-                : data.amount === 0 ? "請確認配送資料" : "請完成客製化尾款"}
+                ? data.totalAmount === 0
+                  ? "配送資料已確認"
+                  : "尾款已完成付款"
+                : isTransferPending
+                  ? "等待轉帳確認"
+                  : isCancelled
+                    ? "尾款連結已失效"
+                    : latestCreditFailed
+                      ? "本次信用卡付款未完成"
+                      : data.amount === 0
+                        ? "請確認配送資料"
+                        : "請完成客製化尾款"}
             </h1>
             <p className="text-sm font-body text-[oklch(0.5_0_0)] mt-3">
               {isPaid
@@ -476,12 +576,12 @@ export default function BalancePayment() {
                   ? "已完成配送資料確認，訂單將進入出貨流程。"
                   : "感謝您的付款，訂單已轉為已付款並會進入出貨流程。"
                 : isTransferPending
-                ? "老闆確認收款後將更新訂單狀態，請耐心等候。"
-                : isCancelled
-                ? "此連結已取消，如仍需付款請聯繫客服。"
-                : latestCreditFailed
-                ? "您的尾款尚未扣款，可使用原連結重新嘗試信用卡，或改用 ATM 轉帳。"
-                : "這是老闆為您的客製化訂單產生的尾款付款連結。"}
+                  ? "老闆確認收款後將更新訂單狀態，請耐心等候。"
+                  : isCancelled
+                    ? "此連結已取消，如仍需付款請聯繫客服。"
+                    : latestCreditFailed
+                      ? "您的尾款尚未扣款，可使用原連結重新嘗試信用卡，或改用 ATM 轉帳。"
+                      : "這是老闆為您的客製化訂單產生的尾款付款連結。"}
             </p>
           </div>
 
@@ -489,15 +589,21 @@ export default function BalancePayment() {
           <div className="space-y-3 border border-[oklch(0.93_0_0)] bg-[oklch(0.99_0_0)] p-5 mb-6">
             <div className="flex justify-between gap-4 text-sm font-body">
               <span className="text-[oklch(0.5_0_0)]">原始訂單編號</span>
-              <span className="text-[oklch(0.12_0_0)] font-mono">{data.order.merchantTradeNo}</span>
+              <span className="text-[oklch(0.12_0_0)] font-mono">
+                {data.order.merchantTradeNo}
+              </span>
             </div>
             <div className="flex justify-between gap-4 text-sm font-body">
               <span className="text-[oklch(0.5_0_0)]">顧客姓名</span>
-              <span className="text-[oklch(0.12_0_0)]">{data.order.buyerName}</span>
+              <span className="text-[oklch(0.12_0_0)]">
+                {data.order.buyerName}
+              </span>
             </div>
             <div className="flex justify-between gap-4 text-sm font-body">
               <span className="text-[oklch(0.5_0_0)]">尾款小計</span>
-              <span className="text-[oklch(0.12_0_0)] font-medium">NT$ {data.amount.toLocaleString()}</span>
+              <span className="text-[oklch(0.12_0_0)] font-medium">
+                NT$ {data.amount.toLocaleString()}
+              </span>
             </div>
             {showPaymentChoice && (
               <div className="border-t border-[oklch(0.9_0_0)] pt-3">
@@ -511,41 +617,64 @@ export default function BalancePayment() {
             )}
             {!showPaymentChoice && data.clearQuartzChipsItem && (
               <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
-                <span className="text-[oklch(0.5_0_0)]">{data.clearQuartzChipsItem.productName}</span>
-                <span className="text-[oklch(0.12_0_0)]">NT$ {data.clearQuartzChipsItem.subtotal.toLocaleString()}</span>
+                <span className="text-[oklch(0.5_0_0)]">
+                  {data.clearQuartzChipsItem.productName}
+                </span>
+                <span className="text-[oklch(0.12_0_0)]">
+                  NT$ {data.clearQuartzChipsItem.subtotal.toLocaleString()}
+                </span>
               </div>
             )}
             {showPaymentChoice && (
               <>
                 {includeClearQuartzChips && hasLiveClearQuartzChipsProduct && (
                   <div className="flex justify-between gap-4 text-sm font-body">
-                    <span className="text-[oklch(0.5_0_0)]">加購白水晶碎石</span>
-                    <span className="text-[oklch(0.12_0_0)]">NT$ {clearQuartzChipsProduct.price.toLocaleString()}</span>
+                    <span className="text-[oklch(0.5_0_0)]">
+                      加購白水晶碎石
+                    </span>
+                    <span className="text-[oklch(0.12_0_0)]">
+                      NT$ {clearQuartzChipsProduct.price.toLocaleString()}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between gap-4 text-sm font-body">
                   <span className="text-[oklch(0.5_0_0)]">運費</span>
-                  <span className="text-[oklch(0.12_0_0)]">NT$ {feeSummary.shippingFee.toLocaleString()}</span>
+                  <span className="text-[oklch(0.12_0_0)]">
+                    NT$ {feeSummary.shippingFee.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
-                  <span className="text-[oklch(0.12_0_0)] font-medium">應付總額</span>
-                  <span className="text-[oklch(0.12_0_0)] font-semibold">NT$ {payableAmount.toLocaleString()}</span>
+                  <span className="text-[oklch(0.12_0_0)] font-medium">
+                    應付總額
+                  </span>
+                  <span className="text-[oklch(0.12_0_0)] font-semibold">
+                    NT$ {payableAmount.toLocaleString()}
+                  </span>
                 </div>
               </>
             )}
             <div className="flex justify-between gap-4 text-sm font-body">
               <span className="text-[oklch(0.5_0_0)]">目前狀態</span>
-              <span className={
-                isPaid ? "text-green-600 font-medium"
-                : isTransferPending ? "text-blue-600 font-medium"
-                : latestCreditFailed ? "text-amber-700 font-medium"
-                : "text-rose-600 font-medium"
-              }>
-                {isPaid ? "已付款"
-                  : isTransferPending ? "⏳ 轉帳待確認"
-                  : latestCreditFailed ? "待重新付款"
-                  : data.paymentStatus === "cancelled" ? "已取消"
-                  : "待付款"}
+              <span
+                className={
+                  isPaid
+                    ? "text-green-600 font-medium"
+                    : isTransferPending
+                      ? "text-blue-600 font-medium"
+                      : latestCreditFailed
+                        ? "text-amber-700 font-medium"
+                        : "text-rose-600 font-medium"
+                }
+              >
+                {isPaid
+                  ? "已付款"
+                  : isTransferPending
+                    ? "⏳ 轉帳待確認"
+                    : latestCreditFailed
+                      ? "待重新付款"
+                      : data.paymentStatus === "cancelled"
+                        ? "已取消"
+                        : "待付款"}
               </span>
             </div>
           </div>
@@ -553,7 +682,9 @@ export default function BalancePayment() {
           {/* 選擇付款方式 */}
           {showPaymentChoice && (
             <>
-              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送地區</p>
+              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">
+                選擇配送地區
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <button
                   type="button"
@@ -566,8 +697,12 @@ export default function BalancePayment() {
                 >
                   <Home className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
                   <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">台灣（國內）</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">宅配或 7-11 取貨</p>
+                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                      台灣（國內）
+                    </p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      宅配或 7-11 取貨
+                    </p>
                   </div>
                 </button>
                 <button
@@ -581,34 +716,60 @@ export default function BalancePayment() {
                 >
                   <Globe className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
                   <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">海外</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">國際宅配</p>
+                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                      海外
+                    </p>
+                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      國際宅配
+                    </p>
                   </div>
                 </button>
               </div>
 
-              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇配送方式</p>
+              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">
+                選擇配送方式
+              </p>
               {checkoutRegion === "domestic" ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     {[
-                      { key: "home" as ShippingMethod, icon: <Home className="w-5 h-5" />, title: "宅配到府", desc: "黑貓宅急便（NT$ 130）" },
-                      { key: "cvs_711" as ShippingMethod, icon: <Store className="w-5 h-5" />, title: "7-11 取貨", desc: "超商取貨（NT$ 60）" },
-                    ].map((opt) => (
+                      {
+                        key: "home" as ShippingMethod,
+                        icon: <Home className="w-5 h-5" />,
+                        title: "宅配到府",
+                        desc: "黑貓宅急便（NT$ 130）",
+                      },
+                      {
+                        key: "cvs_711" as ShippingMethod,
+                        icon: <Store className="w-5 h-5" />,
+                        title: "7-11 取貨",
+                        desc: "超商取貨（NT$ 60）",
+                      },
+                    ].map(opt => (
                       <button
                         key={opt.key}
                         type="button"
-                        onClick={() => { setShippingMethod(opt.key); setCvsStore(null); setErrors({}); }}
+                        onClick={() => {
+                          setShippingMethod(opt.key);
+                          setCvsStore(null);
+                          setErrors({});
+                        }}
                         className={`flex items-start gap-3 p-4 border text-left transition-all ${
                           shippingMethod === opt.key
                             ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
                             : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
                         }`}
                       >
-                        <span className="text-[oklch(0.3_0_0)] mt-0.5 shrink-0">{opt.icon}</span>
+                        <span className="text-[oklch(0.3_0_0)] mt-0.5 shrink-0">
+                          {opt.icon}
+                        </span>
                         <div>
-                          <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">{opt.title}</p>
-                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">{opt.desc}</p>
+                          <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                            {opt.title}
+                          </p>
+                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                            {opt.desc}
+                          </p>
                         </div>
                       </button>
                     ))}
@@ -622,10 +783,15 @@ export default function BalancePayment() {
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-green-600" />
                             <span className="text-sm font-body text-green-800">
-                              已選擇：{cvsStore.storeName}（門市代號：{cvsStore.storeId}）
+                              已選擇：{cvsStore.storeName}（門市代號：
+                              {cvsStore.storeId}）
                             </span>
                           </div>
-                          <button type="button" onClick={() => setCvsStore(null)} className="text-xs font-body text-green-600 underline">
+                          <button
+                            type="button"
+                            onClick={() => setCvsStore(null)}
+                            className="text-xs font-body text-green-600 underline"
+                          >
                             重新選擇
                           </button>
                         </div>
@@ -639,7 +805,11 @@ export default function BalancePayment() {
                           點此選擇 7-11 門市
                         </button>
                       )}
-                      {errors.cvsStore && <p className="text-xs text-red-400 mt-1">{errors.cvsStore}</p>}
+                      {errors.cvsStore && (
+                        <p className="text-xs text-red-400 mt-1">
+                          {errors.cvsStore}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="mb-5 space-y-3">
@@ -649,39 +819,75 @@ export default function BalancePayment() {
                             type="text"
                             placeholder="郵遞區號"
                             value={form.shippingZip}
-                            onChange={(e) => setForm((f) => ({ ...f, shippingZip: e.target.value }))}
+                            onChange={e =>
+                              setForm(f => ({
+                                ...f,
+                                shippingZip: e.target.value,
+                              }))
+                            }
                             className={inputClass("shippingZip")}
                             maxLength={6}
                           />
-                          {errors.shippingZip && <p className="text-xs text-red-400 mt-1">{errors.shippingZip}</p>}
+                          {errors.shippingZip && (
+                            <p className="text-xs text-red-400 mt-1">
+                              {errors.shippingZip}
+                            </p>
+                          )}
                         </div>
                         <div>
                           <input
                             type="text"
                             placeholder="縣市"
                             value={form.shippingCity}
-                            onChange={(e) => setForm((f) => ({ ...f, shippingCity: e.target.value }))}
+                            onChange={e =>
+                              setForm(f => ({
+                                ...f,
+                                shippingCity: e.target.value,
+                              }))
+                            }
                             className={inputClass("shippingCity")}
                           />
-                          {errors.shippingCity && <p className="text-xs text-red-400 mt-1">{errors.shippingCity}</p>}
+                          {errors.shippingCity && (
+                            <p className="text-xs text-red-400 mt-1">
+                              {errors.shippingCity}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <input
                         type="text"
                         placeholder="鄉鎮市區"
                         value={form.shippingDistrict}
-                        onChange={(e) => setForm((f) => ({ ...f, shippingDistrict: e.target.value }))}
+                        onChange={e =>
+                          setForm(f => ({
+                            ...f,
+                            shippingDistrict: e.target.value,
+                          }))
+                        }
                         className={inputClass("shippingDistrict")}
                       />
-                      {errors.shippingDistrict && <p className="text-xs text-red-400 mt-1">{errors.shippingDistrict}</p>}
+                      {errors.shippingDistrict && (
+                        <p className="text-xs text-red-400 mt-1">
+                          {errors.shippingDistrict}
+                        </p>
+                      )}
                       <input
                         type="text"
                         placeholder="路名、門牌、樓層"
                         value={form.shippingDetail}
-                        onChange={(e) => setForm((f) => ({ ...f, shippingDetail: e.target.value }))}
+                        onChange={e =>
+                          setForm(f => ({
+                            ...f,
+                            shippingDetail: e.target.value,
+                          }))
+                        }
                         className={inputClass("shippingDetail")}
                       />
-                      {errors.shippingDetail && <p className="text-xs text-red-400 mt-1">{errors.shippingDetail}</p>}
+                      {errors.shippingDetail && (
+                        <p className="text-xs text-red-400 mt-1">
+                          {errors.shippingDetail}
+                        </p>
+                      )}
                     </div>
                   )}
                 </>
@@ -690,126 +896,205 @@ export default function BalancePayment() {
                   {receiverPhoneField}
                   <select
                     value={form.intlCountry}
-                    onChange={(e) => setForm((f) => ({ ...f, intlCountry: e.target.value, intlState: "", intlPostalCode: "" }))}
+                    onChange={e =>
+                      setForm(f => ({
+                        ...f,
+                        intlCountry: e.target.value,
+                        intlState: "",
+                        intlPostalCode: "",
+                      }))
+                    }
                     className={inputClass("intlCountry")}
                   >
                     <option value="">Select country</option>
                     {OVERSEAS_SHIP_COUNTRY_OPTIONS.map(({ code }) => (
                       <option key={code} value={code}>
-                        {OVERSEAS_COUNTRY_EN[code]} ({OVERSEAS_SHIP_COUNTRY_LABELS[code]}) NT$ {OVERSEAS_SHIPPING_FEES[code]}
+                        {OVERSEAS_COUNTRY_EN[code]} (
+                        {OVERSEAS_SHIP_COUNTRY_LABELS[code]}) NT${" "}
+                        {OVERSEAS_SHIPPING_FEES[code]}
                       </option>
                     ))}
                   </select>
-                  {errors.intlCountry && <p className="text-xs text-red-400 mt-1">{errors.intlCountry}</p>}
+                  {errors.intlCountry && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {errors.intlCountry}
+                    </p>
+                  )}
                   <input
                     type="text"
                     placeholder="Address Line 1"
                     value={form.intlAddrLine1}
-                    onChange={(e) => setForm((f) => ({ ...f, intlAddrLine1: e.target.value }))}
+                    onChange={e =>
+                      setForm(f => ({ ...f, intlAddrLine1: e.target.value }))
+                    }
                     className={inputClass("intlAddrLine1")}
                   />
-                  {errors.intlAddrLine1 && <p className="text-xs text-red-400 mt-1">{errors.intlAddrLine1}</p>}
+                  {errors.intlAddrLine1 && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {errors.intlAddrLine1}
+                    </p>
+                  )}
                   <input
                     type="text"
                     placeholder="Address Line 2 (optional)"
                     value={form.intlAddrLine2}
-                    onChange={(e) => setForm((f) => ({ ...f, intlAddrLine2: e.target.value }))}
+                    onChange={e =>
+                      setForm(f => ({ ...f, intlAddrLine2: e.target.value }))
+                    }
                     className={inputClass("intlAddrLine2")}
                   />
-                  {errors.intlAddrLine2 && <p className="text-xs text-red-400 mt-1">{errors.intlAddrLine2}</p>}
+                  {errors.intlAddrLine2 && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {errors.intlAddrLine2}
+                    </p>
+                  )}
                   <input
                     type="text"
                     placeholder="City"
                     value={form.intlCity}
-                    onChange={(e) => setForm((f) => ({ ...f, intlCity: e.target.value }))}
+                    onChange={e =>
+                      setForm(f => ({ ...f, intlCity: e.target.value }))
+                    }
                     className={inputClass("intlCity")}
                   />
-                  {errors.intlCity && <p className="text-xs text-red-400 mt-1">{errors.intlCity}</p>}
+                  {errors.intlCity && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {errors.intlCity}
+                    </p>
+                  )}
                   {overseasCode === "US" ? (
                     <select
                       value={form.intlState}
-                      onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                      onChange={e =>
+                        setForm(f => ({ ...f, intlState: e.target.value }))
+                      }
                       className={inputClass("intlState")}
                     >
                       <option value="">Select state</option>
-                      {US_STATE_OPTIONS.map((s) => (
-                        <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+                      {US_STATE_OPTIONS.map(s => (
+                        <option key={s.code} value={s.code}>
+                          {s.name} ({s.code})
+                        </option>
                       ))}
                     </select>
                   ) : overseasCode === "AU" ? (
                     <select
                       value={form.intlState}
-                      onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                      onChange={e =>
+                        setForm(f => ({ ...f, intlState: e.target.value }))
+                      }
                       className={inputClass("intlState")}
                     >
                       <option value="">Select state / territory</option>
-                      {AU_STATE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                      {AU_STATE_OPTIONS.map(s => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <input
                       type="text"
                       placeholder="State / province (if applicable)"
                       value={form.intlState}
-                      onChange={(e) => setForm((f) => ({ ...f, intlState: e.target.value }))}
+                      onChange={e =>
+                        setForm(f => ({ ...f, intlState: e.target.value }))
+                      }
                       className={inputClass("intlState")}
                     />
                   )}
-                  {errors.intlState && <p className="text-xs text-red-400 mt-1">{errors.intlState}</p>}
+                  {errors.intlState && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {errors.intlState}
+                    </p>
+                  )}
                   <input
                     type="text"
-                    placeholder={!overseasCode || overseasPostalRequired(overseasCode) ? "Postal code" : "Postal code (optional)"}
+                    placeholder={
+                      !overseasCode || overseasPostalRequired(overseasCode)
+                        ? "Postal code"
+                        : "Postal code (optional)"
+                    }
                     value={form.intlPostalCode}
-                    onChange={(e) => setForm((f) => ({ ...f, intlPostalCode: e.target.value }))}
+                    onChange={e =>
+                      setForm(f => ({ ...f, intlPostalCode: e.target.value }))
+                    }
                     className={inputClass("intlPostalCode")}
                   />
-                  {errors.intlPostalCode && <p className="text-xs text-red-400 mt-1">{errors.intlPostalCode}</p>}
+                  {errors.intlPostalCode && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {errors.intlPostalCode}
+                    </p>
+                  )}
                 </div>
               )}
 
               {payableAmount > 0 && (
                 <>
-                  <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">選擇付款方式</p>
+                  <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">
+                    選擇付款方式
+                  </p>
                   <div className="grid grid-cols-2 gap-3 mb-5">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("credit")}
-                  className={`flex items-start gap-3 p-4 border text-left transition-all ${
-                    paymentMethod === "credit"
-                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                      : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
-                  }`}
-                >
-                  <CreditCard className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
-                  <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">信用卡</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">即時扣款</p>
-                  </div>
-                  <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
-                    paymentMethod === "credit" ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.8_0_0)]"
-                  }`}>
-                    {paymentMethod === "credit" && <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("atm")}
-                  className={`flex items-start gap-3 p-4 border text-left transition-all ${
-                    paymentMethod === "atm"
-                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                      : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
-                  }`}
-                >
-                  <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
-                  <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">轉帳</p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">匯款後填末五碼</p>
-                  </div>
-                  <div className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
-                    paymentMethod === "atm" ? "border-[oklch(0.1_0_0)]" : "border-[oklch(0.8_0_0)]"
-                  }`}>
-                    {paymentMethod === "atm" && <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />}
-                  </div>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("credit")}
+                      className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                        paymentMethod === "credit"
+                          ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
+                          : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                      }`}
+                    >
+                      <CreditCard className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                      <div>
+                        <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                          信用卡
+                        </p>
+                        <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                          即時扣款
+                        </p>
+                      </div>
+                      <div
+                        className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                          paymentMethod === "credit"
+                            ? "border-[oklch(0.1_0_0)]"
+                            : "border-[oklch(0.8_0_0)]"
+                        }`}
+                      >
+                        {paymentMethod === "credit" && (
+                          <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("atm")}
+                      className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                        paymentMethod === "atm"
+                          ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
+                          : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                      }`}
+                    >
+                      <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                      <div>
+                        <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                          轉帳
+                        </p>
+                        <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                          匯款後填末五碼
+                        </p>
+                      </div>
+                      <div
+                        className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                          paymentMethod === "atm"
+                            ? "border-[oklch(0.1_0_0)]"
+                            : "border-[oklch(0.8_0_0)]"
+                        }`}
+                      >
+                        {paymentMethod === "atm" && (
+                          <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                        )}
+                      </div>
+                    </button>
                   </div>
                 </>
               )}
@@ -822,45 +1107,62 @@ export default function BalancePayment() {
                 {startCheckout.isPending
                   ? "處理中..."
                   : payableAmount === 0
-                  ? "確認配送資料"
-                  : paymentMethod === "credit"
-                  ? latestCreditFailed ? "重新使用信用卡付款" : "前往信用卡付款"
-                  : "確認使用轉帳"}
+                    ? "確認配送資料"
+                    : paymentMethod === "credit"
+                      ? latestCreditFailed
+                        ? "重新使用信用卡付款"
+                        : "前往信用卡付款"
+                      : "確認使用轉帳"}
               </button>
             </>
           )}
 
           {/* 轉帳資訊（選完轉帳後顯示） */}
-          {(isTransferPending || (startCheckout.isSuccess && startCheckout.data?.kind === "atm")) && (
+          {(isTransferPending ||
+            (startCheckout.isSuccess &&
+              startCheckout.data?.kind === "atm")) && (
             <div className="border border-blue-200 bg-blue-50 p-5">
               <div className="flex items-start gap-3">
                 <Banknote className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="w-full">
-                  <p className="text-sm font-body font-medium text-blue-800 mb-3">轉帳資訊</p>
+                  <p className="text-sm font-body font-medium text-blue-800 mb-3">
+                    轉帳資訊
+                  </p>
                   {(() => {
-                    const bankInfo = startCheckout.data?.kind === "atm"
-                      ? { ...STORE_BANK_INFO, ...startCheckout.data.bankInfo }
-                      : STORE_BANK_INFO;
+                    const bankInfo =
+                      startCheckout.data?.kind === "atm"
+                        ? { ...STORE_BANK_INFO, ...startCheckout.data.bankInfo }
+                        : STORE_BANK_INFO;
                     return bankInfo ? (
                       <div className="space-y-2 mb-4">
                         <div className="flex justify-between text-sm font-body">
                           <span className="text-blue-700">銀行</span>
-                          <span className="font-medium text-blue-900">{bankInfo.bankName}</span>
+                          <span className="font-medium text-blue-900">
+                            {bankInfo.bankName}
+                          </span>
                         </div>
                         {bankInfo.accountName && (
                           <div className="flex justify-between text-sm font-body">
                             <span className="text-blue-700">戶名</span>
-                            <span className="font-medium text-blue-900">{bankInfo.accountName}</span>
+                            <span className="font-medium text-blue-900">
+                              {bankInfo.accountName}
+                            </span>
                           </div>
                         )}
                         <div className="flex justify-between text-sm font-body">
                           <span className="text-blue-700">帳號</span>
-                          <span className="font-medium text-blue-900 tracking-wider">{bankInfo.accountNumber}</span>
+                          <span className="font-medium text-blue-900 tracking-wider">
+                            {bankInfo.accountNumber}
+                          </span>
                         </div>
                         <div className="flex justify-between text-sm font-body border-t border-blue-200 pt-2">
                           <span className="text-blue-700">轉帳金額</span>
                           <span className="font-bold text-blue-900">
-                            NT$ {(startCheckout.data?.kind === "atm" ? startCheckout.data.amount : payableAmount).toLocaleString()}
+                            NT${" "}
+                            {(startCheckout.data?.kind === "atm"
+                              ? startCheckout.data.amount
+                              : payableAmount
+                            ).toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -869,14 +1171,18 @@ export default function BalancePayment() {
 
                   {!codeSubmitted && !data.transferLastFive ? (
                     <div>
-                      <p className="text-xs font-body text-blue-700 mb-2">轉帳完成後，請填入匯款末五碼：</p>
+                      <p className="text-xs font-body text-blue-700 mb-2">
+                        轉帳完成後，請填入匯款末五碼：
+                      </p>
                       <div className="flex gap-2">
                         <input
                           type="text"
                           inputMode="numeric"
                           maxLength={5}
                           value={transferCode}
-                          onChange={(e) => setTransferCode(e.target.value.replace(/\D/g, ""))}
+                          onChange={e =>
+                            setTransferCode(e.target.value.replace(/\D/g, ""))
+                          }
                           placeholder="12345"
                           className="flex-1 border border-blue-300 bg-white px-3 py-2 text-sm font-body text-center tracking-widest focus:outline-none focus:border-blue-500"
                         />
@@ -889,7 +1195,9 @@ export default function BalancePayment() {
                         </button>
                       </div>
                       <div className="mt-4">
-                        <p className="text-xs tracking-[0.16em] font-body text-blue-800 mb-2">轉帳成功截圖</p>
+                        <p className="text-xs tracking-[0.16em] font-body text-blue-800 mb-2">
+                          轉帳成功截圖
+                        </p>
                         {transferReceipt ? (
                           <div className="flex items-center gap-3 border border-blue-200 bg-white p-3">
                             <img
@@ -898,8 +1206,12 @@ export default function BalancePayment() {
                               className="w-20 h-20 object-cover border border-blue-100"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-body text-blue-900 truncate">{transferReceipt.filename}</p>
-                              <p className="text-xs font-body text-blue-700 mt-1">已選擇截圖</p>
+                              <p className="text-sm font-body text-blue-900 truncate">
+                                {transferReceipt.filename}
+                              </p>
+                              <p className="text-xs font-body text-blue-700 mt-1">
+                                已選擇截圖
+                              </p>
                             </div>
                             <button
                               type="button"
@@ -913,7 +1225,9 @@ export default function BalancePayment() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => transferReceiptInputRef.current?.click()}
+                            onClick={() =>
+                              transferReceiptInputRef.current?.click()
+                            }
                             className="w-full border border-dashed border-blue-300 bg-white px-4 py-4 text-sm font-body text-blue-800 flex items-center justify-center gap-2 hover:border-blue-500 transition-colors"
                           >
                             <ImageUp className="w-4 h-4" />
@@ -927,12 +1241,18 @@ export default function BalancePayment() {
                           className="hidden"
                           onChange={handleTransferReceiptChange}
                         />
-                        {errors.transferReceipt && <p className="text-xs text-red-400 mt-1">{errors.transferReceipt}</p>}
+                        {errors.transferReceipt && (
+                          <p className="text-xs text-red-400 mt-1">
+                            {errors.transferReceipt}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (
                     <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
-                      ✅ 已收到您的匯款末五碼：<strong>{data.transferLastFive}</strong>，老闆確認後將更新訂單狀態。
+                      ✅ 已收到您的匯款末五碼：
+                      <strong>{data.transferLastFive}</strong>
+                      ，老闆確認後將更新訂單狀態。
                     </div>
                   )}
                 </div>
