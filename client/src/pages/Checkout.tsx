@@ -954,7 +954,7 @@ export default function Checkout() {
                     <div>
                       <input
                         type="text"
-                        placeholder="路名、巻號、門牌（如 信義路五杘7號）"
+                        placeholder="路名、巻號、門牌（如 信義路五巷7號）"
                         value={form.shippingDetail}
                         onChange={e =>
                           setForm(f => ({
@@ -1277,7 +1277,7 @@ export default function Checkout() {
                         完成轉帳後上傳截圖
                       </p>
                       <p className="text-xs font-body text-[oklch(0.5_0_0)]">
-                        老闆確認後出貨
+                        設計師確認後出貨
                       </p>
                     </div>
                     <div

@@ -92,7 +92,7 @@ export default function CustomFormC() {
   const steps = [
     {
       title: "您的姓名是？",
-      subtitle: "請填寫真實姓名，老闆將用於脈輪能量解讀",
+      subtitle: "請填寫真實姓名，老師將用於脈輪能量解讀",
       required: true,
       field: (
         <input
@@ -106,7 +106,7 @@ export default function CustomFormC() {
     },
     {
       title: "您的西元生日是？",
-      subtitle: "老闆將透過生日進行脈輪能量解讀",
+      subtitle: "老師將透過生日進行脈輪能量解讀",
       required: true,
       field: (
         <input

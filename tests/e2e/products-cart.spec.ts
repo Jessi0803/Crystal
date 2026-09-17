@@ -96,7 +96,7 @@ async function ensureCustomDepositProducts() {
            disclaimer, crystalType, color, featured, active, isMonthlyLimited, scheduledPublishAt, sortOrder)
          VALUES (?, ?, ?, 'custom', '客製化', ?, ?, ?, NULL,
            ?, NULL, ?, ?, '客製化服務訂金。', '', ?, ?, ?,
-           '此商品為客製化服務訂金，實際尾款金額由老闆確認後另行通知。', ?, ?, false, true, false, NULL, ?)
+           '此商品為客製化服務訂金，實際尾款金額由設計師確認後另行通知。', ?, ?, false, true, false, NULL, ?)
          ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           subtitle = VALUES(subtitle),

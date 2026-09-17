@@ -92,7 +92,7 @@ export default function CustomFormD() {
   const steps = [
     {
       title: "您的姓名是？",
-      subtitle: "請填寫真實姓名，老闆將用於生命靈數能量解讀",
+      subtitle: "請填寫真實姓名，老師將用於生命靈數能量解讀",
       required: true,
       field: (
         <input
@@ -107,7 +107,7 @@ export default function CustomFormD() {
     {
       title: "您的西元生日是？",
       subtitle:
-        "老闆將透過出生年月日計算天賦數、生命數、先天數、星座數，找出缺數並做能量搭配",
+        "老師將透過出生年月日計算天賦數、生命數、先天數、星座數，找出缺數並做能量搭配",
       required: true,
       field: (
         <input

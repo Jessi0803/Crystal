@@ -169,7 +169,7 @@ export default function BalancePayment() {
   const submitCode = trpc.order.submitBalanceTransferCode.useMutation({
     onSuccess: () => {
       setCodeSubmitted(true);
-      toast.success("已送出匯款末五碼，老闆確認後將更新狀態");
+      toast.success("已送出匯款末五碼，設計師確認後將更新狀態");
       refetch();
     },
     onError: err => toast.error(err.message || "送出失敗，請重試"),
@@ -576,12 +576,12 @@ export default function BalancePayment() {
                   ? "已完成配送資料確認，訂單將進入出貨流程。"
                   : "感謝您的付款，訂單已轉為已付款並會進入出貨流程。"
                 : isTransferPending
-                  ? "老闆確認收款後將更新訂單狀態，請耐心等候。"
+                  ? "設計師確認收款後將更新訂單狀態，請耐心等候。"
                   : isCancelled
                     ? "此連結已取消，如仍需付款請聯繫客服。"
                     : latestCreditFailed
                       ? "您的尾款尚未扣款，可使用原連結重新嘗試信用卡，或改用 ATM 轉帳。"
-                      : "這是老闆為您的客製化訂單產生的尾款付款連結。"}
+                      : "這是設計師為您的客製化訂單產生的尾款付款連結。"}
             </p>
           </div>
 
@@ -1252,7 +1252,7 @@ export default function BalancePayment() {
                     <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
                       ✅ 已收到您的匯款末五碼：
                       <strong>{data.transferLastFive}</strong>
-                      ，老闆確認後將更新訂單狀態。
+                      ，設計師確認後將更新訂單狀態。
                     </div>
                   )}
                 </div>

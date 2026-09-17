@@ -7166,7 +7166,7 @@ async function ensureProductsTable() {
     ];
     for (const id of customIds) {
       await db.execute(
-        sql7`UPDATE \`products\` SET \`disclaimer\` = ${customDisclaimer} WHERE \`id\` = ${id} AND (\`disclaimer\` IS NULL OR \`disclaimer\` = '此商品為客製化服務訂金，實際尾款金額由老闆確認後另行通知。')`
+        sql7`UPDATE \`products\` SET \`disclaimer\` = ${customDisclaimer} WHERE \`id\` = ${id} AND (\`disclaimer\` IS NULL OR \`disclaimer\` IN ('此商品為客製化服務訂金，實際尾款金額由老闆確認後另行通知。', '此商品為客製化服務訂金，實際尾款金額由設計師確認後另行通知。'))`
       );
     }
   } catch {

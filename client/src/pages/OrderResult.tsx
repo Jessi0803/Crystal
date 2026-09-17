@@ -226,7 +226,7 @@ export default function OrderResult() {
       return {
         icon: <CheckCircle className="w-12 h-12 text-rose-500" />,
         title: "訂金付款成功",
-        desc: "我們已收到您的訂金，接下來會由老闆建立尾款付款連結給您。",
+        desc: "我們已收到您的訂金，接下來會由設計師建立尾款付款連結給您。",
         color: "text-rose-600",
         bg: "bg-rose-50",
       };
@@ -585,7 +585,7 @@ export default function OrderResult() {
                       <>
                         已收到您的匯款末五碼：
                         <strong>{order.transferLastFive}</strong>
-                        ，老闆確認後將更新訂單狀態。
+                        ，設計師確認後將更新訂單狀態。
                       </>
                     ) : (
                       "此訂單正在等待轉帳確認，若需要補充匯款資訊請聯繫客服。"

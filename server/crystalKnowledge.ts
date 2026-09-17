@@ -346,7 +346,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-what-is-custom",
     question: "什麼是客製化手鍊？",
-    answer: "客製化手鍊是由老闆根據您的個人需求（功效、色系、款式），或透過塔羅、脈輪、生命靈數分析後，為您量身設計的專屬水晶手鍊，每一條都是獨一無二的。詳細方案請見：https://goodaytarot.com/custom",
+    answer: "客製化手鍊是由設計師根據您的個人需求（功效、色系、款式），或透過塔羅、脈輪、生命靈數分析後，為您量身設計的專屬水晶手鍊，每一條都是獨一無二的。詳細方案請見：https://goodaytarot.com/custom",
     embedText: "什麼是客製化手鍊 客製化 量身設計 專屬 獨一無二 功效 塔羅 脈輪 生命靈數",
     keywords: ["客製化", "量身設計", "專屬", "獨一無二", "客製化手鍊", "什麼是客製化"],
     category: "客製化",
@@ -362,7 +362,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-what-is-chakra",
     question: "什麼是脈輪？",
-    answer: "脈輪是人體七個主要能量中心（從海底輪到頂輪），各自對應不同身心層面。老闆以靈擺與塔羅測出您的脈輪能量狀況，再利用水晶能量補足缺失，提升整體能量平衡。",
+    answer: "脈輪是人體七個主要能量中心（從海底輪到頂輪），各自對應不同身心層面。老師以靈擺與塔羅測出您的脈輪能量狀況，再利用水晶能量補足缺失，提升整體能量平衡。",
     embedText: "什麼是脈輪 脈輪 七脈輪 海底輪 頂輪 能量中心 靈擺 能量平衡",
     keywords: ["脈輪", "七脈輪", "海底輪", "頂輪", "能量中心", "靈擺"],
     category: "客製化",
@@ -378,7 +378,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-custom-plans-diff",
     question: "四個客製化方案有什麼差別？",
-    answer: "A 純客製：您提供功效需求，老闆量身設計。B 塔羅方案：透過塔羅牌解析能量缺口再設計。C 脈輪方案：以靈擺測出七脈輪狀態補足能量缺口。D 生命靈數：從出生年月日找出缺數，以水晶精準補足天賦。詳細說明：https://goodaytarot.com/custom",
+    answer: "A 純客製：您提供功效需求，設計師量身設計。B 塔羅方案：透過塔羅牌解析能量缺口再設計。C 脈輪方案：以靈擺測出七脈輪狀態補足能量缺口。D 生命靈數：從出生年月日找出缺數，以水晶精準補足天賦。詳細說明：https://goodaytarot.com/custom",
     embedText: "客製化方案差別 四個方案 純客製 塔羅方案 脈輪方案 生命靈數方案 ABCD 比較",
     keywords: ["方案差別", "純客製", "塔羅方案", "脈輪方案", "生命靈數方案", "ABCD", "選擇方案"],
     category: "客製化",
@@ -418,7 +418,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "faq-dislike-design",
     question: "如果我不喜歡成品圖怎麼辦？",
     answer:
-      "可在免費一次範圍內更換不喜歡的配飾、調整水晶與配飾的擺放順序；不清楚能否改的部分歡迎先問老闆🤍 若需要改手圍、新增材質或色系條件、更換扣具等，屬重新設計需加收 200 元，建議預約時就先透過官方 LINE 說明。第二次修改起每次加收 200 元。LINE：https://line.me/R/ti/p/@011tymeh",
+      "可在免費一次範圍內更換不喜歡的配飾、調整水晶與配飾的擺放順序；不清楚能否改的部分歡迎先問設計師🤍 若需要改手圍、新增材質或色系條件、更換扣具等，屬重新設計需加收 200 元，建議預約時就先透過官方 LINE 說明。第二次修改起每次加收 200 元。LINE：https://line.me/R/ti/p/@011tymeh",
     embedText: "不喜歡成品圖 成品圖 不滿意設計 修改 改款 設計不好看 初版 免費修改 配飾 順序",
     keywords: ["成品圖", "不喜歡", "不滿意", "修改設計", "改款", "配飾", "順序"],
     category: "客製化",
@@ -476,7 +476,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-contact",
     question: "有問題要怎麼聯絡？",
-    answer: "請私訊官方 LINE：https://line.me/R/ti/p/@011tymeh，老闆會盡快回覆。",
+    answer: "請私訊官方 LINE：https://line.me/R/ti/p/@011tymeh，設計師會盡快回覆。",
     embedText: "有問題怎麼聯絡 聯絡 客服 LINE 私訊 詢問 問題 聯繫",
     keywords: ["聯絡", "客服", "LINE", "私訊", "詢問", "聯繫"],
     category: "常見問題",
@@ -508,7 +508,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-crystal-energy-real",
     question: "水晶的能量是真實的嗎？",
-    answer: "水晶具有天然礦石的獨特頻率，許多人在配戴後感受到情緒或能量的轉變。老闆會根據您的需求挑選最適合的水晶，並協助您與手鍊建立連結。",
+    answer: "水晶具有天然礦石的獨特頻率，許多人在配戴後感受到情緒或能量的轉變。設計師會根據您的需求挑選最適合的水晶，並協助您與手鍊建立連結。",
     embedText: "水晶能量真實嗎 水晶能量 是否有效 有用嗎 頻率 礦石 真的有效",
     keywords: ["水晶能量", "有效", "真實", "頻率", "礦石", "有用嗎"],
     category: "常見問題",
@@ -516,7 +516,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   {
     id: "faq-natural-crystal",
     question: "手鍊是天然水晶嗎？",
-    answer: "是的，所有水晶手鍊皆使用天然礦石製作，老闆會嚴格把關水晶品質。",
+    answer: "是的，所有水晶手鍊皆使用天然礦石製作，我們會嚴格把關水晶品質。",
     embedText: "天然水晶嗎 是否天然 真的水晶 假的 合成 天然礦石 品質",
     keywords: ["天然水晶", "天然", "礦石", "真的", "品質", "真假"],
     category: "常見問題",
@@ -525,7 +525,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "faq-see-design-first",
     question: "可以看到成品圖再決定要不要購買嗎？客製化什麼時候付尾款？",
     answer:
-      "客製化流程為先付訂金，老闆設計完成品圖後給您確認，滿意再支付尾款。初版享有免費修改一次，範圍為更換不喜歡的配飾與調整水晶／配飾擺放順序；改手圍、新增條件（如銀管、珠框、色系、扣具等）屬重新設計需另收 200 元，第二次修改起每次亦加收 200 元。預約時請先透過官方 LINE 說明：https://line.me/R/ti/p/@011tymeh",
+      "客製化流程為先付訂金，設計師設計完成品圖後給您確認，滿意再支付尾款。初版享有免費修改一次，範圍為更換不喜歡的配飾與調整水晶／配飾擺放順序；改手圍、新增條件（如銀管、珠框、色系、扣具等）屬重新設計需另收 200 元，第二次修改起每次亦加收 200 元。預約時請先透過官方 LINE 說明：https://line.me/R/ti/p/@011tymeh",
     embedText: "先看成品圖 成品圖確認 先看設計 看圖再付款 設計確認 訂金 尾款 什麼時候付尾款 客製化尾款",
     keywords: ["成品圖", "先看設計", "設計確認", "看圖", "確認後付款", "尾款", "付尾款", "訂金", "客製化尾款"],
     category: "客製化",

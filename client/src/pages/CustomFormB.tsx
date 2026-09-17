@@ -1093,7 +1093,7 @@ export default function CustomFormB() {
                   2. {tarot.topic} — 占卜所需資料
                 </h2>
                 <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">
-                  請填寫以下資料，讓老闆為您進行解析
+                  請填寫以下資料，讓老師為您進行解析
                 </p>
                 {tarotDataFields()}
               </section>
