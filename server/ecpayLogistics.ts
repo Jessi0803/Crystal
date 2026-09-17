@@ -7,6 +7,14 @@
 import crypto from "crypto";
 import { ENV } from "./_core/env";
 
+/** 綠界物流回傳的業務錯誤，訊息可直接顯示給管理員 */
+export class EcpayLogisticsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EcpayLogisticsError";
+  }
+}
+
 // 判斷是否使用沙盒：只有在明確設定 ECPAY_LOGISTICS_SANDBOX=true 時才用沙盒
 // 預設使用正式環境（因為憑證是正式帳號）
 export const useLogisticsSandbox = process.env.ECPAY_LOGISTICS_SANDBOX === "true";
@@ -371,7 +379,7 @@ export async function fetchPrintTradeDocument(opts: {
 
   if (!response.ok || !isPrintableDocument) {
     const body = buffer.toString("utf8").slice(0, 500);
-    throw new Error(`綠界託運單產生失敗：${body || response.statusText}`);
+    throw new EcpayLogisticsError(`綠界託運單產生失敗：${body || response.statusText}`);
   }
 
   return { buffer, contentType };

@@ -66,7 +66,8 @@ vi.mock("./inventoryDb", () => ({
   getProductAvailability: vi.fn(),
 }));
 
-vi.mock("./ecpayLogistics", () => ({
+vi.mock("./ecpayLogistics", async (importOriginal) => ({
+  EcpayLogisticsError: (await importOriginal<typeof import("./ecpayLogistics")>()).EcpayLogisticsError,
   buildPrintTradeDocURL: vi.fn(),
   createCVSLogisticsOrder: vi.fn(),
   createHomeLogisticsOrder: vi.fn(),
@@ -121,6 +122,8 @@ import {
   verifyPayPalOrderBelongsToMerchant,
 } from "./_core/paypal";
 import { buildCreditPaymentParams } from "./ecpay";
+import { createCVSLogisticsOrder, EcpayLogisticsError, fetchPrintTradeDocument } from "./ecpayLogistics";
+import { isUnexpectedInternalError, PUBLIC_INTERNAL_ERROR_MESSAGE } from "./_core/trpc";
 import { storagePut } from "./storage";
 import {
   attachReservedCouponToOrder,
@@ -1613,5 +1616,100 @@ describe("order coupon lifecycle (admin procedures)", () => {
     await createPublicCaller().order.capturePayPal({ merchantTradeNo: "COUPON004", paypalOrderId: "PP" });
 
     expect(markCouponUsedForOrderMock).toHaveBeenCalledWith(104, { merchantTradeNo: "COUPON004" });
+  });
+});
+
+describe("logistics error messages for admins", () => {
+  const paidCvsOrder = {
+    id: 95,
+    merchantTradeNo: "LOGI095",
+    shippingMethod: "cvs_711",
+    buyerName: "物流測試",
+    buyerPhone: "0912345678",
+    cvsStoreId: "123456",
+    totalAmount: 1280,
+  };
+
+  function logisticsDb() {
+    return createMutationMockDb([
+      [paidCvsOrder],
+      [],
+      [{ id: 95, merchantTradeNo: "LOGI095", paymentStatus: "paid", orderStatus: "paid", isCustomOrder: false }],
+    ]);
+  }
+
+  function adminCaller() {
+    return appRouter.createCaller({
+      user: { id: 1, role: "admin" } as any,
+      req: { get: (name: string) => (name === "host" ? "example.test" : undefined), protocol: "https" } as any,
+      res: {} as any,
+    });
+  }
+
+  async function adminError(run: () => Promise<unknown>) {
+    const error = await run().then(
+      () => null,
+      (err: unknown) => err
+    );
+    expect(error).toBeInstanceOf(TRPCError);
+    return error as TRPCError;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("shows the ECPay rejection reason when a logistics order cannot be created", async () => {
+    getDbMock.mockResolvedValue(logisticsDb() as any);
+    vi.mocked(createCVSLogisticsOrder).mockResolvedValue({ success: false, rtnMsg: "收件人電話格式錯誤", raw: {} } as any);
+
+    const error = await adminError(() =>
+      adminCaller().order.createLogistics({ orderId: 95 })
+    );
+
+    expect(error.message).toBe("綠界物流建立失敗：收件人電話格式錯誤");
+    expect(isUnexpectedInternalError(error)).toBe(false);
+  });
+
+  it("returns a readable message without raw details when the ECPay call fails", async () => {
+    getDbMock.mockResolvedValue(logisticsDb() as any);
+    vi.mocked(createCVSLogisticsOrder).mockRejectedValue(new Error("connect ETIMEDOUT 203.66.1.1:443"));
+
+    const error = await adminError(() =>
+      adminCaller().order.createLogistics({ orderId: 95 })
+    );
+
+    expect(error.message).toBe("呼叫綠界物流 API 失敗，請稍後再試");
+    expect(error.message).not.toContain("ETIMEDOUT");
+    expect(isUnexpectedInternalError(error)).toBe(false);
+    expect(error.message).not.toBe(PUBLIC_INTERNAL_ERROR_MESSAGE);
+  });
+
+  it("shows the ECPay reason when a waybill cannot be generated", async () => {
+    getDbMock.mockResolvedValue(createMutationMockDb([
+      [{ orderId: 96, logisticsType: "HOME", logisticsSubType: "TCAT", allPayLogisticsId: "AP96" }],
+    ]) as any);
+    vi.mocked(fetchPrintTradeDocument).mockRejectedValue(new EcpayLogisticsError("綠界託運單產生失敗：查無此筆物流訂單"));
+
+    const error = await adminError(() =>
+      createCaller({ id: 1, role: "admin" }).order.getPrintDocument({ orderId: 96 })
+    );
+
+    expect(error.message).toBe("綠界託運單產生失敗：查無此筆物流訂單");
+    expect(isUnexpectedInternalError(error)).toBe(false);
+  });
+
+  it("explains why a waybill is not available", async () => {
+    getDbMock.mockResolvedValue(createMutationMockDb([
+      [{ orderId: 97, logisticsType: "CVS", logisticsSubType: "UNIMARTC2C", allPayLogisticsId: "AP97" }],
+    ]) as any);
+
+    const error = await adminError(() =>
+      createCaller({ id: 1, role: "admin" }).order.getPrintDocument({ orderId: 97 })
+    );
+
+    expect(error.message).toBe("只有宅配物流單可以列印託運單");
+    expect(fetchPrintTradeDocument).not.toHaveBeenCalled();
   });
 });

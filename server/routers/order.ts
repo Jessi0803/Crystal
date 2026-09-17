@@ -45,6 +45,7 @@ import {
 } from "../inventoryDb";
 import {
   buildPrintTradeDocURL,
+  EcpayLogisticsError,
   createCVSLogisticsOrder,
   createHomeLogisticsOrder,
   fetchPrintTradeDocument,
@@ -1866,11 +1867,11 @@ export const orderRouter = router({
           await db
             .delete(logisticsOrders)
             .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
-          throw new Error(`綠界物流建立失敗：${ecpayResult.rtnMsg}`);
+          throw new TRPCError({ code: "BAD_GATEWAY", message: `綠界物流建立失敗：${ecpayResult.rtnMsg}` });
         }
       } catch (err) {
-        // 若是我們自己拋的錯誤，直接往上傳
-        if (err instanceof Error && err.message.startsWith("綠界物流")) throw err;
+        // 綠界回傳的失敗原因要讓管理員看到，直接往上傳
+        if (err instanceof TRPCError) throw err;
         // 其他錯誤（網路等）
         console.error("[createLogistics] Error calling ECPay:", err);
         // 刪除失敗的物流記錄，讓按鈕可以重新出現
@@ -1879,7 +1880,8 @@ export const orderRouter = router({
             .delete(logisticsOrders)
             .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
         } catch (_) { /* ignore cleanup error */ }
-        throw new Error(`呼叫綠界物流 API 失敗：${String(err)}`);
+        // 原始錯誤只記在伺服器 log，不回傳給前端
+        throw new TRPCError({ code: "BAD_GATEWAY", message: "呼叫綠界物流 API 失敗，請稍後再試", cause: err });
       }
     }),
 
@@ -1919,15 +1921,25 @@ export const orderRouter = router({
         .from(logisticsOrders)
         .where(eq(logisticsOrders.orderId, input.orderId))
         .limit(1);
-      if (!logistics) throw new Error("Logistics order not found");
-      if (logistics.logisticsType !== "HOME") throw new Error("Only HOME logistics supports print");
-      if (!logistics.allPayLogisticsId) throw new Error("AllPayLogisticsID not available yet");
+      if (!logistics) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這筆訂單的物流單" });
+      if (logistics.logisticsType !== "HOME") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "只有宅配物流單可以列印託運單" });
+      }
+      if (!logistics.allPayLogisticsId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "綠界尚未回傳物流編號，請稍後再試" });
+      }
 
-      const document = await fetchPrintTradeDocument({
-        allPayLogisticsId: logistics.allPayLogisticsId,
-        logisticsType: logistics.logisticsType,
-        logisticsSubType: logistics.logisticsSubType,
-      });
+      let document: Awaited<ReturnType<typeof fetchPrintTradeDocument>>;
+      try {
+        document = await fetchPrintTradeDocument({
+          allPayLogisticsId: logistics.allPayLogisticsId,
+          logisticsType: logistics.logisticsType,
+          logisticsSubType: logistics.logisticsSubType,
+        });
+      } catch (err) {
+        if (err instanceof EcpayLogisticsError) throw new TRPCError({ code: "BAD_GATEWAY", message: err.message });
+        throw err;
+      }
 
       return {
         contentType: document.contentType,
