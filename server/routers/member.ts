@@ -252,10 +252,11 @@ export const memberRouter = router({
 
   /** 查詢自己的訂單 */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
-    const currentUser = await db.getUserByOpenId(ctx.user.openId);
+    const currentUser = (await db.getUserByOpenId(ctx.user.openId)) ?? ctx.user;
+    // 未驗證的 Email 不可用來比對訪客訂單，避免冒用他人 Email 註冊後看到對方訂單
     return getOrdersForMember({
-      userId: currentUser?.id ?? ctx.user.id,
-      email: currentUser?.email ?? ctx.user.email,
+      userId: currentUser.id,
+      email: currentUser.emailVerified ? currentUser.email : null,
     });
   }),
 });
