@@ -12,7 +12,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { MEMBER_COUPON_STATUS_LABELS } from "@shared/coupons";
+import { MEMBER_COUPON_STATUS_LABELS, type MemberCouponDisplayStatus } from "@shared/coupons";
 import {
   COUPON_STATUS_BADGE_CLASS,
   formatCouponDate,
@@ -61,6 +61,11 @@ const inputClass =
 const inlineInputClass =
   "border border-[oklch(0.86_0_0)] px-2.5 py-1.5 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] disabled:bg-[oklch(0.96_0_0)] disabled:text-[oklch(0.6_0_0)]";
 const labelClass = "block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1";
+// DialogContent 預設帶 sm:max-w-lg，需以同斷點覆寫；內容區自行捲動，標題與按鈕固定
+const dialogShellClass =
+  "flex flex-col gap-0 overflow-hidden rounded-none p-0 w-[calc(100%-1.5rem)] max-w-none max-h-[calc(100dvh-1.5rem)]";
+const actionButtonClass =
+  "inline-flex items-center justify-center gap-1 border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body hover:bg-[oklch(0.96_0_0)]";
 
 function formatMoney(value: number) {
   return `NT$ ${value.toLocaleString()}`;
@@ -167,9 +172,9 @@ function TemplateFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={next => !next && !saving && onClose()}>
-      <DialogContent className="max-w-lg rounded-none p-0">
-        <form onSubmit={submit}>
-          <div className="border-b border-[oklch(0.93_0_0)] px-6 py-5">
+      <DialogContent className={`${dialogShellClass} sm:max-w-lg`}>
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b border-[oklch(0.93_0_0)] px-5 py-4 pr-12 sm:px-6 sm:py-5">
             <DialogTitle className="text-lg font-normal" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
               {template ? "編輯優惠券" : "新增優惠券"}
             </DialogTitle>
@@ -180,7 +185,27 @@ function TemplateFormDialog({
             </DialogDescription>
           </div>
 
-          <div className="space-y-4 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
+            {/* 整張優惠券的狀態，與下方各項規則分開 */}
+            <div className="flex items-start justify-between gap-4 border border-[oklch(0.9_0_0)] bg-[oklch(0.985_0_0)] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[oklch(0.15_0_0)]">
+                  優惠券狀態：{form.isActive ? "啟用中" : "已停用"}
+                </p>
+                <p className="mt-0.5 text-xs font-body leading-relaxed text-[oklch(0.52_0_0)]">
+                  {form.isActive
+                    ? "可以發放給會員，也可設為 LINE 好友禮。"
+                    : "停用後不能再發放；已發出的券仍可使用至到期。"}
+                </p>
+              </div>
+              <Switch
+                aria-label="啟用這張優惠券"
+                className="mt-0.5 shrink-0"
+                checked={form.isActive}
+                onCheckedChange={value => set("isActive", value)}
+              />
+            </div>
+
             <label className="block">
               <span className={labelClass}>優惠券名稱</span>
               <input
@@ -192,7 +217,7 @@ function TemplateFormDialog({
               />
             </label>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block">
                 <span className={labelClass}>折抵金額（NT$）</span>
                 <input
@@ -254,26 +279,20 @@ function TemplateFormDialog({
               </div>
             </fieldset>
 
-            <div className="grid grid-cols-2 gap-4 items-end">
-              <label className="block">
-                <span className={labelClass}>每位會員最多領取（張）</span>
-                <input
-                  inputMode="numeric"
-                  value={form.maxPerUser}
-                  onChange={e => set("maxPerUser", e.target.value)}
-                  className={inputClass}
-                />
-              </label>
-              <label className="inline-flex items-center gap-2 pb-2.5 text-sm font-body text-[oklch(0.3_0_0)]">
-                <Switch checked={form.isActive} onCheckedChange={value => set("isActive", value)} />
-                {form.isActive ? "啟用" : "停用"}
-              </label>
-            </div>
+            <label className="block sm:w-1/2 sm:pr-2">
+              <span className={labelClass}>每位會員最多領取（張）</span>
+              <input
+                inputMode="numeric"
+                value={form.maxPerUser}
+                onChange={e => set("maxPerUser", e.target.value)}
+                className={inputClass}
+              />
+            </label>
 
             {error && <p className="text-xs font-body text-red-600">{error}</p>}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-[oklch(0.93_0_0)] px-6 py-4">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-[oklch(0.93_0_0)] px-5 py-3 sm:px-6 sm:py-4">
             <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-xs font-body text-[oklch(0.4_0_0)]">
               取消
             </button>
@@ -291,42 +310,95 @@ function TemplateFormDialog({
   );
 }
 
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] tracking-widest font-body text-[oklch(0.55_0_0)]">{label}</dt>
+      <dd className="mt-0.5 text-sm font-body text-[oklch(0.2_0_0)]">{value}</dd>
+    </div>
+  );
+}
+
+type RecordFilter = "all" | MemberCouponDisplayStatus;
+
+const RECORD_FILTERS: { key: RecordFilter; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "available", label: "可使用" },
+  { key: "pending", label: "待付款" },
+  { key: "used", label: "已使用" },
+  { key: "expired", label: "已過期" },
+];
+
+function StatusBadge({ status }: { status: MemberCouponDisplayStatus }) {
+  return (
+    <span className={`inline-block whitespace-nowrap border px-2 py-0.5 text-[11px] font-body ${COUPON_STATUS_BADGE_CLASS[status]}`}>
+      {MEMBER_COUPON_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
 function TemplateDetailDialog({ templateId, onClose }: { templateId: number | null; onClose: () => void }) {
+  const [filter, setFilter] = useState<RecordFilter>("all");
   const { data, isLoading } = trpc.coupons.adminGet.useQuery(
     { id: templateId ?? 0 },
     { enabled: templateId != null }
   );
   const template = data?.template;
   const stats = data?.stats;
+  const records = data?.records ?? [];
+  const visibleRecords = filter === "all" ? records : records.filter(record => record.displayStatus === filter);
+
+  useEffect(() => {
+    setFilter("all");
+  }, [templateId]);
+
+  const statItems = [
+    ["已發放", stats?.issued],
+    ["未使用", stats?.unused],
+    ["已使用", stats?.used],
+    ["已過期", stats?.expired],
+  ] as const;
 
   return (
     <Dialog open={templateId != null} onOpenChange={next => !next && onClose()}>
-      <DialogContent className="max-w-3xl rounded-none p-0 max-h-[90vh] overflow-y-auto">
-        <div className="border-b border-[oklch(0.93_0_0)] px-6 py-5">
-          <DialogTitle className="text-lg font-normal" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
-            {template?.name ?? "優惠券詳情"}
-          </DialogTitle>
-          <DialogDescription className="mt-1 text-xs font-body text-[oklch(0.52_0_0)]">
-            {template
-              ? `折 ${formatMoney(template.discountAmount)} · ${formatCouponMinimum(template.minOrderAmount)} · ${formatCouponValidity(template)} · 每人限 ${template.maxPerUser} 張 · ${template.isActive ? "啟用中" : "已停用"}`
-              : "載入中"}
-          </DialogDescription>
+      <DialogContent className={`${dialogShellClass} sm:max-w-4xl`}>
+        <div className="shrink-0 border-b border-[oklch(0.93_0_0)] px-5 py-4 pr-12 sm:px-6 sm:py-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <DialogTitle className="text-lg font-normal" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
+              {template?.name ?? "優惠券詳情"}
+            </DialogTitle>
+            {template && (
+              <span
+                className={`border px-2 py-0.5 text-[11px] font-body ${
+                  template.isActive
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-[oklch(0.86_0_0)] bg-[oklch(0.96_0_0)] text-[oklch(0.45_0_0)]"
+                }`}
+              >
+                {template.isActive ? "啟用中" : "已停用"}
+              </span>
+            )}
+          </div>
+          <DialogDescription className="sr-only">優惠券規則、發放統計與發放紀錄</DialogDescription>
+          {template && (
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+              <SummaryItem label="折抵金額" value={formatMoney(template.discountAmount)} />
+              <SummaryItem label="最低消費" value={template.minOrderAmount > 0 ? formatMoney(template.minOrderAmount) : "無低消"} />
+              <SummaryItem label="有效期限" value={formatCouponValidity(template)} />
+              <SummaryItem label="每人上限" value={`${template.maxPerUser} 張`} />
+            </dl>
+          )}
         </div>
 
         {isLoading || !data ? (
           <p className="px-6 py-10 text-center text-sm font-body text-[oklch(0.5_0_0)]">載入中...</p>
         ) : (
-          <div className="px-6 py-5 space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 border border-[oklch(0.93_0_0)] divide-x divide-y sm:divide-y-0 divide-[oklch(0.93_0_0)]">
-              {[
-                ["已發放", stats?.issued],
-                ["未使用", stats?.unused],
-                ["已使用", stats?.used],
-                ["已過期", stats?.expired],
-              ].map(([label, value]) => (
-                <div key={label} className="px-4 py-3">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="grid grid-cols-2 gap-px border border-[oklch(0.93_0_0)] bg-[oklch(0.93_0_0)] sm:grid-cols-4">
+              {statItems.map(([label, value]) => (
+                <div key={label} className="bg-white px-4 py-3">
                   <p className="text-[10px] tracking-widest font-body text-[oklch(0.55_0_0)]">{label}</p>
-                  <p className="mt-1 text-lg text-[oklch(0.15_0_0)]">{value ?? 0}</p>
+                  <p className="mt-1 text-xl text-[oklch(0.15_0_0)]">{value ?? 0}</p>
                 </div>
               ))}
             </div>
@@ -335,49 +407,122 @@ function TemplateDetailDialog({ templateId, onClose }: { templateId: number | nu
             )}
 
             <div>
-              <p className="text-sm font-medium text-[oklch(0.12_0_0)] mb-2">發放紀錄</p>
-              {data.records.length === 0 ? (
-                <p className="py-6 text-center text-xs font-body text-[oklch(0.5_0_0)] border border-[oklch(0.93_0_0)]">尚未發放給任何會員</p>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-[oklch(0.12_0_0)]">
+                  發放紀錄 <span className="font-normal text-[oklch(0.55_0_0)]">({visibleRecords.length})</span>
+                </p>
+                {records.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {RECORD_FILTERS.map(item => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setFilter(item.key)}
+                        className={`border px-2.5 py-1 text-xs font-body ${
+                          filter === item.key
+                            ? "border-[oklch(0.15_0_0)] bg-[oklch(0.15_0_0)] text-white"
+                            : "border-[oklch(0.86_0_0)] text-[oklch(0.45_0_0)] hover:bg-[oklch(0.96_0_0)]"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {visibleRecords.length === 0 ? (
+                <p className="border border-[oklch(0.93_0_0)] py-6 text-center text-xs font-body text-[oklch(0.5_0_0)]">
+                  {records.length === 0 ? "尚未發放給任何會員" : "沒有符合條件的紀錄"}
+                </p>
               ) : (
-                <div className="overflow-x-auto border border-[oklch(0.93_0_0)]">
-                  <table className="w-full min-w-[560px] text-left text-xs font-body">
-                    <thead className="bg-[oklch(0.975_0_0)] text-[oklch(0.5_0_0)]">
-                      <tr>
-                        <th className="px-3 py-2 font-normal">會員</th>
-                        <th className="px-3 py-2 font-normal">發放日期</th>
-                        <th className="px-3 py-2 font-normal">到期日期</th>
-                        <th className="px-3 py-2 font-normal">使用狀態</th>
-                        <th className="px-3 py-2 font-normal">使用訂單</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[oklch(0.93_0_0)]">
-                      {data.records.map(record => (
-                        <tr key={record.id}>
-                          <td className="px-3 py-2">
-                            <p className="text-[oklch(0.2_0_0)]">{record.userName || "未填姓名"}</p>
-                            <p className="text-[oklch(0.55_0_0)]">{record.userEmail || `會員 #${record.userId}`}</p>
-                          </td>
-                          <td className="px-3 py-2 text-[oklch(0.4_0_0)]">{formatCouponDate(record.issuedAt)}</td>
-                          <td className="px-3 py-2 text-[oklch(0.4_0_0)]">{formatCouponDate(record.expiresAt)}</td>
-                          <td className="px-3 py-2">
-                            <span className={`border px-2 py-0.5 ${COUPON_STATUS_BADGE_CLASS[record.displayStatus]}`}>
-                              {MEMBER_COUPON_STATUS_LABELS[record.displayStatus]}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-[oklch(0.4_0_0)]">
-                            {record.orderMerchantTradeNo ? `#${record.orderMerchantTradeNo}` : "—"}
-                          </td>
+                <>
+                  {/* 手機：卡片 */}
+                  <ul className="divide-y divide-[oklch(0.93_0_0)] border border-[oklch(0.93_0_0)] md:hidden">
+                    {visibleRecords.map(record => (
+                      <li key={record.id} className="space-y-2 px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-[oklch(0.2_0_0)]">{record.userName || "未填姓名"}</p>
+                            <p className="truncate text-xs font-body text-[oklch(0.55_0_0)]">
+                              {record.userEmail || `會員 #${record.userId}`}
+                            </p>
+                          </div>
+                          <StatusBadge status={record.displayStatus} />
+                        </div>
+                        <dl className="grid grid-cols-2 gap-2 text-xs font-body">
+                          <div>
+                            <dt className="text-[oklch(0.55_0_0)]">發放</dt>
+                            <dd className="text-[oklch(0.3_0_0)]">{formatCouponDate(record.issuedAt)}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[oklch(0.55_0_0)]">到期</dt>
+                            <dd className="text-[oklch(0.3_0_0)]">{formatCouponDate(record.expiresAt)}</dd>
+                          </div>
+                          {record.orderMerchantTradeNo && (
+                            <div className="col-span-2">
+                              <dt className="text-[oklch(0.55_0_0)]">使用訂單</dt>
+                              <dd className="break-all text-[oklch(0.3_0_0)]">#{record.orderMerchantTradeNo}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* 桌機：表格 */}
+                  <div className="hidden border border-[oklch(0.93_0_0)] md:block">
+                    <table className="w-full table-fixed text-left text-xs font-body">
+                      <thead className="bg-[oklch(0.975_0_0)] text-[oklch(0.5_0_0)]">
+                        <tr>
+                          <th className="w-[34%] px-3 py-2 font-normal">會員</th>
+                          <th className="px-3 py-2 font-normal">發放日期</th>
+                          <th className="px-3 py-2 font-normal">到期日期</th>
+                          <th className="px-3 py-2 font-normal">使用狀態</th>
+                          <th className="w-[22%] px-3 py-2 font-normal">使用訂單</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-[oklch(0.93_0_0)]">
+                        {visibleRecords.map(record => (
+                          <tr key={record.id}>
+                            <td className="px-3 py-2">
+                              <p className="truncate text-[oklch(0.2_0_0)]">{record.userName || "未填姓名"}</p>
+                              <p className="truncate text-[oklch(0.55_0_0)]">{record.userEmail || `會員 #${record.userId}`}</p>
+                            </td>
+                            <td className="px-3 py-2 text-[oklch(0.4_0_0)]">{formatCouponDate(record.issuedAt)}</td>
+                            <td className="px-3 py-2 text-[oklch(0.4_0_0)]">{formatCouponDate(record.expiresAt)}</td>
+                            <td className="px-3 py-2">
+                              <StatusBadge status={record.displayStatus} />
+                            </td>
+                            <td className="break-all px-3 py-2 text-[oklch(0.4_0_0)]">
+                              {record.orderMerchantTradeNo ? `#${record.orderMerchantTradeNo}` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TemplateStatusBadge({ isActive }: { isActive: boolean }) {
+  return (
+    <span
+      className={`shrink-0 whitespace-nowrap border px-2 py-1 text-[11px] font-body ${
+        isActive
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-[oklch(0.86_0_0)] bg-[oklch(0.96_0_0)] text-[oklch(0.45_0_0)]"
+      }`}
+    >
+      {isActive ? "啟用" : "停用"}
+    </span>
   );
 }
 
@@ -416,11 +561,15 @@ export default function AdminCoupons() {
     setEditing(null);
     setFormOpen(true);
   };
+  const openEdit = (template: EditableTemplate) => {
+    setEditing(template);
+    setFormOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[oklch(0.97_0_0)]">
       <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-14 lg:top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">COUPONS</p>
             <h1 className="mt-1 text-lg text-[oklch(0.1_0_0)]" style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}>
@@ -430,7 +579,7 @@ export default function AdminCoupons() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)]"
+            className="inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)]"
           >
             <Plus className="w-3.5 h-3.5" />
             新增優惠券
@@ -450,70 +599,82 @@ export default function AdminCoupons() {
               <p className="text-sm font-body text-[oklch(0.5_0_0)]">尚未建立任何優惠券</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-left text-sm font-body">
-                <thead className="border-b border-[oklch(0.93_0_0)] text-[11px] tracking-widest text-[oklch(0.5_0_0)]">
-                  <tr>
-                    <th className="px-4 py-3 font-normal">優惠券名稱</th>
-                    <th className="px-4 py-3 font-normal">折抵金額</th>
-                    <th className="px-4 py-3 font-normal">最低消費</th>
-                    <th className="px-4 py-3 font-normal">有效期限</th>
-                    <th className="px-4 py-3 font-normal text-right">已發放</th>
-                    <th className="px-4 py-3 font-normal text-right">已使用</th>
-                    <th className="px-4 py-3 font-normal">狀態</th>
-                    <th className="px-4 py-3 font-normal text-right">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[oklch(0.93_0_0)]">
-                  {templates.map(template => (
-                    <tr key={template.id}>
-                      <td className="px-4 py-3 text-[oklch(0.15_0_0)]">{template.name}</td>
-                      <td className="px-4 py-3">{formatMoney(template.discountAmount)}</td>
-                      <td className="px-4 py-3 text-[oklch(0.4_0_0)]">
-                        {template.minOrderAmount > 0 ? formatMoney(template.minOrderAmount) : "無低消"}
-                      </td>
-                      <td className="px-4 py-3 text-[oklch(0.4_0_0)]">{formatCouponValidity(template)}</td>
-                      <td className="px-4 py-3 text-right">{template.stats.issued}</td>
-                      <td className="px-4 py-3 text-right">{template.stats.used}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-[11px] border px-2 py-1 ${
-                            template.isActive
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                              : "border-[oklch(0.86_0_0)] bg-[oklch(0.96_0_0)] text-[oklch(0.45_0_0)]"
-                          }`}
-                        >
-                          {template.isActive ? "啟用" : "停用"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditing(template);
-                              setFormOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1 border border-[oklch(0.86_0_0)] px-2.5 py-1.5 text-xs hover:bg-[oklch(0.96_0_0)]"
-                          >
-                            <Pencil className="w-3 h-3" />
-                            編輯
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDetailId(template.id)}
-                            className="inline-flex items-center gap-1 border border-[oklch(0.86_0_0)] px-2.5 py-1.5 text-xs hover:bg-[oklch(0.96_0_0)]"
-                          >
-                            <Eye className="w-3 h-3" />
-                            查看
-                          </button>
-                        </div>
-                      </td>
+            <>
+              {/* 手機：卡片 */}
+              <ul className="divide-y divide-[oklch(0.93_0_0)] md:hidden">
+                {templates.map(template => (
+                  <li key={template.id} className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium text-[oklch(0.15_0_0)]">{template.name}</p>
+                      <TemplateStatusBadge isActive={template.isActive} />
+                    </div>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <SummaryItem label="折抵金額" value={formatMoney(template.discountAmount)} />
+                      <SummaryItem label="最低消費" value={template.minOrderAmount > 0 ? formatMoney(template.minOrderAmount) : "無低消"} />
+                      <SummaryItem label="有效期限" value={formatCouponValidity(template)} />
+                      <SummaryItem label="已發放 / 已使用" value={`${template.stats.issued} / ${template.stats.used}`} />
+                    </dl>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => openEdit(template)} className={actionButtonClass}>
+                        <Pencil className="w-3.5 h-3.5" />
+                        編輯
+                      </button>
+                      <button type="button" onClick={() => setDetailId(template.id)} className={actionButtonClass}>
+                        <Eye className="w-3.5 h-3.5" />
+                        查看
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* 桌機：表格 */}
+              <div className="hidden md:block">
+                <table className="w-full text-left text-sm font-body">
+                  <thead className="border-b border-[oklch(0.93_0_0)] text-[11px] tracking-widest text-[oklch(0.5_0_0)]">
+                    <tr>
+                      <th className="px-4 py-3 font-normal">優惠券名稱</th>
+                      <th className="px-4 py-3 font-normal">折抵金額</th>
+                      <th className="px-4 py-3 font-normal">最低消費</th>
+                      <th className="px-4 py-3 font-normal">有效期限</th>
+                      <th className="px-4 py-3 font-normal text-right">已發放</th>
+                      <th className="px-4 py-3 font-normal text-right">已使用</th>
+                      <th className="px-4 py-3 font-normal">狀態</th>
+                      <th className="px-4 py-3 font-normal text-right">操作</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-[oklch(0.93_0_0)]">
+                    {templates.map(template => (
+                      <tr key={template.id}>
+                        <td className="px-4 py-3 text-[oklch(0.15_0_0)]">{template.name}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">{formatMoney(template.discountAmount)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-[oklch(0.4_0_0)]">
+                          {template.minOrderAmount > 0 ? formatMoney(template.minOrderAmount) : "無低消"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-[oklch(0.4_0_0)]">{formatCouponValidity(template)}</td>
+                        <td className="px-4 py-3 text-right">{template.stats.issued}</td>
+                        <td className="px-4 py-3 text-right">{template.stats.used}</td>
+                        <td className="px-4 py-3">
+                          <TemplateStatusBadge isActive={template.isActive} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <button type="button" onClick={() => openEdit(template)} className={actionButtonClass}>
+                              <Pencil className="w-3 h-3" />
+                              編輯
+                            </button>
+                            <button type="button" onClick={() => setDetailId(template.id)} className={actionButtonClass}>
+                              <Eye className="w-3 h-3" />
+                              查看
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </section>
         <p className="mt-3 text-xs font-body text-[oklch(0.55_0_0)]">
