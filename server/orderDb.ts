@@ -1051,9 +1051,14 @@ export async function createLogisticsOrder(data: InsertLogisticsOrder) {
   return created;
 }
 
+/**
+ * 更新物流狀態；只有目前狀態在 allowedFrom 內才會寫入（條件式 UPDATE，避免舊回呼覆蓋新狀態）。
+ * 回傳是否有更新。
+ */
 export async function updateLogisticsStatus(
   logisticsMerchantTradeNo: string,
   status: "created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed",
+  allowedFrom: ("created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed")[],
   extra?: {
     cvsPaymentNo?: string;
     cvsValidationNo?: string;
@@ -1065,14 +1070,21 @@ export async function updateLogisticsStatus(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  if (allowedFrom.length === 0) return false;
 
-  await db
+  const result = await db
     .update(logisticsOrders)
     .set({
       logisticsStatus: status,
       ...extra,
     })
-    .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo));
+    .where(
+      and(
+        eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo),
+        inArray(logisticsOrders.logisticsStatus, allowedFrom)
+      )
+    );
+  return getAffectedRows(result) > 0;
 }
 
 export function generateBalanceMerchantTradeNo() {

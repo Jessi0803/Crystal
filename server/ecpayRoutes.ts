@@ -27,38 +27,19 @@ import {
 } from "./customerOrderNotification";
 import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  classifyECPayLogisticsStatus,
+  LOGISTICS_STATUS_ALLOWED_FROM,
+  ORDER_STATUS_ALLOWED_FROM,
+  orderStatusForLogistics,
+  parseECPayStatusDate,
+  type LogisticsStatus,
+} from "./logisticsStatus";
+
+type OrderStatus = (typeof orders.orderStatus.enumValues)[number];
 import { recordAuditEventSafely } from "./auditDb";
 import { markCouponUsedForOrderSafely, releaseCouponsForOrdersSafely } from "./couponDb";
-
-type LogisticsStatus = "created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed";
-
-export function mapECPayLogisticsStatus(data: { RtnCode?: string; LogisticsSubType?: string; LogisticsType?: string }): LogisticsStatus {
-  const rtnCode = data.RtnCode ?? "";
-  const logisticsSubType = data.LogisticsSubType || data.LogisticsType || "";
-
-  if (["3002", "3003", "3004", "7013"].includes(rtnCode)) return "failed";
-
-  if (logisticsSubType.includes("UNIMART")) {
-    if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
-    if (rtnCode === "2067") return "picked_up";
-    if (rtnCode === "2074") return "returned";
-    if (rtnCode === "2098") return "arrived";
-  }
-
-  if (logisticsSubType.includes("FAMI")) {
-    if (rtnCode === "3018") return "arrived";
-    if (rtnCode === "3022") return "picked_up";
-    if (rtnCode === "3020") return "returned";
-  }
-
-  if (rtnCode === "3018") return "arrived";
-  if (rtnCode === "2073" || rtnCode === "2063") return "arrived";
-  if (rtnCode === "3022" || rtnCode === "2067") return "picked_up";
-  if (rtnCode === "3020" || rtnCode === "2074" || rtnCode === "3028") return "returned";
-
-  return "in_transit";
-}
 
 // 只允許導回本站的相對路徑（必須以單一 "/" 開頭），避免開放轉址。
 // 不合法時退回結帳頁。
@@ -209,6 +190,131 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
 
 function matchesECPayAmount(rawAmount: string | undefined, expectedAmount: number) {
   return typeof rawAmount === "string" && /^\d+$/.test(rawAmount) && Number(rawAmount) === expectedAmount;
+}
+
+const LOGISTICS_STATUS_LABELS: Record<LogisticsStatus, string> = {
+  created: "已建立",
+  in_transit: "運送中",
+  arrived: "已到店",
+  picked_up: "已取貨／已送達",
+  returned: "已退回",
+  failed: "物流異常",
+};
+
+/**
+ * 綠界物流狀態通知（ServerReplyURL）。
+ * 物流與訂單狀態都只往前推進；已完成、已取消等由管理員決定的訂單狀態不會被回呼覆蓋。
+ */
+export async function handleECPayLogisticsNotify(data: Record<string, string>) {
+  const logisticsMerchantTradeNo = data.MerchantTradeNo || null;
+  const callbackDetails = {
+    rtnCode: data.RtnCode ?? null,
+    rtnMsg: data.RtnMsg ?? null,
+    logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null,
+    updateStatusDate: data.UpdateStatusDate ?? null,
+  };
+  console.log("[ECPay Logistics Notify]", { merchantTradeNo: logisticsMerchantTradeNo, ...callbackDetails });
+
+  if (!verifyLogisticsCheckMacValue(data)) {
+    console.error("[ECPay Logistics Notify] CheckMacValue verification failed");
+    await recordAuditEventSafely({
+      source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+      outcome: "rejected", severity: "warning", merchantTradeNo: logisticsMerchantTradeNo,
+      summary: "綠界物流回呼簽章驗證失敗",
+      details: callbackDetails,
+    });
+    return "0|CheckMacValue Error";
+  }
+  if (!logisticsMerchantTradeNo) return "0|MerchantTradeNo Error";
+
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [logistics] = await db
+    .select({
+      orderId: logisticsOrders.orderId,
+      logisticsType: logisticsOrders.logisticsType,
+      logisticsSubType: logisticsOrders.logisticsSubType,
+      logisticsStatus: logisticsOrders.logisticsStatus,
+    })
+    .from(logisticsOrders)
+    .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo))
+    .limit(1);
+  if (!logistics) {
+    await recordAuditEventSafely({
+      source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+      outcome: "rejected", severity: "warning", merchantTradeNo: logisticsMerchantTradeNo,
+      summary: "綠界物流回呼找不到對應的物流單",
+      details: callbackDetails,
+    });
+    // 回 1|OK 避免綠界對已刪除的物流單持續重送
+    return "1|OK";
+  }
+
+  // 回呼未帶物流商時，以建立物流單時記錄的類型判斷
+  const classification = classifyECPayLogisticsStatus({
+    RtnCode: data.RtnCode,
+    LogisticsSubType: data.LogisticsSubType || logistics.logisticsSubType || undefined,
+    LogisticsType: data.LogisticsType || logistics.logisticsType,
+  });
+
+  if (classification.kind === "record_only") {
+    await recordAuditEventSafely({
+      source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+      outcome: "success", severity: "warning", orderId: logistics.orderId, merchantTradeNo: logisticsMerchantTradeNo,
+      summary: `綠界通知撤銷先前的物流狀態（${data.RtnMsg ?? data.RtnCode}），未自動變更，請人工確認`,
+      details: { ...callbackDetails, currentStatus: logistics.logisticsStatus },
+    });
+    return "1|OK";
+  }
+
+  const newStatus = classification.status;
+  const statusDate = parseECPayStatusDate(data.UpdateStatusDate) ?? new Date();
+  const logisticsUpdated = await updateLogisticsStatus(
+    logisticsMerchantTradeNo,
+    newStatus,
+    LOGISTICS_STATUS_ALLOWED_FROM[newStatus],
+    {
+      cvsPaymentNo: data.CVSPaymentNo,
+      cvsValidationNo: data.CVSValidationNo,
+      bookingNote: data.BookingNote,
+      arrivedAt: newStatus === "arrived" ? statusDate : undefined,
+      pickedUpAt: newStatus === "picked_up" ? statusDate : undefined,
+      ecpayLogisticsData: data,
+    }
+  );
+
+  let orderUpdated = false;
+  const orderStatus = logisticsUpdated ? orderStatusForLogistics(newStatus) : null;
+  if (orderStatus) {
+    const result = await db
+      .update(orders)
+      .set({ orderStatus })
+      .where(and(eq(orders.id, logistics.orderId), inArray(orders.orderStatus, ORDER_STATUS_ALLOWED_FROM[orderStatus] as OrderStatus[])));
+    const candidate = Array.isArray(result) ? result[0] : result;
+    orderUpdated = Boolean((candidate as { affectedRows?: number } | undefined)?.affectedRows);
+  }
+
+  console.log(`[ECPay Logistics Notify] ${logisticsMerchantTradeNo} → ${newStatus}`, { logisticsUpdated, orderUpdated });
+  const needsAttention = logisticsUpdated && classification.needsAttention === true;
+  await recordAuditEventSafely({
+    source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
+    outcome: logisticsUpdated ? (newStatus === "failed" ? "failed" : "success") : "duplicate",
+    severity: needsAttention ? "warning" : "info",
+    orderId: logistics.orderId,
+    merchantTradeNo: logisticsMerchantTradeNo,
+    summary: logisticsUpdated
+      ? needsAttention
+        ? `物流異常：${data.RtnMsg ?? data.RtnCode}，請人工確認`
+        : `綠界物流狀態更新為${LOGISTICS_STATUS_LABELS[newStatus]}${orderStatus && !orderUpdated ? "（訂單狀態未變更）" : ""}`
+      : `已忽略較舊或重複的物流狀態（${LOGISTICS_STATUS_LABELS[newStatus]}）`,
+    details: {
+      ...callbackDetails,
+      previousStatus: logistics.logisticsStatus,
+      newStatus,
+      orderStatus: orderUpdated ? orderStatus : null,
+    },
+  });
+  return "1|OK";
 }
 
 export function registerECPayRoutes(app: Application) {
@@ -368,75 +474,7 @@ ${inputs}
    */
   app.post("/api/ecpay/logistics-notify", async (req: Request, res: Response) => {
     try {
-      const data = req.body as Record<string, string>;
-      console.log("[ECPay Logistics Notify]", {
-        merchantTradeNo: data.MerchantTradeNo,
-        rtnCode: data.RtnCode,
-        logisticsType: data.LogisticsSubType ?? data.LogisticsType,
-      });
-
-      // 驗證 CheckMacValue
-      const isValid = verifyLogisticsCheckMacValue(data);
-      if (!isValid) {
-        console.error("[ECPay Logistics Notify] CheckMacValue verification failed");
-        await recordAuditEventSafely({
-          source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
-          outcome: "rejected", severity: "warning", merchantTradeNo: data.MerchantTradeNo,
-          summary: "綠界物流回呼簽章驗證失敗",
-          details: { rtnCode: data.RtnCode ?? null, logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null },
-        });
-        res.send("0|CheckMacValue Error");
-        return;
-      }
-
-      const logisticsMerchantTradeNo = data.MerchantTradeNo;
-      const newStatus = mapECPayLogisticsStatus(data);
-
-      await updateLogisticsStatus(logisticsMerchantTradeNo, newStatus, {
-        cvsPaymentNo: data.CVSPaymentNo,
-        cvsValidationNo: data.CVSValidationNo,
-        bookingNote: data.BookingNote,
-        arrivedAt: newStatus === "arrived" ? new Date() : undefined,
-        pickedUpAt: newStatus === "picked_up" ? new Date() : undefined,
-        ecpayLogisticsData: data,
-      });
-
-      const db = await getDb();
-      const [logistics] = db
-        ? await db
-            .select({ orderId: logisticsOrders.orderId })
-            .from(logisticsOrders)
-            .where(eq(logisticsOrders.logisticsMerchantTradeNo, logisticsMerchantTradeNo))
-            .limit(1)
-        : [];
-
-      // 如果物流狀態已到店、已取貨或退件，同步更新訂單狀態
-      if (newStatus === "arrived" || newStatus === "picked_up" || newStatus === "returned") {
-        if (db && logistics) {
-          const orderStatus =
-            newStatus === "arrived"
-              ? "arrived"
-              : newStatus === "picked_up"
-                ? "picked_up"
-                : "not_picked";
-          await db
-            .update(orders)
-            .set({ orderStatus })
-            .where(eq(orders.id, logistics.orderId));
-        }
-      }
-
-      console.log(`[ECPay Logistics Notify] ${logisticsMerchantTradeNo} → ${newStatus}`);
-      await recordAuditEventSafely({
-        source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
-        outcome: newStatus === "failed" ? "failed" : "success",
-        severity: newStatus === "failed" ? "warning" : "info",
-        orderId: logistics?.orderId ?? null,
-        merchantTradeNo: logisticsMerchantTradeNo,
-        summary: `綠界物流狀態更新為 ${newStatus}`,
-        details: { rtnCode: data.RtnCode ?? null, logisticsType: data.LogisticsSubType ?? data.LogisticsType ?? null },
-      });
-      res.send("1|OK");
+      res.send(await handleECPayLogisticsNotify(req.body as Record<string, string>));
     } catch (err) {
       console.error("[ECPay Logistics Notify] Error:", err);
       const data = req.body as Record<string, string>;
