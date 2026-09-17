@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { logisticsOrders, orderItems, orders, users } from "../drizzle/schema";
+import { NON_PRODUCT_ORDER_ITEM_IDS } from "../shared/coupons";
 
 type LinePushResult =
   | { sent: true }
@@ -87,7 +88,7 @@ export async function notifyLineOrderPlaced(orderId: number): Promise<LinePushRe
 
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
   const productLines = items
-    .filter((item) => !["shipping-fee", "payment-fee"].includes(item.productId))
+    .filter((item) => !NON_PRODUCT_ORDER_ITEM_IDS.includes(item.productId))
     .slice(0, 6)
     .map((item) => `・${item.productName} x${item.quantity}`)
     .join("\n");

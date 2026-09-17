@@ -16,6 +16,8 @@ export const users = mysqlTable("users", {
   resetToken: varchar("resetToken", { length: 128 }),
   resetTokenExpiresAt: timestamp("resetTokenExpiresAt"),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  // LINE Login 提供的信箱（僅供後台參考，不參與登入與訂單比對）
+  lineEmail: varchar("lineEmail", { length: 320 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -476,3 +478,66 @@ export const dbProducts = mysqlTable("products", {
 
 export type DbProduct = typeof dbProducts.$inferSelect;
 export type InsertDbProduct = typeof dbProducts.$inferInsert;
+
+// ─── 會員專屬優惠券 ───────────────────────────────────────────────────────────
+// 優惠券模板：管理員設定的規則，建立模板不代表任何會員已持有
+export const couponTemplates = mysqlTable("couponTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  // 固定金額折抵（新台幣）
+  discountAmount: int("discountAmount").notNull(),
+  // 最低消費（以商品小計計算，不含運費）
+  minOrderAmount: int("minOrderAmount").notNull().default(0),
+  // 有效期限：發放後 N 天，或固定截止日期
+  validityType: mysqlEnum("validityType", ["days_after_issue", "fixed_date"]).notNull().default("days_after_issue"),
+  validDays: int("validDays"),
+  fixedExpiresAt: timestamp("fixedExpiresAt"),
+  maxPerUser: int("maxPerUser").notNull().default(1),
+  isActive: boolean("isActive").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CouponTemplate = typeof couponTemplates.$inferSelect;
+export type InsertCouponTemplate = typeof couponTemplates.$inferInsert;
+
+// 會員持有的優惠券：發放當下 snapshot 名稱、金額、低消與到期日，模板之後修改不影響
+export const memberCoupons = mysqlTable("memberCoupons", {
+  id: int("id").autoincrement().primaryKey(),
+  couponTemplateId: int("couponTemplateId").notNull(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  discountAmount: int("discountAmount").notNull(),
+  minOrderAmount: int("minOrderAmount").notNull().default(0),
+  issuedAt: timestamp("issuedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  // available：可使用；reserved：已套用在待付款訂單；used：訂單已付款
+  status: mysqlEnum("status", ["available", "reserved", "used"]).notNull().default("available"),
+  orderId: int("orderId"),
+  reservedAt: timestamp("reservedAt"),
+  usedAt: timestamp("usedAt"),
+  // LINE_FRIEND / BIRTHDAY / ADMIN_GIFT / CAMPAIGN
+  source: varchar("source", { length: 32 }).notNull(),
+  issuedByUserId: int("issuedByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("member_coupons_user_status_idx").on(table.userId, table.status),
+  index("member_coupons_template_idx").on(table.couponTemplateId),
+  index("member_coupons_order_idx").on(table.orderId),
+]);
+
+export type MemberCoupon = typeof memberCoupons.$inferSelect;
+export type InsertMemberCoupon = typeof memberCoupons.$inferInsert;
+
+// LINE 好友綁定禮領取紀錄：同一會員、同一 LINE 帳號都只能領一次（由 UNIQUE 保證）
+export const lineFriendRewards = mysqlTable("lineFriendRewards", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  lineUserId: varchar("lineUserId", { length: 64 }).notNull().unique(),
+  couponTemplateId: int("couponTemplateId").notNull(),
+  memberCouponId: int("memberCouponId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type LineFriendReward = typeof lineFriendRewards.$inferSelect;

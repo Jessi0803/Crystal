@@ -5,7 +5,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
 type AuditOutcome = "success" | "rejected" | "failed" | "duplicate";
-type AuditSource = "admin" | "ecpay" | "paypal" | "logistics" | "system";
+type AuditSource = "admin" | "ecpay" | "paypal" | "logistics" | "system" | "coupon" | "line";
 
 const OUTCOME_STYLE: Record<AuditOutcome, { label: string; className: string }> = {
   success: { label: "成功", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
@@ -20,6 +20,8 @@ const SOURCE_LABEL: Record<AuditSource, string> = {
   paypal: "PayPal",
   logistics: "物流",
   system: "系統",
+  coupon: "優惠券",
+  line: "LINE",
 };
 
 export default function AdminMonitoring() {

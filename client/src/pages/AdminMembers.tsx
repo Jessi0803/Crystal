@@ -11,10 +11,12 @@ import {
   ChevronUp,
   CreditCard,
   Crown,
+  Gift,
   Mail,
   MapPin,
   Package,
   Phone,
+  Plus,
   RefreshCw,
   Save,
   Search,
@@ -29,6 +31,8 @@ import { getLoginUrl } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { formatCustomConsultationNoteForDisplay } from "@shared/customConsultationNote";
+import { COUPON_SOURCE_LABELS, MEMBER_COUPON_STATUS_LABELS, type CouponSource } from "@shared/coupons";
+import { COUPON_STATUS_BADGE_CLASS, formatCouponDate, formatCouponMinimum } from "@/lib/coupons";
 
 const PAGE_SIZE = 50;
 
@@ -192,6 +196,132 @@ function MemberOrderDetail({ orderId }: { orderId: number }) {
           {(detail.balancePayment as any).transferLastFive && <p>尾款匯款末五碼：{(detail.balancePayment as any).transferLastFive}</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+function MemberCouponsPanel({ userId }: { userId: number }) {
+  const utils = trpc.useUtils();
+  const { data: coupons = [], isLoading, error } = trpc.coupons.adminMemberCoupons.useQuery({ userId });
+  const [issuing, setIssuing] = useState(false);
+  const [templateId, setTemplateId] = useState<number | null>(null);
+  const { data: templates = [], isLoading: templatesLoading } = trpc.coupons.adminActiveTemplates.useQuery(undefined, {
+    enabled: issuing,
+  });
+  const issueCoupon = trpc.coupons.adminIssue.useMutation({
+    onSuccess: async (coupon) => {
+      toast.success(`已發放「${coupon.name}」`);
+      setIssuing(false);
+      setTemplateId(null);
+      await Promise.all([
+        utils.coupons.adminMemberCoupons.invalidate({ userId }),
+        utils.coupons.adminList.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "發放優惠券失敗"),
+  });
+
+  useEffect(() => {
+    setIssuing(false);
+    setTemplateId(null);
+  }, [userId]);
+
+  return (
+    <div className="border-t border-[oklch(0.9_0_0)] pt-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-sm font-medium text-[oklch(0.12_0_0)]">
+          <Gift className="w-4 h-4 text-[oklch(0.35_0_0)]" />
+          持有優惠券 {coupons.length ? `(${coupons.length})` : ""}
+        </p>
+        {!issuing && (
+          <button
+            type="button"
+            onClick={() => setIssuing(true)}
+            className="inline-flex items-center gap-1.5 border border-[oklch(0.86_0_0)] px-3 py-2 text-xs font-body text-[oklch(0.25_0_0)] hover:bg-[oklch(0.96_0_0)]"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            發放優惠券
+          </button>
+        )}
+      </div>
+
+      {issuing && (
+        <div className="mt-3 border border-[oklch(0.9_0_0)] bg-[oklch(0.985_0_0)] p-4 space-y-3">
+          <p className="text-xs font-body text-[oklch(0.45_0_0)]">選擇要發給此會員的優惠券（僅列出啟用中的優惠券）</p>
+          {templatesLoading ? (
+            <p className="text-xs font-body text-[oklch(0.5_0_0)]">載入優惠券中...</p>
+          ) : templates.length === 0 ? (
+            <p className="text-xs font-body text-[oklch(0.5_0_0)]">目前沒有啟用中的優惠券，請先到「優惠券管理」建立。</p>
+          ) : (
+            <div className="space-y-2" role="radiogroup" aria-label="選擇優惠券">
+              {templates.map((template) => (
+                <label key={template.id} className="flex items-start gap-2.5 cursor-pointer text-sm font-body">
+                  <input
+                    type="radio"
+                    name={`issue-coupon-${userId}`}
+                    className="mt-1"
+                    checked={templateId === template.id}
+                    onChange={() => setTemplateId(template.id)}
+                  />
+                  <span>
+                    {template.name} <span className="text-[oklch(0.35_0_0)]">折 {formatMoney(template.discountAmount)}</span>
+                    <span className="block text-xs text-[oklch(0.55_0_0)]">
+                      {formatCouponMinimum(template.minOrderAmount)} · 每人限 {template.maxPerUser} 張
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIssuing(false);
+                setTemplateId(null);
+              }}
+              className="px-3 py-2 text-xs font-body text-[oklch(0.4_0_0)]"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              disabled={!templateId || issueCoupon.isPending}
+              onClick={() => templateId && issueCoupon.mutate({ userId, templateId })}
+              className="px-4 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
+            >
+              {issueCoupon.isPending ? "發放中" : "確認發放"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 divide-y divide-[oklch(0.93_0_0)] border-y border-[oklch(0.93_0_0)]">
+        {isLoading ? (
+          <p className="py-4 text-center text-xs font-body text-[oklch(0.5_0_0)]">載入優惠券中...</p>
+        ) : error ? (
+          <p className="py-4 text-center text-xs font-body text-red-600">載入優惠券失敗</p>
+        ) : coupons.length === 0 ? (
+          <p className="py-4 text-center text-xs font-body text-[oklch(0.5_0_0)]">此會員目前沒有優惠券</p>
+        ) : (
+          coupons.map((coupon) => (
+            <div key={coupon.id} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm text-[oklch(0.15_0_0)]">
+                  {coupon.name} <span className="font-medium">折 {formatMoney(coupon.discountAmount)}</span>
+                </p>
+                <p className="mt-0.5 text-xs font-body text-[oklch(0.55_0_0)]">
+                  {COUPON_SOURCE_LABELS[coupon.source as CouponSource] ?? coupon.source} · 取得 {formatCouponDate(coupon.issuedAt)} · 到期 {formatCouponDate(coupon.expiresAt)}
+                  {coupon.orderMerchantTradeNo ? ` · 訂單 #${coupon.orderMerchantTradeNo}` : ""}
+                </p>
+              </div>
+              <span className={`self-start sm:self-center shrink-0 text-[11px] font-body border px-2 py-1 ${COUPON_STATUS_BADGE_CLASS[coupon.displayStatus]}`}>
+                {MEMBER_COUPON_STATUS_LABELS[coupon.displayStatus]}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -455,6 +585,7 @@ export default function AdminMembers() {
                     </div>
                     <div className="flex items-center gap-3 mt-3 text-[11px] font-body text-[oklch(0.55_0_0)]">
                       <span>#{member.id}</span>
+                      {member.lineBound && <span className="text-[#06a04a]">LINE</span>}
                       <span>{member.orderCount} 筆訂單</span>
                       <span>{formatMoney(member.totalSpent)}</span>
                     </div>
@@ -562,6 +693,12 @@ export default function AdminMembers() {
                             <span className="truncate">{selectedMember.email || "無 Email"}</span>
                           </p>
                           <p>註冊方式：{selectedMember.loginMethod || "未紀錄"}</p>
+                          <p>
+                            LINE：{selectedMember.lineBound ? "已綁定" : "未綁定"}
+                            {selectedMember.lineBound && selectedMember.lineEmail && selectedMember.lineEmail !== selectedMember.email
+                              ? `（LINE 信箱：${selectedMember.lineEmail}）`
+                              : ""}
+                          </p>
                           <p>加入時間：{formatDate(selectedMember.createdAt)}</p>
                           <p>最後登入：{formatDate(selectedMember.lastSignedIn)}</p>
                         </div>
@@ -634,6 +771,8 @@ export default function AdminMembers() {
                       </button>
                     </div>
                   </div>
+
+                  <MemberCouponsPanel userId={selectedMember.id} />
                 </div>
               ) : (
                 <div className="py-10 text-center text-sm font-body text-[oklch(0.5_0_0)]">請先選擇會員</div>

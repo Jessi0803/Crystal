@@ -21,6 +21,7 @@ import {
 } from "../drizzle/schema";
 import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "../shared/const";
 import { calcCheckoutFees } from "../shared/checkoutFees";
+import { COUPON_DISCOUNT_PRODUCT_ID, NON_PRODUCT_ORDER_ITEM_IDS } from "../shared/coupons";
 
 type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type OrderRow = typeof orders.$inferSelect;
@@ -128,7 +129,7 @@ async function orderHasDomesticFreeShipping(db: DbInstance, orderId: number) {
     .leftJoin(dbProducts, eq(orderItems.productId, dbProducts.id))
     .where(eq(orderItems.orderId, orderId));
   const productItems = items
-    .filter((item) => !["shipping", "shipping-fee", "payment-fee"].includes(item.id))
+    .filter((item) => !NON_PRODUCT_ORDER_ITEM_IDS.includes(item.id))
     .map((item) => ({
       ...item,
       twoItemFreeShippingEligible: item.twoItemFreeShippingEligible ?? true,
@@ -1014,6 +1015,7 @@ export async function getProductSalesTotals() {
   const productMap = new Map<string, { productId: string; productName: string; totalQty: number; totalRevenue: number }>();
 
   for (const item of allItems) {
+    if (item.productId === COUPON_DISCOUNT_PRODUCT_ID) continue;
     const existing = productMap.get(item.productId);
     if (existing) {
       existing.totalQty += item.quantity;

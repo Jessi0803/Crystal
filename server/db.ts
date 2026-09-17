@@ -2,7 +2,7 @@ import { eq, and, gt, sql } from "drizzle-orm";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql, { type Pool } from "mysql2/promise";
-import { chatbotLogs, InsertUser, orders, users } from "../drizzle/schema";
+import { chatbotLogs, InsertUser, memberCoupons, orders, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 const ADMIN_EMAIL_ALLOWLIST = new Set(
@@ -95,7 +95,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "lineEmail"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -176,6 +176,7 @@ async function mergeDuplicateMemberIntoPrimary(opts: {
   duplicateUserId: number;
   lineOpenId: string;
   email: string;
+  lineEmail: string | null;
   name?: string | null;
   lastSignedIn: Date;
 }) {
@@ -192,6 +193,10 @@ async function mergeDuplicateMemberIntoPrimary(opts: {
     .update(chatbotLogs)
     .set({ userId: opts.primaryUserId })
     .where(eq(chatbotLogs.userId, opts.duplicateUserId));
+  await db
+    .update(memberCoupons)
+    .set({ userId: opts.primaryUserId })
+    .where(eq(memberCoupons.userId, opts.duplicateUserId));
 
   const shouldKeepAdmin =
     primary.role === "admin" ||
@@ -203,6 +208,7 @@ async function mergeDuplicateMemberIntoPrimary(opts: {
       openId: opts.lineOpenId,
       name: opts.name?.trim() || primary.name || duplicate.name,
       email: opts.email,
+      lineEmail: opts.lineEmail ?? primary.lineEmail,
       passwordHash: primary.passwordHash ?? duplicate.passwordHash,
       emailVerified: true,
       verifyToken: null,
@@ -258,13 +264,26 @@ export async function upsertLineUserAsPrimary(data: {
   const name = data.name?.trim() || null;
 
   const [lineUser] = await db.select().from(users).where(eq(users.openId, data.openId)).limit(1);
-  const [sameEmailUser] = email
+  // 由 Email 會員主動綁定的 LINE：保留會員自己的登入 Email 與驗證狀態，不與其他帳號合併
+  const isBoundEmailAccount = Boolean(lineUser?.passwordHash && lineUser.email);
+  const [sameEmailCandidate] = email && !isBoundEmailAccount
     ? await db
         .select()
         .from(users)
         .where(sql`LOWER(TRIM(${users.email})) = ${email} AND ${users.openId} <> ${data.openId}`)
         .limit(1)
     : [];
+  // 同 Email 的帳號已綁定其他 LINE 時，不可被這個 LINE 合併或接管；
+  // 也不寫入這個 Email，避免同一個 Email 對應兩個帳號
+  const emailOwnedByOtherLine = Boolean(sameEmailCandidate?.openId.startsWith("line:"));
+  const sameEmailUser = emailOwnedByOtherLine ? undefined : sameEmailCandidate;
+  const assignableEmail = emailOwnedByOtherLine ? null : email;
+  if (emailOwnedByOtherLine) {
+    console.warn("[Database] LINE email already belongs to a member bound to another LINE account; not merging", {
+      lineOpenId: data.openId,
+      existingUserId: sameEmailCandidate!.id,
+    });
+  }
 
   if (lineUser && sameEmailUser) {
     await mergeDuplicateMemberIntoPrimary({
@@ -272,9 +291,27 @@ export async function upsertLineUserAsPrimary(data: {
       duplicateUserId: sameEmailUser.id,
       lineOpenId: data.openId,
       email: email!,
+      lineEmail: email,
       name,
       lastSignedIn,
     });
+    return;
+  }
+
+  if (lineUser && isBoundEmailAccount) {
+    await db
+      .update(users)
+      .set({
+        name: lineUser.name || name,
+        lineEmail: email ?? lineUser.lineEmail,
+        role:
+          shouldGrantAdminRole(data.openId, lineUser.email, lineUser.emailVerified === true) || lineUser.role === "admin"
+            ? "admin"
+            : lineUser.role,
+        lastSignedIn,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, lineUser.id));
     return;
   }
 
@@ -283,12 +320,13 @@ export async function upsertLineUserAsPrimary(data: {
       .update(users)
       .set({
         name: name || lineUser.name,
-        email: email ?? lineUser.email,
+        email: assignableEmail ?? lineUser.email,
+        lineEmail: email ?? lineUser.lineEmail,
         loginMethod: "line",
         emailVerified: true,
         verifyToken: null,
         verifyTokenExpiresAt: null,
-        role: shouldGrantAdminRole(data.openId, email ?? lineUser.email, true) || lineUser.role === "admin" ? "admin" : lineUser.role,
+        role: shouldGrantAdminRole(data.openId, assignableEmail ?? lineUser.email, true) || lineUser.role === "admin" ? "admin" : lineUser.role,
         lastSignedIn,
         updatedAt: new Date(),
       })
@@ -303,6 +341,7 @@ export async function upsertLineUserAsPrimary(data: {
         openId: data.openId,
         name: name || sameEmailUser.name,
         email,
+        lineEmail: email,
         loginMethod: "line",
         emailVerified: true,
         verifyToken: null,
@@ -321,11 +360,61 @@ export async function upsertLineUserAsPrimary(data: {
   await upsertUser({
     openId: data.openId,
     name: name ?? undefined,
-    email: email ?? undefined,
+    email: assignableEmail ?? undefined,
+    lineEmail: email ?? undefined,
     loginMethod: "line",
     lastSignedIn,
     emailVerified: true,
   });
+}
+
+export type BindLineResult = "bound" | "already_bound" | "line_in_use" | "user_has_other_line";
+
+/**
+ * 已登入的 Email 會員綁定 LINE：把 openId 改為 line:<userId>。
+ * 不自動合併其他帳號；該 LINE 已屬於其他會員時拒絕。
+ */
+export async function bindLineToUser(opts: {
+  userId: number;
+  lineOpenId: string;
+  lineEmail?: string | null;
+}): Promise<BindLineResult> {
+  if (!opts.lineOpenId.startsWith("line:")) throw new Error("LINE openId is required");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [current] = await db.select().from(users).where(eq(users.id, opts.userId)).limit(1);
+  if (!current) throw new Error("User not found");
+  if (current.openId === opts.lineOpenId) {
+    if (opts.lineEmail) {
+      await db.update(users).set({ lineEmail: opts.lineEmail }).where(eq(users.id, current.id));
+    }
+    return "already_bound";
+  }
+  if (current.openId.startsWith("line:")) return "user_has_other_line";
+
+  const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.openId, opts.lineOpenId)).limit(1);
+  if (owner) return "line_in_use";
+
+  try {
+    const result = await db
+      .update(users)
+      .set({
+        openId: opts.lineOpenId,
+        lineEmail: opts.lineEmail ?? null,
+        lastSignedIn: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(users.id, current.id), eq(users.openId, current.openId)));
+    const affected = (Array.isArray(result) ? result[0] : result) as { affectedRows?: number };
+    return affected?.affectedRows ? "bound" : "user_has_other_line";
+  } catch (error) {
+    // openId 為 UNIQUE：並行綁定同一個 LINE 時只有一個會成功
+    if (String(error).includes("Duplicate entry") || String((error as { cause?: unknown })?.cause).includes("Duplicate entry")) {
+      return "line_in_use";
+    }
+    throw error;
+  }
 }
 
 export async function createEmailUser(data: {

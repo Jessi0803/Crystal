@@ -103,6 +103,8 @@ describe("adminMembers router", () => {
           name: "羅意涵",
           email: "buyer@example.com",
           loginMethod: "email",
+          openId: "line:Ubuyer",
+          lineEmail: "buyer-line@example.com",
           role: "user",
           createdAt: new Date("2026-06-01T00:00:00Z"),
           updatedAt: new Date("2026-06-01T00:00:00Z"),
@@ -136,7 +138,14 @@ describe("adminMembers router", () => {
     const caller = createCaller({ id: 1, role: "admin" });
     const result = await caller.detail({ userId: 7 });
 
-    expect(result.member).toMatchObject({ id: 7, vipTier: "vvip" });
+    expect(result.member).toMatchObject({
+      id: 7,
+      vipTier: "vvip",
+      lineBound: true,
+      lineEmail: "buyer-line@example.com",
+    });
+    // 只提供是否綁定，不把 LINE userId 傳到前端
+    expect(result.member).not.toHaveProperty("openId");
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0]).toMatchObject({
       merchantTradeNo: "CAMPV499RZI7CB",
@@ -178,7 +187,12 @@ describe("adminMembers router", () => {
 
     expect(result).toEqual({ success: true, deletedUserId: 7 });
     expect(db.select).toHaveBeenCalledTimes(1);
-    expect(db.execute).toHaveBeenCalledTimes(5);
+    // 2 次 ensure VIP 欄位 + 訂單、客服紀錄、未使用優惠券、會員本身
+    expect(db.execute).toHaveBeenCalledTimes(6);
+    const statements = db.execute.mock.calls.map(([query]: [{ queryChunks: unknown[] }]) =>
+      JSON.stringify(query.queryChunks)
+    );
+    expect(statements.some((statement: string) => statement.includes("DELETE FROM `memberCoupons`"))).toBe(true);
   });
 
   it("does not allow admins to delete themselves", async () => {

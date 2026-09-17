@@ -9,6 +9,7 @@ import {
 import { deductInventoryAfterPayment } from "./inventoryDb";
 import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
 import { recordAuditEventSafely } from "./auditDb";
+import { markCouponUsedForOrderSafely, releaseCouponsForOrdersSafely } from "./couponDb";
 
 vi.mock("./ecpay", () => ({
   verifyCheckMacValue: vi.fn(),
@@ -42,6 +43,11 @@ vi.mock("./customerOrderNotification", () => ({
   notifyCustomerOrderShippedSafely: vi.fn(),
 }));
 
+vi.mock("./couponDb", () => ({
+  markCouponUsedForOrderSafely: vi.fn(),
+  releaseCouponsForOrdersSafely: vi.fn(),
+}));
+
 vi.mock("./db", () => ({ getDb: vi.fn() }));
 
 vi.mock("./auditDb", () => ({ recordAuditEventSafely: vi.fn().mockResolvedValue(true) }));
@@ -53,6 +59,8 @@ const updateOrderPaymentStatusMock = vi.mocked(updateOrderPaymentStatus);
 const deductInventoryAfterPaymentMock = vi.mocked(deductInventoryAfterPayment);
 const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
 const recordAuditEventSafelyMock = vi.mocked(recordAuditEventSafely);
+const markCouponUsedForOrderMock = vi.mocked(markCouponUsedForOrderSafely);
+const releaseCouponsForOrdersMock = vi.mocked(releaseCouponsForOrdersSafely);
 
 function paidPayload(overrides: Record<string, string> = {}) {
   return {
@@ -105,8 +113,29 @@ describe("ECPay callback security regression coverage", () => {
 
     expect(updateOrderPaymentStatusMock).toHaveBeenCalledTimes(2);
     expect(deductInventoryAfterPaymentMock).toHaveBeenCalledTimes(1);
+    expect(markCouponUsedForOrderMock).toHaveBeenCalledTimes(1);
+    expect(markCouponUsedForOrderMock).toHaveBeenCalledWith(301, expect.anything());
     expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledTimes(1);
     expect(recordAuditEventSafelyMock).toHaveBeenCalledWith(expect.objectContaining({ outcome: "success" }));
     expect(recordAuditEventSafelyMock).toHaveBeenCalledWith(expect.objectContaining({ outcome: "duplicate" }));
+  });
+
+  it("returns the coupon once when ECPay reports a failed payment", async () => {
+    updateOrderPaymentStatusMock
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    await handleECPayPaymentNotify(paidPayload({ RtnCode: "10100058" }));
+    await handleECPayPaymentNotify(paidPayload({ RtnCode: "10100058" }));
+
+    expect(markCouponUsedForOrderMock).not.toHaveBeenCalled();
+    expect(releaseCouponsForOrdersMock).toHaveBeenCalledTimes(1);
+    expect(releaseCouponsForOrdersMock).toHaveBeenCalledWith([301], expect.objectContaining({ includeUsed: false }));
+  });
+
+  it("does not use or return coupons for a rejected callback", async () => {
+    await handleECPayPaymentNotify(paidPayload({ TradeAmt: "1" }));
+
+    expect(markCouponUsedForOrderMock).not.toHaveBeenCalled();
+    expect(releaseCouponsForOrdersMock).not.toHaveBeenCalled();
   });
 });

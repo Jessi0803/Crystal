@@ -14,6 +14,7 @@ import {
   InsertProductInventory,
 } from "../drizzle/schema";
 import { CUSTOM_PRODUCT_IDS } from "../shared/const";
+import { NON_PRODUCT_ORDER_ITEM_IDS } from "../shared/coupons";
 
 let ordersColumnsEnsured = false;
 export async function ensureOrdersColumns() {
@@ -39,7 +40,7 @@ export async function ensureOrdersColumns() {
 }
 
 const NO_EXPIRY_LOCK_DATE = new Date("2038-01-01T00:00:00.000Z");
-const NON_INVENTORY_PRODUCT_IDS = new Set(["shipping", "shipping-fee", "payment-fee", ...CUSTOM_PRODUCT_IDS]);
+const NON_INVENTORY_PRODUCT_IDS = new Set([...NON_PRODUCT_ORDER_ITEM_IDS, ...CUSTOM_PRODUCT_IDS]);
 
 function shouldSkipInventory(productId: string) {
   return NON_INVENTORY_PRODUCT_IDS.has(productId);

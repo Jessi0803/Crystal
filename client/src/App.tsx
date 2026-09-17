@@ -32,6 +32,7 @@ import AdminInventory from "./pages/AdminInventory";
 import AdminProducts from "./pages/AdminProducts";
 import AdminMembers from "./pages/AdminMembers";
 import AdminSettings from "./pages/AdminSettings";
+import AdminCoupons from "./pages/AdminCoupons";
 import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminLayout from "./components/AdminLayout";
 import Login from "./pages/Login";
@@ -159,6 +160,7 @@ function Router() {
       <Route path="/admin/inventory" component={AdminInventory} />
       <Route path="/admin/products" component={AdminProducts} />
       <Route path="/admin/members" component={AdminMembers} />
+      <Route path="/admin/coupons" component={AdminCoupons} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/monitoring" component={AdminMonitoring} />
       <Route path="/login" component={Login} />

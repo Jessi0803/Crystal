@@ -6,7 +6,7 @@ export type AuditOutcome = "success" | "rejected" | "failed" | "duplicate";
 export type AuditSeverity = "info" | "warning" | "error";
 
 export type AuditEventInput = {
-  source: "admin" | "ecpay" | "paypal" | "logistics" | "system";
+  source: "admin" | "ecpay" | "paypal" | "logistics" | "system" | "coupon" | "line";
   category: string;
   action: string;
   outcome: AuditOutcome;

@@ -20,9 +20,12 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { sdk } from "./_core/sdk";
 import * as db from "./db";
+import { getLineFriendRewardForUser, getLineFriendRewardOffer, grantLineFriendReward } from "./couponDb";
+import { checkLineFriendship } from "./lineFriendship";
 
 const LINE_STATE_COOKIE = "line_oauth_state";
 const LINE_RETURN_TO_COOKIE = "line_oauth_return_to";
+const LINE_MODE_COOKIE = "line_oauth_mode";
 
 function lineConfig() {
   const channelId = process.env.LINE_CHANNEL_ID?.trim();
@@ -136,6 +139,12 @@ export function lineOAuthStart(req: Request, res: Response): void {
   if (returnTo) {
     res.cookie(LINE_RETURN_TO_COOKIE, returnTo, cookieOpts);
   }
+  // mode=link：已登入的會員綁定 LINE（會員身分於 callback 由 session 確認）
+  if (req.query.mode === "link") {
+    res.cookie(LINE_MODE_COOKIE, "link", cookieOpts);
+  } else {
+    res.clearCookie(LINE_MODE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
+  }
 
   const authorize = new URL("https://access.line.me/oauth2/v2.1/authorize");
   authorize.searchParams.set("response_type", "code");
@@ -143,6 +152,8 @@ export function lineOAuthStart(req: Request, res: Response): void {
   authorize.searchParams.set("redirect_uri", callback);
   authorize.searchParams.set("state", state);
   authorize.searchParams.set("scope", "profile openid email");
+  // 同意登入後另開畫面詢問是否加入官方 LINE 好友（需在 LINE Login channel 連結官方帳號）
+  authorize.searchParams.set("bot_prompt", "aggressive");
 
   res.redirect(302, authorize.toString());
 }
@@ -151,7 +162,9 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
     const clearStateCookie = () => {
       res.clearCookie(LINE_STATE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
       res.clearCookie(LINE_RETURN_TO_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
+      res.clearCookie(LINE_MODE_COOKIE, { path: "/", ...getSessionCookieOptions(req) });
     };
+    const isLinkMode = readCookie(req, LINE_MODE_COOKIE) === "link";
 
     try {
       const code = typeof req.query.code === "string" ? req.query.code : "";
@@ -188,13 +201,31 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
 
       const openId = `line:${profile.userId}`;
       const name = profile.displayName?.trim() || null;
+      const returnTo = safeReturnTo(readCookie(req, LINE_RETURN_TO_COOKIE));
 
-      await db.upsertLineUserAsPrimary({
-        openId,
-        name: name ?? undefined,
-        email: email ?? undefined,
-        lastSignedIn: new Date(),
-      });
+      if (isLinkMode) {
+        let currentUser: Awaited<ReturnType<typeof sdk.authenticateRequest>>;
+        try {
+          currentUser = await sdk.authenticateRequest(req);
+        } catch {
+          clearStateCookie();
+          res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo ?? "/member")}`);
+          return;
+        }
+        const bindResult = await db.bindLineToUser({ userId: currentUser.id, lineOpenId: openId, lineEmail: email });
+        if (bindResult === "line_in_use" || bindResult === "user_has_other_line") {
+          clearStateCookie();
+          res.redirect(302, withQuery(returnTo ?? "/member", { line: bindResult }));
+          return;
+        }
+      } else {
+        await db.upsertLineUserAsPrimary({
+          openId,
+          name: name ?? undefined,
+          email: email ?? undefined,
+          lastSignedIn: new Date(),
+        });
+      }
 
       let user = await db.getUserByOpenId(openId);
       if (!user) {
@@ -211,6 +242,13 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
         }
       }
 
+      const rewardStatus = await tryGrantLineFriendReward({
+        userId: user.id,
+        lineUserId: profile.userId,
+        loginAccessToken: tokenJson.access_token,
+      });
+
+      // 綁定後 openId 已改變，需重新簽發 session
       const sessionToken = await sdk.createSessionToken(openId, {
         name: user.name ?? "",
         expiresInMs: ONE_YEAR_MS,
@@ -218,13 +256,56 @@ export async function lineOAuthCallback(req: Request, res: Response): Promise<vo
       clearStateCookie();
       const sessionCookieOpts = { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS };
       res.cookie(COOKIE_NAME, sessionToken, sessionCookieOpts);
-      const returnTo = safeReturnTo(readCookie(req, LINE_RETURN_TO_COOKIE));
-      res.redirect(302, returnTo ?? (user.role === "admin" ? "/admin/orders" : "/products"));
+      const destination = isLinkMode
+        ? returnTo ?? "/member"
+        : returnTo ?? (user.role === "admin" ? "/admin/orders" : "/products");
+      const query: Record<string, string> = {};
+      if (isLinkMode) query.line = "bound";
+      if (rewardStatus && (isLinkMode || rewardStatus === "granted")) query.lineReward = rewardStatus;
+      res.redirect(302, withQuery(destination, query));
     } catch (err) {
       console.error("[LINE OAuth] callback failed", err);
       clearStateCookie();
       res.status(500).send("LINE 登入失敗，請稍後再試。");
     }
+}
+
+function withQuery(path: string, params: Record<string, string>) {
+  if (Object.keys(params).length === 0) return path;
+  const url = new URL(path, "https://placeholder.local");
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+type LineRewardRedirectStatus = "granted" | "already" | "not_friend" | "unavailable";
+
+/**
+ * 登入／綁定完成後，由伺服器向 LINE 確認好友狀態並發放好友禮。
+ * 任何錯誤都不影響登入本身；未領到的會員之後可在會員中心重新確認。
+ */
+async function tryGrantLineFriendReward(opts: {
+  userId: number;
+  lineUserId: string;
+  loginAccessToken: string;
+}): Promise<LineRewardRedirectStatus | null> {
+  try {
+    const offer = await getLineFriendRewardOffer();
+    if (!offer) return null;
+    if (await getLineFriendRewardForUser(opts.userId)) return "already";
+
+    const friendship = await checkLineFriendship({
+      lineUserId: opts.lineUserId,
+      loginAccessToken: opts.loginAccessToken,
+    });
+    if (friendship.status === "not_friend") return "not_friend";
+    if (friendship.status !== "friend") return "unavailable";
+
+    const result = await grantLineFriendReward({ userId: opts.userId, lineUserId: opts.lineUserId });
+    return result.status === "disabled" ? null : result.status;
+  } catch (error) {
+    console.error("[LINE OAuth] friend reward failed", error);
+    return "unavailable";
+  }
 }
 
 export function registerLineOAuthRoutes(app: Express) {

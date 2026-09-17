@@ -80,6 +80,7 @@ export const adminMembersRouter = router({
           name: users.name,
           email: users.email,
           loginMethod: users.loginMethod,
+          lineBound: sql<number>`CASE WHEN ${users.openId} LIKE 'line:%' THEN 1 ELSE 0 END`,
           role: users.role,
           createdAt: users.createdAt,
           lastSignedIn: users.lastSignedIn,
@@ -107,6 +108,7 @@ export const adminMembersRouter = router({
           users.name,
           users.email,
           users.loginMethod,
+          users.openId,
           users.role,
           users.createdAt,
           users.lastSignedIn,
@@ -118,7 +120,7 @@ export const adminMembersRouter = router({
         .offset(input.offset);
 
       return {
-        items: rows,
+        items: rows.map((row) => ({ ...row, lineBound: Number(row.lineBound) === 1 })),
         total: Number(totalRow?.count ?? 0),
       };
     }),
@@ -133,6 +135,8 @@ export const adminMembersRouter = router({
           name: users.name,
           email: users.email,
           loginMethod: users.loginMethod,
+          openId: users.openId,
+          lineEmail: users.lineEmail,
           role: users.role,
           createdAt: users.createdAt,
           updatedAt: users.updatedAt,
@@ -186,7 +190,8 @@ export const adminMembersRouter = router({
         .orderBy(desc(orders.createdAt))
         .limit(100);
 
-      return { member, orders: history };
+      const { openId, ...memberFields } = member;
+      return { member: { ...memberFields, lineBound: openId.startsWith("line:") }, orders: history };
     }),
 
   updateVip: adminProcedure
@@ -234,6 +239,8 @@ export const adminMembersRouter = router({
 
       await db.execute(sql`UPDATE \`orders\` SET \`userId\` = NULL WHERE \`userId\` = ${input.userId}`);
       await db.execute(sql`UPDATE \`chatbotLogs\` SET \`userId\` = NULL WHERE \`userId\` = ${input.userId}`);
+      // 未使用的優惠券隨會員刪除；已使用的保留，作為訂單折抵紀錄
+      await db.execute(sql`DELETE FROM \`memberCoupons\` WHERE \`userId\` = ${input.userId} AND \`status\` <> 'used'`);
       await db.execute(sql`DELETE FROM \`users\` WHERE \`id\` = ${input.userId}`);
 
       return { success: true, deletedUserId: input.userId };

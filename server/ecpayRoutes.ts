@@ -29,6 +29,7 @@ import { getDb } from "./db";
 import { orders, logisticsOrders } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { recordAuditEventSafely } from "./auditDb";
+import { markCouponUsedForOrderSafely, releaseCouponsForOrdersSafely } from "./couponDb";
 
 type LogisticsStatus = "created" | "in_transit" | "arrived" | "picked_up" | "returned" | "failed";
 
@@ -117,8 +118,12 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
     }
     const claimed = await updateOrderPaymentStatus(merchantTradeNo, status, tradeNo, notifyData);
     if (claimed && status === "paid") {
+      await markCouponUsedForOrderSafely(order.id, { merchantTradeNo });
       await deductInventoryAfterPayment(merchantTradeNo);
       await notifyCustomerOrderPlacedSafely(order.id);
+    }
+    if (claimed && status === "failed") {
+      await releaseCouponsForOrdersSafely([order.id], { includeUsed: false, reason: "綠界回報付款失敗" });
     }
     console.log(`[ECPay Notify] Order ${merchantTradeNo} → ${status}`);
     await recordAuditEventSafely({

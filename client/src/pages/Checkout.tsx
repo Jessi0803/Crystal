@@ -16,11 +16,14 @@ import {
   Home,
   Globe,
   ImageUp,
+  TicketPercent,
   X,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { saveOrderAccess } from "@/lib/orderAccess";
+import { formatCouponDate, formatCouponMinimum } from "@/lib/coupons";
+import { calcCouponDiscount } from "@shared/coupons";
 import { toast } from "sonner";
 import {
   AU_STATE_OPTIONS,
@@ -179,6 +182,30 @@ export default function Checkout() {
 
   const createAndPay = trpc.order.createAndPay.useMutation();
   const { data: sessionUser } = trpc.auth.me.useQuery();
+  const utils = trpc.useUtils();
+
+  // 會員優惠券：前端只負責選擇與預覽，實際折抵由伺服器重新驗證與計算
+  const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
+  const { data: myCoupons = [] } = trpc.coupons.mine.useQuery(undefined, {
+    enabled: Boolean(sessionUser),
+  });
+  const couponOptions = myCoupons
+    .filter(coupon => coupon.displayStatus === "available")
+    .map(coupon => ({
+      coupon,
+      preview: calcCouponDiscount({ subtotal: totalPrice, shippingFee, coupon }),
+    }));
+  const selectedCoupon = couponOptions.find(option => option.coupon.id === selectedCouponId);
+  const appliedCoupon = selectedCoupon?.preview.ok ? selectedCoupon : null;
+  const couponDiscount = appliedCoupon?.preview.ok ? appliedCoupon.preview.discount : 0;
+  const payableTotal = appliedCoupon?.preview.ok ? appliedCoupon.preview.total : finalTotal;
+
+  // 購物車或運費變動後，已選的券不再適用時取消選取
+  useEffect(() => {
+    if (selectedCouponId != null && !appliedCoupon && myCoupons.length > 0) {
+      setSelectedCouponId(null);
+    }
+  }, [selectedCouponId, appliedCoupon, myCoupons.length]);
 
   // 已登入時帶入帳號 Email／姓名，避免與會員中心訂單比對不一致
   useEffect(() => {
@@ -231,6 +258,7 @@ export default function Checkout() {
         if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod);
         if (saved.shippingMethod) setShippingMethod(saved.shippingMethod);
         if (saved.form) setForm(f => ({ ...f, ...saved.form }));
+        if (typeof saved.selectedCouponId === "number") setSelectedCouponId(saved.selectedCouponId);
       }
     } catch {
       /* ignore */
@@ -455,6 +483,7 @@ export default function Checkout() {
         })),
         origin: window.location.origin,
         customerNote: hasCustomDepositItem ? customConsultationNote : undefined,
+        memberCouponId: appliedCoupon?.coupon.id,
       });
 
       saveOrderAccess(
@@ -509,6 +538,10 @@ export default function Checkout() {
           ? (err as { message: string }).message
           : "建立訂單失敗，請稍後再試";
       toast.error(msg);
+      if (appliedCoupon && msg.includes("優惠券")) {
+        setSelectedCouponId(null);
+        void utils.coupons.mine.invalidate();
+      }
     }
   };
 
@@ -561,7 +594,7 @@ export default function Checkout() {
     try {
       sessionStorage.setItem(
         CHECKOUT_FORM_KEY,
-        JSON.stringify({ checkoutRegion, paymentMethod, shippingMethod, form })
+        JSON.stringify({ checkoutRegion, paymentMethod, shippingMethod, form, selectedCouponId })
       );
     } catch {
       /* 暫存失敗仍可繼續，只是回來時表單需重填 */
@@ -1325,7 +1358,7 @@ export default function Checkout() {
                             轉帳金額
                           </span>
                           <span className="font-bold text-blue-900 text-right">
-                            NT$ {finalTotal.toLocaleString()}
+                            NT$ {payableTotal.toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -1551,11 +1584,67 @@ export default function Checkout() {
                   </div>
                 ))}
               </div>
+              {couponOptions.length > 0 && (
+                <div className="border-t border-[oklch(0.93_0_0)] py-4">
+                  <p className="flex items-center gap-1.5 text-xs tracking-[0.1em] text-[oklch(0.4_0_0)] font-body mb-3">
+                    <TicketPercent className="w-3.5 h-3.5" />
+                    可使用優惠
+                  </p>
+                  <div className="space-y-2" role="radiogroup" aria-label="選擇優惠券">
+                    <label className="flex items-center gap-2.5 cursor-pointer text-sm font-body">
+                      <input
+                        type="radio"
+                        name="memberCoupon"
+                        checked={selectedCouponId == null}
+                        onChange={() => setSelectedCouponId(null)}
+                      />
+                      不使用優惠券
+                    </label>
+                    {couponOptions.map(({ coupon, preview }) => (
+                      <label
+                        key={coupon.id}
+                        className={`flex items-start gap-2.5 text-sm font-body ${
+                          preview.ok ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="memberCoupon"
+                          className="mt-1"
+                          disabled={!preview.ok}
+                          checked={selectedCouponId === coupon.id}
+                          onChange={() => setSelectedCouponId(coupon.id)}
+                        />
+                        <span className="flex-1 min-w-0">
+                          <span className="flex justify-between gap-2">
+                            <span>{coupon.name}</span>
+                            <span className="shrink-0">-NT$ {coupon.discountAmount.toLocaleString()}</span>
+                          </span>
+                          <span className="block text-xs text-[oklch(0.55_0_0)]">
+                            有效期限 {formatCouponDate(coupon.expiresAt)}
+                            {coupon.minOrderAmount > 0 ? `・${formatCouponMinimum(coupon.minOrderAmount)}` : ""}
+                          </span>
+                          {!preview.ok && (
+                            <span className="block text-xs text-[oklch(0.55_0_0)]">{preview.reason}</span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[0.65rem] text-[oklch(0.6_0_0)] font-body">每筆訂單限用一張，折抵商品金額（不含運費）。</p>
+                </div>
+              )}
               <div className="border-t border-[oklch(0.93_0_0)] pt-4 space-y-2">
                 <div className="flex justify-between text-sm font-body">
-                  <span className="text-[oklch(0.5_0_0)]">小計</span>
+                  <span className="text-[oklch(0.5_0_0)]">商品小計</span>
                   <span>NT$ {totalPrice.toLocaleString()}</span>
                 </div>
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-sm font-body">
+                    <span className="text-[oklch(0.5_0_0)]">優惠券</span>
+                    <span className="text-rose-700">-NT$ {couponDiscount.toLocaleString()}</span>
+                  </div>
+                )}
                 {displayShippingFee && (
                   <div className="flex justify-between text-sm font-body">
                     <span className="text-[oklch(0.5_0_0)]">運費</span>
@@ -1567,8 +1656,8 @@ export default function Checkout() {
                   </div>
                 )}
                 <div className="flex justify-between text-base font-medium border-t border-[oklch(0.93_0_0)] pt-3 mt-3">
-                  <span>總計</span>
-                  <span>NT$ {finalTotal.toLocaleString()}</span>
+                  <span>{couponDiscount > 0 ? "應付金額" : "總計"}</span>
+                  <span>NT$ {payableTotal.toLocaleString()}</span>
                 </div>
               </div>
             </div>

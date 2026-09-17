@@ -89,8 +89,22 @@ vi.mock("./storage", () => ({
   storagePut: vi.fn(),
 }));
 
+vi.mock("./couponDb", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./couponDb")>();
+  return {
+    ...actual,
+    getCouponForCheckout: vi.fn(),
+    reserveCoupon: vi.fn(),
+    attachReservedCouponToOrder: vi.fn(),
+    cancelCouponReservation: vi.fn(),
+    markCouponUsedForOrderSafely: vi.fn(),
+    releaseCouponsForOrdersSafely: vi.fn(),
+  };
+});
+
 import {
   createOrder,
+  isCustomDepositProduct,
   getAdminOrderSummaries,
   getOrderWithItems,
   getBalancePaymentDetail,
@@ -108,6 +122,15 @@ import {
 } from "./_core/paypal";
 import { buildCreditPaymentParams } from "./ecpay";
 import { storagePut } from "./storage";
+import {
+  attachReservedCouponToOrder,
+  cancelCouponReservation,
+  CouponError,
+  getCouponForCheckout,
+  markCouponUsedForOrderSafely,
+  releaseCouponsForOrdersSafely,
+  reserveCoupon,
+} from "./couponDb";
 import { notifyCustomerOrderPlacedSafely, notifyCustomerOrderShippedSafely } from "./customerOrderNotification";
 
 const getAdminOrderSummariesMock = vi.mocked(getAdminOrderSummaries);
@@ -127,6 +150,13 @@ const storagePutMock = vi.mocked(storagePut);
 const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
 const notifyCustomerOrderShippedSafelyMock = vi.mocked(notifyCustomerOrderShippedSafely);
 const deductInventoryAfterBalancePaymentMock = vi.mocked(deductInventoryAfterBalancePayment);
+const getCouponForCheckoutMock = vi.mocked(getCouponForCheckout);
+const reserveCouponMock = vi.mocked(reserveCoupon);
+const attachReservedCouponToOrderMock = vi.mocked(attachReservedCouponToOrder);
+const cancelCouponReservationMock = vi.mocked(cancelCouponReservation);
+const markCouponUsedForOrderMock = vi.mocked(markCouponUsedForOrderSafely);
+const releaseCouponsForOrdersMock = vi.mocked(releaseCouponsForOrdersSafely);
+const isCustomDepositProductMock = vi.mocked(isCustomDepositProduct);
 
 function createCaller(user: { id: number; role: string } | null) {
   return appRouter.createCaller({
@@ -702,6 +732,7 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
     const result = await caller.order.deleteCancelledOrders({ orderIds: [10, 11] });
 
     expect(result).toEqual({ success: true, deletedCount: 2 });
+    expect(releaseCouponsForOrdersMock).toHaveBeenCalledWith([10, 11], expect.objectContaining({ includeUsed: true }));
     expect(db.select).toHaveBeenCalledTimes(2);
     expect(db.delete).toHaveBeenCalledTimes(6);
   });
@@ -1335,5 +1366,252 @@ describe("order.getBalancePaymentCheckout", () => {
     });
 
     expect(db.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("order.createAndPay member coupons", () => {
+  const RESERVED_AT = new Date("2026-09-17T02:00:00.000Z");
+
+  function productDb() {
+    return createMutationMockDb([
+      [{
+        id: "bracelet-1",
+        name: "通知測試手鍊",
+        price: 1280,
+        image: "",
+        active: true,
+        wristSizePriceRules: [],
+        purchaseOptions: [],
+      }],
+      [{ id: "bracelet-1", twoItemFreeShippingEligible: true }],
+    ]);
+  }
+
+  let callerIp = 0;
+  function memberCaller(userId = 55) {
+    // 每個測試使用不同 IP，避免與其他結帳測試共用頻率限制
+    callerIp += 1;
+    return appRouter.createCaller({
+      user: { id: userId, role: "user", openId: "email:member@example.com" } as any,
+      req: {
+        headers: { "x-forwarded-for": `198.51.100.${callerIp}` },
+        get: (name: string) => (name === "host" ? "example.test" : undefined),
+        protocol: "https",
+      } as any,
+      res: {} as any,
+    });
+  }
+
+  function memberCoupon(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 9,
+      couponTemplateId: 1,
+      userId: 55,
+      name: "LINE 好友禮",
+      discountAmount: 50,
+      minOrderAmount: 0,
+      status: "available",
+      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      ...overrides,
+    } as Awaited<ReturnType<typeof getCouponForCheckout>>;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createOrderMock.mockResolvedValue(101);
+    mockAvailableProducts();
+    getDbMock.mockResolvedValue(productDb() as any);
+    getCouponForCheckoutMock.mockResolvedValue(memberCoupon());
+    reserveCouponMock.mockResolvedValue(RESERVED_AT);
+    attachReservedCouponToOrderMock.mockResolvedValue(true);
+    isCustomDepositProductMock.mockReturnValue(false);
+  });
+
+  it("applies the coupon discount calculated on the server", async () => {
+    await memberCaller().order.createAndPay({ ...checkoutInput("credit"), memberCouponId: 9 });
+
+    expect(getCouponForCheckoutMock).toHaveBeenCalledWith(9, 55);
+    // 商品 1280 - 折抵 50 + 宅配運費 130
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 1360, userId: 55 }),
+      expect.arrayContaining([
+        expect.objectContaining({ productId: "coupon-discount", unitPrice: -50, subtotal: -50, quantity: 1 }),
+        expect.objectContaining({ productId: "shipping-fee", unitPrice: 130 }),
+      ])
+    );
+    expect(reserveCouponMock).toHaveBeenCalledWith(9, 55);
+    expect(attachReservedCouponToOrderMock).toHaveBeenCalledWith(9, RESERVED_AT, 101);
+    expect(buildCreditPaymentParams).toHaveBeenCalledWith(expect.objectContaining({ totalAmount: 1360 }));
+  });
+
+  it("ignores client-supplied discount and final amount fields", async () => {
+    const input = {
+      ...checkoutInput("credit"),
+      memberCouponId: 9,
+      couponDiscount: 1279,
+      discountAmount: 1279,
+      finalPrice: 1,
+      totalAmount: 1,
+    };
+
+    await memberCaller().order.createAndPay(input as any);
+
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 1360 }),
+      expect.arrayContaining([expect.objectContaining({ productId: "coupon-discount", unitPrice: -50 })])
+    );
+  });
+
+  it("requires a signed-in member to use a coupon", async () => {
+    const guestCaller = appRouter.createCaller({
+      user: null,
+      req: { headers: { "x-forwarded-for": "198.51.100.200" }, get: () => undefined, protocol: "https" } as any,
+      res: {} as any,
+    });
+    await expect(
+      guestCaller.order.createAndPay({ ...checkoutInput("credit"), memberCouponId: 9 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(getCouponForCheckoutMock).not.toHaveBeenCalled();
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["another member's coupon", new CouponError("NOT_FOUND", "找不到這張優惠券")],
+    ["an expired coupon", new CouponError("EXPIRED", "這張優惠券已過期")],
+    ["a used coupon", new CouponError("UNAVAILABLE", "這張優惠券已使用")],
+  ])("rejects %s without creating an order", async (_label, error) => {
+    getCouponForCheckoutMock.mockRejectedValue(error);
+
+    await expect(
+      memberCaller().order.createAndPay({ ...checkoutInput("credit"), memberCouponId: 9 })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: error.message });
+    expect(reserveCouponMock).not.toHaveBeenCalled();
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a coupon when the product subtotal is below the minimum", async () => {
+    getCouponForCheckoutMock.mockResolvedValue(memberCoupon({ minOrderAmount: 2000 }));
+
+    await expect(
+      memberCaller().order.createAndPay({ ...checkoutInput("credit"), memberCouponId: 9 })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringContaining("未達最低消費") });
+    expect(reserveCouponMock).not.toHaveBeenCalled();
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects when a concurrent checkout already reserved the coupon", async () => {
+    reserveCouponMock.mockResolvedValue(null);
+
+    await expect(
+      memberCaller().order.createAndPay({ ...checkoutInput("credit"), memberCouponId: 9 })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the reservation when the order cannot be created", async () => {
+    createOrderMock.mockRejectedValue(new Error("insert failed"));
+
+    await expect(
+      memberCaller().order.createAndPay({ ...checkoutInput("credit"), memberCouponId: 9 })
+    ).rejects.toThrow("insert failed");
+    expect(cancelCouponReservationMock).toHaveBeenCalledWith(9, RESERVED_AT);
+  });
+
+  it("allows a coupon on a custom deposit order without charging shipping", async () => {
+    getDbMock.mockResolvedValue(createMutationMockDb([
+      [{
+        id: "custom-deposit-product",
+        name: "客製化商品",
+        price: 500,
+        image: "",
+        active: true,
+        category: "custom",
+        wristSizePriceRules: [],
+        purchaseOptions: [],
+      }],
+      [{ id: "custom-deposit-product", twoItemFreeShippingEligible: true }],
+    ]) as any);
+    isCustomDepositProductMock.mockReturnValue(true);
+    const input = checkoutInput("credit");
+    input.items = [{ id: "custom-deposit-product", name: "客製化商品", price: 500, quantity: 1, image: "" }];
+
+    await memberCaller().order.createAndPay({ ...input, memberCouponId: 9 });
+
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 450, isCustomOrder: true }),
+      expect.not.arrayContaining([expect.objectContaining({ productId: "shipping-fee" })])
+    );
+  });
+
+  it("does not touch coupons when no coupon is selected", async () => {
+    await memberCaller().order.createAndPay(checkoutInput("credit"));
+
+    expect(getCouponForCheckoutMock).not.toHaveBeenCalled();
+    expect(reserveCouponMock).not.toHaveBeenCalled();
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 1410 }),
+      expect.not.arrayContaining([expect.objectContaining({ productId: "coupon-discount" })])
+    );
+  });
+});
+
+describe("order coupon lifecycle (admin procedures)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns coupons when an order is cancelled", async () => {
+    const db = createMutationMockDb([
+      [{ id: 101, merchantTradeNo: "COUPON001" }],
+      [],
+      [{ merchantTradeNo: "COUPON001" }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 101, status: "cancelled" });
+
+    expect(releaseCouponsForOrdersMock).toHaveBeenCalledWith([101], expect.objectContaining({
+      includeUsed: true,
+      actorUserId: 1,
+    }));
+    expect(markCouponUsedForOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("marks the coupon used when a bank transfer is confirmed", async () => {
+    const db = createMutationMockDb([[{ merchantTradeNo: "COUPON002" }]]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.confirmTransfer({ orderId: 102 });
+
+    expect(markCouponUsedForOrderMock).toHaveBeenCalledWith(102, { merchantTradeNo: "COUPON002" });
+  });
+
+  it("marks the coupon used when an admin sets an order to paid", async () => {
+    const db = createMutationMockDb([
+      [{ id: 103, merchantTradeNo: "COUPON003" }],
+      [],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await createCaller({ id: 1, role: "admin" }).order.updateOrderStatus({ orderId: 103, status: "paid" });
+
+    expect(markCouponUsedForOrderMock).toHaveBeenCalledWith(103, { merchantTradeNo: "COUPON003" });
+    expect(releaseCouponsForOrdersMock).not.toHaveBeenCalled();
+  });
+
+  it("marks the coupon used on PayPal capture", async () => {
+    getOrderWithItemsMock.mockResolvedValue({
+      id: 104,
+      merchantTradeNo: "COUPON004",
+      paymentMethod: "paypal",
+      paymentStatus: "pending",
+    } as any);
+    verifyPayPalOrderBelongsToMerchantMock.mockResolvedValue(undefined as any);
+    capturePayPalOrderMock.mockResolvedValue({ status: "completed", captureId: "CAP", raw: {} } as any);
+    getDbMock.mockResolvedValue(createMutationMockDb([]) as any);
+
+    await createPublicCaller().order.capturePayPal({ merchantTradeNo: "COUPON004", paypalOrderId: "PP" });
+
+    expect(markCouponUsedForOrderMock).toHaveBeenCalledWith(104, { merchantTradeNo: "COUPON004" });
   });
 });

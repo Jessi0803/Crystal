@@ -45,6 +45,11 @@ vi.mock("./customerOrderNotification", () => ({
   notifyCustomerOrderShippedSafely: vi.fn(),
 }));
 
+vi.mock("./couponDb", () => ({
+  markCouponUsedForOrderSafely: vi.fn(),
+  releaseCouponsForOrdersSafely: vi.fn(),
+}));
+
 vi.mock("./db", () => ({
   getDb: vi.fn(),
 }));

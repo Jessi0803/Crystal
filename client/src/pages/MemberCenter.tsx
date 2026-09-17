@@ -2,6 +2,27 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { lineLinkUrl, MemberCouponList } from "@/components/MemberCoupons";
+
+type MemberTab = "orders" | "coupons" | "profile";
+
+const LINE_REDIRECT_MESSAGES: Record<string, { type: "success" | "info" | "error"; message: string }> = {
+  "line:bound": { type: "success", message: "LINE 綁定成功" },
+  "line:line_in_use": { type: "error", message: "這個 LINE 帳號已綁定其他會員，無法重複綁定" },
+  "line:user_has_other_line": { type: "error", message: "您的帳號已綁定其他 LINE 帳號" },
+  "lineReward:granted": { type: "success", message: "LINE 好友優惠券已放入會員帳戶" },
+  "lineReward:already": { type: "info", message: "您已經領取過 LINE 好友禮" },
+  "lineReward:not_friend": { type: "info", message: "尚未加入官方 LINE 好友，加入後可在「我的優惠券」領取" },
+  "lineReward:unavailable": { type: "error", message: "暫時無法確認好友狀態，請稍後在「我的優惠券」重新領取" },
+};
+
+function initialTab(): MemberTab {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  if (tab === "coupons" || tab === "profile") return tab;
+  if (params.has("line") || params.has("lineReward")) return "coupons";
+  return "orders";
+}
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待付款",
@@ -57,7 +78,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function MemberCenter() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"orders" | "profile">("orders");
+  const [activeTab, setActiveTab] = useState<MemberTab>(initialTab);
   const [profileName, setProfileName] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
 
@@ -97,6 +118,24 @@ export default function MemberCenter() {
       navigate("/login");
     }
   }, [navigate, user, userLoading]);
+
+  // LINE 綁定／好友禮結果由伺服器帶在網址上，顯示一次後清除
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let handled = false;
+    for (const key of ["line", "lineReward"]) {
+      const value = params.get(key);
+      if (!value) continue;
+      handled = true;
+      const notice = LINE_REDIRECT_MESSAGES[`${key}:${value}`];
+      if (notice) toast[notice.type](notice.message);
+      params.delete(key);
+    }
+    if (!handled) return;
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    utils.coupons.invalidate();
+  }, [utils]);
 
   if (userLoading) {
     return (
@@ -161,12 +200,13 @@ export default function MemberCenter() {
         <div className="flex gap-0 border-b border-[oklch(0.9_0_0)] mb-8">
           {[
             { key: "orders", label: "我的訂單" },
+            { key: "coupons", label: "我的優惠券" },
             { key: "profile", label: "帳號設定" },
           ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as typeof activeTab)}
-              className={`px-6 py-3 text-sm font-body tracking-[0.05em] border-b-2 transition-colors ${
+              className={`px-4 sm:px-6 py-3 text-sm font-body tracking-[0.05em] border-b-2 transition-colors ${
                 activeTab === tab.key
                   ? "border-[oklch(0.15_0_0)] text-[oklch(0.15_0_0)]"
                   : "border-transparent text-[oklch(0.55_0_0)] hover:text-[oklch(0.35_0_0)]"
@@ -295,6 +335,8 @@ export default function MemberCenter() {
           </div>
         )}
 
+        {activeTab === "coupons" && <MemberCouponList />}
+
         {/* 帳號設定 */}
         {activeTab === "profile" && (
           <div className="bg-white border border-[oklch(0.93_0_0)] p-6 sm:p-8 max-w-md">
@@ -339,6 +381,23 @@ export default function MemberCenter() {
               >
                 {updateProfileMutation.isPending ? "儲存中..." : "儲存變更"}
               </button>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-[oklch(0.93_0_0)]">
+              <p className="text-xs tracking-[0.08em] text-[oklch(0.4_0_0)] mb-2 font-body">LINE 帳號</p>
+              {user.openId?.startsWith("line:") ? (
+                <p className="text-sm font-body text-[oklch(0.3_0_0)]">已綁定 LINE</p>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-body text-[oklch(0.5_0_0)]">尚未綁定</p>
+                  <a
+                    href={lineLinkUrl("/member?tab=profile")}
+                    className="text-xs font-body bg-[#06C755] text-white px-4 py-2 hover:opacity-90"
+                  >
+                    綁定 LINE
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         )}

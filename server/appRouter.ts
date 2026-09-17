@@ -10,6 +10,7 @@ import { productRouter } from "./routers/products";
 import { adminMembersRouter } from "./routers/adminMembers";
 import { siteSettingsRouter } from "./routers/siteSettings";
 import { auditRouter } from "./routers/audit";
+import { couponRouter } from "./routers/coupons";
 
 export const appRouter = router({
   system: systemRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
   adminMembers: adminMembersRouter,
   siteSettings: siteSettingsRouter,
   audit: auditRouter,
+  coupons: couponRouter,
 });
 
 export type AppRouter = typeof appRouter;

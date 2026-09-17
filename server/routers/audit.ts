@@ -8,7 +8,7 @@ export const auditRouter = router({
       limit: z.number().int().min(1).max(200).optional().default(50),
       orderId: z.number().int().positive().optional(),
       outcome: z.enum(["success", "rejected", "failed", "duplicate"]).optional(),
-      source: z.enum(["admin", "ecpay", "paypal", "logistics", "system"]).optional(),
+      source: z.enum(["admin", "ecpay", "paypal", "logistics", "system", "coupon", "line"]).optional(),
       hours: z.number().int().min(1).max(720).optional().default(24),
     }).optional())
     .query(({ input }) => {

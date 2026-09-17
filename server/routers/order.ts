@@ -88,8 +88,28 @@ import {
   TAROT_DEPOSIT_PRODUCT_ID,
 } from "@shared/tarotPricing";
 import { createOrderAccessToken, verifyOrderAccessToken } from "../orderAccess";
+import { calcCouponDiscount, COUPON_DISCOUNT_PRODUCT_ID, NON_PRODUCT_ORDER_ITEM_IDS } from "@shared/coupons";
+import {
+  attachReservedCouponToOrder,
+  cancelCouponReservation,
+  CouponError,
+  getCouponForCheckout,
+  markCouponUsedForOrderSafely,
+  releaseCouponsForOrdersSafely,
+  reserveCoupon,
+} from "../couponDb";
 
 const BANK_TRANSFER_INVENTORY_LOCK_TTL_MS: number | null = null;
+// 訂單進入這些狀態代表已收款，保留中的優惠券改為已使用
+const COUPON_CONSUMING_ORDER_STATUSES = new Set<string>([
+  "deposit_paid",
+  "paid",
+  "processing",
+  "shipped",
+  "arrived",
+  "picked_up",
+  "completed",
+]);
 const TRANSFER_RECEIPT_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function getClearQuartzChipsAddOn(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
@@ -109,6 +129,7 @@ async function getClearQuartzChipsAddOn(db: NonNullable<Awaited<ReturnType<typeo
 async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>, orderIds: number[]) {
   if (!db) throw new Error("Database not available");
 
+  await releaseCouponsForOrdersSafely(orderIds, { includeUsed: true, reason: "刪除已取消訂單" });
   await db.transaction(async (tx) => {
     const mergeMemberships = await tx
       .select({ groupId: orderMergeMembers.groupId })
@@ -733,7 +754,7 @@ async function originalOrderHasDomesticFreeShipping(orderId: number) {
     })
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId));
-  const productItems = items.filter((item) => !["shipping", "shipping-fee", "payment-fee"].includes(item.id));
+  const productItems = items.filter((item) => !NON_PRODUCT_ORDER_ITEM_IDS.includes(item.id));
   if (productItems.length === 0) return false;
 
   const feeItems = await attachTwoItemFreeShippingEligibility(productItems);
@@ -780,12 +801,14 @@ export const orderRouter = router({
           origin: z.string(),
           sessionToken: z.string().optional(),
           customerNote: z.string().max(10000).optional(),
+          // 只接受會員持有的優惠券 ID；折抵金額一律由伺服器重新計算
+          memberCouponId: z.number().int().positive().optional(),
         })
         .superRefine((data, ctx) => {
           const isCustomDepositCheckout = data.items
             .filter((item) => {
               const productId = item.baseProductId ?? item.id;
-              return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
+              return !NON_PRODUCT_ORDER_ITEM_IDS.includes(productId);
             })
             .some(isCustomCheckoutItem);
 
@@ -872,7 +895,7 @@ export const orderRouter = router({
       await ensureOrdersColumns();
       let submittedItems: NormalizedCheckoutItem[] = input.items.filter((item) => {
         const productId = item.baseProductId ?? item.id;
-        return productId !== "shipping" && productId !== "shipping-fee" && productId !== "payment-fee";
+        return !NON_PRODUCT_ORDER_ITEM_IDS.includes(productId);
       }).map((item) => ({ ...item, configurationSnapshot: null }));
       submittedItems = await normalizePurchaseOptionItems(submittedItems);
       if (submittedItems.length === 0) {
@@ -963,8 +986,42 @@ export const orderRouter = router({
           configurationSnapshot: null,
         });
       }
+      let totalAmount = feeSummary.total;
+      const couponUserId = ctx.user?.id ?? null;
+      let couponToReserve: { id: number } | null = null;
+      if (input.memberCouponId != null) {
+        if (couponUserId == null) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "請先登入會員才能使用優惠券" });
+        }
+        let coupon;
+        try {
+          coupon = await getCouponForCheckout(input.memberCouponId, couponUserId);
+        } catch (error) {
+          if (error instanceof CouponError) throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          throw error;
+        }
+        const productSubtotal = submittedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const discount = calcCouponDiscount({
+          subtotal: productSubtotal,
+          shippingFee: feeSummary.shippingFee,
+          coupon,
+        });
+        if (!discount.ok) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `「${coupon.name}」無法使用：${discount.reason}` });
+        }
+        feeItems.push({
+          id: COUPON_DISCOUNT_PRODUCT_ID,
+          baseProductId: COUPON_DISCOUNT_PRODUCT_ID,
+          name: `優惠券折抵 - ${coupon.name}`,
+          price: -discount.discount,
+          quantity: 1,
+          image: "",
+          configurationSnapshot: null,
+        });
+        totalAmount = discount.total;
+        couponToReserve = { id: coupon.id };
+      }
       const orderItems = submittedItems.concat(feeItems);
-      const totalAmount = feeSummary.total;
       let transferReceiptUrl: string | undefined;
       if (paymentMethod === "atm") {
         const receiptBase64 = input.transferReceiptImageBase64;
@@ -1011,21 +1068,42 @@ export const orderRouter = router({
         orderRow.userId = ctx.user.id;
       }
 
-      const createdOrderId = await createOrder(
-        orderRow,
-        orderItems.map((item) => ({
-          orderId: 0,
-          productId: item.baseProductId ?? item.id,
-          productName: item.name,
-          productImage: item.image ?? "",
-          quantity: item.quantity,
-          unitPrice: item.price,
-          subtotal: item.price * item.quantity,
-          purchaseOptionId: item.purchaseOptionId ?? null,
-          configurationSnapshot: item.configurationSnapshot,
-          isPreorder: item.isPreorder ?? false,
-        }))
-      );
+      // 建立訂單前以條件式 UPDATE 保留優惠券，並行的請求只有一個會成功
+      const couponReservedAt = couponToReserve && couponUserId != null
+        ? await reserveCoupon(couponToReserve.id, couponUserId)
+        : null;
+      if (couponToReserve && !couponReservedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這張優惠券目前無法使用，請重新整理後再試" });
+      }
+
+      let createdOrderId: number;
+      try {
+        createdOrderId = await createOrder(
+          orderRow,
+          orderItems.map((item) => ({
+            orderId: 0,
+            productId: item.baseProductId ?? item.id,
+            productName: item.name,
+            productImage: item.image ?? "",
+            quantity: item.quantity,
+            unitPrice: item.price,
+            subtotal: item.price * item.quantity,
+            purchaseOptionId: item.purchaseOptionId ?? null,
+            configurationSnapshot: item.configurationSnapshot,
+            isPreorder: item.isPreorder ?? false,
+          }))
+        );
+      } catch (error) {
+        if (couponToReserve && couponReservedAt) await cancelCouponReservation(couponToReserve.id, couponReservedAt);
+        throw error;
+      }
+      if (couponToReserve && couponReservedAt) {
+        const attached = await attachReservedCouponToOrder(couponToReserve.id, couponReservedAt, createdOrderId);
+        if (!attached) {
+          await deleteCancelledOrderRecords(await getDb(), [createdOrderId]);
+          throw new TRPCError({ code: "BAD_REQUEST", message: "這張優惠券目前無法使用，請重新整理後再試" });
+        }
+      }
       if (paymentMethod === "atm") {
         await notifyCustomerOrderPlacedSafely(createdOrderId);
       }
@@ -1156,6 +1234,7 @@ export const orderRouter = router({
           });
         }
         await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
+        await markCouponUsedForOrderSafely(order.id, { merchantTradeNo: input.merchantTradeNo });
         await deductInventoryAfterPayment(input.merchantTradeNo);
         await notifyCustomerOrderPlacedSafely(order.id);
         await recordAuditEventSafely({
@@ -1298,6 +1377,7 @@ export const orderRouter = router({
       const [order] = await db.select({ merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
       if (!order) throw new Error("Order not found");
       await confirmTransferPayment(order.merchantTradeNo);
+      await markCouponUsedForOrderSafely(input.orderId, { merchantTradeNo: order.merchantTradeNo });
       await deductInventoryAfterPayment(order.merchantTradeNo);
       return { success: true };
     }),
@@ -1310,7 +1390,7 @@ export const orderRouter = router({
       orderId: z.number(),
       status: z.enum(["pending_payment", "transfer_pending", "deposit_paid", "paid", "processing", "shipped", "arrived", "picked_up", "not_picked", "completed", "cancelled"]),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const [order] = await db.select({ id: orders.id, merchantTradeNo: orders.merchantTradeNo }).from(orders).where(eq(orders.id, input.orderId)).limit(1);
@@ -1343,6 +1423,15 @@ export const orderRouter = router({
           await Promise.all(
             affectedOrders.map((affectedOrder) => restoreInventoryOnCancel(affectedOrder.merchantTradeNo))
           );
+          // 目前商業規則：訂單取消一律退回優惠券（含已付款後取消）
+          await releaseCouponsForOrdersSafely(operationContext.orderIds, {
+            includeUsed: true,
+            reason: "管理員取消訂單",
+            actorUserId: ctx.user.id,
+          });
+        } else if (COUPON_CONSUMING_ORDER_STATUSES.has(input.status)) {
+          // 轉帳訂單可能未經「確認收款」就直接改為出貨等狀態，此時視為已付款並核銷
+          await Promise.all(operationContext.orderIds.map((orderId) => markCouponUsedForOrderSafely(orderId)));
         }
         if (input.status === "shipped") {
           await Promise.all(
@@ -1359,6 +1448,9 @@ export const orderRouter = router({
         // deductInventoryAfterPayment 以 inventoryDeducted 旗標防止重複扣減。
         await db.update(orders).set({ paymentStatus: "paid", paidAt: new Date() }).where(eq(orders.id, order.id));
         await deductInventoryAfterPayment(order.merchantTradeNo);
+      }
+      if (COUPON_CONSUMING_ORDER_STATUSES.has(input.status)) {
+        await markCouponUsedForOrderSafely(order.id, { merchantTradeNo: order.merchantTradeNo });
       }
       return { success: true };
     }),

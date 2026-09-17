@@ -4,8 +4,8 @@
  * 僅限 admin 角色存取
  */
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
-import { Megaphone, Save, Settings, XCircle } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Gift, Megaphone, Save, Settings, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -174,7 +174,99 @@ export default function AdminSettings() {
             </button>
           </div>
         </section>
+
+        <LineFriendRewardSettings />
       </main>
     </div>
+  );
+}
+
+function LineFriendRewardSettings() {
+  const utils = trpc.useUtils();
+  const { data: settings, isLoading } = trpc.coupons.adminLineRewardSettings.useQuery();
+  const { data: templates = [], isLoading: templatesLoading } = trpc.coupons.adminActiveTemplates.useQuery();
+  const [enabled, setEnabled] = useState(false);
+  const [templateId, setTemplateId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!settings) return;
+    setEnabled(settings.enabled);
+    setTemplateId(settings.templateId);
+  }, [settings]);
+
+  const saveSettings = trpc.coupons.adminSaveLineRewardSettings.useMutation({
+    onSuccess: async saved => {
+      utils.coupons.adminLineRewardSettings.setData(undefined, saved);
+      toast.success("LINE 好友綁定禮設定已更新");
+      await utils.coupons.adminLineRewardSettings.invalidate();
+    },
+    onError: err => toast.error(err.message || "更新 LINE 好友綁定禮失敗"),
+  });
+
+  const busy = isLoading || templatesLoading || saveSettings.isPending;
+  // 目前設定的模板若已停用，不會出現在啟用中清單，需提醒管理員重新選擇
+  const selectedIsActive = templateId == null || templates.some(template => template.id === templateId);
+
+  return (
+    <section className="bg-white border border-[oklch(0.93_0_0)] p-5 space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Gift className="w-4 h-4 text-[oklch(0.35_0_0)]" />
+          <div>
+            <p className="text-sm font-medium text-[oklch(0.12_0_0)]">LINE 好友綁定禮</p>
+            <p className="text-xs text-[oklch(0.52_0_0)] font-body mt-1">
+              會員綁定 LINE 並確認已加入官方帳號好友後，自動發放一張優惠券（每位會員、每個 LINE 帳號限領一次）。
+            </p>
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-xs font-body text-[oklch(0.35_0_0)] shrink-0">
+          <Switch checked={enabled} disabled={busy} onCheckedChange={setEnabled} />
+          {enabled ? "開啟" : "關閉"}
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-2">
+          好友綁定後贈送
+        </span>
+        <select
+          value={templateId ?? ""}
+          disabled={busy}
+          onChange={e => setTemplateId(e.target.value ? Number(e.target.value) : null)}
+          className="w-full sm:max-w-md border border-[oklch(0.86_0_0)] px-3 py-2.5 text-sm font-body bg-white disabled:bg-[oklch(0.96_0_0)]"
+        >
+          <option value="">請選擇優惠券</option>
+          {templates.map(template => (
+            <option key={template.id} value={template.id}>
+              {template.name}（折 NT$ {template.discountAmount.toLocaleString()}）
+            </option>
+          ))}
+        </select>
+        {!selectedIsActive && (
+          <span className="block text-xs text-amber-700 font-body mt-2">
+            目前設定的優惠券已停用，會員暫時無法領取，請重新選擇。
+          </span>
+        )}
+        {templates.length === 0 && !templatesLoading && (
+          <span className="block text-xs text-[oklch(0.52_0_0)] font-body mt-2">
+            尚無啟用中的優惠券，請先到
+            <Link href="/admin/coupons" className="underline mx-1">優惠券管理</Link>
+            建立。
+          </span>
+        )}
+      </label>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => saveSettings.mutate({ enabled, templateId })}
+          disabled={busy || (enabled && !templateId)}
+          className="inline-flex items-center gap-2 px-5 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white hover:bg-[oklch(0.25_0_0)] disabled:opacity-50"
+        >
+          <Save className="w-3.5 h-3.5" />
+          {saveSettings.isPending ? "儲存中…" : "儲存"}
+        </button>
+      </div>
+    </section>
   );
 }
