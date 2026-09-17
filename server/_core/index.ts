@@ -9,6 +9,7 @@ import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
 import { registerLineWebhookRoutes } from "../lineWebhookRoutes";
 import { appRouter } from "../appRouter";
 import { createContext } from "./context";
+import { logTrpcError } from "./trpc";
 import { serveStatic, setupVite } from "./vite";
 import { registerECPayRoutes } from "../ecpayRoutes";
 import { enforceTrustedOrigin, setSecurityHeaders } from "./httpSecurity";
@@ -56,6 +57,7 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError: logTrpcError,
     })
   );
   // development mode uses Vite, production mode uses static files

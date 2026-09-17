@@ -5,8 +5,32 @@ import type { TrpcContext } from "./context";
 import { enforceRateLimit } from "./rateLimit";
 import { recordAuditEventSafely } from "../auditDb";
 
+export const PUBLIC_INTERNAL_ERROR_MESSAGE = "系統暫時發生錯誤，請稍後再試";
+
+/**
+ * 非預期的錯誤（資料庫錯誤、一般 throw new Error 等）會被 tRPC 包成 INTERNAL_SERVER_ERROR，
+ * 並沿用原始訊息（可能含 SQL 與查詢參數）。這類錯誤只回傳通用訊息，完整內容由 logTrpcError 記在伺服器。
+ * 明確寫給使用者的 TRPCError（有自己的 message）與其他錯誤代碼維持原樣。
+ */
+export function isUnexpectedInternalError(error: TRPCError) {
+  if (error.code !== "INTERNAL_SERVER_ERROR") return false;
+  const cause = error.cause;
+  return cause != null && !(cause instanceof TRPCError) && error.message === cause.message;
+}
+
+export function logTrpcError({ error, path, type }: { error: TRPCError; path?: string; type?: string }) {
+  if (error.code !== "INTERNAL_SERVER_ERROR") return;
+  console.error(`[tRPC] ${type ?? "request"} ${path ?? "(unknown)"} failed:`, error.cause ?? error);
+}
+
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    if (!isUnexpectedInternalError(error)) return shape;
+    // 開發環境的 stack 第一行同樣包含原始訊息，一併移除；完整內容見伺服器 log
+    const { stack: _stack, ...data } = shape.data;
+    return { ...shape, message: PUBLIC_INTERNAL_ERROR_MESSAGE, data };
+  },
 });
 
 export const router = t.router;

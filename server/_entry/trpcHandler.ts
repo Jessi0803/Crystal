@@ -6,6 +6,7 @@ import express, { type NextFunction } from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../appRouter";
 import { createContext } from "../_core/context";
+import { logTrpcError } from "../_core/trpc";
 import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
 import { registerLineWebhookRoutes } from "../lineWebhookRoutes";
 import { enforceTrustedOrigin, publicServerError, setSecurityHeaders } from "../_core/httpSecurity";
@@ -28,6 +29,7 @@ app.use(
   createExpressMiddleware({
     router: appRouter,
     createContext,
+    onError: logTrpcError,
   })
 );
 
