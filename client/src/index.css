@@ -11,6 +11,20 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* 前台用途色 → Tailwind class：text-sf-ink、border-sf-line、bg-sf-cream… */
+  --color-sf-ink: var(--sf-ink);
+  --color-sf-text: var(--sf-text);
+  --color-sf-muted: var(--sf-text-muted);
+  --color-sf-line: var(--sf-line);
+  --color-sf-line-strong: var(--sf-line-strong);
+  --color-sf-cream: var(--sf-cream);
+  --color-sf-cream-deep: var(--sf-cream-deep);
+  --color-sf-accent: var(--sf-accent);
+  --color-sf-accent-hover: var(--sf-accent-hover);
+  --color-sf-selected: var(--sf-selected-bg);
+  --color-brand-lace: var(--brand-lace);
+  --color-brand-peach: var(--brand-peach);
+  --color-brand-blush: var(--brand-blush);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

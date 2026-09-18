@@ -1,12 +1,12 @@
 // 日日好日 — Footer
-// Design: Vacanza-inspired — minimal footer, brand only + bottom bar
+// Design: 法式氣質＋溫柔浪漫 — 深棕底頁尾，品牌與聯絡資訊
 import { Link } from "wouter";
 import { Instagram, MessageCircle } from "lucide-react";
 import { BrandTextMark } from "./BrandMark";
 
 export default function Footer() {
   return (
-    <footer className="bg-[oklch(0.1_0_0)] text-white">
+    <footer className="bg-sf-ink text-white">
       {/* Main Footer — Brand Only */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
@@ -33,7 +33,7 @@ export default function Footer() {
                 href="https://www.instagram.com/gooday_tarot_"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
+                className="w-8 h-8 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition-colors"
                 aria-label="Instagram"
               >
                 <Instagram className="w-3.5 h-3.5 text-white/70" />
@@ -42,7 +42,7 @@ export default function Footer() {
                 href="https://line.me/R/ti/p/@011tymeh"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 border border-white/20 flex items-center justify-center hover:border-white/60 transition-colors"
+                className="w-8 h-8 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition-colors"
                 aria-label="LINE"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-white/70" />

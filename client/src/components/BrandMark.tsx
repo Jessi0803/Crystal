@@ -18,7 +18,7 @@ export function BrandTextMark({
     >
       <div className="flex items-baseline gap-1.5">
         <span
-          className={`text-[1.6rem] leading-none ${light ? "text-white" : "text-[oklch(0.1_0_0)]"}`}
+          className={`text-[1.6rem] leading-none ${light ? "text-white" : "text-sf-ink"}`}
           style={{
             fontFamily: "'Noto Serif TC', serif",
             fontWeight: 300,
@@ -28,7 +28,7 @@ export function BrandTextMark({
           椛
         </span>
         <span
-          className={`text-[0.6rem] ${light ? "text-white/50" : "text-[oklch(0.55_0_0)]"}`}
+          className={`text-[0.6rem] ${light ? "text-white/50" : "text-sf-muted"}`}
           style={{
             fontFamily: "'Noto Sans TC', sans-serif",
             fontWeight: 300,
@@ -38,7 +38,7 @@ export function BrandTextMark({
           ˙
         </span>
         <span
-          className={`text-[1.4rem] leading-none italic ${light ? "text-white" : "text-[oklch(0.2_0_0)]"}`}
+          className={`text-[1.4rem] leading-none italic ${light ? "text-white" : "text-sf-ink"}`}
           style={{
             fontFamily: "'Cormorant Garamond', 'Georgia', serif",
             fontWeight: 300,
@@ -49,7 +49,7 @@ export function BrandTextMark({
         </span>
       </div>
       <span
-        className={`text-[0.45rem] tracking-[0.35em] ${light ? "text-white/50" : "text-[oklch(0.65_0_0)]"}`}
+        className={`text-[0.45rem] tracking-[0.35em] ${light ? "text-white/50" : "text-sf-muted"}`}
         style={{ fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 300 }}
       >
         CRYSTAL ENERGY
