@@ -30,7 +30,7 @@ export default function CrystalWorkshop() {
   }, [activeTab]);
 
   return (
-    <div className="bg-[#FAF9F6] text-[#333333] min-h-screen font-sans selection:bg-[#D8C3BD]">
+    <div className="bg-sf-cream text-sf-ink min-h-screen font-sans selection:bg-brand-peach">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@300;400&display=swap');
         .font-serif-en { font-family: 'Cormorant Garamond', serif; }
@@ -44,11 +44,11 @@ export default function CrystalWorkshop() {
         </div>
 
         <div className="max-w-4xl mx-auto scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
-          <span className="font-serif-en text-sm tracking-[0.5em] text-[#8E735B] mb-6 block uppercase">Workshop & Course</span>
+          <span className="font-serif-en text-sm tracking-[0.5em] text-sf-accent mb-6 block uppercase">Workshop & Course</span>
           <h1 className="text-4xl md:text-5xl font-serif-zh tracking-widest mb-8 leading-tight">
             在頻率中，遇見更好的自己
           </h1>
-          <p className="text-gray-500 font-sans-zh font-light tracking-widest text-sm md:text-base max-w-2xl mx-auto leading-loose">
+          <p className="text-sf-muted font-sans-zh font-light tracking-widest text-sm md:text-base max-w-2xl mx-auto leading-loose">
             無論是想開啟一段療癒的時光，或是想將愛好轉化為事業，我們都為您準備了最細緻的引導。
           </p>
         </div>
@@ -56,13 +56,13 @@ export default function CrystalWorkshop() {
         <div className="mt-16 flex justify-center gap-4 scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-200">
           <button
             onClick={() => setActiveTab("experience")}
-            className={`px-8 py-3 rounded-full text-sm font-serif-zh tracking-widest transition-all duration-500 ${activeTab === "experience" ? "bg-[#8E735B] text-white shadow-lg" : "bg-white text-[#8E735B] border border-[#8E735B]/20 hover:border-[#8E735B]"}`}
+            className={`px-8 py-3 rounded-full text-sm font-serif-zh tracking-widest transition-all duration-500 ${activeTab === "experience" ? "bg-sf-accent text-white shadow-lg" : "bg-white text-sf-accent border border-sf-accent/20 hover:border-sf-accent"}`}
           >
             生命靈數體驗課
           </button>
           <button
             onClick={() => setActiveTab("entrepreneur")}
-            className={`px-8 py-3 rounded-full text-sm font-serif-zh tracking-widest transition-all duration-500 ${activeTab === "entrepreneur" ? "bg-[#8E735B] text-white shadow-lg" : "bg-white text-[#8E735B] border border-[#8E735B]/20 hover:border-[#8E735B]"}`}
+            className={`px-8 py-3 rounded-full text-sm font-serif-zh tracking-widest transition-all duration-500 ${activeTab === "entrepreneur" ? "bg-sf-accent text-white shadow-lg" : "bg-white text-sf-accent border border-sf-accent/20 hover:border-sf-accent"}`}
           >
             水晶創業全能班
           </button>
@@ -75,28 +75,28 @@ export default function CrystalWorkshop() {
             <div className="grid md:grid-cols-12 gap-16 items-start">
               <div className="md:col-span-5 scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
                 <div className="aspect-[3/4] bg-white p-4 shadow-xl rotate-[-2deg] transition-transform hover:rotate-0 duration-700">
-                  <div className="w-full h-full bg-[#E5DCD5] flex items-center justify-center overflow-hidden">
+                  <div className="w-full h-full bg-sf-line flex items-center justify-center overflow-hidden">
                     <img src="/workshop-cover.jpg" alt="體驗課情境圖" className="object-cover w-full h-full opacity-80" />
                   </div>
-                  <p className="mt-4 font-serif-zh text-xs tracking-widest text-center text-[#8E735B]">生命靈數 · 水晶手鍊體驗</p>
+                  <p className="mt-4 font-serif-zh text-xs tracking-widest text-center text-sf-accent">生命靈數 · 水晶手鍊體驗</p>
                 </div>
               </div>
 
               <div className="md:col-span-7 space-y-12 scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-300">
                 <div>
                   <h2 className="text-3xl font-serif-zh mb-6 tracking-widest">生命靈數水晶手鍊體驗課</h2>
-                  <div className="flex flex-wrap gap-4 text-xs text-gray-500 mb-8">
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100">
+                  <div className="flex flex-wrap gap-4 text-xs text-sf-muted mb-8">
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-sf-line">
                       <MapPin className="w-3 h-3" /> 桃園火車站開車 7 分鐘
                     </div>
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-sf-line">
                       <Users className="w-3 h-3" /> 1-4 人小班制
                     </div>
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-sf-line">
                       <Calendar className="w-3 h-3" /> 1.5 - 2 小時
                     </div>
                   </div>
-                  <p className="text-gray-600 leading-loose font-light font-sans-zh">
+                  <p className="text-sf-text leading-loose font-light font-sans-zh">
                     這堂課會讓你學到：
                   </p>
                 </div>
@@ -111,21 +111,21 @@ export default function CrystalWorkshop() {
                     "水晶能量知識探討",
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#D8C3BD]" />
-                      <span className="text-sm font-light text-gray-700">{item}</span>
+                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand-peach" />
+                      <span className="text-sm font-light text-sf-text">{item}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="bg-white p-8 border-l-4 border-[#8E735B] shadow-sm">
+                <div className="bg-white p-8 border-l-4 border-sf-accent shadow-sm">
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-xs text-gray-400 tracking-widest mb-2 uppercase">課程費用 Pricing</p>
-                      <h4 className="text-2xl font-serif-en text-[#8E735B]">$2,500 <span className="text-xs text-gray-400 ml-2">(含所有材料費)</span></h4>
+                      <p className="text-xs text-sf-muted tracking-widest mb-2 uppercase">課程費用 Pricing</p>
+                      <h4 className="text-2xl font-serif-en text-sf-accent">$2,500 <span className="text-xs text-sf-muted ml-2">(含所有材料費)</span></h4>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-[#8E735B] font-medium mb-1">多人同行優惠</p>
-                      <p className="text-xs text-gray-500">2 人同行 -$100/人 | 3 人同行 -$150/人</p>
+                      <p className="text-xs text-sf-accent font-medium mb-1">多人同行優惠</p>
+                      <p className="text-xs text-sf-muted">2 人同行 -$100/人 | 3 人同行 -$150/人</p>
                     </div>
                   </div>
                 </div>
@@ -133,7 +133,7 @@ export default function CrystalWorkshop() {
                   href="https://line.me/R/ti/p/@011tymeh"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center px-8 py-3 bg-[#06C755] text-white text-sm tracking-[0.1em] hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center justify-center rounded-full px-8 py-3 bg-[#06C755] text-white text-sm tracking-[0.1em] hover:opacity-90 transition-opacity"
                 >
                   聯繫 LINE 諮詢課程
                 </a>
@@ -144,36 +144,36 @@ export default function CrystalWorkshop() {
               <div className="grid md:grid-cols-2 gap-16 items-center">
                 <div className="scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
                   <h2 className="text-3xl font-serif-zh mb-8 tracking-[0.2em]">水晶創業全能班</h2>
-                  <p className="text-gray-600 leading-[2] font-light mb-10">
+                  <p className="text-sf-text leading-[2] font-light mb-10">
                     不只是手作，更是一套完整的創業思維。我們將從水晶理論、基礎美學，到少見的技術細節，甚至連「小資創業 SOP」都毫無保留地分享給您，陪您建立自己的個人品牌。
                   </p>
                   <div className="grid grid-cols-2 gap-6">
-                    <div className="p-6 bg-white border border-[#E5DCD5] rounded-xl hover:shadow-md transition-shadow">
-                      <BookOpen className="w-6 h-6 text-[#8E735B] mb-4" />
+                    <div className="p-6 bg-white border border-sf-line rounded-xl hover:shadow-md transition-shadow">
+                      <BookOpen className="w-6 h-6 text-sf-accent mb-4" />
                       <h4 className="font-serif-zh text-sm mb-2">3件作品實戰</h4>
-                      <p className="text-xs text-gray-400 leading-relaxed">
+                      <p className="text-xs text-sf-muted leading-relaxed">
                         掌握 6 種核心製作方法，包涵（彈力繩獨家不易鬆脫綁法、磁扣、龍蝦扣、U 型扣、項鍊、吊飾）
                       </p>
                     </div>
-                    <div className="p-6 bg-white border border-[#E5DCD5] rounded-xl hover:shadow-md transition-shadow">
-                      <Briefcase className="w-6 h-6 text-[#8E735B] mb-4" />
+                    <div className="p-6 bg-white border border-sf-line rounded-xl hover:shadow-md transition-shadow">
+                      <Briefcase className="w-6 h-6 text-sf-accent mb-4" />
                       <h4 className="font-serif-zh text-sm mb-2">創業 SOP</h4>
-                      <p className="text-xs text-gray-400">進貨、庫存、品質分辨</p>
+                      <p className="text-xs text-sf-muted">進貨、庫存、品質分辨</p>
                     </div>
                   </div>
                 </div>
                 <div className="scroll-fade opacity-0 translate-y-10 transition-all duration-1000 delay-300">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="aspect-square bg-[#3D3D3D] rounded-2xl overflow-hidden shadow-lg relative group">
+                    <div className="aspect-square bg-sf-ink rounded-2xl overflow-hidden shadow-lg relative group">
                       <img src="/images/workshop-small-class.jpg" className="w-full h-full object-cover object-center opacity-80 transition-transform duration-700 group-hover:scale-105" alt="小班制教學體驗" />
                     </div>
-                    <div className="aspect-square bg-[#D8C3BD]/30 rounded-2xl p-6 flex flex-col justify-center">
-                      <Sparkles className="w-8 h-8 text-[#8E735B] mb-4" />
-                      <p className="font-serif-zh text-sm leading-relaxed text-[#8E735B]">
+                    <div className="aspect-square bg-brand-peach/30 rounded-2xl p-6 flex flex-col justify-center">
+                      <Sparkles className="w-8 h-8 text-sf-accent mb-4" />
+                      <p className="font-serif-zh text-sm leading-relaxed text-sf-accent">
                         包含少見的「U型扣技法」，更有效的保護線材與水晶連結。
                       </p>
                     </div>
-                    <div className="col-span-2 aspect-[16/9] bg-[#3D3D3D] rounded-2xl overflow-hidden relative group">
+                    <div className="col-span-2 aspect-[16/9] bg-sf-ink rounded-2xl overflow-hidden relative group">
                       <img src="/images/workshop-products.jpg" className="w-full h-full object-cover object-center opacity-60 transition-transform duration-700 group-hover:scale-110" alt="手鍊吊飾項鍊作品展示" />
                       <div className="absolute inset-x-0 top-0 grid grid-cols-3 px-4 pt-6 text-center">
                         {["Bracelet", "Necklace", "Charm"].map((label) => (
@@ -193,7 +193,7 @@ export default function CrystalWorkshop() {
               <div className="py-20 bg-white rounded-[3rem] px-8 md:px-20 shadow-sm scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
                 <h3 className="text-center font-serif-zh text-2xl mb-20 tracking-widest">課程大綱 Syllabus</h3>
                 <div className="relative">
-                  <div className="absolute left-[15px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-px bg-[#E5DCD5]" />
+                  <div className="absolute left-[15px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-px bg-sf-line" />
 
                   {[
                     {
@@ -214,13 +214,13 @@ export default function CrystalWorkshop() {
                   ].map((step, i) => (
                     <div key={i} className={`relative flex items-center mb-16 last:mb-0 ${i % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"}`}>
                       <div className="hidden md:block w-1/2 px-12" />
-                      <div className="absolute left-0 md:left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white border-2 border-[#8E735B] flex items-center justify-center z-10">
-                        <div className="w-2 h-2 rounded-full bg-[#8E735B]" />
+                      <div className="absolute left-0 md:left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white border-2 border-sf-accent flex items-center justify-center z-10">
+                        <div className="w-2 h-2 rounded-full bg-sf-accent" />
                       </div>
                       <div className={`w-full md:w-1/2 pl-12 md:pl-0 ${i % 2 === 0 ? "md:pl-12" : "md:pr-12 md:text-right"}`}>
-                        <span className="font-serif-en text-[#8E735B] text-sm tracking-widest">{step.time}</span>
+                        <span className="font-serif-en text-sf-accent text-sm tracking-widest">{step.time}</span>
                         <h4 className="font-serif-zh text-lg mb-2 mt-1">{step.title}</h4>
-                        <p className="text-sm text-gray-400 font-light leading-relaxed">{step.desc}</p>
+                        <p className="text-sm text-sf-muted font-light leading-relaxed">{step.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -233,17 +233,17 @@ export default function CrystalWorkshop() {
                   { title: "全能技法", icon: <Gem className="w-5 h-5" />, list: ["彈力繩獨家不易鬆脫綁法", "磁扣、龍蝦扣、U 型扣", "項鍊、吊飾"] },
                   { title: "專屬贈禮", icon: <Gift className="w-5 h-5" />, list: ["IG 分享送許願蠟燭＋淨化水晶一包"] },
                 ].map((box, i) => (
-                  <div key={i} className="p-10 bg-white border-t-2 border-[#8E735B] flex flex-col items-center text-center">
-                    <div className="mb-6 text-[#8E735B]">{box.icon}</div>
+                  <div key={i} className="p-10 bg-white border-t-2 border-sf-accent flex flex-col items-center text-center">
+                    <div className="mb-6 text-sf-accent">{box.icon}</div>
                     <h4 className="font-serif-zh mb-6 tracking-widest text-lg">{box.title}</h4>
                     <ul className="space-y-4">
-                      {box.list.map((li, j) => <li key={j} className="text-xs text-gray-500 font-light">{li}</li>)}
+                      {box.list.map((li, j) => <li key={j} className="text-xs text-sf-muted font-light">{li}</li>)}
                     </ul>
                   </div>
                 ))}
               </div>
 
-              <div className="bg-[#8E735B] rounded-[2rem] p-12 text-center text-white scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
+              <div className="bg-sf-accent rounded-[2rem] p-12 text-center text-white scroll-fade opacity-0 translate-y-10 transition-all duration-1000">
                 <span className="font-serif-en tracking-[0.5em] text-xs opacity-70 block mb-4">ENROLLMENT OPEN</span>
                 <h3 className="text-3xl font-serif-zh mb-8 tracking-widest">早鳥優惠價 $12,888 <span className="text-sm opacity-60">/ 共 6 小時</span></h3>
                 <div className="flex flex-col md:flex-row justify-center gap-8 items-center mb-12">
@@ -262,7 +262,7 @@ export default function CrystalWorkshop() {
                     href="https://line.me/R/ti/p/@011tymeh"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-8 py-3 bg-[#06C755] text-white text-sm tracking-[0.1em] hover:opacity-90 transition-opacity"
+                    className="inline-flex items-center justify-center rounded-full px-8 py-3 bg-[#06C755] text-white text-sm tracking-[0.1em] hover:opacity-90 transition-opacity"
                   >
                     聯繫 LINE 諮詢課程
                   </a>
@@ -273,9 +273,9 @@ export default function CrystalWorkshop() {
         </div>
       </section>
 
-      <footer className="py-20 bg-[#FAF9F6] border-t border-gray-100 text-center">
-        <Leaf className="w-6 h-6 mx-auto mb-8 text-[#D8C3BD]" />
-        <p className="font-serif-zh text-sm tracking-widest text-gray-400">
+      <footer className="py-20 bg-sf-cream border-t border-sf-line text-center">
+        <Leaf className="w-6 h-6 mx-auto mb-8 text-brand-peach" />
+        <p className="font-serif-zh text-sm tracking-widest text-sf-muted">
           願每一顆水晶，都能指引您找到內在的完整。
         </p>
       </footer>

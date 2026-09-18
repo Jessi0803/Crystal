@@ -59,7 +59,7 @@ export default function Quiz() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* Page Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-10 px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto">
           <p className="eyebrow mb-2">ENERGY QUIZ</p>
           <h1 className="heading-lg">能量水晶測驗</h1>
@@ -71,10 +71,10 @@ export default function Quiz() {
         {/* Intro */}
         {currentStep === 0 && (
           <div className="text-center">
-            <div className="text-6xl text-[oklch(0.88_0.04_15)] mb-8">◈</div>
+            <div className="text-6xl text-brand-peach mb-8">◈</div>
             <p className="eyebrow mb-4">30 SECONDS · 3 QUESTIONS</p>
             <h2 className="heading-lg mb-6">找到你的能量水晶</h2>
-            <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-10 max-w-sm mx-auto">
+            <p className="text-sm font-body font-light text-sf-text leading-relaxed mb-10 max-w-sm mx-auto">
               每個人的能量場都是獨一無二的。透過 3 個簡單的問題，我們將為你找到最適合你目前狀態的能量水晶。
             </p>
             <button onClick={() => setCurrentStep(1)} className="btn-primary">
@@ -92,9 +92,9 @@ export default function Quiz() {
                 <span className="eyebrow">問題 {currentStep} / {totalSteps}</span>
                 <span className="eyebrow">{Math.round((currentStep / totalSteps) * 100)}%</span>
               </div>
-              <div className="h-px bg-[oklch(0.9_0_0)] relative">
+              <div className="h-px bg-sf-cream relative">
                 <div
-                  className="absolute top-0 left-0 h-px bg-[oklch(0.1_0_0)] transition-all duration-500"
+                  className="absolute top-0 left-0 h-px bg-sf-accent transition-all duration-500"
                   style={{ width: `${(currentStep / totalSteps) * 100}%` }}
                 />
               </div>
@@ -113,12 +113,12 @@ export default function Quiz() {
                   onClick={() => handleAnswer(option.value)}
                   className={`p-6 text-left border transition-all duration-200 ${
                     selectedOption === option.value
-                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                      : "border-[oklch(0.9_0_0)] bg-white hover:border-[oklch(0.6_0_0)]"
+                      ? "border-sf-accent bg-sf-selected"
+                      : "border-sf-line bg-white hover:border-sf-accent/50"
                   }`}
                 >
                   <div className="text-2xl mb-3">{option.icon}</div>
-                  <p className="text-sm font-body font-light text-[oklch(0.3_0_0)] leading-relaxed">
+                  <p className="text-sm font-body font-light text-sf-text leading-relaxed">
                     {option.text}
                   </p>
                 </button>
@@ -144,14 +144,14 @@ export default function Quiz() {
             <div className="text-center mb-10">
               <p className="eyebrow mb-3">YOUR CRYSTAL MATCH</p>
               <h2 className="heading-lg mb-2">你的能量水晶是</h2>
-              <p className="text-2xl font-light italic text-[oklch(0.72_0.09_70)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+              <p className="text-2xl font-light italic text-brand-blush" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                 {resultProduct.crystalType}
               </p>
             </div>
 
             {/* Result Card */}
-            <div className="border border-[oklch(0.93_0_0)] mb-8">
-              <div className="aspect-video overflow-hidden bg-[oklch(0.97_0_0)]">
+            <div className="border border-sf-line mb-8">
+              <div className="aspect-video overflow-hidden bg-sf-cream">
                 <img
                   src={resultProduct.image}
                   alt={resultProduct.name}
@@ -164,14 +164,14 @@ export default function Quiz() {
                     <span key={tag} className="tag">{tag}</span>
                   ))}
                 </div>
-                <h3 className="text-2xl font-medium text-[oklch(0.1_0_0)] mb-2" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                <h3 className="text-2xl font-light tracking-[0.06em] text-sf-ink mb-2" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>
                   {resultProduct.name}
                 </h3>
-                <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-5">
+                <p className="text-sm font-body font-light text-sf-text leading-relaxed mb-5">
                   {resultProduct.story.slice(0, 120)}...
                 </p>
-                <div className="flex items-center justify-between border-t border-[oklch(0.93_0_0)] pt-5">
-                  <span className="text-2xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                <div className="flex items-center justify-between border-t border-sf-line pt-5">
+                  <span className="text-2xl font-medium text-sf-ink" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                     NT$ {resultProduct.price.toLocaleString()}
                   </span>
                   <div className="flex gap-3">
@@ -190,7 +190,7 @@ export default function Quiz() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={handleReset}
-                className="flex items-center justify-center gap-2 text-xs font-body tracking-[0.1em] text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                className="flex items-center justify-center gap-2 text-xs font-body tracking-[0.1em] text-sf-muted hover:text-sf-ink transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 重新測驗

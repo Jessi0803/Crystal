@@ -52,7 +52,7 @@ export default function Knowledge() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* Page Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-10 px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto">
           <p className="eyebrow mb-2">CRYSTAL KNOWLEDGE</p>
           <h1 className="heading-lg">水晶知識小教室</h1>
@@ -65,15 +65,15 @@ export default function Knowledge() {
           {/* Left: Accordion */}
           <div className="lg:col-span-2">
             {/* Category Filter */}
-            <div className="flex items-center gap-0 overflow-x-auto mb-8 border-b border-[oklch(0.93_0_0)]">
+            <div className="flex items-center gap-0 overflow-x-auto mb-8 border-b border-sf-line">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={`shrink-0 px-4 py-2.5 text-[0.7rem] tracking-[0.1em] font-body border-b-2 transition-colors ${
                     activeCategory === cat
-                      ? "border-[oklch(0.1_0_0)] text-[oklch(0.1_0_0)]"
-                      : "border-transparent text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)]"
+                      ? "border-sf-accent text-sf-ink"
+                      : "border-transparent text-sf-muted hover:text-sf-ink"
                   }`}
                 >
                   {cat}
@@ -82,7 +82,7 @@ export default function Knowledge() {
             </div>
 
             {/* Accordion */}
-            <div className="divide-y divide-[oklch(0.93_0_0)]">
+            <div className="divide-y divide-sf-line">
               {filtered.map((item) => (
                 <div key={item.id}>
                   <button
@@ -90,22 +90,22 @@ export default function Knowledge() {
                     className="w-full flex items-center justify-between py-5 text-left group"
                   >
                     <div className="flex items-center gap-4">
-                      <span className="text-lg text-[oklch(0.72_0.09_70)]">{item.icon}</span>
+                      <span className="text-lg text-brand-blush">{item.icon}</span>
                       <div>
                         <span className="tag mb-1 inline-block">{item.category}</span>
-                        <h3 className="text-sm font-body font-medium text-[oklch(0.1_0_0)] group-hover:text-[oklch(0.4_0_0)] transition-colors">
+                        <h3 className="text-sm font-body font-medium text-sf-ink group-hover:text-sf-accent transition-colors">
                           {item.title}
                         </h3>
                       </div>
                     </div>
                     {expandedId === item.id
-                      ? <ChevronUp className="w-4 h-4 text-[oklch(0.55_0_0)] shrink-0 ml-4" />
-                      : <ChevronDown className="w-4 h-4 text-[oklch(0.55_0_0)] shrink-0 ml-4" />
+                      ? <ChevronUp className="w-4 h-4 text-sf-muted shrink-0 ml-4" />
+                      : <ChevronDown className="w-4 h-4 text-sf-muted shrink-0 ml-4" />
                     }
                   </button>
                   {expandedId === item.id && (
                     <div className="pb-5 pl-10">
-                      <p className="text-sm font-body font-light text-[oklch(0.4_0_0)] leading-relaxed">
+                      <p className="text-sm font-body font-light text-sf-text leading-relaxed">
                         {item.content}
                       </p>
                     </div>
@@ -118,11 +118,11 @@ export default function Knowledge() {
           {/* Right: Sidebar */}
           <div className="space-y-8">
             {/* Energy Quotes */}
-            <div className="border border-[oklch(0.93_0_0)] p-6">
+            <div className="border border-sf-line p-6">
               <p className="eyebrow mb-5">ENERGY QUOTES · 能量語錄</p>
               <div className="space-y-5">
                 {energyQuotes.slice(0, 4).map((quote, i) => (
-                  <blockquote key={i} className="text-base font-light text-[oklch(0.2_0_0)] leading-relaxed border-l-2 border-[oklch(0.88_0.04_15)] pl-4" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                  <blockquote key={i} className="text-base font-light text-sf-ink leading-relaxed border-l-2 border-brand-peach pl-4" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                     {quote}
                   </blockquote>
                 ))}
@@ -130,9 +130,9 @@ export default function Knowledge() {
             </div>
 
             {/* Quiz CTA */}
-            <div className="bg-[oklch(0.1_0_0)] p-6 text-white">
+            <div className="rounded-lg bg-sf-ink p-6 text-white">
               <p className="eyebrow text-white/50 mb-3">ENERGY QUIZ</p>
-              <h3 className="text-xl font-medium mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>不確定選哪個？</h3>
+              <h3 className="text-xl font-light tracking-[0.06em] mb-3" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>不確定選哪個？</h3>
               <p className="text-xs font-body font-light text-white/60 leading-relaxed mb-5">
                 做個 30 秒能量測驗，找到最適合你的水晶。
               </p>
@@ -144,10 +144,10 @@ export default function Knowledge() {
             </div>
 
             {/* Shop CTA */}
-            <div className="border border-[oklch(0.93_0_0)] p-6">
+            <div className="border border-sf-line p-6">
               <p className="eyebrow mb-3">SHOP NOW</p>
-              <h3 className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>開始選購</h3>
-              <p className="text-xs font-body font-light text-[oklch(0.5_0_0)] leading-relaxed mb-5">
+              <h3 className="text-xl font-light tracking-[0.06em] text-sf-ink mb-3" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>開始選購</h3>
+              <p className="text-xs font-body font-light text-sf-muted leading-relaxed mb-5">
                 探索我們精選的天然能量水晶系列。
               </p>
               <Link href="/products">

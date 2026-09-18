@@ -29,12 +29,12 @@ export default function ShoppingGuide() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* Page Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-10 px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto">
           <div className="flex items-center gap-2 mb-3">
-            <Link href="/"><span className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors">首頁</span></Link>
-            <ChevronRight className="w-3 h-3 text-[oklch(0.7_0_0)]" />
-            <span className="text-[0.65rem] font-body text-[oklch(0.1_0_0)]">購物說明</span>
+            <Link href="/"><span className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors">首頁</span></Link>
+            <ChevronRight className="w-3 h-3 text-sf-muted" />
+            <span className="text-[0.65rem] font-body text-sf-ink">購物說明</span>
           </div>
           <p className="eyebrow mb-2">SHOPPING GUIDE</p>
           <h1 className="heading-lg">購物說明</h1>
@@ -52,7 +52,7 @@ export default function ShoppingGuide() {
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className="flex items-center gap-2 py-2.5 text-[0.75rem] tracking-[0.05em] text-[oklch(0.45_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors border-l-2 border-transparent hover:border-[oklch(0.1_0_0)] pl-3 group"
+                  className="flex items-center gap-2 py-2.5 text-[0.75rem] tracking-[0.05em] text-sf-text hover:text-sf-ink transition-colors border-l-2 border-transparent hover:border-sf-accent pl-3 group"
                 >
                   {s.label}
                 </a>
@@ -66,9 +66,9 @@ export default function ShoppingGuide() {
             {/* ── 退換貨說明 ── */}
             <section id="return" className="scroll-mt-24">
               <p className="eyebrow mb-3">RETURN POLICY</p>
-              <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>退換貨說明</h2>
+              <h2 className="text-2xl font-light tracking-[0.06em] mb-6 pb-4 border-b border-sf-line" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>退換貨說明</h2>
 
-              <div className="space-y-4 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
+              <div className="space-y-4 text-sm font-body font-light text-sf-text leading-relaxed">
                 <p>
                   每一條手鍊出貨前皆經過細心檢查，出貨後恕不提供退換貨服務。
                 </p>
@@ -81,9 +81,9 @@ export default function ShoppingGuide() {
             {/* ── 運送說明 ── */}
             <section id="shipping" className="scroll-mt-24">
               <p className="eyebrow mb-3">SHIPPING INFO</p>
-              <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>運送說明</h2>
+              <h2 className="text-2xl font-light tracking-[0.06em] mb-6 pb-4 border-b border-sf-line" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>運送說明</h2>
 
-              <div className="space-y-6 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
+              <div className="space-y-6 text-sm font-body font-light text-sf-text leading-relaxed">
                 <div className="space-y-2">
                   <p>• 台灣地區（含離島）：黑貓宅急便（$130）、7-11店到店（$60）單次任選 2 件即免運。</p>
                   <p>• 台灣地區以外：馬來西亞、香港、新加波、美國、英國、澳洲</p>
@@ -94,9 +94,9 @@ export default function ShoppingGuide() {
             {/* ── 付款方式 ── */}
             <section id="payment" className="scroll-mt-24">
               <p className="eyebrow mb-3">PAYMENT</p>
-              <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>付款方式</h2>
+              <h2 className="text-2xl font-light tracking-[0.06em] mb-6 pb-4 border-b border-sf-line" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>付款方式</h2>
 
-              <div className="space-y-2 text-sm font-body font-light text-[oklch(0.35_0_0)] leading-relaxed">
+              <div className="space-y-2 text-sm font-body font-light text-sf-text leading-relaxed">
                 <p>• 台灣地區（含離島）：轉帳、信用卡、Apple pay</p>
                 <p>• 台灣以外：Paypal</p>
               </div>
@@ -105,9 +105,9 @@ export default function ShoppingGuide() {
             {/* ── 常見問題 ── */}
             <section id="faq" className="scroll-mt-24">
               <p className="eyebrow mb-3">FAQ</p>
-              <h2 className="text-2xl font-medium mb-6 pb-4 border-b border-[oklch(0.93_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>常見問題</h2>
+              <h2 className="text-2xl font-light tracking-[0.06em] mb-6 pb-4 border-b border-sf-line" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>常見問題</h2>
 
-              <div className="space-y-0 divide-y divide-[oklch(0.93_0_0)]">
+              <div className="space-y-0 divide-y divide-sf-line">
                 {[
                   {
                     q: "手鍊有保固嗎？",
@@ -147,8 +147,8 @@ export default function ShoppingGuide() {
                   },
                 ].map((item, i) => (
                   <div key={i} className="py-5">
-                    <p className="text-sm font-medium text-[oklch(0.1_0_0)] mb-2">Q：{item.q}</p>
-                    <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed pl-4 border-l-2 border-[oklch(0.93_0_0)] whitespace-pre-line">
+                    <p className="text-sm font-medium text-sf-ink mb-2">Q：{item.q}</p>
+                    <p className="text-sm font-body font-light text-sf-text leading-relaxed pl-4 border-l-2 border-sf-line whitespace-pre-line">
                       {item.a}
                     </p>
                   </div>
@@ -157,26 +157,26 @@ export default function ShoppingGuide() {
             </section>
 
             {/* Contact CTA */}
-            <div className="relative bg-[#F8F5F2] p-8 sm:p-10 text-center overflow-hidden">
-              <div className="pointer-events-none absolute -top-20 -left-16 w-64 h-64 rounded-full bg-[rgba(199,174,255,0.14)] blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-24 -right-10 w-72 h-72 rounded-full bg-[rgba(156,214,255,0.12)] blur-3xl" />
-              <p className="eyebrow text-[0.55rem] text-[oklch(0.45_0.01_60)] mb-3">STILL HAVE QUESTIONS?</p>
-              <h3 className="text-base font-medium mb-5 text-[oklch(0.28_0.01_40)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>還有其他問題？</h3>
+            <div className="relative rounded-lg bg-sf-cream-deep p-8 sm:p-10 text-center overflow-hidden">
+              <div className="pointer-events-none absolute -top-20 -left-16 w-64 h-64 rounded-full bg-brand-blush/15 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-24 -right-10 w-72 h-72 rounded-full bg-brand-peach/20 blur-3xl" />
+              <p className="eyebrow text-[0.55rem] text-brand-blush mb-3">STILL HAVE QUESTIONS?</p>
+              <h3 className="text-base font-light tracking-[0.06em] mb-5 text-sf-ink" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>還有其他問題？</h3>
               <div className="flex flex-col items-center justify-center gap-5 mt-6">
                 <Link href="/contact">
-                  <button className="w-full sm:w-[560px] h-16 border border-[oklch(0.78_0.01_60)] bg-white text-[oklch(0.26_0.01_40)] hover:border-[oklch(0.68_0.02_55)] hover:bg-[oklch(0.99_0.003_90)] transition-all duration-300 flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.05em] font-light shadow-[0_6px_20px_rgba(120,100,80,0.08)]"
+                  <button className="w-full sm:w-[560px] h-14 rounded-full border border-sf-line-strong bg-white text-sf-ink hover:border-sf-accent hover:bg-sf-selected transition-all duration-300 flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.05em] font-light shadow-[0_6px_20px_rgba(120,100,80,0.08)]"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}>
-                    <MessageCircle className="w-4 h-4 text-[oklch(0.48_0.03_55)]" strokeWidth={1.8} />
+                    <MessageCircle className="w-4 h-4 text-sf-accent" strokeWidth={1.8} />
                     聯絡我們
                   </button>
                 </Link>
                 <div className="w-full sm:w-[560px]">
                   <button
                     onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
-                    className="w-full h-16 bg-gradient-to-r from-[#8E735B] via-[#A8835F] to-[#7A614D] text-white hover:brightness-105 transition-all duration-300 shadow-[0_10px_24px_rgba(122,97,77,0.28)] hover:shadow-[0_14px_28px_rgba(122,97,77,0.34)] flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.02em] font-light"
+                    className="w-full h-14 rounded-full bg-gradient-to-r from-sf-accent via-sf-accent to-sf-accent-hover text-white hover:brightness-105 transition-all duration-300 shadow-[0_10px_24px_rgb(75_52_44/0.18)] hover:shadow-[0_14px_28px_rgb(75_52_44/0.24)] flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.02em] font-light"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}
                   >
-                    <CircleHelp className="w-4 h-4 text-[#F8F1E9]" strokeWidth={1.8} />
+                    <CircleHelp className="w-4 h-4 text-sf-cream" strokeWidth={1.8} />
                     問問24小時椛小助人工智能服務
                   </button>
                 </div>

@@ -404,7 +404,7 @@ export default function Home() {
           {/* 圖片較亮，文字加深色遮罩維持可讀性 */}
           <div className="split-card-overlay bg-sf-ink/40">
             <p className="eyebrow text-white/80 mb-1">CRYSTAL WORKSHOP</p>
-            <h3 className="text-2xl text-white font-medium" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>水晶創業班</h3>
+            <h3 className="text-2xl text-white font-light tracking-[0.06em]" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>水晶創業班</h3>
             <p className="mt-2 max-w-xs text-xs font-body font-light leading-relaxed text-white/85">
               從生命靈數體驗課到創業全能班，帶你學會配色美學、手作技法與小資創業 SOP。
             </p>

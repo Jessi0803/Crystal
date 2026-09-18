@@ -8,12 +8,12 @@ export default function Contact() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* Page Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-10 px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto">
           <div className="flex items-center gap-2 mb-3">
-            <Link href="/"><span className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors">首頁</span></Link>
-            <ChevronRight className="w-3 h-3 text-[oklch(0.7_0_0)]" />
-            <span className="text-[0.65rem] font-body text-[oklch(0.1_0_0)]">聯絡我們</span>
+            <Link href="/"><span className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors">首頁</span></Link>
+            <ChevronRight className="w-3 h-3 text-sf-muted" />
+            <span className="text-[0.65rem] font-body text-sf-ink">聯絡我們</span>
           </div>
           <p className="eyebrow mb-2">CONTACT US</p>
           <h1 className="heading-lg">聯絡我們</h1>
@@ -25,7 +25,7 @@ export default function Contact() {
 
           {/* Left: Contact Info */}
           <div>
-            <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-10 max-w-md">
+            <p className="text-sm font-body font-light text-sf-text leading-relaxed mb-10 max-w-md">
               有任何關於商品、訂單或能量水晶的問題，歡迎透過以下方式聯絡我們。
             </p>
 
@@ -46,21 +46,21 @@ export default function Contact() {
                   href: "https://line.me/R/ti/p/@011tymeh",
                 },
               ].map((item) => (
-                <div key={item.label} className="flex gap-4 py-5 border-b border-[oklch(0.93_0_0)]">
-                  <div className="w-8 h-8 border border-[oklch(0.93_0_0)] flex items-center justify-center shrink-0 text-[oklch(0.4_0_0)]">
+                <div key={item.label} className="flex gap-4 py-5 border-b border-sf-line">
+                  <div className="w-8 h-8 border border-sf-line flex items-center justify-center shrink-0 text-sf-text">
                     {item.icon}
                   </div>
                   <div>
-                    <p className="text-[0.65rem] tracking-[0.1em] text-[oklch(0.55_0_0)] mb-0.5">{item.label}</p>
+                    <p className="text-[0.65rem] tracking-[0.1em] text-sf-muted mb-0.5">{item.label}</p>
                     {item.href ? (
                       <a href={item.href} target={item.href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer"
-                        className="text-sm font-medium text-[oklch(0.1_0_0)] hover:text-[oklch(0.4_0_0)] transition-colors">
+                        className="text-sm font-medium text-sf-ink hover:text-sf-accent transition-colors">
                         {item.value}
                       </a>
                     ) : (
-                      <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{item.value}</p>
+                      <p className="text-sm font-medium text-sf-ink">{item.value}</p>
                     )}
-                    <p className="text-xs text-[oklch(0.6_0_0)] mt-0.5">{item.sub}</p>
+                    <p className="text-xs text-sf-muted mt-0.5">{item.sub}</p>
                   </div>
                 </div>
               ))}
@@ -77,9 +77,9 @@ export default function Contact() {
                   { label: "常見問題", href: "/shopping-guide#faq" },
                 ].map((item) => (
                   <Link key={item.href} href={item.href}>
-                    <div className="flex items-center justify-between py-2.5 text-sm font-body text-[oklch(0.35_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors group cursor-pointer">
+                    <div className="flex items-center justify-between py-2.5 text-sm font-body text-sf-text hover:text-sf-ink transition-colors group cursor-pointer">
                       <span>{item.label}</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-[oklch(0.7_0_0)] group-hover:text-[oklch(0.3_0_0)] transition-colors" />
+                      <ChevronRight className="w-3.5 h-3.5 text-sf-muted group-hover:text-sf-accent transition-colors" />
                     </div>
                   </Link>
                 ))}
@@ -89,15 +89,15 @@ export default function Contact() {
 
           {/* Right: Quick Contact Card */}
           <div className="lg:pt-2">
-            <div className="border border-[oklch(0.93_0_0)] bg-[oklch(0.98_0.005_240)] p-8 sm:p-10">
+            <div className="rounded-lg border border-sf-line bg-sf-cream p-8 sm:p-10">
               <p className="eyebrow mb-3">QUICK CONTACT</p>
               <h2
-                className="text-xl font-medium text-[oklch(0.12_0_0)] mb-3"
+                className="text-xl font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}
               >
                 立即聯繫我們
               </h2>
-              <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-8">
+              <p className="text-sm font-body font-light text-sf-text leading-relaxed mb-8">
                 官方管道僅提供 LINE 與 Instagram，點擊下方按鈕即可直接前往。
               </p>
 
@@ -106,7 +106,7 @@ export default function Contact() {
                   href="https://line.me/R/ti/p/@011tymeh"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full h-12 inline-flex items-center justify-center text-sm tracking-[0.08em] text-white bg-[#06C755] hover:opacity-90 transition-opacity"
+                  className="w-full h-12 inline-flex items-center justify-center rounded-full text-sm tracking-[0.08em] text-white bg-[#06C755] hover:opacity-90 transition-opacity"
                 >
                   前往官方 LINE
                 </a>
@@ -114,7 +114,7 @@ export default function Contact() {
                   href="https://instagram.com/gooday_tarot_"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full h-12 inline-flex items-center justify-center text-sm tracking-[0.08em] text-[oklch(0.18_0_0)] border border-[oklch(0.85_0_0)] bg-white hover:border-[oklch(0.7_0_0)] transition-colors"
+                  className="w-full h-12 inline-flex items-center justify-center text-sm tracking-[0.08em] text-sf-ink border border-sf-line-strong bg-white hover:border-sf-accent/50 transition-colors"
                 >
                   前往 Instagram
                 </a>

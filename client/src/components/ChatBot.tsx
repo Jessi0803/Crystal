@@ -56,7 +56,7 @@ function renderWithLinks(text: string) {
         href={part}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: "#9b59b6", textDecoration: "underline", wordBreak: "break-all" }}
+        style={{ color: "#9c7164", textDecoration: "underline", wordBreak: "break-all" }}
       >
         {part}
       </a>
@@ -209,14 +209,14 @@ export default function ChatBot() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-2xl shadow-md max-w-[min(220px,calc(100vw-5.5rem))]"
             style={{
               background: "white",
-              border: "1px solid rgba(192, 132, 212, 0.3)",
-              boxShadow: "0 2px 12px rgba(155, 89, 182, 0.15)",
+              border: "1px solid rgba(195, 131, 128, 0.3)",
+              boxShadow: "0 2px 12px rgba(156, 113, 100, 0.15)",
             }}
           >
             <span
               className="text-xs leading-snug text-left"
               style={{
-                color: "#9b59b6",
+                color: "#9c7164",
                 fontFamily: "'Noto Sans TC', sans-serif",
                 fontWeight: 500,
               }}
@@ -234,14 +234,14 @@ export default function ChatBot() {
               <span
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: "rgba(192, 132, 212, 0.35)",
+                  background: "rgba(195, 131, 128, 0.35)",
                   animation: "ping 2s cubic-bezier(0, 0, 0.2, 1) infinite",
                 }}
               />
               <span
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: "rgba(192, 132, 212, 0.2)",
+                  background: "rgba(195, 131, 128, 0.2)",
                   animation: "ping 2s cubic-bezier(0, 0, 0.2, 1) infinite 0.5s",
                 }}
               />
@@ -254,10 +254,10 @@ export default function ChatBot() {
             }}
             className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95"
             style={{
-              background: "linear-gradient(135deg, #d4a0e8 0%, #b06fd4 50%, #8e44ad 100%)",
+              background: "linear-gradient(135deg, #d8b69f 0%, #c38380 50%, #9c7164 100%)",
               boxShadow: isOpen
-                ? "0 4px 16px rgba(142, 68, 173, 0.5)"
-                : "0 4px 20px rgba(142, 68, 173, 0.45)",
+                ? "0 4px 16px rgba(156, 113, 100, 0.5)"
+                : "0 4px 20px rgba(156, 113, 100, 0.45)",
             }}
             aria-label="開啟水晶顧問"
           >
@@ -277,22 +277,22 @@ export default function ChatBot() {
           style={{
             height: "520px",
             background: "#fdfaf8",
-            border: "1px solid rgba(192, 132, 212, 0.2)",
-            boxShadow: "0 8px 40px rgba(155, 89, 182, 0.15)",
+            border: "1px solid rgba(195, 131, 128, 0.2)",
+            boxShadow: "0 8px 40px rgba(156, 113, 100, 0.15)",
           }}
         >
           {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-3 flex-shrink-0"
             style={{
-              background: "linear-gradient(135deg, #f3e8f9 0%, #ede0f5 100%)",
-              borderBottom: "1px solid rgba(192, 132, 212, 0.2)",
+              background: "linear-gradient(135deg, #fbf7f2 0%, #f2eae2 100%)",
+              borderBottom: "1px solid rgba(195, 131, 128, 0.2)",
             }}
           >
             <div className="flex items-center gap-2.5">
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #e8b4d8, #c084d4)" }}
+                style={{ background: "linear-gradient(135deg, #d8b69f, #c38380)" }}
               >
                 <CrystalChatIcon className="w-5 h-5" />
               </div>
@@ -332,14 +332,14 @@ export default function ChatBot() {
                     style={
                       msg.role === "user"
                         ? {
-                            background: "linear-gradient(135deg, #c084d4, #9b59b6)",
+                            background: "linear-gradient(135deg, #c38380, #9c7164)",
                             color: "white",
                             fontFamily: "'Noto Sans TC', sans-serif",
                           }
                         : {
                             background: "white",
                             color: "oklch(0.2 0 0)",
-                            border: "1px solid rgba(192, 132, 212, 0.2)",
+                            border: "1px solid rgba(195, 131, 128, 0.2)",
                             fontFamily: "'Noto Sans TC', sans-serif",
                           }
                     }
@@ -356,7 +356,7 @@ export default function ChatBot() {
                         <div
                           className="flex-shrink-0 w-[120px] rounded-xl overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                           style={{
-                            border: "1px solid rgba(192, 132, 212, 0.25)",
+                            border: "1px solid rgba(195, 131, 128, 0.25)",
                             background: "white",
                           }}
                         >
@@ -377,7 +377,7 @@ export default function ChatBot() {
                             </p>
                             <p
                               className="text-[0.65rem] mt-1 font-medium"
-                              style={{ color: "#9b59b6" }}
+                              style={{ color: "#9c7164" }}
                             >
                               NT$ {p.price.toLocaleString()}
                             </p>
@@ -397,12 +397,12 @@ export default function ChatBot() {
                   className="rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2"
                   style={{
                     background: "white",
-                    border: "1px solid rgba(192, 132, 212, 0.2)",
+                    border: "1px solid rgba(195, 131, 128, 0.2)",
                   }}
                 >
                   <Loader2
                     className="w-3.5 h-3.5 animate-spin"
-                    style={{ color: "#c084d4" }}
+                    style={{ color: "#c38380" }}
                   />
                   <span className="text-xs" style={{ color: "oklch(0.55 0 0)" }}>
                     椛小助思考中…
@@ -418,7 +418,7 @@ export default function ChatBot() {
           {showQuickQuestions && (
             <div
               className="px-3 py-2 flex-shrink-0"
-              style={{ borderTop: "1px solid rgba(192, 132, 212, 0.15)" }}
+              style={{ borderTop: "1px solid rgba(195, 131, 128, 0.15)" }}
             >
               <p
                 className="text-[0.6rem] tracking-[0.08em] mb-2"
@@ -433,9 +433,9 @@ export default function ChatBot() {
                     onClick={() => handleQuickQuestion(q)}
                     className="text-[0.65rem] px-2.5 py-1 rounded-full transition-all hover:scale-105 active:scale-95"
                     style={{
-                      background: "rgba(192, 132, 212, 0.1)",
-                      color: "#9b59b6",
-                      border: "1px solid rgba(192, 132, 212, 0.3)",
+                      background: "rgba(195, 131, 128, 0.1)",
+                      color: "#9c7164",
+                      border: "1px solid rgba(195, 131, 128, 0.3)",
                       fontFamily: "'Noto Sans TC', sans-serif",
                     }}
                   >
@@ -450,11 +450,11 @@ export default function ChatBot() {
           <form
             onSubmit={handleSubmit}
             className="px-3 py-2.5 flex-shrink-0"
-            style={{ borderTop: "1px solid rgba(192, 132, 212, 0.2)" }}
+            style={{ borderTop: "1px solid rgba(195, 131, 128, 0.2)" }}
           >
             {(shouldShowMessageCount || isAtMessageLimit) && (
               <div
-                className={`mb-1.5 text-[0.65rem] font-body ${isAtMessageLimit ? "text-red-500" : "text-[oklch(0.55_0_0)]"}`}
+                className={`mb-1.5 text-[0.65rem] font-body ${isAtMessageLimit ? "text-red-500" : "text-sf-muted"}`}
                 role="status"
               >
                 {isAtMessageLimit ? `請輸入 ${MAX_CHATBOT_MESSAGE_LENGTH} 字內` : `${input.length} / ${MAX_CHATBOT_MESSAGE_LENGTH}`}
@@ -470,8 +470,8 @@ export default function ChatBot() {
                 placeholder="問問椛小助…"
                 className="flex-1 text-sm px-3 py-2 rounded-full outline-none"
                 style={{
-                  background: "rgba(192, 132, 212, 0.08)",
-                  border: isAtMessageLimit ? "1px solid rgba(239, 68, 68, 0.65)" : "1px solid rgba(192, 132, 212, 0.25)",
+                  background: "rgba(195, 131, 128, 0.08)",
+                  border: isAtMessageLimit ? "1px solid rgba(239, 68, 68, 0.65)" : "1px solid rgba(195, 131, 128, 0.25)",
                   color: "oklch(0.2 0 0)",
                   fontFamily: "'Noto Sans TC', sans-serif",
                 }}
@@ -482,7 +482,7 @@ export default function ChatBot() {
                 disabled={!input.trim() || chatMutation.isPending}
                 className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: "linear-gradient(135deg, #c084d4, #9b59b6)",
+                  background: "linear-gradient(135deg, #c38380, #9c7164)",
                 }}
               >
                 <Send className="w-4 h-4 text-white" />
