@@ -356,29 +356,17 @@ html.storefront {
   }
 
   /* ── Product Card ── */
-  /* 米色相框卡：圖片內縮、文字置中 */
   .product-card {
     display: flex;
     flex-direction: column;
-    height: 100%;
-    padding: 0.4rem;
-    border: 1px solid var(--sf-line);
-    border-radius: 0.6rem;
-    background: var(--sf-cream);
+    background: oklch(1 0 0);
     cursor: pointer;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  }
-
-  .product-card:hover {
-    border-color: var(--sf-line-strong);
-    box-shadow: 0 10px 28px rgb(75 52 44 / 0.08);
   }
 
   .product-card-image {
-    aspect-ratio: 4/5;
+    aspect-ratio: 3/4;
     overflow: hidden;
-    border-radius: 0.4rem;
-    background: #fff;
+    background: var(--sf-cream);
     position: relative;
   }
 
@@ -387,6 +375,11 @@ html.storefront {
     height: 100%;
     object-fit: cover;
     transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* 首頁卡片用正方形圖，避免圖片面積過大 */
+  .home-product-card .product-card-image {
+    aspect-ratio: 1/1;
   }
 
   .product-card:hover .product-card-image img {
@@ -415,73 +408,8 @@ html.storefront {
     box-shadow: 0 10px 24px rgb(75 52 44 / 0.16);
   }
 
-  /* 桌機滑過時換第二張圖 */
-  .product-card-hover-image {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-
-  .product-card:hover .product-card-hover-image {
-    opacity: 1;
-  }
-
-  .product-card-badge {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
-    z-index: 2;
-    border-radius: 9999px;
-    background: rgb(255 255 255 / 0.92);
-    padding: 0.15rem 0.55rem;
-    font-size: 0.6rem;
-    letter-spacing: 0.1em;
-    color: #9c5f5b;
-  }
-
-  .product-card-quick-add {
-    position: absolute;
-    left: 50%;
-    bottom: 0.75rem;
-    z-index: 2;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    background: rgb(255 255 255 / 0.94);
-    padding: 0.45rem 1.1rem;
-    font-size: 0.68rem;
-    letter-spacing: 0.12em;
-    white-space: nowrap;
-    color: var(--sf-accent);
-    opacity: 0;
-    transform: translate(-50%, 0.4rem);
-    transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.3s ease, color 0.3s ease;
-  }
-
-  .product-card:hover .product-card-quick-add {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-
-  .product-card-quick-add:hover {
-    background: var(--sf-accent);
-    color: #fff;
-  }
-
   .product-card-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0.7rem 0.25rem 0.35rem;
-    text-align: center;
-  }
-
-  .product-card-tags {
-    margin-bottom: 0.15rem;
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
-    color: var(--sf-text-muted);
+    padding: 0.875rem 0 0;
   }
 
   .product-card-name {

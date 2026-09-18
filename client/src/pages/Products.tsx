@@ -1,12 +1,13 @@
 // 日日好日 — Products Page
 // Design: Vacanza-inspired minimal grid layout
 import { useState, useEffect, useMemo, useRef } from "react";
-import ProductCard from "@/components/ProductCard";
 import { Link, useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
-import { requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
+import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
+import { getDiscountLabel } from "@/lib/pricing";
+import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -33,6 +34,37 @@ const sortOptions = [
 
 function getProductCategories(product: { category: string; categories?: string[] }) {
   return product.categories?.length ? product.categories : [product.category];
+}
+
+function ProductCardImage({
+  src,
+  alt,
+  priority = false,
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return <div className="h-full w-full bg-sf-cream" aria-hidden="true" />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      fetchPriority={priority ? "high" : "auto"}
+      onError={() => setHasError(true)}
+    />
+  );
 }
 
 export default function Products() {
@@ -199,12 +231,12 @@ export default function Products() {
 
         {/* Product Grid */}
         {productsLoading && products.length === 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-4 sm:gap-x-4 sm:gap-y-6 py-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="animate-pulse rounded-[0.6rem] border border-sf-line bg-sf-cream p-[0.4rem]">
-                <div className="aspect-[4/5] rounded-md bg-white" />
-                <div className="mx-auto mt-3 h-3 w-2/3 rounded bg-white" />
-                <div className="mx-auto mt-2 mb-1 h-3 w-1/3 rounded bg-white" />
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] bg-sf-cream" />
+                <div className="mt-4 h-3 w-2/3 bg-sf-cream" />
+                <div className="mt-2 h-3 w-1/2 bg-sf-cream" />
               </div>
             ))}
           </div>
@@ -223,18 +255,62 @@ export default function Products() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-4 sm:gap-x-4 sm:gap-y-6 py-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
             {filtered.map((product, index) => {
               const availability = availabilityByProductId.get(product.id);
               const soldOut = availability?.isMonthlyLimited === true && availability.available === false;
+              const discountLabel = getDiscountLabel(product);
               return (
-              <ProductCard
-                key={product.id}
-                product={product}
-                soldOut={soldOut}
-                priority={index < 8}
-                onAddToCart={handleAddToCart}
-              />
+              <Link key={product.id} href={`/products/${product.id}`}>
+                <div className="product-card group">
+                  <div className="product-card-image">
+                    <ProductCardImage src={product.image} alt={product.name} priority={index < 8} />
+                    {soldOut && <span className="sold-out-card">已售完</span>}
+                    {/* Hover Add to Cart */}
+                    {!soldOut && (
+                      <button
+                        onClick={(e) => handleAddToCart(product, e)}
+                        className="absolute bottom-0 left-0 right-0 bg-sf-accent text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        {getQuickCartActionLabel(product) ?? "加入購物袋"}
+                      </button>
+                    )}
+                    {/* Sale Badge */}
+                    {discountLabel && (
+                      <span className="absolute top-3 left-3 bg-white text-[0.6rem] tracking-[0.08em] font-body px-2 py-1">
+                        {discountLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="product-card-info">
+                    <div className="tag-scroll mb-1.5">
+                      {product.tags.map((tag) => (
+                        <span key={tag} className="tag">{tag}</span>
+                      ))}
+                    </div>
+                    <p className="product-card-name">{product.name}</p>
+                    <div className="flex flex-col gap-0.5 mt-1">
+                      {product.originalPrice && product.originalPrice > product.price ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-[0.7rem] font-body text-sf-muted line-through">
+                            NT$ {product.originalPrice.toLocaleString()}
+                          </p>
+                          <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                        </div>
+                      ) : product.priceRange ? (
+                        <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
+                      ) : (
+                        <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                      )}
+                      {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
+                        <p className="text-[0.7rem] font-body text-sf-muted">
+                          {getCustomPriceDisplay(product.id, product.priceRange)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Link>
             );
             })}
           </div>

@@ -26,8 +26,6 @@ import {
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
 import { RichTextContent } from "@/components/RichTextContent";
-import ProductCard from "@/components/ProductCard";
-import MobileProductGallery from "@/components/MobileProductGallery";
 import StickyBuyBar from "@/components/StickyBuyBar";
 import {
   getTarotDepositPrice,
@@ -286,10 +284,6 @@ export default function ProductDetail() {
   const activeGalleryImage = galleryImages.includes(selectedGalleryImage)
     ? selectedGalleryImage
     : selectedOptionImage || galleryImages[0] || product.image;
-  // 手機輪播：方案圖不在相簿時放在第一張
-  const mobileSlides = selectedOptionImage && !galleryImages.includes(selectedOptionImage)
-    ? [selectedOptionImage, ...galleryImages]
-    : galleryImages.length > 0 ? galleryImages : [product.image];
   const wristSizeNumber = Number(selectedWristSize);
   const selectedComboWristSizeNumbers = selectedWristSizeGroups.map((group) =>
     Number(selectedWristSizeSelections[group.id] ?? wristSizes[0])
@@ -365,7 +359,7 @@ export default function ProductDetail() {
 
   // 有購買按鈕的商品才顯示手機底部固定購買列
   const hasStickyBuyBar = product.category !== "custom" || isCustomDepositProduct(product.id);
-  // 固定購買列顯示目前（或預設）的規格：方案・手圍・扣具・鬆緊
+  // 固定購買列顯示目前（或預設）的規格：方案・占卜主題・手圍・扣具・鬆緊
   const stickySelectionSummary = [
     purchaseOptions.length > 1 ? selectedPurchaseOption?.label : null,
     isTarotDepositProduct && selectedTarotTopic ? `占卜主題 ${selectedTarotTopic.label}` : null,
@@ -466,19 +460,12 @@ export default function ProductDetail() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-10 lg:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 lg:gap-20">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
 
           {/* Left: Gallery */}
-          <MobileProductGallery
-            slides={mobileSlides}
-            activeImage={activeGalleryImage}
-            alt={product.name}
-            soldOut={isSoldOutItem}
-            contain={product.id === "d002-honey-realm"}
-          />
-          <div className="hidden space-y-3 lg:block">
-            <div className="relative bg-sf-cream aspect-square overflow-hidden rounded-lg">
+          <div className="space-y-3">
+            <div className="relative bg-sf-cream aspect-square overflow-hidden">
               <img
                 src={activeGalleryImage}
                 alt={product.name}
@@ -1058,9 +1045,19 @@ export default function ProductDetail() {
               <p className="eyebrow mb-2">YOU MAY ALSO LIKE</p>
               <h2 className="heading-lg">相關商品</h2>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {related.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <Link key={p.id} href={`/products/${p.id}`}>
+                  <div className="product-card group">
+                    <div className="product-card-image">
+                      <img src={p.image} alt={p.name} loading="lazy" />
+                    </div>
+                    <div className="product-card-info">
+                      <p className="product-card-name">{p.name}</p>
+                      <p className="product-card-price">NT$ {p.price.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           </div>
