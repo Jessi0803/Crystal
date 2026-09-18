@@ -52,7 +52,7 @@ function ProductCardImage({
   }, [src]);
 
   if (!src || hasError) {
-    return <div className="h-full w-full bg-[oklch(0.96_0_0)]" aria-hidden="true" />;
+    return <div className="h-full w-full bg-sf-cream" aria-hidden="true" />;
   }
 
   return (
@@ -173,7 +173,7 @@ export default function Products() {
     <div className="min-h-screen bg-white page-enter">
 
       {/* Page Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-10 px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto">
           <p className="eyebrow mb-2">ALL PRODUCTS</p>
           <h1 className="heading-lg">所有商品</h1>
@@ -183,7 +183,7 @@ export default function Products() {
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Filter Bar */}
-        <div className="flex items-center justify-between py-5 border-b border-[oklch(0.93_0_0)]">
+        <div className="flex items-center justify-between py-5 border-b border-sf-line">
           {/* Category Tabs */}
           <div
             ref={categoryTabsRef}
@@ -199,8 +199,8 @@ export default function Products() {
                 aria-current={activeCategory === cat.id ? "page" : undefined}
                 className={`shrink-0 px-4 py-2 text-[0.7rem] tracking-[0.1em] font-body transition-colors border-b-2 ${
                   activeCategory === cat.id
-                    ? "border-[oklch(0.1_0_0)] text-[oklch(0.1_0_0)]"
-                    : "border-transparent text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)]"
+                    ? "border-sf-accent text-sf-ink"
+                    : "border-transparent text-sf-muted hover:text-sf-ink"
                 }`}
               >
                 {cat.label}
@@ -213,7 +213,7 @@ export default function Products() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="text-[0.7rem] tracking-[0.08em] font-body text-[oklch(0.4_0_0)] bg-transparent border-none outline-none cursor-pointer"
+              className="text-[0.7rem] tracking-[0.08em] font-body text-sf-text bg-transparent border-none outline-none cursor-pointer"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>{opt.label}</option>
@@ -223,8 +223,8 @@ export default function Products() {
         </div>
 
         {/* Results Count */}
-        <div className="py-4 border-b border-[oklch(0.95_0_0)]">
-          <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] tracking-wide">
+        <div className="py-4 border-b border-sf-line">
+          <p className="text-[0.65rem] font-body text-sf-muted tracking-wide">
             {productsLoading ? "商品載入中…" : `共 ${filtered.length} 件商品`}
           </p>
         </div>
@@ -234,19 +234,19 @@ export default function Products() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 py-10">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="animate-pulse">
-                <div className="aspect-[3/4] bg-[oklch(0.94_0_0)]" />
-                <div className="mt-4 h-3 w-2/3 bg-[oklch(0.94_0_0)]" />
-                <div className="mt-2 h-3 w-1/2 bg-[oklch(0.94_0_0)]" />
+                <div className="aspect-[3/4] bg-sf-cream" />
+                <div className="mt-4 h-3 w-2/3 bg-sf-cream" />
+                <div className="mt-2 h-3 w-1/2 bg-sf-cream" />
               </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-2xl font-light text-[oklch(0.7_0_0)] mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+            <p className="text-2xl font-light text-sf-muted mb-3" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
               {activeCategory === "energy-perfume" ? "商品即將推出" : "暫無商品"}
             </p>
             {activeCategory === "energy-perfume" && (
-              <p className="text-sm font-body text-[oklch(0.55_0_0)] tracking-[0.08em] mb-6">
+              <p className="text-sm font-body text-sf-muted tracking-[0.08em] mb-6">
                 敬請期待
               </p>
             )}
@@ -270,7 +270,7 @@ export default function Products() {
                     {!soldOut && (
                       <button
                         onClick={(e) => handleAddToCart(product, e)}
-                        className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        className="absolute bottom-0 left-0 right-0 bg-sf-accent text-white text-[0.65rem] tracking-[0.15em] py-3 font-body opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                       >
                         {getQuickCartActionLabel(product) ?? "加入購物袋"}
                       </button>
@@ -292,7 +292,7 @@ export default function Products() {
                     <div className="flex flex-col gap-0.5 mt-1">
                       {product.originalPrice && product.originalPrice > product.price ? (
                         <div className="flex items-center gap-2">
-                          <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
+                          <p className="text-[0.7rem] font-body text-sf-muted line-through">
                             NT$ {product.originalPrice.toLocaleString()}
                           </p>
                           <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
@@ -303,7 +303,7 @@ export default function Products() {
                         <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
                       )}
                       {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
-                        <p className="text-[0.7rem] font-body text-[oklch(0.55_0_0)]">
+                        <p className="text-[0.7rem] font-body text-sf-muted">
                           {getCustomPriceDisplay(product.id, product.priceRange)}
                         </p>
                       )}

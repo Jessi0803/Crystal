@@ -25,6 +25,8 @@
   --color-brand-lace: var(--brand-lace);
   --color-brand-peach: var(--brand-peach);
   --color-brand-blush: var(--brand-blush);
+  --color-sf-rose: #9c5f5b;
+  --color-sf-rose-bg: #f3e3e0;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -741,7 +743,7 @@ html.storefront {
   font-weight: 300;
   line-height: 1.85;
   letter-spacing: 0.02em;
-  color: oklch(0.35 0 0);
+  color: var(--sf-text);
   overflow-wrap: anywhere;
 }
 .rich-content > :first-child { margin-top: 0; }
@@ -767,7 +769,7 @@ html.storefront {
   letter-spacing: 0.04em;
   color: var(--brand-umber);
 }
-.rich-content strong { font-weight: 500; color: oklch(0.22 0 0); }
+.rich-content strong { font-weight: 500; color: var(--sf-ink); }
 .rich-content em { font-style: italic; }
 .rich-content u { text-underline-offset: 3px; }
 .rich-content a {

@@ -60,10 +60,10 @@ export default function ClearQuartzAddonOption({
 
   return (
     <label
-      className={`flex items-start gap-3 border border-[oklch(0.9_0_0)] bg-[oklch(0.99_0_0)] px-3.5 py-3 transition-colors ${
+      className={`flex items-start gap-3 rounded-md border border-sf-line bg-sf-cream px-3.5 py-3 transition-colors ${
         disabled
           ? "cursor-not-allowed opacity-65"
-          : "cursor-pointer hover:border-[oklch(0.72_0_0)]"
+          : "cursor-pointer hover:border-sf-accent/50"
       } ${className}`}
     >
       <input
@@ -71,29 +71,29 @@ export default function ClearQuartzAddonOption({
         checked={checked}
         disabled={disabled}
         onChange={(event) => onCheckedChange(event.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 accent-[oklch(0.18_0_0)]"
+        className="mt-1 h-4 w-4 shrink-0 accent-sf-accent"
       />
       {product.image ? (
         <img
           src={product.image}
           alt={product.name}
-          className="h-14 w-14 shrink-0 border border-[oklch(0.92_0_0)] object-cover"
+          className="h-14 w-14 shrink-0 rounded border border-sf-line object-cover"
         />
       ) : (
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center border border-[oklch(0.92_0_0)] bg-white">
-          <Sparkles className="h-5 w-5 text-[oklch(0.58_0_0)]" />
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded border border-sf-line bg-white">
+          <Sparkles className="h-5 w-5 text-sf-muted" />
         </div>
       )}
       <span className="min-w-0 flex-1">
         <span className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-          <span className="text-sm font-body font-medium leading-snug text-[oklch(0.14_0_0)]">
+          <span className="text-sm font-body font-medium leading-snug text-sf-ink">
             加購{product.name}
           </span>
-          <span className="shrink-0 text-xs font-body font-medium text-[oklch(0.26_0_0)]">
+          <span className="shrink-0 text-xs font-body font-medium text-sf-text">
             {priceLabel}
           </span>
         </span>
-        <span className="mt-1 block text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">
+        <span className="mt-1 block text-xs font-body leading-relaxed text-sf-muted">
           適合放置水晶、飾品或日常空間旁，作為能量淨化與擺放陪伴。
         </span>
       </span>

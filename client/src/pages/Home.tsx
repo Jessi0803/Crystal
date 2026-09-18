@@ -110,7 +110,7 @@ function ProductCard({
             <img src={product.image} alt={product.name} loading="lazy" />
             <button
               onClick={(event) => onAddToCart(product, event)}
-              className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
+              className="absolute bottom-0 left-0 right-0 bg-sf-accent text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
               style={{ transition: "opacity 0.2s" }}
             >
               {getQuickCartActionLabel(product) ?? "加入購物車"}
@@ -126,7 +126,7 @@ function ProductCard({
             <div className="flex flex-col gap-0.5 mt-1">
               {product.originalPrice && product.originalPrice > product.price ? (
                 <div className="flex items-center gap-2">
-                  <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
+                  <p className="text-[0.7rem] font-body text-sf-muted line-through">
                     NT$ {product.originalPrice.toLocaleString()}
                   </p>
                   <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
@@ -137,7 +137,7 @@ function ProductCard({
                 <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
               )}
               {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
-                <p className="text-[0.7rem] font-body text-[oklch(0.55_0_0)]">
+                <p className="text-[0.7rem] font-body text-sf-muted">
                   {getCustomPriceDisplay(product.id, product.priceRange)}
                 </p>
               )}
@@ -247,7 +247,7 @@ export default function Home() {
               <br />
               <span className="home-hero-accent">能量水晶</span>
             </h1>
-            <p className="mb-6 text-sm font-body font-light leading-[1.9] tracking-[0.06em] text-[#6b5048] sm:mb-8 sm:text-[15px]">
+            <p className="mb-6 text-sm font-body font-light leading-[1.9] tracking-[0.06em] text-sf-text sm:mb-8 sm:text-[15px]">
               每一顆水晶，都是大自然的溫柔回應，
               <br className="hidden sm:inline" />
               讓能量陪你走過生活的每一段旅程。
@@ -274,12 +274,12 @@ export default function Home() {
                 >
                   <span
                     className={`block h-px transition-all duration-500 ${
-                      index === heroSlide ? "w-8 bg-[#9C7164]" : "w-0 bg-transparent"
+                      index === heroSlide ? "w-8 bg-sf-accent" : "w-0 bg-transparent"
                     }`}
                   />
                   <span
                     className={`font-display text-sm tracking-[0.1em] transition-colors ${
-                      index === heroSlide ? "text-[#4B342C]" : "text-[#C9B3A6] group-hover:text-[#9C7164]"
+                      index === heroSlide ? "text-sf-ink" : "text-[#C9B3A6] group-hover:text-sf-accent"
                     }`}
                   >
                     {String(index + 1).padStart(2, "0")}
@@ -351,13 +351,13 @@ export default function Home() {
             <Sparkles aria-hidden="true" className="absolute right-[20%] top-8 -z-10 h-auto w-3.5 text-[#d4ad91]/60 sm:right-[23%] sm:top-10 sm:w-4" strokeWidth={1.25} />
 
             <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center">
-              <p className="mb-2 text-[0.62rem] font-body font-medium tracking-[0.18em] text-[oklch(0.62_0.05_65)] sm:mb-3 sm:text-xs sm:tracking-[0.28em]">
-                TODAY&apos;S ENERGY <span className="mx-1 text-[oklch(0.7_0.06_65)] sm:mx-1.5">•</span> 今日能量語錄
+              <p className="mb-2 text-[0.62rem] font-body font-medium tracking-[0.18em] text-brand-blush sm:mb-3 sm:text-xs sm:tracking-[0.28em]">
+                TODAY&apos;S ENERGY <span className="mx-1 text-brand-peach sm:mx-1.5">•</span> 今日能量語錄
               </p>
-              <blockquote className="max-w-3xl px-3 text-base font-light leading-[1.75] text-[oklch(0.2_0.01_55)] [text-wrap:balance] sm:px-12 sm:text-[1.35rem] md:text-2xl" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>
-                <span aria-hidden="true" className="mr-1 text-[1.4em] leading-none text-[oklch(0.55_0.035_60)]">“</span>
+              <blockquote className="max-w-3xl px-3 text-base font-light leading-[1.75] text-sf-ink [text-wrap:balance] sm:px-12 sm:text-[1.35rem] md:text-2xl" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>
+                <span aria-hidden="true" className="mr-1 text-[1.4em] leading-none text-brand-peach">“</span>
                 {quote}
-                <span aria-hidden="true" className="ml-1 text-[1.4em] leading-none text-[oklch(0.55_0.035_60)]">”</span>
+                <span aria-hidden="true" className="ml-1 text-[1.4em] leading-none text-brand-peach">”</span>
               </blockquote>
             </div>
           </div>
@@ -376,12 +376,12 @@ export default function Home() {
 
       {/* ─── MONTHLY LIMITED ─── */}
       {monthlyProducts.length > 0 && (
-        <section className="py-12 border-t border-[oklch(0.93_0_0)] bg-[oklch(0.985_0_0)] sm:py-14">
+        <section className="py-12 border-t border-sf-line bg-sf-cream sm:py-14">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-6 text-center reveal sm:mb-8">
               <p className="eyebrow mb-2">MONTHLY LIMITED</p>
               <h2 className="heading-lg">本月限定款</h2>
-              <p className="mt-2 text-sm font-body font-light text-[oklch(0.45_0_0)]">每月限量設計，售完即不再製作。</p>
+              <p className="mt-2 text-sm font-body font-light text-sf-text">每月限量設計，售完即不再製作。</p>
             </div>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               {monthlyProducts.map((product) => (
@@ -398,11 +398,11 @@ export default function Home() {
       )}
 
       {/* ─── SECOND BANNER: 2-col split ─── */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 border-t border-[oklch(0.93_0_0)]">
+      <section className="grid grid-cols-1 lg:grid-cols-2 border-t border-sf-line">
         <Link href="/crystal-workshop" className="split-card h-[62vw] min-h-[320px] sm:h-[42vw] lg:h-[45vh]">
           <img src={HERO_BANNER2_IMG} alt="水晶創業班課程作品" loading="lazy" />
           {/* 圖片較亮，文字加深色遮罩維持可讀性 */}
-          <div className="split-card-overlay bg-[oklch(0_0_0/0.34)]">
+          <div className="split-card-overlay bg-sf-ink/40">
             <p className="eyebrow text-white/80 mb-1">CRYSTAL WORKSHOP</p>
             <h3 className="text-2xl text-white font-medium" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>水晶創業班</h3>
             <p className="mt-2 max-w-xs text-xs font-body font-light leading-relaxed text-white/85">
@@ -420,10 +420,10 @@ export default function Home() {
             </span>
           </div>
         </Link>
-        <div className="split-card h-[62vw] min-h-[320px] sm:h-[42vw] lg:h-[45vh] bg-[oklch(0.97_0_0)] flex flex-col items-center justify-center px-12 text-center">
+        <div className="split-card h-[62vw] min-h-[320px] sm:h-[42vw] lg:h-[45vh] bg-sf-cream flex flex-col items-center justify-center px-12 text-center">
           <p className="eyebrow mb-4">CUSTOM CRYSTAL</p>
           <h3 className="heading-lg mb-4">想要專屬定制？</h3>
-          <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-8 max-w-xs">
+          <p className="text-sm font-body font-light text-sf-text leading-relaxed mb-8 max-w-xs">
             根據你的需求量身打造，提供塔羅、脈輪、生命靈數等多種客製化方案。
           </p>
           <Link href="/custom">
