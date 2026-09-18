@@ -2,21 +2,22 @@
 // Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown, Heart, Coins, Shield, Leaf, Gem, Ribbon, Droplet, Sparkles, type LucideIcon } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { BrandTextMark } from "./BrandMark";
 
-const effectSeriesLinks = [
-  { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
-  { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: "💰" },
-  { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: "🪄" },
-  { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: "🧘🏻" },
-  { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: "💎" },
-  { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: "🎀" },
-  { label: "能量香水", href: "/products?category=energy-perfume", desc: "香氣能量・即將推出", icon: "🌙" },
-  { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: "✨" },
+// 功效分類圖示：Lucide 細線圖示（ISC 授權，可免費商用），風格與導覽列其他圖示一致
+const effectSeriesLinks: { label: string; href: string; desc: string; icon: LucideIcon }[] = [
+  { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: Heart },
+  { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: Coins },
+  { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: Shield },
+  { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: Leaf },
+  { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: Gem },
+  { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: Ribbon },
+  { label: "能量香水", href: "/products?category=energy-perfume", desc: "香氣能量・即將推出", icon: Droplet },
+  { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: Sparkles },
 ];
 
 // 購物說明下拉選單
@@ -186,7 +187,7 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-sf-selected transition-colors group cursor-pointer"
                     >
-                      <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
+                      <CategoryIcon icon={cat.icon} />
                       <div className="min-w-0">
                         <p className="text-[0.75rem] font-medium text-sf-ink tracking-[0.05em] group-hover:text-sf-accent transition-colors">
                           {cat.label}
@@ -398,7 +399,7 @@ export default function Navbar() {
                         {effectSeriesLinks.map((cat) => (
                           <Link key={cat.href} href={cat.href}>
                             <div onClick={closeMobileMenu} className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-sf-selected transition-colors cursor-pointer">
-                              <span className="text-base w-5 shrink-0">{cat.icon}</span>
+                              <CategoryIcon icon={cat.icon} />
                               <div>
                                 <p className="text-sm font-medium text-sf-ink">{cat.label}</p>
                                 <p className="text-[0.6rem] text-sf-muted">{cat.desc}</p>
@@ -479,6 +480,14 @@ export default function Navbar() {
         </div>
       )}
     </>
+  );
+}
+
+function CategoryIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sf-selected text-sf-accent" aria-hidden="true">
+      <Icon className="h-[15px] w-[15px]" strokeWidth={1.4} />
+    </span>
   );
 }
 
