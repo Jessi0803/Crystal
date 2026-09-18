@@ -181,6 +181,11 @@ function App() {
   const [location] = useLocation();
   const isAdminPage = location.startsWith("/admin");
 
+  // 前台套用「法式氣質＋溫柔浪漫」風格；掛在 <html> 上，彈窗、抽屜等 portal 內容也吃得到，後台不受影響
+  useEffect(() => {
+    document.documentElement.classList.toggle("storefront", !isAdminPage);
+  }, [isAdminPage]);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
