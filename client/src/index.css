@@ -64,6 +64,14 @@
   --crystal-gold: oklch(0.72 0.09 70);
   --crystal-gold-light: oklch(0.88 0.06 70);
 
+  /* 品牌色（法式氣質＋溫柔浪漫）：首頁 hero、功效說明文字顏色共用 */
+  --brand-lace: #e8e1d1;   /* Antique Lace 奶油米 */
+  --brand-peach: #d8b69f;  /* Soft Peach 柔米杏 */
+  --brand-blush: #c38380;  /* Rosy Blush 玫瑰粉 */
+  --brand-taupe: #9c7164;  /* Rose Taupe 玫瑰棕 */
+  --brand-umber: #4b342c;  /* Deep Umber 深棕 */
+  --brand-greige: #857670; /* 灰棕色 */
+
   /* Shadcn tokens */
   --radius: 0;
   --background: oklch(1 0 0);
@@ -560,7 +568,7 @@
   filter: sepia(0.06) saturate(0.97) hue-rotate(-3deg) contrast(0.98);
 }
 .home-hero-tint {
-  background: linear-gradient(135deg, #e8e1d1 0%, #d8b69f 55%, #c38380 100%);
+  background: linear-gradient(135deg, var(--brand-lace) 0%, var(--brand-peach) 55%, var(--brand-blush) 100%);
   mix-blend-mode: soft-light;
   opacity: 0.65;
 }
@@ -578,7 +586,7 @@
   font-family: 'Allura', 'Cormorant Garamond', cursive;
   font-size: clamp(1.6rem, 3.2vw, 2.25rem);
   line-height: 1;
-  color: #c38380;
+  color: var(--brand-blush);
 }
 .home-hero-title {
   font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
@@ -586,10 +594,10 @@
   font-weight: 400;
   line-height: 1.35;
   letter-spacing: 0.08em;
-  color: #4b342c;
+  color: var(--brand-umber);
 }
 .home-hero-accent {
-  color: #9c7164;
+  color: var(--brand-taupe);
 }
 .home-hero-button {
   display: inline-flex;
@@ -597,7 +605,7 @@
   justify-content: center;
   gap: 0.9rem;
   border-radius: 9999px;
-  background: #9c7164;
+  background: var(--brand-taupe);
   padding: 0.6rem 1.9rem;
   font-size: 0.875rem;
   letter-spacing: 0.16em;
@@ -605,23 +613,118 @@
   transition: background-color 0.3s ease;
 }
 .home-hero-button:hover {
-  background: #4b342c;
+  background: var(--brand-umber);
 }
 .home-hero-button-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #9c7164;
+  border: 1px solid var(--brand-taupe);
   border-radius: 9999px;
   background: var(--hero-bg);
   padding: 0.45rem 1rem;
   font-size: 0.8125rem;
   letter-spacing: 0.14em;
-  color: #9c7164;
+  color: var(--brand-taupe);
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 .home-hero-button-outline:hover {
-  border-color: #4b342c;
-  background: #4b342c;
+  border-color: var(--brand-umber);
+  background: var(--brand-umber);
   color: #fff;
 }
+
+/* ─── 功效說明富文字（後台 Editor 與前台共用；class 需與 shared/richText.ts 一致）─── */
+.rich-content {
+  font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.85;
+  letter-spacing: 0.02em;
+  color: oklch(0.35 0 0);
+  overflow-wrap: anywhere;
+}
+.rich-content > :first-child { margin-top: 0; }
+.rich-content > :last-child { margin-bottom: 0; }
+.rich-content p { margin: 0 0 0.9em; }
+/* 連按兩次 Enter 產生的空段落保留為空行；Editor 自動補在最後的空段落不顯示 */
+.rich-content p:empty::before { content: "\00a0"; }
+.rich-content > p:last-child:empty { display: none; }
+.rich-content h2 {
+  margin: 1.6em 0 0.6em;
+  font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  color: var(--brand-umber);
+}
+.rich-content h3 {
+  margin: 1.3em 0 0.5em;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  color: var(--brand-umber);
+}
+.rich-content strong { font-weight: 500; color: oklch(0.22 0 0); }
+.rich-content em { font-style: italic; }
+.rich-content u { text-underline-offset: 3px; }
+.rich-content a {
+  color: var(--brand-taupe);
+  text-decoration: underline;
+  text-decoration-color: var(--brand-peach);
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+.rich-content a:hover { color: var(--brand-umber); }
+.rich-content ul,
+.rich-content ol { margin: 0 0 0.9em; padding-left: 1.4em; }
+.rich-content ul { list-style: disc; }
+.rich-content ol { list-style: decimal; }
+.rich-content li { margin: 0.25em 0; }
+.rich-content li::marker { color: var(--brand-taupe); }
+.rich-content li > p { margin: 0; }
+.rich-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.4em auto;
+}
+.rich-content img.rt-img-left { margin-left: 0; margin-right: auto; }
+.rich-content img.rt-img-right { margin-left: auto; margin-right: 0; }
+.rich-content img.rt-img-sm { width: 40%; }
+.rich-content img.rt-img-md { width: 65%; }
+.rich-content img.rt-img-lg { width: 85%; }
+.rich-content img.rt-img-full { width: 100%; }
+@media (max-width: 639px) {
+  .rich-content img.rt-img-sm { width: 60%; }
+  .rich-content img.rt-img-md,
+  .rich-content img.rt-img-lg { width: 100%; }
+}
+.rich-content .rt-align-center { text-align: center; }
+.rich-content .rt-align-right { text-align: right; }
+.rich-content .rt-size-14 { font-size: 14px; }
+.rich-content .rt-size-16 { font-size: 16px; }
+.rich-content .rt-size-18 { font-size: 18px; }
+.rich-content .rt-size-20 { font-size: 20px; }
+.rich-content .rt-size-24 { font-size: 24px; line-height: 1.5; }
+.rich-content .rt-size-28 { font-size: 28px; line-height: 1.45; }
+.rich-content .rt-color-umber { color: var(--brand-umber); }
+.rich-content .rt-color-taupe { color: var(--brand-taupe); }
+.rich-content .rt-color-blush { color: var(--brand-blush); }
+.rich-content .rt-color-greige { color: var(--brand-greige); }
+
+/* 後台 Editor 編輯區 */
+.rich-content-editor {
+  min-height: 260px;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid oklch(0.86 0 0);
+  background: #fff;
+  padding: 14px 16px;
+  outline: none;
+}
+.rich-content-editor:focus { border-color: oklch(0.2 0 0); }
+.rich-content-editor img { cursor: pointer; }
+.rich-content-editor img.ProseMirror-selectednode { outline: 2px solid var(--brand-taupe); outline-offset: 2px; }

@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { chatbotKnowledge, dbProducts } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
+import { richTextToPlainText } from "@shared/richText";
 
 export interface KnowledgeChunk {
   id: string;
@@ -71,7 +72,8 @@ function productPriceText(product: ProductKnowledgeSource): string {
 
 export function buildProductKnowledgeChunk(product: ProductKnowledgeSource): KnowledgeChunk {
   const crystalTerms = splitTerms(product.crystalType);
-  const benefits = asStringArray(product.benefits);
+  // 功效說明可能是富文字 HTML，給 AI 前先轉成純文字
+  const benefits = asStringArray(product.benefits).map(richTextToPlainText).filter(Boolean);
   const tags = asStringArray(product.tags);
   const suitableFor = asStringArray(product.suitableFor);
   const categoryLabels = asStringArray(product.categoryLabels);

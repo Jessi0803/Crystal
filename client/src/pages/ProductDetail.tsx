@@ -1,6 +1,6 @@
 // 日日好日 — Product Detail Page
 // Design: Vacanza-inspired — large image + clean product info
-import { Fragment, useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Plus, Minus, ShoppingBag } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
@@ -25,6 +25,7 @@ import {
 } from "@/lib/pricing";
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
+import { RichTextContent } from "@/components/RichTextContent";
 import {
   getTarotDepositPrice,
   getTarotTopicByLabel,
@@ -143,20 +144,6 @@ function CustomPriceTile({
 function getProductImages(product: { image: string; images?: string[] }) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
-}
-
-function MultilineText({ text }: { text: string }) {
-  const lines = text.split("\n");
-  return (
-    <>
-      {lines.map((line, index) => (
-        <Fragment key={index}>
-          {line}
-          {index < lines.length - 1 && <br />}
-        </Fragment>
-      ))}
-    </>
-  );
 }
 
 export default function ProductDetail() {
@@ -963,9 +950,7 @@ export default function ProductDetail() {
               </div>
 
               {activeTab === "benefits" && (
-                <div className="text-sm font-body font-light text-[oklch(0.35_0_0)] leading-[1.8]">
-                  <MultilineText text={benefitText} />
-                </div>
+                <RichTextContent value={benefitText} />
               )}
               {activeTab === "content" && (
                 <ul className="space-y-2">

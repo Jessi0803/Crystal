@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, type ChangeEvent } from "react";
+import { lazy, Suspense, useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   Package, Plus, Search, Save, X, Upload, ImageIcon,
@@ -10,6 +10,10 @@ import { products as staticProducts } from "@/lib/data";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
+import { compressImage } from "@/lib/imageCompression";
+
+// 富文字編輯器較大，開啟商品表單時才載入
+const BenefitsEditor = lazy(() => import("@/components/admin/BenefitsEditor"));
 import type { DbProduct } from "../../../drizzle/schema";
 
 const CATEGORY_OPTIONS = [
@@ -246,29 +250,6 @@ function getProductCategoryLabels(product: DbProduct) {
 function getProductImages(product: Pick<DbProduct, "image" | "images">) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
-}
-
-function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const MAX = 900;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-        else { width = Math.round(width * MAX / height); height = MAX; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.78));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("圖片讀取失敗")); };
-    img.src = url;
-  });
 }
 
 // ── 庫存行內編輯（沿用 AdminInventory 的模式）──────────────────────────────
@@ -896,7 +877,7 @@ function ProductModal({
     }
     setCompressing(true);
     try {
-      const dataUrls = await Promise.all(files.map(compressImage));
+      const dataUrls = await Promise.all(files.map((file) => compressImage(file)));
       setForm((p) => {
         const images = [...p.images, ...dataUrls];
         return { ...p, images, image: images[0] ?? "" };
@@ -1644,16 +1625,12 @@ function ProductModal({
 
           {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}
           {primaryCategory !== "custom" ? (
-            <label className="block">
-              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（依輸入格式顯示）</span>
-              <textarea
-                value={form.benefits}
-                onChange={(e) => setForm((p) => ({ ...p, benefits: e.target.value }))}
-                rows={4}
-                placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n\n帶來平靜、安定的能量"}
-                className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
-              />
-            </label>
+            <div>
+              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明</span>
+              <Suspense fallback={<div className="h-72 border border-[oklch(0.86_0_0)] bg-[oklch(0.985_0_0)]" />}>
+                <BenefitsEditor value={form.benefits} onChange={(benefits) => setForm((p) => ({ ...p, benefits }))} />
+              </Suspense>
+            </div>
           ) : (
             <>
               <label className="block">

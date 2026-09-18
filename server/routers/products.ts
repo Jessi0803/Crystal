@@ -9,6 +9,9 @@ import { removeProductKnowledge, syncProductKnowledge, syncProductKnowledgeById 
 import { recordAuditEventSafely } from "../auditDb";
 import { getProductSalesTotals } from "../orderDb";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { RICH_TEXT_MAX_LENGTH, richTextToPlainText } from "@shared/richText";
+import { sanitizeBenefits } from "../richTextSanitize";
+import { BlobUploadError, UPLOADABLE_IMAGE_TYPES, putPublicImage } from "../blobStorage";
 
 let tableEnsured = false;
 
@@ -59,7 +62,7 @@ function inferProductCategories(p: Pick<DbProduct, "id" | "category" | "benefits
   if (override) return override;
 
   const text = [
-    ...((p.benefits as string[] | null) ?? []),
+    ...((p.benefits as string[] | null) ?? []).map(richTextToPlainText),
     ...((p.tags as string[] | null) ?? []),
     p.crystalType ?? "",
   ].join(" ");
@@ -341,7 +344,8 @@ const ProductInputSchema = z.object({
   tags: z.array(z.string()).default([]),
   description: z.string().default(""),
   story: z.string().default(""),
-  benefits: z.array(z.string()).default([]),
+  // 功效說明可為富文字 HTML，存檔前一律清理
+  benefits: z.array(z.string().max(RICH_TEXT_MAX_LENGTH, "功效說明內容過長")).default([]).transform(sanitizeBenefits),
   suitableFor: z.array(z.string()).default([]),
   howToUse: z.array(z.string()).default([]),
   disclaimer: z.string().default(""),
@@ -623,6 +627,25 @@ export const productRouter = router({
       const key = `products/${Date.now()}.${ext}`;
       const result = await storagePut(key, buf, input.contentType);
       return { url: result.url };
+    }),
+
+  /** 功效說明富文字內的圖片，上傳到 Vercel Blob */
+  uploadRichTextImage: adminProcedure
+    .input(z.object({
+      contentType: z.enum(Object.keys(UPLOADABLE_IMAGE_TYPES) as [keyof typeof UPLOADABLE_IMAGE_TYPES]),
+      // base64 約為原始大小的 4/3，實際大小由 putPublicImage 檢查
+      dataBase64: z.string().min(1).max(4_200_000, "圖片太大，請小於 3MB"),
+    }))
+    .mutation(async ({ input }) => {
+      try {
+        const { url } = await putPublicImage("product-benefits", Buffer.from(input.dataBase64, "base64"), input.contentType);
+        return { url };
+      } catch (error) {
+        if (error instanceof BlobUploadError) {
+          throw new TRPCError({ code: error.code === "TOO_LARGE" ? "BAD_REQUEST" : "PRECONDITION_FAILED", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   seed: adminProcedure
