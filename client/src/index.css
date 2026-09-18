@@ -359,7 +359,8 @@ html.storefront {
   .product-card {
     display: flex;
     flex-direction: column;
-    background: oklch(1 0 0);
+    /* 透明底：卡片放在白底、米色區塊都能融入 */
+    background: transparent;
     cursor: pointer;
   }
 
@@ -575,9 +576,9 @@ html.storefront {
     font-weight: 400;
     letter-spacing: 0.08em;
     padding: 0.2rem 0.7rem;
-    border: 1px solid var(--sf-line);
+    border: 1px solid var(--sf-line-strong);
     border-radius: 9999px;
-    background: #fff;
+    background: transparent;
     color: var(--sf-text-muted);
   }
 
