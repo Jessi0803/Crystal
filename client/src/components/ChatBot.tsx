@@ -202,7 +202,7 @@ export default function ChatBot() {
   return (
     <>
       {/* 懸浮按鈕區域 */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
+      <div className="chatbot-launcher fixed bottom-6 right-6 z-50 flex items-center gap-3">
         {/* 浮動標籤（聊天關閉時常駐顯示） */}
         {!isOpen && (
           <div
@@ -273,7 +273,7 @@ export default function ChatBot() {
       {/* 聊天視窗 */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          className="chatbot-panel fixed bottom-24 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           style={{
             height: "520px",
             background: "#fdfaf8",

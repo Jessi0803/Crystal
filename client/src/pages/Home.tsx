@@ -6,11 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
-import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { products as staticProducts, type Product } from "@/lib/data";
-import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
+import { requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import ProductCard from "@/components/ProductCard";
 
 const heroSlides = [
   { src: "/hero-cover.jpg", alt: "白水晶與銀色飾件設計手鍊" },
@@ -94,59 +94,6 @@ function useScrollReveal() {
   }, []);
 }
 
-/** 首頁商品卡（熱銷 Top 6 與本月限定款共用） */
-function ProductCard({
-  product,
-  onAddToCart,
-}: {
-  product: Product;
-  onAddToCart: (product: Product, event: React.MouseEvent) => void;
-}) {
-  return (
-    // 不使用 reveal：商品是資料載入後才渲染，捲動漸顯只在頁面載入時掃描一次，會導致卡片永遠不顯示
-    <Link href={`/products/${product.id}`}>
-        <div className="product-card home-product-card">
-          <div className="product-card-image">
-            <img src={product.image} alt={product.name} loading="lazy" />
-            <button
-              onClick={(event) => onAddToCart(product, event)}
-              className="absolute bottom-0 left-0 right-0 bg-sf-accent text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
-              style={{ transition: "opacity 0.2s" }}
-            >
-              {getQuickCartActionLabel(product) ?? "加入購物車"}
-            </button>
-          </div>
-          <div className="product-card-info">
-            <div className="tag-scroll mb-1.5">
-              {product.tags.map((tag) => (
-                <span key={tag} className="tag">{tag}</span>
-              ))}
-            </div>
-            <p className="product-card-name">{product.name}</p>
-            <div className="flex flex-col gap-0.5 mt-1">
-              {product.originalPrice && product.originalPrice > product.price ? (
-                <div className="flex items-center gap-2">
-                  <p className="text-[0.7rem] font-body text-sf-muted line-through">
-                    NT$ {product.originalPrice.toLocaleString()}
-                  </p>
-                  <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
-                </div>
-              ) : product.priceRange ? (
-                <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
-              ) : (
-                <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
-              )}
-              {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
-                <p className="text-[0.7rem] font-body text-sf-muted">
-                  {getCustomPriceDisplay(product.id, product.priceRange)}
-                </p>
-              )}
-            </div>
-          </div>
-      </div>
-    </Link>
-  );
-}
 
 export default function Home() {
   const { addToCart } = useCart();
