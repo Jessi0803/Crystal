@@ -7,6 +7,8 @@ import { dbProducts, productInventory, type DbProduct } from "../../drizzle/sche
 import { storagePut } from "../storage";
 import { removeProductKnowledge, syncProductKnowledge, syncProductKnowledgeById } from "../crystalKnowledge";
 import { recordAuditEventSafely } from "../auditDb";
+import { getProductSalesTotals } from "../orderDb";
+import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 
 let tableEnsured = false;
 
@@ -380,7 +382,48 @@ const BulkTwoItemFreeShippingInputSchema = z.object({
   eligible: z.boolean(),
 });
 
+/**
+ * 首頁熱銷：依實際銷量排序，後台勾選「精選」的商品優先。
+ * 排除測試、客製化訂金與已下架商品；沒有銷售紀錄時以排序值遞補，避免首頁開天窗。
+ */
+export function rankTopSellers<T extends { id: string; featured?: boolean; sortOrder?: number }>(
+  products: T[],
+  salesByProductId: Map<string, number>,
+  limit: number
+) {
+  return [...products]
+    .sort((a, b) => {
+      if (Boolean(b.featured) !== Boolean(a.featured)) return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+      const sales = (salesByProductId.get(b.id) ?? 0) - (salesByProductId.get(a.id) ?? 0);
+      if (sales !== 0) return sales;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    })
+    .slice(0, limit);
+}
+
 export const productRouter = router({
+  topSellers: publicProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(12).default(6) }).default({ limit: 6 }))
+    .query(async ({ input }) => {
+      await ensureProductsTable();
+      await publishDueProducts();
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.select().from(dbProducts).where(eq(dbProducts.active, true));
+      const sellable = rows.filter((p) => p.category !== "test" && !CUSTOM_PRODUCT_IDS.includes(p.id));
+
+      let salesByProductId = new Map<string, number>();
+      try {
+        const totals = await getProductSalesTotals();
+        salesByProductId = new Map(totals.map((total) => [total.productId, total.totalQty]));
+      } catch (error) {
+        // 沒有銷量資料時仍以排序值顯示商品
+        console.warn("[product.topSellers] failed to load sales totals:", error);
+      }
+
+      return rankTopSellers(sellable, salesByProductId, input.limit).map(toFrontendProduct);
+    }),
+
   list: publicProcedure.query(async () => {
     await ensureProductsTable();
     await publishDueProducts();

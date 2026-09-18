@@ -224,7 +224,7 @@ export default function Navbar() {
     refetchOnWindowFocus: true,
     staleTime: 0,
   });
-  const announcementText = siteSettings?.announcementText.trim() ?? "任選兩件商品免運 · 6/1–6/10 全面九折 ·";
+  const announcementText = siteSettings?.announcementText.trim() ?? "任選 2 件即免運 ·";
   const showAnnouncement = siteSettings?.announcementEnabled !== false && announcementText.length > 0;
 
   useEffect(() => {

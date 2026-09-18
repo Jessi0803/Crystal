@@ -1,6 +1,11 @@
 import { useEffect } from "react";
-import { Anchor, Leaf } from "lucide-react";
+import { Anchor, Gem, Leaf } from "lucide-react";
 import { Link } from "wouter";
+
+const customerReviewImages = Array.from(
+  { length: 15 },
+  (_, index) => `/reviews/review-${String(index + 1).padStart(2, "0")}.jpg`
+);
 
 export default function About() {
   // 滾動漸顯動畫
@@ -129,6 +134,45 @@ export default function About() {
               <br />
               <span className="bg-[#D8C3BD]/20 px-1 py-1 italic">想起自己值得被好好對待</span>
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 天然水晶保證 */}
+      <section className="bg-[#F8F5F2] px-6 py-24">
+        <div className="mx-auto max-w-4xl text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
+          <Gem className="mx-auto mb-6 h-5 w-5 text-[#8E735B]" aria-hidden="true" />
+          <h2 className="mb-6 font-serif-zh text-2xl font-medium letter-spacing-wide">100% 天然水晶</h2>
+          <p className="font-sans-zh text-base font-light leading-[2.2] text-gray-600">
+            無染色、無酸洗，與合作檢定廠商把關品質。
+            <br />
+            每一顆水晶都是大地億萬年的結晶，我們只想把最真實的能量交到你手上。
+          </p>
+          <p className="mt-8 font-serif-en text-[10px] uppercase tracking-[0.4em] text-[#8E735B]">
+            天然水晶 · 能量淨化 · 手工設計 · 正緣桃花 · 招財轉運 · 情緒療癒
+          </p>
+        </div>
+      </section>
+
+      {/* 顧客回饋 */}
+      <section className="px-6 py-24">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-12 text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
+            <p className="mb-3 font-serif-en text-[10px] uppercase tracking-[0.4em] text-[#8E735B]">Customer Reviews</p>
+            <h2 className="font-serif-zh text-2xl font-medium letter-spacing-wide">來自顧客的真實回饋</h2>
+            <p className="mt-4 font-sans-zh text-sm font-light text-gray-500">謝謝每一位把能量故事分享給我們的人。</p>
+          </div>
+          <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+            {customerReviewImages.map((src, index) => (
+              <figure key={src} className="mb-4 break-inside-avoid overflow-hidden border border-stone-200 bg-white">
+                <img
+                  src={src}
+                  alt={`顧客好評截圖 ${index + 1}`}
+                  loading={index < 3 ? "eager" : "lazy"}
+                  className="h-auto w-full"
+                />
+              </figure>
+            ))}
           </div>
         </div>
       </section>

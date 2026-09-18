@@ -298,6 +298,11 @@
     transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
+  /* 首頁卡片用正方形圖，避免圖片面積過大 */
+  .home-product-card .product-card-image {
+    aspect-ratio: 1/1;
+  }
+
   .product-card:hover .product-card-image img {
     transform: scale(1.05);
   }
@@ -543,4 +548,80 @@
     transform: scale(1.8);
     opacity: 0;
   }
+}
+
+/* ─── Home hero（配色：#E8E1D1 奶油米 / #D8B69F 柔米杏 / #C38380 玫瑰粉 / #9C7164 玫瑰棕 / #4B342C 深棕）─── */
+.home-hero {
+  --hero-bg: #f2eae2;
+  background: var(--hero-bg);
+}
+/* 主圖調色：暖化冷白色調，再疊一層米杏／玫瑰粉蒙版，貼近品牌色系 */
+.home-hero-image {
+  filter: sepia(0.06) saturate(0.97) hue-rotate(-3deg) contrast(0.98);
+}
+.home-hero-tint {
+  background: linear-gradient(135deg, #e8e1d1 0%, #d8b69f 55%, #c38380 100%);
+  mix-blend-mode: soft-light;
+  opacity: 0.65;
+}
+/* 手機：圖片在上，往下漸層融入文字區 */
+.home-hero-fade {
+  background: linear-gradient(to bottom, transparent 72%, color-mix(in srgb, var(--hero-bg) 70%, transparent) 90%, var(--hero-bg) 100%);
+}
+/* 寬螢幕：圖片在右，往左漸層融入文字區 */
+@media (min-width: 1024px) {
+  .home-hero-fade {
+    background: linear-gradient(to right, var(--hero-bg) 0%, color-mix(in srgb, var(--hero-bg) 55%, transparent) 22%, transparent 48%);
+  }
+}
+.home-hero-script {
+  font-family: 'Allura', 'Cormorant Garamond', cursive;
+  font-size: clamp(1.6rem, 3.2vw, 2.25rem);
+  line-height: 1;
+  color: #c38380;
+}
+.home-hero-title {
+  font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+  font-size: clamp(2rem, 4.6vw, 3.25rem);
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  color: #4b342c;
+}
+.home-hero-accent {
+  color: #9c7164;
+}
+.home-hero-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  border-radius: 9999px;
+  background: #9c7164;
+  padding: 0.6rem 1.9rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.16em;
+  color: #fff;
+  transition: background-color 0.3s ease;
+}
+.home-hero-button:hover {
+  background: #4b342c;
+}
+.home-hero-button-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #9c7164;
+  border-radius: 9999px;
+  background: var(--hero-bg);
+  padding: 0.45rem 1rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.14em;
+  color: #9c7164;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.home-hero-button-outline:hover {
+  border-color: #4b342c;
+  background: #4b342c;
+  color: #fff;
 }

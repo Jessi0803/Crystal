@@ -170,7 +170,7 @@ export default function CartDrawer() {
             </div>
             {showFreeShippingHint && (
               <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] bg-[oklch(0.97_0.01_70)] border border-[oklch(0.9_0.02_70)] px-3 py-2 mb-5 tracking-wide">
-                購買 2 件商品享國內免運，目前還差 1 件
+                任選 2 件即免運（國內），目前還差 1 件
               </p>
             )}
             {hasLiveClearQuartzChipsProduct && !hasClearQuartzChips && (

@@ -1,29 +1,13 @@
 // 日日好日 — Home Page
 // Design: Vacanza-inspired Minimalist Modern
-// Layout: Announcement → Split Hero → Brand Statement → 2-col Category → TOP ITEMS slider → Members Section → Footer
+// Layout: Announcement → Hero (carousel + tagline) → Top 6 → Categories → Daily quote → Monthly limited → Workshop/Custom banner
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Gem,
-  Sparkles,
-  Star,
-  UsersRound,
-} from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
-import { products as staticProducts } from "@/lib/data";
+import { products as staticProducts, type Product } from "@/lib/data";
 import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -41,11 +25,6 @@ const HERO_BANNER2_IMG = "/images/best-sellers.jpg";
 const DAILY_ENERGY_BOTANICAL_IMG = "/images/home/daily-energy-botanical-transparent-web.png";
 const DAILY_ENERGY_RIGHT_BOTANICAL_IMG = "/images/home/daily-energy-right-botanical-transparent-web.png";
 const DAILY_ENERGY_SUN_GLYPH_IMG = "/images/home/daily-energy-sun-glyph-web.png";
-const customerReviewImages = Array.from(
-  { length: 15 },
-  (_, index) => `/reviews/review-${String(index + 1).padStart(2, "0")}.jpg`
-);
-
 const categoryCards = [
   {
     en: "LOVE & ROMANCE",
@@ -98,24 +77,87 @@ function useScrollReveal() {
       },
       { threshold: 0.06, rootMargin: "0px 0px -30px 0px" }
     );
-    const els = document.querySelectorAll(".reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => { els.forEach((el) => observer.unobserve(el)); observer.disconnect(); };
+
+    const observeAll = () => {
+      document.querySelectorAll(".reveal:not(.visible)").forEach((el) => observer.observe(el));
+    };
+    observeAll();
+
+    // 資料載入後才出現的區塊（例如本月限定款）也要納入，否則會一直維持隱藏
+    const mutations = new MutationObserver(observeAll);
+    mutations.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      mutations.disconnect();
+      observer.disconnect();
+    };
   }, []);
+}
+
+/** 首頁商品卡（熱銷 Top 6 與本月限定款共用） */
+function ProductCard({
+  product,
+  onAddToCart,
+}: {
+  product: Product;
+  onAddToCart: (product: Product, event: React.MouseEvent) => void;
+}) {
+  return (
+    // 不使用 reveal：商品是資料載入後才渲染，捲動漸顯只在頁面載入時掃描一次，會導致卡片永遠不顯示
+    <Link href={`/products/${product.id}`}>
+        <div className="product-card home-product-card">
+          <div className="product-card-image">
+            <img src={product.image} alt={product.name} loading="lazy" />
+            <button
+              onClick={(event) => onAddToCart(product, event)}
+              className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
+              style={{ transition: "opacity 0.2s" }}
+            >
+              {getQuickCartActionLabel(product) ?? "加入購物車"}
+            </button>
+          </div>
+          <div className="product-card-info">
+            <div className="tag-scroll mb-1.5">
+              {product.tags.map((tag) => (
+                <span key={tag} className="tag">{tag}</span>
+              ))}
+            </div>
+            <p className="product-card-name">{product.name}</p>
+            <div className="flex flex-col gap-0.5 mt-1">
+              {product.originalPrice && product.originalPrice > product.price ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
+                    NT$ {product.originalPrice.toLocaleString()}
+                  </p>
+                  <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+                </div>
+              ) : product.priceRange ? (
+                <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
+              ) : (
+                <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
+              )}
+              {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
+                <p className="text-[0.7rem] font-body text-[oklch(0.55_0_0)]">
+                  {getCustomPriceDisplay(product.id, product.priceRange)}
+                </p>
+              )}
+            </div>
+          </div>
+      </div>
+    </Link>
+  );
 }
 
 export default function Home() {
   const { addToCart } = useCart();
   const [, setLocation] = useLocation();
-  const sliderRef = useRef<HTMLDivElement>(null);
   const [heroSlide, setHeroSlide] = useState(0);
   const [isHeroPaused, setIsHeroPaused] = useState(false);
-  const [isSliderPaused, setIsSliderPaused] = useState(false);
-  const [isReviewsOpen, setIsReviewsOpen] = useState(false);
   const [quote] = useState(() => dailyQuotes[new Date().getDay()]);
   useScrollReveal();
 
   const { data: dbProducts } = trpc.product.list.useQuery();
+  const { data: topSellers } = trpc.product.topSellers.useQuery({ limit: 6 });
   const products = useMemo(() => {
     if (!dbProducts || dbProducts.length === 0) {
       return staticProducts.filter((p) => p.category !== "test" && p.category !== "custom");
@@ -127,15 +169,15 @@ export default function Home() {
     return [...dbProducts, ...staticExtras];
   }, [dbProducts]);
 
-  const scrollSlider = (dir: "left" | "right") => {
-    const slider = sliderRef.current;
-    if (!slider) return;
-    const firstItem = slider.querySelector<HTMLElement>('.scroll-item');
-    const gap = firstItem ? (parseFloat(getComputedStyle(slider).gap) || 16) : 16;
-    const itemPlusGap = firstItem ? firstItem.offsetWidth + gap : slider.clientWidth;
-    const pageWidth = Math.round(slider.clientWidth / itemPlusGap) * itemPlusGap;
-    slider.scrollBy({ left: dir === "right" ? pageWidth : -pageWidth, behavior: "smooth" });
-  };
+  // 熱銷 Top 6：銷量與精選由伺服器決定；資料還沒回來時先用現有商品遞補，避免版面跳動
+  const topProducts = useMemo(
+    () => (topSellers && topSellers.length > 0 ? topSellers : products.slice(0, 6)),
+    [topSellers, products]
+  );
+  const monthlyProducts = useMemo(
+    () => products.filter((product) => product.isMonthlyLimited).slice(0, 3),
+    [products]
+  );
 
   useEffect(() => {
     if (isHeroPaused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -147,31 +189,7 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [isHeroPaused]);
 
-  useEffect(() => {
-    if (isSliderPaused) return;
-    const timer = window.setInterval(() => {
-      const slider = sliderRef.current;
-      if (!slider) return;
-
-      const maxScrollLeft = slider.scrollWidth - slider.clientWidth;
-      if (maxScrollLeft <= 0) return;
-
-      if (slider.scrollLeft >= maxScrollLeft - 8) {
-        slider.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-      }
-
-      const firstItem = slider.querySelector<HTMLElement>('.scroll-item');
-      const gap = firstItem ? (parseFloat(getComputedStyle(slider).gap) || 16) : 16;
-      const itemPlusGap = firstItem ? firstItem.offsetWidth + gap : slider.clientWidth;
-      const pageWidth = Math.round(slider.clientWidth / itemPlusGap) * itemPlusGap;
-      slider.scrollBy({ left: pageWidth, behavior: "smooth" });
-    }, 1800);
-
-    return () => window.clearInterval(timer);
-  }, [isSliderPaused]);
-
-  const handleAddToCart = (product: typeof products[0], e: React.MouseEvent) => {
+  const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (requiresDetailSelectionBeforeCart(product)) {
@@ -190,20 +208,20 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white page-enter">
 
-      {/* ─── HERO SPLIT ─── */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 lg:min-h-[85vh]">
-        {/* Left: Image */}
-        <div
-          className="relative overflow-hidden bg-[oklch(0.97_0_0)] h-[46svh] min-h-[330px] max-h-[470px] lg:h-auto lg:min-h-[85vh] lg:max-h-none"
-          role="region"
-          aria-roledescription="carousel"
-          aria-label="封面精選設計"
-          onMouseEnter={() => setIsHeroPaused(true)}
-          onMouseLeave={() => setIsHeroPaused(false)}
-          onFocusCapture={() => setIsHeroPaused(true)}
-          onBlurCapture={() => setIsHeroPaused(false)}
-        >
-          <Link href="/products" className="absolute inset-0 block" aria-label="查看全部商品">
+      {/* ─── HERO ─── */}
+      {/* 圖片在右（手機在上），以漸層與左側（手機下方）文字區融合 */}
+      <section
+        className="home-hero relative overflow-hidden"
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="封面精選設計"
+        onMouseEnter={() => setIsHeroPaused(true)}
+        onMouseLeave={() => setIsHeroPaused(false)}
+        onFocusCapture={() => setIsHeroPaused(true)}
+        onBlurCapture={() => setIsHeroPaused(false)}
+      >
+        <div className="relative h-[82vw] max-h-[520px] sm:h-[60vw] lg:absolute lg:inset-y-0 lg:right-0 lg:h-auto lg:max-h-none lg:w-[64%]">
+          <Link href="/products" className="absolute inset-0 block" aria-label="查看全部商品" tabIndex={-1}>
             {heroSlides.map((slide, index) => (
               <img
                 key={slide.src}
@@ -211,126 +229,85 @@ export default function Home() {
                 alt={index === heroSlide ? slide.alt : ""}
                 aria-hidden={index !== heroSlide}
                 loading={index === 0 ? "eager" : "lazy"}
-                className={`absolute inset-0 w-full h-full object-cover object-[center_38%] sm:object-center transition-opacity duration-[800ms] ease-out ${
+                className={`home-hero-image absolute inset-0 w-full h-full object-cover object-[center_42%] transition-opacity duration-[800ms] ease-out ${
                   index === heroSlide ? "opacity-100" : "opacity-0"
                 }`}
               />
             ))}
           </Link>
-          <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center">
-            {heroSlides.map((slide, index) => (
-              <button
-                key={slide.src}
-                type="button"
-                aria-label={`顯示第 ${index + 1} 張封面照片`}
-                aria-current={index === heroSlide}
-                onClick={() => setHeroSlide(index)}
-                className="flex h-11 w-12 items-center justify-center"
-              >
-                <span
-                  className={`block h-px transition-all duration-500 ${
-                    index === heroSlide ? "w-10 bg-[oklch(0.2_0_0)]" : "w-6 bg-[oklch(0.2_0_0)]/30"
-                  }`}
-                />
-              </button>
-            ))}
-          </div>
+          <div className="home-hero-tint pointer-events-none absolute inset-0" aria-hidden="true" />
+          <div className="home-hero-fade pointer-events-none absolute inset-x-0 top-0 -bottom-px" aria-hidden="true" />
         </div>
 
-        {/* Right: Text */}
-        <div className="flex flex-col justify-center px-5 pt-8 pb-9 sm:px-12 sm:py-16 lg:px-16 xl:px-20 bg-white">
-          <h1 className="mb-3 sm:mb-4" style={{
-            fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif",
-            fontSize: "clamp(2.2rem, 5vw, 3.5rem)",
-            fontWeight: 300,
-            lineHeight: 1.25,
-            letterSpacing: "0.04em",
-            color: "oklch(0.1 0 0)"
-          }}>
-            找到屬於你的<br />
-            <em className="not-italic" style={{color: "oklch(0.72 0.09 70)", fontWeight: 400}}>能量水晶</em>
-          </h1>
-          <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-7 sm:mb-10 max-w-sm">
-            提升愛情、財運與內在平衡，從今天開始改變你的能量場。
-            每一顆天然水晶，都是大地億萬年的結晶。
-          </p>
-          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-row sm:flex-wrap sm:gap-3">
-            <Link href="/products?category=monthly" className="col-span-2 sm:col-auto">
-              <button className="btn-primary w-full justify-between sm:w-auto sm:justify-center">
-                每月限量 <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </Link>
-            <Link href="/products">
-              <button className="btn-outline w-full justify-center">
-                固定設計款
-              </button>
-            </Link>
-            <Link href="/custom">
-              <button className="btn-outline w-full justify-center">
-                客製款
-              </button>
-            </Link>
-          </div>
-
-          {/* Stats */}
-          <div className="mt-9 border-t border-[oklch(0.93_0_0)] pt-6 sm:mt-12 sm:pt-8">
-            <div className="grid border-y border-[#eee9e4] bg-[#fcfaf7] sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => setIsReviewsOpen(true)}
-                className="group relative flex min-h-[126px] flex-col p-4 text-left transition-colors duration-300 hover:bg-white/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#cdb9a8] sm:px-5"
-                aria-label="查看顧客好評照片"
-              >
-                <span className="mb-4 flex items-center gap-2 text-[0.58rem] tracking-[0.18em] text-[#b49378]">
-                  <UsersRound className="h-3.5 w-3.5" aria-hidden="true" />
-                  COMMUNITY
-                </span>
-                <span className="text-2xl font-medium leading-none text-[oklch(0.16_0_0)] sm:text-[1.65rem]" style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-                  10,000+
-                </span>
-                <span className="mt-2 text-xs font-medium tracking-[0.13em] text-[oklch(0.38_0_0)]">滿意顧客</span>
-                <span className="mt-auto flex items-center gap-1 pt-2 text-[0.66rem] font-body text-[#a38269]">
-                  查看真實回饋
-                  <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
-                </span>
-              </button>
-
-              <div className="flex min-h-[126px] flex-col border-t border-[#eee9e4] p-4 sm:border-l sm:border-t-0 sm:px-5">
-                <span className="mb-4 flex items-center gap-2 text-[0.58rem] tracking-[0.18em] text-[#b49378]">
-                  <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-                  RATING
-                </span>
-                <span className="text-2xl font-medium leading-none text-[oklch(0.16_0_0)] sm:text-[1.65rem]" style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-                  4.9
-                </span>
-                <span className="mt-2 text-xs font-medium tracking-[0.13em] text-[oklch(0.38_0_0)]">平均評分</span>
-                <span className="mt-auto pt-2 text-[0.66rem] font-body leading-relaxed text-[oklch(0.52_0_0)]">用心製作，累積真實口碑</span>
+        <div className="relative z-10 mx-auto flex max-w-[1440px] items-center px-5 pb-8 -mt-8 sm:-mt-10 sm:px-8 lg:mt-0 lg:min-h-[clamp(480px,40vw,620px)] lg:px-12 lg:py-16">
+          <div className="max-w-[460px]">
+            <p className="home-hero-script mb-2 sm:mb-3">Find Your Energy</p>
+            <h1 className="home-hero-title mb-4 sm:mb-5">
+              找到屬於你的
+              <br />
+              <span className="home-hero-accent">能量水晶</span>
+            </h1>
+            <p className="mb-6 text-sm font-body font-light leading-[1.9] tracking-[0.06em] text-[#6b5048] sm:mb-8 sm:text-[15px]">
+              每一顆水晶，都是大自然的溫柔回應，
+              <br className="hidden sm:inline" />
+              讓能量陪你走過生活的每一段旅程。
+            </p>
+            <div className="inline-flex flex-col gap-3">
+              <Link href="/products" className="home-hero-button">
+                探索水晶飾品 <ArrowRight className="h-4 w-4" />
+              </Link>
+              <div className="grid grid-cols-2 gap-3">
+                <Link href="/products?category=monthly" className="home-hero-button-outline">每月限量</Link>
+                <Link href="/custom" className="home-hero-button-outline">客製款</Link>
               </div>
+            </div>
 
-              <div className="flex min-h-[126px] flex-col border-t border-[#eee9e4] p-4 sm:border-l sm:border-t-0 sm:px-5">
-                <span className="mb-4 flex items-center gap-2 text-[0.58rem] tracking-[0.18em] text-[#b49378]">
-                  <Gem className="h-3.5 w-3.5" aria-hidden="true" />
-                  NATURAL
-                </span>
-                <span className="text-2xl font-medium leading-none text-[oklch(0.16_0_0)] sm:text-[1.65rem]" style={{ fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-                  100%
-                </span>
-                <span className="mt-2 text-xs font-medium tracking-[0.13em] text-[oklch(0.38_0_0)]">天然水晶</span>
-                <span className="mt-auto pt-2 text-[0.66rem] font-body leading-relaxed text-[oklch(0.52_0_0)]">無染色・無酸洗<br />合作檢定廠商把關</span>
-              </div>
+            <div className="mt-6 flex items-center gap-1 sm:mt-10">
+              {heroSlides.map((slide, index) => (
+                <button
+                  key={slide.src}
+                  type="button"
+                  aria-label={`顯示第 ${index + 1} 張封面照片`}
+                  aria-current={index === heroSlide}
+                  onClick={() => setHeroSlide(index)}
+                  className="group flex h-11 min-w-11 flex-col items-start justify-center gap-1.5 pr-3"
+                >
+                  <span
+                    className={`block h-px transition-all duration-500 ${
+                      index === heroSlide ? "w-8 bg-[#9C7164]" : "w-0 bg-transparent"
+                    }`}
+                  />
+                  <span
+                    className={`font-display text-sm tracking-[0.1em] transition-colors ${
+                      index === heroSlide ? "text-[#4B342C]" : "text-[#C9B3A6] group-hover:text-[#9C7164]"
+                    }`}
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── BRAND STATEMENT ─── */}
-      <section className="py-6 border-y border-[oklch(0.93_0_0)] overflow-hidden">
-        <div className="marquee-track">
-          {Array(6).fill(null).map((_, i) => (
-            <span key={i} className="px-10 shrink-0 text-[0.65rem] tracking-[0.3em] font-body text-[oklch(0.55_0_0)] uppercase">
-              天然水晶 · 能量淨化 · 手工設計 · 正緣桃花 · 招財轉運 · 情緒療癒 ·&nbsp;
-            </span>
-          ))}
+      {/* ─── TOP 6 ─── */}
+      <section className="py-12 sm:py-14">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-6 text-center reveal sm:mb-8">
+            <p className="eyebrow mb-2">BEST SELLERS</p>
+            <h2 className="heading-lg">熱銷 Top 6</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            {topProducts.map((product) => (
+              <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+            ))}
+          </div>
+          <div className="mt-8 text-center reveal">
+            <Link href="/products">
+              <button className="btn-ghost">查看全部商品 <ArrowRight className="w-3.5 h-3.5" /></button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -339,7 +316,7 @@ export default function Home() {
         <div className="grid grid-cols-2 lg:grid-cols-4">
           {categoryCards.map((cat, i) => (
             <Link key={i} href={cat.href}>
-              <div className="split-card h-[55vw] sm:h-[40vw] lg:h-[60vh]">
+              <div className="split-card h-[38vw] min-h-[150px] sm:h-[26vw] lg:h-[30vh]">
                 <img src={cat.img} alt={cat.zh} loading="lazy" />
                 <div className="split-card-overlay">
                   <h3 className="category-title-en">{cat.en}</h3>
@@ -397,112 +374,53 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── TOP ITEMS ─── */}
-      <section className="py-14">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="flex items-end justify-between mb-8 reveal">
-            <div>
-              <p className="eyebrow mb-2">FEATURED PRODUCTS</p>
-              <h2 className="heading-lg">人氣熱銷</h2>
+      {/* ─── MONTHLY LIMITED ─── */}
+      {monthlyProducts.length > 0 && (
+        <section className="py-12 border-t border-[oklch(0.93_0_0)] bg-[oklch(0.985_0_0)] sm:py-14">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-6 text-center reveal sm:mb-8">
+              <p className="eyebrow mb-2">MONTHLY LIMITED</p>
+              <h2 className="heading-lg">本月限定款</h2>
+              <p className="mt-2 text-sm font-body font-light text-[oklch(0.45_0_0)]">每月限量設計，售完即不再製作。</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => scrollSlider("left")}
-                className="w-9 h-9 border border-[oklch(0.85_0_0)] flex items-center justify-center hover:bg-[oklch(0.97_0_0)] transition-colors"
-                aria-label="向左"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => scrollSlider("right")}
-                className="w-9 h-9 border border-[oklch(0.85_0_0)] flex items-center justify-center hover:bg-[oklch(0.97_0_0)] transition-colors"
-                aria-label="向右"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+              {monthlyProducts.map((product) => (
+                <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+              ))}
+            </div>
+            <div className="mt-8 text-center reveal">
+              <Link href="/products?category=monthly">
+                <button className="btn-ghost">查看每月限量 <ArrowRight className="w-3.5 h-3.5" /></button>
+              </Link>
             </div>
           </div>
-
-          {/* Horizontal Scroll */}
-          <div
-            ref={sliderRef}
-            className="scroll-container gap-4 pb-2"
-            onMouseEnter={() => setIsSliderPaused(true)}
-            onMouseLeave={() => setIsSliderPaused(false)}
-            onTouchStart={() => setIsSliderPaused(true)}
-            onTouchEnd={() => window.setTimeout(() => setIsSliderPaused(false), 2500)}
-          >
-            {products.map((product) => {
-              return (
-              <div key={product.id} className="scroll-item w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.75rem)] lg:w-[calc(25%-0.75rem)]">
-                <Link href={`/products/${product.id}`}>
-                  <div className="product-card">
-                    <div className="product-card-image">
-                      <img src={product.image} alt={product.name} loading="lazy" />
-                      {/* Quick Add */}
-                      <button
-                        onClick={(e) => handleAddToCart(product, e)}
-                        className="absolute bottom-0 left-0 right-0 bg-[oklch(0.1_0_0)] text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
-                        style={{ transition: "opacity 0.2s" }}
-                      >
-                        {getQuickCartActionLabel(product) ?? "加入購物車"}
-                      </button>
-                    </div>
-                    <div className="product-card-info">
-                      <div className="tag-scroll mb-1.5">
-                        {product.tags.map((tag) => (
-                          <span key={tag} className="tag">{tag}</span>
-                        ))}
-                      </div>
-                      <p className="product-card-name">{product.name}</p>
-                      <div className="flex flex-col gap-0.5 mt-1">
-                        {product.originalPrice && product.originalPrice > product.price ? (
-                          <div className="flex items-center gap-2">
-                            <p className="text-[0.7rem] font-body text-[oklch(0.7_0_0)] line-through">
-                              NT$ {product.originalPrice.toLocaleString()}
-                            </p>
-                            <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
-                          </div>
-                        ) : product.priceRange ? (
-                          <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
-                        ) : (
-                          <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
-                        )}
-                        {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
-                          <p className="text-[0.7rem] font-body text-[oklch(0.55_0_0)]">
-                            {getCustomPriceDisplay(product.id, product.priceRange)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            );
-            })}
-          </div>
-
-          {/* View All */}
-          <div className="mt-8 text-center reveal">
-            <Link href="/products">
-              <button className="btn-ghost">查看全部商品 <ArrowRight className="w-3.5 h-3.5" /></button>
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ─── SECOND BANNER: 2-col split ─── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 border-t border-[oklch(0.93_0_0)]">
-        <div className="split-card h-[60vw] sm:h-[45vw] lg:h-[55vh]">
-          <img src={HERO_BANNER2_IMG} alt="水晶系列" loading="lazy" />
-          <div className="split-card-overlay">
-            <p className="eyebrow text-white/80 mb-1">BEST SELLERS</p>
-            <h3 className="text-2xl text-white font-medium" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>經典熱銷系列</h3>
-            <p className="text-xs text-white/70 font-body mt-1">回購率 TOP</p>
+        <Link href="/crystal-workshop" className="split-card h-[62vw] min-h-[320px] sm:h-[42vw] lg:h-[45vh]">
+          <img src={HERO_BANNER2_IMG} alt="水晶創業班課程作品" loading="lazy" />
+          {/* 圖片較亮，文字加深色遮罩維持可讀性 */}
+          <div className="split-card-overlay bg-[oklch(0_0_0/0.34)]">
+            <p className="eyebrow text-white/80 mb-1">CRYSTAL WORKSHOP</p>
+            <h3 className="text-2xl text-white font-medium" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>水晶創業班</h3>
+            <p className="mt-2 max-w-xs text-xs font-body font-light leading-relaxed text-white/85">
+              從生命靈數體驗課到創業全能班，帶你學會配色美學、手作技法與小資創業 SOP。
+            </p>
+            <ul className="mt-4 flex flex-wrap justify-center gap-1.5">
+              {["體驗課可單堂參加", "3 件作品 × 6 種技法", "創業 SOP 與進貨把關"].map((item) => (
+                <li key={item} className="border border-white/40 px-2.5 py-1 text-[0.65rem] font-body text-white/90">
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <span className="mt-5 inline-flex items-center gap-1.5 border-b border-white/70 pb-1 text-xs font-body tracking-[0.12em] text-white">
+              了解課程與報名 <ArrowRight className="h-3.5 w-3.5" />
+            </span>
           </div>
-        </div>
-        <div className="split-card h-[60vw] sm:h-[45vw] lg:h-[55vh] bg-[oklch(0.97_0_0)] flex flex-col items-center justify-center px-12 text-center">
+        </Link>
+        <div className="split-card h-[62vw] min-h-[320px] sm:h-[42vw] lg:h-[45vh] bg-[oklch(0.97_0_0)] flex flex-col items-center justify-center px-12 text-center">
           <p className="eyebrow mb-4">CUSTOM CRYSTAL</p>
           <h3 className="heading-lg mb-4">想要專屬定制？</h3>
           <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-8 max-w-xs">
@@ -513,85 +431,6 @@ export default function Home() {
           </Link>
         </div>
       </section>
-
-      {/* ─── CRYSTAL WORKSHOP INTRO ─── */}
-      <section className="py-16 border-t border-[oklch(0.93_0_0)] bg-[oklch(0.985_0.008_75)]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
-            <div className="reveal">
-              <p className="eyebrow mb-3">CRYSTAL WORKSHOP</p>
-              <h2 className="heading-lg mb-5">水晶創業班</h2>
-              <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] leading-relaxed mb-8 max-w-xl">
-                從生命靈數體驗課到水晶創業全能班，帶你完整學會配色美學、手作技法、淨化保養與小資創業 SOP。
-                如果你想把熱愛變成專業，這裡會是最好的起點。
-              </p>
-              <Link href="/crystal-workshop">
-                <button className="btn-primary">
-                  前往水晶創業班 <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </Link>
-            </div>
-
-            <div className="reveal reveal-delay-1">
-              <div className="bg-white border border-[oklch(0.92_0_0)] p-6 sm:p-8">
-                <p className="text-[0.65rem] tracking-[0.18em] text-[oklch(0.55_0_0)] mb-5">課程亮點</p>
-                <div className="space-y-3">
-                  {[
-                    "生命靈數水晶手鍊體驗課",
-                    "3 件作品實戰 + 6 種核心技法",
-                    "小資創業 SOP 與進貨品質分辨",
-                  ].map((item) => (
-                    <div key={item} className="flex items-start gap-3">
-                      <span className="text-[oklch(0.72_0.09_70)] mt-0.5">◇</span>
-                      <span className="text-sm font-body font-light text-[oklch(0.35_0_0)]">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <Dialog open={isReviewsOpen} onOpenChange={setIsReviewsOpen}>
-        <DialogContent
-          className="max-h-[86svh] max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-none border border-stone-200 bg-white p-0 shadow-2xl sm:max-w-[920px]"
-          style={{ backgroundColor: "#ffffff" }}
-        >
-          <DialogHeader
-            className="border-b border-stone-200 px-5 py-5 text-left sm:px-8"
-            style={{ backgroundColor: "#ffffff" }}
-          >
-            <p className="eyebrow mb-2">CUSTOMER REVIEWS</p>
-            <DialogTitle className="text-2xl font-medium leading-tight text-[oklch(0.1_0_0)] sm:text-3xl">
-              來自顧客的真實回饋
-            </DialogTitle>
-            <DialogDescription className="font-body text-sm font-light leading-relaxed text-[oklch(0.45_0_0)]">
-              謝謝每一位把能量故事分享給我們的人。
-            </DialogDescription>
-          </DialogHeader>
-          <div
-            className="max-h-[calc(86svh-142px)] overflow-y-auto bg-stone-50 px-4 py-5 sm:px-7 sm:py-7"
-            style={{ backgroundColor: "#fafaf9" }}
-          >
-            <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-              {customerReviewImages.map((src, index) => (
-                <figure
-                  key={src}
-                  className="mb-4 break-inside-avoid overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm"
-                >
-                  <img
-                    src={src}
-                    alt={`顧客好評截圖 ${index + 1}`}
-                    loading={index < 6 ? "eager" : "lazy"}
-                    className="h-auto w-full"
-                  />
-                </figure>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
     </div>
   );

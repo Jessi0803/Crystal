@@ -5,7 +5,7 @@ import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { siteSettings } from "../../drizzle/schema";
 
-const DEFAULT_ANNOUNCEMENT_TEXT = "任選兩件商品免運 · 6/1–6/10 全面九折 ·";
+const DEFAULT_ANNOUNCEMENT_TEXT = "任選 2 件即免運 ·";
 const ANNOUNCEMENT_TEXT_KEY = "announcementText";
 const ANNOUNCEMENT_ENABLED_KEY = "announcementEnabled";
 
