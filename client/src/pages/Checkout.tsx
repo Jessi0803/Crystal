@@ -305,7 +305,7 @@ export default function Checkout() {
         >
           購物車是空的
         </p>
-        <p className="text-sm text-[oklch(0.5_0_0)] mb-8">
+        <p className="text-sm text-sf-muted mb-8">
           請先選擇商品後再進行結帳
         </p>
         <button
@@ -610,7 +610,7 @@ export default function Checkout() {
     `w-full border px-4 py-3 text-sm font-body focus:outline-none transition-colors ${
       errors[field]
         ? "border-red-400 focus:border-red-500"
-        : "border-[oklch(0.88_0_0)] focus:border-[oklch(0.1_0_0)]"
+        : "border-sf-line-strong focus:border-sf-accent"
     }`;
 
   const setRegion = (r: CheckoutRegion) => {
@@ -630,16 +630,16 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-4 px-4 sm:px-8">
+      <div className="border-b border-sf-line py-4 px-4 sm:px-8">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           <button
             onClick={() => setLocation("/")}
-            className="flex items-center gap-1.5 text-xs tracking-widest font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+            className="flex items-center gap-1.5 text-xs tracking-widest font-body text-sf-muted hover:text-sf-ink transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             返回
           </button>
-          <span className="text-[oklch(0.8_0_0)]">/</span>
+          <span className="text-sf-line-strong">/</span>
           <span className="text-xs tracking-widest font-body">結帳</span>
         </div>
       </div>
@@ -654,73 +654,73 @@ export default function Checkout() {
             {/* 配送地區 */}
             {!isCustomDepositCheckout && (
               <section>
-                <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
+                <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-sf-line">
                   配送地區
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setRegion("domestic")}
-                    className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                    className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                       checkoutRegion === "domestic"
-                        ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                        : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                        ? "border-sf-accent bg-sf-selected"
+                        : "border-sf-line-strong hover:border-sf-accent/50"
                     }`}
                   >
-                    <Home className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                    <Home className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                     <div>
-                      <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                      <p className="text-sm font-body font-medium text-sf-ink">
                         台灣（國內）
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      <p className="text-xs font-body text-sf-muted mt-0.5">
                         7-11 取貨、宅配；信用卡／轉帳
                       </p>
                     </div>
                     <div
                       className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                         checkoutRegion === "domestic"
-                          ? "border-[oklch(0.1_0_0)]"
-                          : "border-[oklch(0.8_0_0)]"
+                          ? "border-sf-accent"
+                          : "border-sf-line-strong"
                       }`}
                     >
                       {checkoutRegion === "domestic" && (
-                        <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                        <div className="w-2 h-2 rounded-full bg-sf-accent" />
                       )}
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRegion("overseas")}
-                    className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                    className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                       checkoutRegion === "overseas"
-                        ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                        : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                        ? "border-sf-accent bg-sf-selected"
+                        : "border-sf-line-strong hover:border-sf-accent/50"
                     }`}
                   >
-                    <Globe className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                    <Globe className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                     <div>
-                      <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                      <p className="text-sm font-body font-medium text-sf-ink">
                         海外
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      <p className="text-xs font-body text-sf-muted mt-0.5">
                         國際宅配＋PayPal 付款
                       </p>
                     </div>
                     <div
                       className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                         checkoutRegion === "overseas"
-                          ? "border-[oklch(0.1_0_0)]"
-                          : "border-[oklch(0.8_0_0)]"
+                          ? "border-sf-accent"
+                          : "border-sf-line-strong"
                       }`}
                     >
                       {checkoutRegion === "overseas" && (
-                        <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                        <div className="w-2 h-2 rounded-full bg-sf-accent" />
                       )}
                     </div>
                   </button>
                 </div>
                 {checkoutRegion === "overseas" && (
-                  <p className="mt-3 text-xs font-body text-[oklch(0.45_0_0)] leading-relaxed">
+                  <p className="mt-3 text-xs font-body text-sf-text leading-relaxed">
                     海外訂單僅提供國際宅配與 PayPal
                     付款；宅配僅限馬來西亞、香港、新加坡、美國、英國、澳洲。
                   </p>
@@ -730,12 +730,12 @@ export default function Checkout() {
 
             {/* 購買人資訊 */}
             <section>
-              <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
+              <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-sf-line">
                 購買人資訊
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
+                  <label className="block text-xs tracking-widest font-body text-sf-text mb-2">
                     姓名 <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -754,7 +754,7 @@ export default function Checkout() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
+                  <label className="block text-xs tracking-widest font-body text-sf-text mb-2">
                     Email <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -773,7 +773,7 @@ export default function Checkout() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
+                  <label className="block text-xs tracking-widest font-body text-sf-text mb-2">
                     {isCustomDepositCheckout || checkoutRegion === "domestic"
                       ? "手機號碼"
                       : "聯絡電話"}{" "}
@@ -804,7 +804,7 @@ export default function Checkout() {
             {/* 配送方式 */}
             {!isCustomDepositCheckout && (
               <section>
-                <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
+                <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-sf-line">
                   {checkoutRegion === "overseas"
                     ? "收件地址（國際宅配）"
                     : "配送方式"}
@@ -832,32 +832,32 @@ export default function Checkout() {
                           setShippingMethod(opt.key);
                           setCvsStore(null);
                         }}
-                        className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                        className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                           shippingMethod === opt.key
-                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                            : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                            ? "border-sf-accent bg-sf-selected"
+                            : "border-sf-line-strong hover:border-sf-accent/50"
                         }`}
                       >
-                        <span className="text-[oklch(0.3_0_0)] mt-0.5 shrink-0">
+                        <span className="text-sf-text mt-0.5 shrink-0">
                           {opt.icon}
                         </span>
                         <div>
-                          <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                          <p className="text-sm font-body font-medium text-sf-ink">
                             {opt.title}
                           </p>
-                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                          <p className="text-xs font-body text-sf-muted mt-0.5">
                             {opt.desc}
                           </p>
                         </div>
                         <div
                           className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                             shippingMethod === opt.key
-                              ? "border-[oklch(0.1_0_0)]"
-                              : "border-[oklch(0.8_0_0)]"
+                              ? "border-sf-accent"
+                              : "border-sf-line-strong"
                           }`}
                         >
                           {shippingMethod === opt.key && (
-                            <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                            <div className="w-2 h-2 rounded-full bg-sf-accent" />
                           )}
                         </div>
                       </button>
@@ -866,11 +866,11 @@ export default function Checkout() {
                 )}
 
                 {checkoutRegion === "overseas" && (
-                  <div className="p-4 border border-[oklch(0.88_0_0)] bg-[oklch(0.99_0_0)] mb-4">
-                    <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
+                  <div className="p-4 border border-sf-line-strong bg-sf-cream mb-4">
+                    <p className="text-sm font-body font-medium text-sf-ink mb-1">
                       國際宅配
                     </p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)]">
+                    <p className="text-xs font-body text-sf-muted">
                       僅配送馬來西亞、香港、新加坡、美國、英國、澳洲。
                     </p>
                   </div>
@@ -901,7 +901,7 @@ export default function Checkout() {
                         <button
                           type="button"
                           onClick={handleSelectCvsStore}
-                          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[oklch(0.7_0_0)] text-sm font-body text-[oklch(0.4_0_0)] hover:border-[oklch(0.3_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors"
+                          className="w-full flex items-center justify-center gap-2 rounded-md py-3 border border-dashed border-sf-line-strong text-sm font-body text-sf-text hover:border-sf-accent hover:text-sf-ink transition-colors"
                         >
                           <MapPin className="w-4 h-4" />
                           點此選擇 7-11 門市
@@ -918,7 +918,7 @@ export default function Checkout() {
                 {/* 宅配地址（國內） */}
                 {checkoutRegion === "domestic" && shippingMethod === "home" && (
                   <div className="mt-4 space-y-3">
-                    <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)]">
+                    <p className="text-xs tracking-widest font-body text-sf-text">
                       收件地址 <span className="text-red-400">*</span>
                     </p>
                     {/* 郵遞區號 + 縣市 */}
@@ -1009,13 +1009,13 @@ export default function Checkout() {
                 {/* 國際地址（英文；依國家驗證） */}
                 {checkoutRegion === "overseas" && (
                   <div className="mt-4 space-y-4">
-                    <p className="text-xs font-body text-[oklch(0.45_0_0)] leading-relaxed border border-amber-200 bg-amber-50/80 px-3 py-2">
+                    <p className="text-xs font-body text-sf-text leading-relaxed border border-amber-200 bg-amber-50/80 px-3 py-2">
                       Please fill in all address fields below in{" "}
                       <strong>English</strong> only. Labels follow international
                       shipping forms.
                     </p>
                     <div>
-                      <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      <label className="block text-xs font-medium tracking-wide text-sf-text mb-2">
                         Country <span className="text-red-400">*</span>
                       </label>
                       <select
@@ -1046,7 +1046,7 @@ export default function Checkout() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      <label className="block text-xs font-medium tracking-wide text-sf-text mb-2">
                         Address Line 1 <span className="text-red-400">*</span>
                       </label>
                       <input
@@ -1068,13 +1068,13 @@ export default function Checkout() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      <label className="block text-xs font-medium tracking-wide text-sf-text mb-2">
                         Address Line 2{" "}
-                        <span className="text-[oklch(0.45_0_0)] font-normal">
+                        <span className="text-sf-text font-normal">
                           (optional)
                         </span>
                       </label>
-                      <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                      <p className="text-[0.65rem] font-body text-sf-muted mb-1.5">
                         Building / unit / floor
                       </p>
                       <input
@@ -1096,7 +1096,7 @@ export default function Checkout() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      <label className="block text-xs font-medium tracking-wide text-sf-text mb-2">
                         City <span className="text-red-400">*</span>
                       </label>
                       <input
@@ -1115,12 +1115,12 @@ export default function Checkout() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      <label className="block text-xs font-medium tracking-wide text-sf-text mb-2">
                         State / Province{" "}
                         {overseasCode === "US" || overseasCode === "AU" ? (
                           <span className="text-red-400">*</span>
                         ) : (
-                          <span className="text-[oklch(0.45_0_0)] font-normal">
+                          <span className="text-sf-text font-normal">
                             (optional where N/A)
                           </span>
                         )}
@@ -1173,42 +1173,42 @@ export default function Checkout() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium tracking-wide text-[oklch(0.25_0_0)] mb-2">
+                      <label className="block text-xs font-medium tracking-wide text-sf-text mb-2">
                         Postal Code{" "}
                         {!overseasCode ||
                         overseasPostalRequired(overseasCode) ? (
                           <span className="text-red-400">*</span>
                         ) : (
-                          <span className="text-[oklch(0.45_0_0)] font-normal">
+                          <span className="text-sf-text font-normal">
                             (optional)
                           </span>
                         )}
                       </label>
                       {overseasCode === "HK" && (
-                        <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        <p className="text-[0.65rem] font-body text-sf-muted mb-1.5">
                           Hong Kong has no postal code — leave blank if not
                           applicable.
                         </p>
                       )}
                       {overseasCode === "US" && (
-                        <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        <p className="text-[0.65rem] font-body text-sf-muted mb-1.5">
                           ZIP Code: 5 digits or ZIP+4 (e.g. 10001 or
                           10001-1234).
                         </p>
                       )}
                       {overseasCode === "GB" && (
-                        <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        <p className="text-[0.65rem] font-body text-sf-muted mb-1.5">
                           UK postcode format is strictly validated (e.g. SW1A
                           1AA).
                         </p>
                       )}
                       {overseasCode === "AU" && (
-                        <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        <p className="text-[0.65rem] font-body text-sf-muted mb-1.5">
                           4-digit postcode; state required (e.g. NSW, VIC).
                         </p>
                       )}
                       {(overseasCode === "MY" || overseasCode === "SG") && (
-                        <p className="text-[0.65rem] font-body text-[oklch(0.5_0_0)] mb-1.5">
+                        <p className="text-[0.65rem] font-body text-sf-muted mb-1.5">
                           {overseasCode === "MY"
                             ? "5-digit postcode."
                             : "6-digit postcode."}
@@ -1252,7 +1252,7 @@ export default function Checkout() {
             {/* 付款方式 */}
             {checkoutRegion === "domestic" && (
               <section>
-                <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
+                <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-sf-line">
                   付款方式
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1260,33 +1260,33 @@ export default function Checkout() {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("credit")}
-                    className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                    className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                       paymentMethod === "credit"
-                        ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                        : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                        ? "border-sf-accent bg-sf-selected"
+                        : "border-sf-line-strong hover:border-sf-accent/50"
                     }`}
                   >
-                    <CreditCard className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                    <CreditCard className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                     <div>
-                      <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                      <p className="text-sm font-body font-medium text-sf-ink">
                         信用卡 / Apple Pay
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      <p className="text-xs font-body text-sf-muted mt-0.5">
                         VISA / Master / JCB
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)]">
+                      <p className="text-xs font-body text-sf-muted">
                         即時扣款
                       </p>
                     </div>
                     <div
                       className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                         paymentMethod === "credit"
-                          ? "border-[oklch(0.1_0_0)]"
-                          : "border-[oklch(0.8_0_0)]"
+                          ? "border-sf-accent"
+                          : "border-sf-line-strong"
                       }`}
                     >
                       {paymentMethod === "credit" && (
-                        <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                        <div className="w-2 h-2 rounded-full bg-sf-accent" />
                       )}
                     </div>
                   </button>
@@ -1295,33 +1295,33 @@ export default function Checkout() {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("atm")}
-                    className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                    className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                       paymentMethod === "atm"
-                        ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                        : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                        ? "border-sf-accent bg-sf-selected"
+                        : "border-sf-line-strong hover:border-sf-accent/50"
                     }`}
                   >
-                    <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                    <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                     <div>
-                      <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                      <p className="text-sm font-body font-medium text-sf-ink">
                         轉帳
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      <p className="text-xs font-body text-sf-muted mt-0.5">
                         完成轉帳後上傳截圖
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)]">
+                      <p className="text-xs font-body text-sf-muted">
                         設計師確認後出貨
                       </p>
                     </div>
                     <div
                       className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                         paymentMethod === "atm"
-                          ? "border-[oklch(0.1_0_0)]"
-                          : "border-[oklch(0.8_0_0)]"
+                          ? "border-sf-accent"
+                          : "border-sf-line-strong"
                       }`}
                     >
                       {paymentMethod === "atm" && (
-                        <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                        <div className="w-2 h-2 rounded-full bg-sf-accent" />
                       )}
                     </div>
                   </button>
@@ -1452,11 +1452,11 @@ export default function Checkout() {
             )}
 
             {checkoutRegion === "overseas" && (
-              <section className="border border-[oklch(0.88_0_0)] p-4 bg-[oklch(0.985_0_0)]">
+              <section className="border border-sf-line-strong p-4 bg-sf-cream">
                 <h2 className="text-sm tracking-[0.2em] font-body mb-2">
                   付款方式
                 </h2>
-                <p className="text-sm font-body text-[oklch(0.25_0_0)]">
+                <p className="text-sm font-body text-sf-text">
                   PayPal（送出後將前往 PayPal 安全付款頁面）
                 </p>
               </section>
@@ -1466,7 +1466,7 @@ export default function Checkout() {
             <button
               type="submit"
               disabled={submitDisabled}
-              className="w-full btn-primary py-4 text-sm tracking-[0.2em] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full btn-primary py-3 text-sm tracking-[0.2em] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {createAndPay.isPending ? (
                 <>
@@ -1486,7 +1486,7 @@ export default function Checkout() {
             </button>
 
             {/* 安全說明 */}
-            <div className="flex items-center justify-center gap-2 text-xs font-body text-[oklch(0.6_0_0)]">
+            <div className="flex items-center justify-center gap-2 text-xs font-body text-sf-muted">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>
                 {checkoutRegion === "overseas"
@@ -1498,14 +1498,14 @@ export default function Checkout() {
 
           {/* Right: Order Summary */}
           <div className="order-1 h-fit lg:order-2 lg:sticky lg:top-8">
-            <div className="border border-[oklch(0.93_0_0)] p-6">
-              <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-[oklch(0.93_0_0)]">
+            <div className="border border-sf-line p-6">
+              <h2 className="text-sm tracking-[0.2em] font-body mb-5 pb-3 border-b border-sf-line">
                 訂單摘要
               </h2>
               <div className="space-y-4 mb-6">
                 {items.map(item => (
                   <div key={item.id} className="flex gap-3">
-                    <div className="w-16 h-16 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
+                    <div className="w-16 h-16 bg-sf-cream shrink-0 overflow-hidden">
                       {item.product.image && (
                         <img
                           src={getPurchaseOptionImage(
@@ -1518,15 +1518,15 @@ export default function Checkout() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-body text-[oklch(0.1_0_0)] truncate">
+                      <p className="text-sm font-body text-sf-ink truncate">
                         {item.product.name}
                         {item.isPreorder && (
-                          <span className="text-[oklch(0.58_0_0)]">
+                          <span className="text-sf-muted">
                             （預購）
                           </span>
                         )}
                       </p>
-                      <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                      <p className="text-xs font-body text-sf-muted mt-0.5">
                         x {item.quantity}
                       </p>
                       {(item.purchaseOptionLabel ||
@@ -1534,7 +1534,7 @@ export default function Checkout() {
                         item.wristSizeSelections?.length ||
                         item.claspType ||
                         item.fitPreference) && (
-                        <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mt-0.5">
+                        <p className="text-[0.65rem] font-body text-sf-text mt-0.5">
                           {item.purchaseOptionLabel
                             ? `方案 ${item.purchaseOptionLabel}`
                             : ""}
@@ -1578,15 +1578,15 @@ export default function Checkout() {
                         </p>
                       )}
                     </div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)] shrink-0">
+                    <p className="text-sm font-body font-medium text-sf-ink shrink-0">
                       NT$ {(item.unitPrice * item.quantity).toLocaleString()}
                     </p>
                   </div>
                 ))}
               </div>
               {couponOptions.length > 0 && (
-                <div className="border-t border-[oklch(0.93_0_0)] py-4">
-                  <p className="flex items-center gap-1.5 text-xs tracking-[0.1em] text-[oklch(0.4_0_0)] font-body mb-3">
+                <div className="border-t border-sf-line py-4">
+                  <p className="flex items-center gap-1.5 text-xs tracking-[0.1em] text-sf-text font-body mb-3">
                     <TicketPercent className="w-3.5 h-3.5" />
                     可使用優惠
                   </p>
@@ -1622,7 +1622,7 @@ export default function Checkout() {
                               {preview.ok && preview.discount < coupon.discountAmount ? (
                                 <>
                                   折 NT$ {preview.discount.toLocaleString()}
-                                  <span className="block text-xs text-[oklch(0.55_0_0)]">
+                                  <span className="block text-xs text-sf-muted">
                                     面額 {coupon.discountAmount.toLocaleString()}
                                   </span>
                                 </>
@@ -1636,34 +1636,34 @@ export default function Checkout() {
                               商品金額低於面額，只折抵 NT$ {preview.discount.toLocaleString()}，差額不退回
                             </span>
                           )}
-                          <span className="block text-xs text-[oklch(0.55_0_0)]">
+                          <span className="block text-xs text-sf-muted">
                             有效期限 {formatCouponDate(coupon.expiresAt)}
                             {coupon.minOrderAmount > 0 ? `・${formatCouponMinimum(coupon.minOrderAmount)}` : ""}
                           </span>
                           {!preview.ok && (
-                            <span className="block text-xs text-[oklch(0.55_0_0)]">{preview.reason}</span>
+                            <span className="block text-xs text-sf-muted">{preview.reason}</span>
                           )}
                         </span>
                       </label>
                     ))}
                   </div>
-                  <p className="mt-2 text-[0.65rem] text-[oklch(0.6_0_0)] font-body">每筆訂單限用一張，折抵商品金額（不含運費）。</p>
+                  <p className="mt-2 text-[0.65rem] text-sf-muted font-body">每筆訂單限用一張，折抵商品金額（不含運費）。</p>
                 </div>
               )}
-              <div className="border-t border-[oklch(0.93_0_0)] pt-4 space-y-2">
+              <div className="border-t border-sf-line pt-4 space-y-2">
                 <div className="flex justify-between text-sm font-body">
-                  <span className="text-[oklch(0.5_0_0)]">商品小計</span>
+                  <span className="text-sf-muted">商品小計</span>
                   <span>NT$ {totalPrice.toLocaleString()}</span>
                 </div>
                 {couponDiscount > 0 && (
                   <div className="flex justify-between text-sm font-body">
-                    <span className="text-[oklch(0.5_0_0)]">優惠券</span>
+                    <span className="text-sf-muted">優惠券</span>
                     <span className="text-rose-700">-NT$ {couponDiscount.toLocaleString()}</span>
                   </div>
                 )}
                 {displayShippingFee && (
                   <div className="flex justify-between text-sm font-body">
-                    <span className="text-[oklch(0.5_0_0)]">運費</span>
+                    <span className="text-sf-muted">運費</span>
                     {shippingFee === 0 ? (
                       <span className="text-green-600">免收</span>
                     ) : (
@@ -1671,7 +1671,7 @@ export default function Checkout() {
                     )}
                   </div>
                 )}
-                <div className="flex justify-between text-base font-medium border-t border-[oklch(0.93_0_0)] pt-3 mt-3">
+                <div className="flex justify-between text-base font-medium border-t border-sf-line pt-3 mt-3">
                   <span>{couponDiscount > 0 ? "應付金額" : "總計"}</span>
                   <span>NT$ {payableTotal.toLocaleString()}</span>
                 </div>

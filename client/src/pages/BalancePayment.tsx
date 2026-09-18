@@ -321,8 +321,8 @@ export default function BalancePayment() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+          <div className="w-8 h-8 border-2 border-sf-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-body text-sf-muted">
             載入尾款資訊中...
           </p>
         </div>
@@ -340,7 +340,7 @@ export default function BalancePayment() {
         >
           找不到尾款連結
         </p>
-        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
+        <p className="text-sm font-body text-sf-muted mb-8">
           請確認連結是否正確，或聯繫客服協助。
         </p>
         <button
@@ -406,12 +406,12 @@ export default function BalancePayment() {
     `w-full border px-4 py-3 text-sm font-body focus:outline-none transition-colors ${
       errors[field]
         ? "border-red-400 focus:border-red-500"
-        : "border-[oklch(0.88_0_0)] focus:border-[oklch(0.1_0_0)]"
+        : "border-sf-line-strong focus:border-sf-accent"
     }`;
 
   const receiverPhoneField = (
     <div className="mb-5">
-      <label className="block text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-2">
+      <label className="block text-xs tracking-widest font-body text-sf-text mb-2">
         {checkoutRegion === "domestic" ? "手機號碼" : "聯絡電話"}{" "}
         <span className="text-red-400">*</span>
       </label>
@@ -535,9 +535,9 @@ export default function BalancePayment() {
   };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_60)]">
+    <div className="min-h-screen bg-sf-cream">
       <div className="max-w-2xl mx-auto px-4 sm:px-8 py-12">
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-8 sm:p-10">
+        <div className="bg-white border border-sf-line p-8 sm:p-10">
           {/* Header */}
           <div className="text-center mb-8">
             {isPaid ? (
@@ -549,11 +549,11 @@ export default function BalancePayment() {
             ) : (
               <CreditCard className="w-14 h-14 text-rose-500 mx-auto mb-4" />
             )}
-            <p className="text-xs tracking-[0.16em] text-[oklch(0.5_0_0)] font-body mb-2">
+            <p className="text-xs tracking-[0.16em] text-sf-muted font-body mb-2">
               客製化尾款
             </p>
             <h1
-              className="text-2xl text-[oklch(0.12_0_0)]"
+              className="text-2xl text-sf-ink"
               style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
             >
               {isPaid
@@ -570,7 +570,7 @@ export default function BalancePayment() {
                         ? "請確認配送資料"
                         : "請完成客製化尾款"}
             </h1>
-            <p className="text-sm font-body text-[oklch(0.5_0_0)] mt-3">
+            <p className="text-sm font-body text-sf-muted mt-3">
               {isPaid
                 ? data.totalAmount === 0
                   ? "已完成配送資料確認，訂單將進入出貨流程。"
@@ -586,27 +586,27 @@ export default function BalancePayment() {
           </div>
 
           {/* 訂單摘要 */}
-          <div className="space-y-3 border border-[oklch(0.93_0_0)] bg-[oklch(0.99_0_0)] p-5 mb-6">
+          <div className="space-y-3 border border-sf-line bg-sf-cream p-5 mb-6">
             <div className="flex justify-between gap-4 text-sm font-body">
-              <span className="text-[oklch(0.5_0_0)]">原始訂單編號</span>
-              <span className="text-[oklch(0.12_0_0)] font-mono">
+              <span className="text-sf-muted">原始訂單編號</span>
+              <span className="text-sf-ink font-mono">
                 {data.order.merchantTradeNo}
               </span>
             </div>
             <div className="flex justify-between gap-4 text-sm font-body">
-              <span className="text-[oklch(0.5_0_0)]">顧客姓名</span>
-              <span className="text-[oklch(0.12_0_0)]">
+              <span className="text-sf-muted">顧客姓名</span>
+              <span className="text-sf-ink">
                 {data.order.buyerName}
               </span>
             </div>
             <div className="flex justify-between gap-4 text-sm font-body">
-              <span className="text-[oklch(0.5_0_0)]">尾款小計</span>
-              <span className="text-[oklch(0.12_0_0)] font-medium">
+              <span className="text-sf-muted">尾款小計</span>
+              <span className="text-sf-ink font-medium">
                 NT$ {data.amount.toLocaleString()}
               </span>
             </div>
             {showPaymentChoice && (
-              <div className="border-t border-[oklch(0.9_0_0)] pt-3">
+              <div className="border-t border-sf-line pt-3">
                 <ClearQuartzAddonOption
                   checked={includeClearQuartzChips}
                   onCheckedChange={setIncludeClearQuartzChips}
@@ -616,11 +616,11 @@ export default function BalancePayment() {
               </div>
             )}
             {!showPaymentChoice && data.clearQuartzChipsItem && (
-              <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
-                <span className="text-[oklch(0.5_0_0)]">
+              <div className="flex justify-between gap-4 text-sm font-body border-t border-sf-line pt-3">
+                <span className="text-sf-muted">
                   {data.clearQuartzChipsItem.productName}
                 </span>
-                <span className="text-[oklch(0.12_0_0)]">
+                <span className="text-sf-ink">
                   NT$ {data.clearQuartzChipsItem.subtotal.toLocaleString()}
                 </span>
               </div>
@@ -629,32 +629,32 @@ export default function BalancePayment() {
               <>
                 {includeClearQuartzChips && hasLiveClearQuartzChipsProduct && (
                   <div className="flex justify-between gap-4 text-sm font-body">
-                    <span className="text-[oklch(0.5_0_0)]">
+                    <span className="text-sf-muted">
                       加購白水晶碎石
                     </span>
-                    <span className="text-[oklch(0.12_0_0)]">
+                    <span className="text-sf-ink">
                       NT$ {clearQuartzChipsProduct.price.toLocaleString()}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between gap-4 text-sm font-body">
-                  <span className="text-[oklch(0.5_0_0)]">運費</span>
-                  <span className="text-[oklch(0.12_0_0)]">
+                  <span className="text-sf-muted">運費</span>
+                  <span className="text-sf-ink">
                     NT$ {feeSummary.shippingFee.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between gap-4 text-sm font-body border-t border-[oklch(0.9_0_0)] pt-3">
-                  <span className="text-[oklch(0.12_0_0)] font-medium">
+                <div className="flex justify-between gap-4 text-sm font-body border-t border-sf-line pt-3">
+                  <span className="text-sf-ink font-medium">
                     應付總額
                   </span>
-                  <span className="text-[oklch(0.12_0_0)] font-semibold">
+                  <span className="text-sf-ink font-semibold">
                     NT$ {payableAmount.toLocaleString()}
                   </span>
                 </div>
               </>
             )}
             <div className="flex justify-between gap-4 text-sm font-body">
-              <span className="text-[oklch(0.5_0_0)]">目前狀態</span>
+              <span className="text-sf-muted">目前狀態</span>
               <span
                 className={
                   isPaid
@@ -682,25 +682,25 @@ export default function BalancePayment() {
           {/* 選擇付款方式 */}
           {showPaymentChoice && (
             <>
-              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">
+              <p className="text-xs tracking-widest font-body text-sf-text mb-3">
                 選擇配送地區
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <button
                   type="button"
                   onClick={() => setRegion("domestic")}
-                  className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                  className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                     checkoutRegion === "domestic"
-                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                      : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                      ? "border-sf-accent bg-sf-selected"
+                      : "border-sf-line-strong hover:border-sf-accent/50"
                   }`}
                 >
-                  <Home className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                  <Home className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                   <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                    <p className="text-sm font-body font-medium text-sf-ink">
                       台灣（國內）
                     </p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                    <p className="text-xs font-body text-sf-muted mt-0.5">
                       宅配或 7-11 取貨
                     </p>
                   </div>
@@ -708,25 +708,25 @@ export default function BalancePayment() {
                 <button
                   type="button"
                   onClick={() => setRegion("overseas")}
-                  className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                  className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                     checkoutRegion === "overseas"
-                      ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                      : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                      ? "border-sf-accent bg-sf-selected"
+                      : "border-sf-line-strong hover:border-sf-accent/50"
                   }`}
                 >
-                  <Globe className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                  <Globe className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                   <div>
-                    <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                    <p className="text-sm font-body font-medium text-sf-ink">
                       海外
                     </p>
-                    <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                    <p className="text-xs font-body text-sf-muted mt-0.5">
                       國際宅配
                     </p>
                   </div>
                 </button>
               </div>
 
-              <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">
+              <p className="text-xs tracking-widest font-body text-sf-text mb-3">
                 選擇配送方式
               </p>
               {checkoutRegion === "domestic" ? (
@@ -754,20 +754,20 @@ export default function BalancePayment() {
                           setCvsStore(null);
                           setErrors({});
                         }}
-                        className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                        className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                           shippingMethod === opt.key
-                            ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                            : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                            ? "border-sf-accent bg-sf-selected"
+                            : "border-sf-line-strong hover:border-sf-accent/50"
                         }`}
                       >
-                        <span className="text-[oklch(0.3_0_0)] mt-0.5 shrink-0">
+                        <span className="text-sf-text mt-0.5 shrink-0">
                           {opt.icon}
                         </span>
                         <div>
-                          <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                          <p className="text-sm font-body font-medium text-sf-ink">
                             {opt.title}
                           </p>
-                          <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                          <p className="text-xs font-body text-sf-muted mt-0.5">
                             {opt.desc}
                           </p>
                         </div>
@@ -799,7 +799,7 @@ export default function BalancePayment() {
                         <button
                           type="button"
                           onClick={handleSelectCvsStore}
-                          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[oklch(0.7_0_0)] text-sm font-body text-[oklch(0.4_0_0)] hover:border-[oklch(0.3_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors"
+                          className="w-full flex items-center justify-center gap-2 rounded-md py-3 border border-dashed border-sf-line-strong text-sm font-body text-sf-text hover:border-sf-accent hover:text-sf-ink transition-colors"
                         >
                           <MapPin className="w-4 h-4" />
                           點此選擇 7-11 門市
@@ -1031,67 +1031,67 @@ export default function BalancePayment() {
 
               {payableAmount > 0 && (
                 <>
-                  <p className="text-xs tracking-widest font-body text-[oklch(0.4_0_0)] mb-3">
+                  <p className="text-xs tracking-widest font-body text-sf-text mb-3">
                     選擇付款方式
                   </p>
                   <div className="grid grid-cols-2 gap-3 mb-5">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("credit")}
-                      className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                      className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                         paymentMethod === "credit"
-                          ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                          : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                          ? "border-sf-accent bg-sf-selected"
+                          : "border-sf-line-strong hover:border-sf-accent/50"
                       }`}
                     >
-                      <CreditCard className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                      <CreditCard className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                       <div>
-                        <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                        <p className="text-sm font-body font-medium text-sf-ink">
                           信用卡
                         </p>
-                        <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                        <p className="text-xs font-body text-sf-muted mt-0.5">
                           即時扣款
                         </p>
                       </div>
                       <div
                         className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                           paymentMethod === "credit"
-                            ? "border-[oklch(0.1_0_0)]"
-                            : "border-[oklch(0.8_0_0)]"
+                            ? "border-sf-accent"
+                            : "border-sf-line-strong"
                         }`}
                       >
                         {paymentMethod === "credit" && (
-                          <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                          <div className="w-2 h-2 rounded-full bg-sf-accent" />
                         )}
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("atm")}
-                      className={`flex items-start gap-3 p-4 border text-left transition-all ${
+                      className={`flex items-start gap-3 rounded-md p-4 border text-left transition-all ${
                         paymentMethod === "atm"
-                          ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)]"
-                          : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.7_0_0)]"
+                          ? "border-sf-accent bg-sf-selected"
+                          : "border-sf-line-strong hover:border-sf-accent/50"
                       }`}
                     >
-                      <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-[oklch(0.3_0_0)]" />
+                      <Banknote className="w-5 h-5 mt-0.5 shrink-0 text-sf-text" />
                       <div>
-                        <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+                        <p className="text-sm font-body font-medium text-sf-ink">
                           轉帳
                         </p>
-                        <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-0.5">
+                        <p className="text-xs font-body text-sf-muted mt-0.5">
                           匯款後填末五碼
                         </p>
                       </div>
                       <div
                         className={`ml-auto w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
                           paymentMethod === "atm"
-                            ? "border-[oklch(0.1_0_0)]"
-                            : "border-[oklch(0.8_0_0)]"
+                            ? "border-sf-accent"
+                            : "border-sf-line-strong"
                         }`}
                       >
                         {paymentMethod === "atm" && (
-                          <div className="w-2 h-2 rounded-full bg-[oklch(0.1_0_0)]" />
+                          <div className="w-2 h-2 rounded-full bg-sf-accent" />
                         )}
                       </div>
                     </button>
@@ -1102,7 +1102,7 @@ export default function BalancePayment() {
               <button
                 onClick={startBalanceCheckout}
                 disabled={startCheckout.isPending}
-                className="w-full bg-[oklch(0.12_0_0)] text-white py-3.5 text-sm font-body hover:bg-[oklch(0.22_0_0)] transition-colors disabled:opacity-60"
+                className="w-full rounded-full bg-sf-accent text-white py-3 text-sm tracking-[0.12em] font-body hover:bg-sf-accent-hover transition-colors disabled:opacity-60"
               >
                 {startCheckout.isPending
                   ? "處理中..."

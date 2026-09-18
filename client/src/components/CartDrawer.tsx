@@ -50,16 +50,16 @@ export default function CartDrawer() {
       }`}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[oklch(0.93_0_0)]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-sf-line">
           <div>
             <p className="eyebrow">SHOPPING BAG</p>
-            <h3 className="text-lg font-medium text-[oklch(0.1_0_0)] mt-0.5" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-              購物袋 {totalItems > 0 && <span className="text-sm text-[oklch(0.55_0_0)]">({totalItems})</span>}
+            <h3 className="text-lg font-light tracking-[0.08em] text-sf-ink mt-0.5" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>
+              購物袋 {totalItems > 0 && <span className="text-sm text-sf-muted">({totalItems})</span>}
             </h3>
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+            className="p-2 text-sf-text hover:text-sf-ink transition-colors"
             aria-label="關閉"
           >
             <X className="w-4 h-4" />
@@ -70,8 +70,8 @@ export default function CartDrawer() {
         <div className="flex-1 overflow-y-auto">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
-              <ShoppingBag className="w-12 h-12 text-[oklch(0.85_0_0)]" strokeWidth={1} />
-              <p className="text-sm font-body font-light text-[oklch(0.55_0_0)] text-center">
+              <ShoppingBag className="w-12 h-12 text-sf-line-strong" strokeWidth={1} />
+              <p className="text-sm font-body font-light text-sf-muted text-center">
                 你的購物袋是空的
               </p>
               <Link href="/products">
@@ -84,11 +84,11 @@ export default function CartDrawer() {
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-[oklch(0.95_0_0)]">
+            <div className="divide-y divide-sf-line">
               {items.map(({ id, product, quantity, unitPrice, purchaseOptionId, purchaseOptionLabel, wristSize, wristSizeSelections, claspType, fitPreference, isPreorder }) => (
                 <div key={id} className="flex gap-4 px-6 py-5">
                   {/* Image */}
-                  <div className="w-20 h-24 bg-[oklch(0.97_0_0)] shrink-0 overflow-hidden">
+                  <div className="w-20 h-24 bg-sf-cream shrink-0 overflow-hidden">
                     <img
                       src={getPurchaseOptionImage(product, purchaseOptionId)}
                       alt={product.name}
@@ -98,15 +98,15 @@ export default function CartDrawer() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-body font-medium text-[oklch(0.1_0_0)] leading-snug mb-1">
+                    <p className="text-xs font-body font-medium text-sf-ink leading-snug mb-1">
                       {product.name}
-                      {isPreorder && <span className="text-[oklch(0.58_0_0)] font-normal">（預購）</span>}
+                      {isPreorder && <span className="text-sf-muted font-normal">（預購）</span>}
                     </p>
-                    <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] mb-3">
+                    <p className="text-[0.65rem] font-body text-sf-muted mb-3">
                       {product.categoryLabel}
                     </p>
                     {(purchaseOptionLabel || wristSize || wristSizeSelections?.length || claspType || fitPreference) && (
-                      <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] mb-2">
+                      <p className="text-[0.65rem] font-body text-sf-text mb-2">
                         {purchaseOptionLabel ? `方案 ${purchaseOptionLabel}` : ""}
                         {purchaseOptionLabel && (wristSize || wristSizeSelections?.length || claspType || fitPreference) ? " · " : ""}
                         {wristSize ? `手圍 ${wristSize} cm` : ""}
@@ -119,10 +119,10 @@ export default function CartDrawer() {
                     )}
                     <div className="flex items-center justify-between">
                       {/* Qty */}
-                      <div className="flex items-center border border-[oklch(0.9_0_0)]">
+                      <div className="flex items-center rounded-full border border-sf-line-strong">
                         <button
                           onClick={() => updateQuantity(id, quantity - 1)}
-                          className="w-7 h-7 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                          className="w-7 h-7 flex items-center justify-center text-sf-text hover:text-sf-ink transition-colors"
                           aria-label="減少"
                         >
                           <Minus className="w-3 h-3" />
@@ -130,13 +130,13 @@ export default function CartDrawer() {
                         <span className="w-7 text-center text-xs font-body">{quantity}</span>
                         <button
                           onClick={() => updateQuantity(id, quantity + 1)}
-                          className="w-7 h-7 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                          className="w-7 h-7 flex items-center justify-center text-sf-text hover:text-sf-ink transition-colors"
                           aria-label="增加"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
-                      <p className="text-xs font-body font-medium text-[oklch(0.1_0_0)]">
+                      <p className="text-xs font-body font-medium text-sf-ink">
                         NT$ {(unitPrice * quantity).toLocaleString()}
                       </p>
                     </div>
@@ -148,7 +148,7 @@ export default function CartDrawer() {
                       removeFromCart(id);
                       toast.success("已從購物袋移除");
                     }}
-                    className="self-start p-1 text-[oklch(0.7_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                    className="self-start p-1 text-sf-muted hover:text-sf-ink transition-colors"
                     aria-label="移除"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -161,33 +161,33 @@ export default function CartDrawer() {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="border-t border-[oklch(0.93_0_0)] px-6 py-6">
+          <div className="border-t border-sf-line px-6 py-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-body text-[oklch(0.55_0_0)] tracking-wide">小計</p>
-              <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+              <p className="text-xs font-body text-sf-muted tracking-wide">小計</p>
+              <p className="text-sm font-body font-medium text-sf-ink">
                 NT$ {totalPrice.toLocaleString()}
               </p>
             </div>
             {showFreeShippingHint && (
-              <p className="text-[0.65rem] font-body text-[oklch(0.45_0_0)] bg-[oklch(0.97_0.01_70)] border border-[oklch(0.9_0.02_70)] px-3 py-2 mb-5 tracking-wide">
+              <p className="text-[0.65rem] font-body rounded-md text-sf-text bg-sf-cream border border-sf-line px-3 py-2 mb-5 tracking-wide">
                 任選 2 件即免運（國內），目前還差 1 件
               </p>
             )}
             {hasLiveClearQuartzChipsProduct && !hasClearQuartzChips && (
-              <div className="mb-5 border border-[oklch(0.9_0_0)] bg-[oklch(0.99_0_0)] px-3 py-3">
+              <div className="mb-5 rounded-md border border-sf-line bg-sf-cream px-3 py-3">
                 <div className="flex items-start gap-3">
                   {clearQuartzChipsProduct.image && (
                     <img
                       src={clearQuartzChipsProduct.image}
                       alt={clearQuartzChipsProduct.name}
-                      className="h-12 w-12 shrink-0 border border-[oklch(0.92_0_0)] object-cover"
+                      className="h-12 w-12 shrink-0 rounded border border-sf-line object-cover"
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-body font-medium leading-snug text-[oklch(0.14_0_0)]">
+                    <p className="text-xs font-body font-medium leading-snug text-sf-ink">
                       加購{clearQuartzChipsProduct.name}
                     </p>
-                    <p className="mt-1 text-[0.65rem] font-body leading-relaxed text-[oklch(0.5_0_0)]">
+                    <p className="mt-1 text-[0.65rem] font-body leading-relaxed text-sf-muted">
                       讓水晶多一份日常淨化儀式
                     </p>
                   </div>
@@ -197,7 +197,7 @@ export default function CartDrawer() {
                       addToCart(clearQuartzChipsProduct);
                       toast.success(`已加購：${clearQuartzChipsProduct.name}`);
                     }}
-                    className="shrink-0 border border-[oklch(0.18_0_0)] px-2.5 py-1.5 text-[0.65rem] font-body text-[oklch(0.12_0_0)] transition-colors hover:bg-[oklch(0.96_0_0)]"
+                    className="shrink-0 rounded-full border border-sf-accent px-3 py-1.5 text-[0.65rem] font-body text-sf-accent transition-colors hover:bg-sf-selected"
                   >
                     + NT$ {clearQuartzChipsProduct.price.toLocaleString()}
                   </button>
