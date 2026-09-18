@@ -464,11 +464,16 @@ export default function Navbar() {
       {/* ── 跑馬燈公告 ── */}
       {showAnnouncement && (
         <div className="bg-sf-cream-deep border-b border-sf-line py-2 overflow-hidden">
+          {/* 兩組相同內容、每組至少滿版寬，往左捲一組的寬度後無縫接回，寬螢幕也不會出現空白 */}
           <div className="marquee-track">
-            {Array(8).fill(null).map((_, i) => (
-              <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-sf-text uppercase">
-                {announcementText}&nbsp;
-              </span>
+            {[0, 1].map((group) => (
+              <div key={group} className="marquee-group" aria-hidden={group === 1}>
+                {Array(6).fill(null).map((_, i) => (
+                  <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-sf-text uppercase">
+                    {announcementText}&nbsp;
+                  </span>
+                ))}
+              </div>
             ))}
           </div>
         </div>

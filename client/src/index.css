@@ -240,7 +240,15 @@ html.storefront {
 
   .marquee-track {
     display: flex;
+    width: max-content;
     animation: marquee 28s linear infinite;
+  }
+
+  .marquee-group {
+    display: flex;
+    flex-shrink: 0;
+    min-width: 100vw;
+    justify-content: space-around;
   }
 
   @keyframes marquee {
