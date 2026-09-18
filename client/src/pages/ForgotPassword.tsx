@@ -23,38 +23,38 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_60)] flex items-center justify-center px-4 py-16">
+    <div className="min-h-screen bg-sf-cream flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/">
             <span
               className="text-2xl tracking-[0.12em] cursor-pointer"
-              style={{ fontFamily: "'Noto Serif TC', serif", color: "oklch(0.3 0 0)" }}
+              style={{ fontFamily: "'Noto Serif TC', serif", color: "var(--sf-ink)" }}
             >
               椛 · Crystal
             </span>
           </Link>
-          <p className="text-xs tracking-[0.2em] text-[oklch(0.55_0_0)] mt-1 font-body">CRYSTAL ENERGY</p>
+          <p className="text-xs tracking-[0.2em] text-sf-muted mt-1 font-body">CRYSTAL ENERGY</p>
         </div>
 
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-8 sm:p-10">
+        <div className="rounded-lg bg-white border border-sf-line p-8 sm:p-10">
           {sent ? (
             <div className="text-center py-4">
               <div className="text-4xl mb-4">✉️</div>
               <h2
-                className="text-lg font-medium text-[oklch(0.15_0_0)] mb-3"
+                className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
               >
                 重設連結已發送
               </h2>
-              <p className="text-sm text-[oklch(0.5_0_0)] font-body leading-relaxed mb-6">
+              <p className="text-sm text-sf-muted font-body leading-relaxed mb-6">
                 若此 Email 已在我們系統中註冊，您將收到密碼重設連結。
                 <br />
                 請記得檢查垃圾信件夾。
               </p>
               <Link href="/login">
-                <button className="text-sm text-[oklch(0.55_0.08_60)] font-body underline hover:text-[oklch(0.45_0.08_60)]">
+                <button className="text-sm text-sf-accent font-body underline hover:text-sf-ink">
                   返回登入
                 </button>
               </Link>
@@ -62,18 +62,18 @@ export default function ForgotPassword() {
           ) : (
             <>
               <h1
-                className="text-xl font-medium text-[oklch(0.15_0_0)] mb-1"
-                style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
+                className="text-xl font-light tracking-[0.08em] text-sf-ink mb-1"
+                style={{ fontFamily: "\'Noto Serif TC\', serif" }}
               >
                 忘記密碼
               </h1>
-              <p className="text-xs text-[oklch(0.55_0_0)] font-body mb-8">
+              <p className="text-xs text-sf-muted font-body mb-8">
                 輸入您的 Email，我們將發送密碼重設連結
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block text-xs tracking-[0.08em] text-[oklch(0.4_0_0)] mb-1.5 font-body">
+                  <label className="block text-xs tracking-[0.08em] text-sf-text mb-1.5 font-body">
                     EMAIL
                   </label>
                   <input
@@ -82,22 +82,22 @@ export default function ForgotPassword() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
-                    className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body outline-none transition-colors focus:border-[oklch(0.6_0.08_60)]"
+                    className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body outline-none transition-colors focus:border-sf-accent"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={mutation.isPending || !email}
-                  className="w-full bg-[oklch(0.15_0_0)] text-white py-3.5 text-sm tracking-[0.12em] font-body hover:bg-[oklch(0.25_0_0)] transition-colors disabled:opacity-60"
+                  className="w-full rounded-full bg-sf-accent text-white py-3 text-sm tracking-[0.12em] font-body hover:bg-sf-accent-hover transition-colors disabled:opacity-60"
                 >
                   {mutation.isPending ? "發送中..." : "發送重設連結"}
                 </button>
               </form>
 
-              <p className="text-center mt-6 text-xs text-[oklch(0.55_0_0)] font-body">
+              <p className="text-center mt-6 text-xs text-sf-muted font-body">
                 <Link href="/login">
-                  <span className="cursor-pointer hover:text-[oklch(0.35_0_0)]">← 返回登入</span>
+                  <span className="cursor-pointer hover:text-sf-accent">← 返回登入</span>
                 </Link>
               </p>
             </>

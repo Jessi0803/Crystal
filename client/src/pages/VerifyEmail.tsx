@@ -29,26 +29,26 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_60)] flex items-center justify-center px-4 py-16">
+    <div className="min-h-screen bg-sf-cream flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/">
             <span
               className="text-2xl tracking-[0.12em] cursor-pointer"
-              style={{ fontFamily: "'Noto Serif TC', serif", color: "oklch(0.3 0 0)" }}
+              style={{ fontFamily: "'Noto Serif TC', serif", color: "var(--sf-ink)" }}
             >
               椛 · Crystal
             </span>
           </Link>
-          <p className="text-xs tracking-[0.2em] text-[oklch(0.55_0_0)] mt-1 font-body">CRYSTAL ENERGY</p>
+          <p className="text-xs tracking-[0.2em] text-sf-muted mt-1 font-body">CRYSTAL ENERGY</p>
         </div>
 
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-8 sm:p-10 text-center">
+        <div className="rounded-lg bg-white border border-sf-line p-8 sm:p-10 text-center">
           {status === "loading" && (
             <>
-              <div className="w-8 h-8 border-2 border-[oklch(0.85_0_0)] border-t-[oklch(0.4_0_0)] rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-sm text-[oklch(0.5_0_0)] font-body">驗證中，請稍候...</p>
+              <div className="w-8 h-8 border-2 border-sf-line-strong border-t-sf-line-strong rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-sm text-sf-muted font-body">驗證中，請稍候...</p>
             </>
           )}
 
@@ -56,22 +56,22 @@ export default function VerifyEmail() {
             <>
               <div className="text-4xl mb-4">✅</div>
               <h2
-                className="text-lg font-medium text-[oklch(0.15_0_0)] mb-3"
+                className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
               >
                 Email 驗證成功！
               </h2>
-              <p className="text-sm text-[oklch(0.5_0_0)] font-body mb-6">
+              <p className="text-sm text-sf-muted font-body mb-6">
                 您的帳號已完成驗證，現在可以享受完整的會員服務。
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link href="/">
-                  <button className="bg-[oklch(0.15_0_0)] text-white px-8 py-2.5 text-sm font-body hover:bg-[oklch(0.25_0_0)] transition-colors">
+                  <button className="rounded-full bg-sf-accent text-white px-8 py-2.5 text-sm font-body hover:bg-sf-accent-hover transition-colors">
                     前往首頁
                   </button>
                 </Link>
                 <Link href="/member">
-                  <button className="border border-[oklch(0.85_0_0)] text-[oklch(0.4_0_0)] px-8 py-2.5 text-sm font-body hover:bg-[oklch(0.97_0_0)] transition-colors">
+                  <button className="border border-sf-line-strong text-sf-text px-8 py-2.5 text-sm font-body hover:bg-sf-selected transition-colors">
                     會員中心
                   </button>
                 </Link>
@@ -83,15 +83,15 @@ export default function VerifyEmail() {
             <>
               <div className="text-4xl mb-4">❌</div>
               <h2
-                className="text-lg font-medium text-[oklch(0.15_0_0)] mb-3"
+                className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
               >
                 驗證失敗
               </h2>
-              <p className="text-sm text-[oklch(0.5_0_0)] font-body mb-6">{message}</p>
+              <p className="text-sm text-sf-muted font-body mb-6">{message}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link href="/member">
-                  <button className="bg-[oklch(0.15_0_0)] text-white px-8 py-2.5 text-sm font-body hover:bg-[oklch(0.25_0_0)] transition-colors">
+                  <button className="rounded-full bg-sf-accent text-white px-8 py-2.5 text-sm font-body hover:bg-sf-accent-hover transition-colors">
                     前往會員中心重新發送
                   </button>
                 </Link>

@@ -37,11 +37,11 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-[oklch(0.98_0.005_60)] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-sf-cream flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-sm text-[oklch(0.55_0_0)] font-body mb-4">無效的重設連結</p>
+          <p className="text-sm text-sf-muted font-body mb-4">無效的重設連結</p>
           <Link href="/forgot-password">
-            <button className="text-sm text-[oklch(0.55_0.08_60)] underline font-body">重新申請</button>
+            <button className="text-sm text-sf-accent underline font-body">重新申請</button>
           </Link>
         </div>
       </div>
@@ -49,36 +49,36 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_60)] flex items-center justify-center px-4 py-16">
+    <div className="min-h-screen bg-sf-cream flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/">
             <span
               className="text-2xl tracking-[0.12em] cursor-pointer"
-              style={{ fontFamily: "'Noto Serif TC', serif", color: "oklch(0.3 0 0)" }}
+              style={{ fontFamily: "'Noto Serif TC', serif", color: "var(--sf-ink)" }}
             >
               椛 · Crystal
             </span>
           </Link>
-          <p className="text-xs tracking-[0.2em] text-[oklch(0.55_0_0)] mt-1 font-body">CRYSTAL ENERGY</p>
+          <p className="text-xs tracking-[0.2em] text-sf-muted mt-1 font-body">CRYSTAL ENERGY</p>
         </div>
 
-        <div className="bg-white border border-[oklch(0.93_0_0)] p-8 sm:p-10">
+        <div className="rounded-lg bg-white border border-sf-line p-8 sm:p-10">
           {done ? (
             <div className="text-center py-4">
               <div className="text-4xl mb-4">✅</div>
               <h2
-                className="text-lg font-medium text-[oklch(0.15_0_0)] mb-3"
+                className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
               >
                 密碼已重設
               </h2>
-              <p className="text-sm text-[oklch(0.5_0_0)] font-body mb-6">
+              <p className="text-sm text-sf-muted font-body mb-6">
                 請使用新密碼重新登入
               </p>
               <Link href="/login">
-                <button className="bg-[oklch(0.15_0_0)] text-white px-8 py-2.5 text-sm font-body hover:bg-[oklch(0.25_0_0)] transition-colors">
+                <button className="rounded-full bg-sf-accent text-white px-8 py-2.5 text-sm font-body hover:bg-sf-accent-hover transition-colors">
                   前往登入
                 </button>
               </Link>
@@ -86,18 +86,18 @@ export default function ResetPassword() {
           ) : (
             <>
               <h1
-                className="text-xl font-medium text-[oklch(0.15_0_0)] mb-1"
-                style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
+                className="text-xl font-light tracking-[0.08em] text-sf-ink mb-1"
+                style={{ fontFamily: "\'Noto Serif TC\', serif" }}
               >
                 設定新密碼
               </h1>
-              <p className="text-xs text-[oklch(0.55_0_0)] font-body mb-8">
+              <p className="text-xs text-sf-muted font-body mb-8">
                 請輸入您的新密碼（至少 8 個字元）
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block text-xs tracking-[0.08em] text-[oklch(0.4_0_0)] mb-1.5 font-body">
+                  <label className="block text-xs tracking-[0.08em] text-sf-text mb-1.5 font-body">
                     新密碼
                   </label>
                   <input
@@ -105,8 +105,8 @@ export default function ResetPassword() {
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     placeholder="至少 8 個字元"
-                    className={`w-full border px-4 py-3 text-sm font-body outline-none transition-colors focus:border-[oklch(0.6_0.08_60)] ${
-                      errors.password ? "border-red-400" : "border-[oklch(0.88_0_0)]"
+                    className={`w-full border px-4 py-3 text-sm font-body outline-none transition-colors focus:border-sf-accent ${
+                      errors.password ? "border-red-400" : "border-sf-line-strong"
                     }`}
                   />
                   {errors.password && (
@@ -115,7 +115,7 @@ export default function ResetPassword() {
                 </div>
 
                 <div>
-                  <label className="block text-xs tracking-[0.08em] text-[oklch(0.4_0_0)] mb-1.5 font-body">
+                  <label className="block text-xs tracking-[0.08em] text-sf-text mb-1.5 font-body">
                     確認新密碼
                   </label>
                   <input
@@ -123,8 +123,8 @@ export default function ResetPassword() {
                     value={form.confirmPassword}
                     onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                     placeholder="再次輸入新密碼"
-                    className={`w-full border px-4 py-3 text-sm font-body outline-none transition-colors focus:border-[oklch(0.6_0.08_60)] ${
-                      errors.confirmPassword ? "border-red-400" : "border-[oklch(0.88_0_0)]"
+                    className={`w-full border px-4 py-3 text-sm font-body outline-none transition-colors focus:border-sf-accent ${
+                      errors.confirmPassword ? "border-red-400" : "border-sf-line-strong"
                     }`}
                   />
                   {errors.confirmPassword && (
@@ -135,7 +135,7 @@ export default function ResetPassword() {
                 <button
                   type="submit"
                   disabled={mutation.isPending}
-                  className="w-full bg-[oklch(0.15_0_0)] text-white py-3.5 text-sm tracking-[0.12em] font-body hover:bg-[oklch(0.25_0_0)] transition-colors disabled:opacity-60"
+                  className="w-full rounded-full bg-sf-accent text-white py-3 text-sm tracking-[0.12em] font-body hover:bg-sf-accent-hover transition-colors disabled:opacity-60"
                 >
                   {mutation.isPending ? "重設中..." : "確認重設密碼"}
                 </button>
