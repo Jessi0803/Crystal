@@ -64,7 +64,7 @@ export default function AccessoryReferenceGallery({
             key={image.src}
             type="button"
             onClick={() => selectImage(index)}
-            className="group relative aspect-[4/3] overflow-hidden rounded-sm border border-[oklch(0.9_0_0)] bg-[oklch(0.97_0_0)] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.35_0_0)] focus-visible:ring-offset-2"
+            className="group relative aspect-[4/3] overflow-hidden rounded-md border border-sf-line bg-sf-cream text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sf-accent focus-visible:ring-offset-2"
             aria-label={`放大查看${image.label}`}
           >
             <img
@@ -93,7 +93,7 @@ export default function AccessoryReferenceGallery({
       >
         <DialogContent
           showCloseButton
-          className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none gap-0 overflow-hidden rounded-sm border-0 bg-black/95 p-0 text-white shadow-2xl sm:h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)]"
+          className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none gap-0 overflow-hidden rounded-md border-0 bg-black/95 p-0 text-white shadow-2xl sm:h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)]"
           onKeyDown={(event) => {
             if (event.key === "ArrowLeft") changeImage(-1);
             if (event.key === "ArrowRight") changeImage(1);

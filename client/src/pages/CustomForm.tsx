@@ -104,7 +104,7 @@ export default function CustomForm() {
           onChange={e => setForm({ ...form, colorPreference: e.target.value })}
           placeholder="寫下喜歡或不喜歡的顏色，沒有指定可以留空"
           rows={5}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+          className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none leading-relaxed"
         />
       ),
     },
@@ -135,11 +135,11 @@ export default function CustomForm() {
               step={CUSTOM_WRIST_SIZE_STEP}
               min={CUSTOM_WRIST_SIZE_MIN}
               max={CUSTOM_WRIST_SIZE_MAX}
-              className="w-48 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-48 border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
-            <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
+            <span className="text-sm font-body text-sf-muted">cm</span>
           </div>
-          <p className="text-xs font-body text-[oklch(0.6_0_0)] leading-relaxed">
+          <p className="text-xs font-body text-sf-muted leading-relaxed">
             不知道怎麼量？拿皮尺平貼在想戴的位置，繞一圈的長度就是淨手圍。
           </p>
         </div>
@@ -167,7 +167,7 @@ export default function CustomForm() {
           onChange={e => setForm({ ...form, specialRequests: e.target.value })}
           placeholder="例如：不喜歡太華麗、容易過敏不要某種材質、想放入某個紀念意義……"
           rows={7}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+          className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none leading-relaxed"
         />
       ),
     },
@@ -178,13 +178,13 @@ export default function CustomForm() {
       field: (
         <div className="space-y-6">
           <div
-            className="p-5 rounded-sm"
+            className="p-5 rounded-md"
             style={{
               backgroundColor: "oklch(0.97 0.03 145)",
               border: "1px solid oklch(0.85 0.06 145)",
             }}
           >
-            <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
+            <p className="text-sm font-body text-sf-ink leading-relaxed mb-4">
               付完訂金後，請加入官方 LINE 並傳送
               <br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
@@ -194,7 +194,7 @@ export default function CustomForm() {
               href="https://line.me/R/ti/p/@011tymeh"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-sm transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-full transition-opacity hover:opacity-90"
               style={{ backgroundColor: "#06C755" }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
@@ -206,7 +206,7 @@ export default function CustomForm() {
           <div>
             <label
               htmlFor="custom-contact-handle"
-              className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5"
+              className="block text-xs font-body text-sf-muted mb-1.5"
             >
               Instagram 帳號 / LINE ID <span className="text-red-400">*</span>
             </label>
@@ -217,9 +217,9 @@ export default function CustomForm() {
               value={form.igHandle}
               onChange={e => setForm({ ...form, igHandle: e.target.value })}
               placeholder="例如：@your_ig_handle 或 LINE ID"
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
-            <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
+            <p className="mt-1.5 text-xs font-body text-sf-muted">
               請填寫 IG 帳號；若沒有 IG，請填寫 LINE ID
             </p>
           </div>
@@ -273,21 +273,21 @@ export default function CustomForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_240)] page-enter">
+    <div className="min-h-screen bg-sf-cream page-enter">
       {/* Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] bg-white">
+      <div className="border-b border-sf-line bg-white">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/custom">
-            <button className="flex items-center gap-1.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors">
+            <button className="flex items-center gap-1.5 text-sm font-body text-sf-muted hover:text-sf-ink transition-colors">
               <ArrowLeft className="w-4 h-4" />
               返回
             </button>
           </Link>
           <div>
-            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">
+            <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase">
               純客製水晶手鍊
             </p>
-            <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+            <p className="text-sm font-body font-medium text-sf-ink">
               報名表單
             </p>
           </div>
@@ -307,24 +307,24 @@ export default function CustomForm() {
           {steps.map((item, index) => (
             <section
               key={item.title}
-              className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
+              className="bg-white border border-sf-line rounded-md p-6 sm:p-8"
             >
               <div className="flex items-start justify-between gap-4 mb-2">
                 <h2
-                  className="text-lg font-medium text-[oklch(0.1_0_0)]"
+                  className="text-lg font-medium text-sf-ink"
                   style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
                 >
                   {index + 1}. {item.title}
                 </h2>
                 {!item.required &&
                   item.title !== "完成！付完訂金後記得加入 LINE" && (
-                    <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
+                    <span className="shrink-0 text-xs font-body text-sf-muted">
                       選填
                     </span>
                   )}
               </div>
               {item.subtitle && (
-                <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
+                <p className="text-sm text-sf-muted mb-6 font-body leading-relaxed">
                   {item.subtitle}
                 </p>
               )}
@@ -337,7 +337,7 @@ export default function CustomForm() {
           <Link href="/custom">
             <button
               type="button"
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-sf-muted hover:text-sf-ink border border-sf-line-strong hover:border-sf-accent/50 transition-colors rounded-full"
             >
               <ArrowLeft className="w-4 h-4" />
               返回方案頁
@@ -348,8 +348,8 @@ export default function CustomForm() {
             type="button"
             onClick={handleSubmit}
             disabled={formSubmission.isSubmitting}
-            className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-            style={{ backgroundColor: "oklch(0.72 0.09 70)" }}
+            className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-full"
+            style={{ backgroundColor: "var(--sf-accent)" }}
           >
             <Check className="w-4 h-4" />
             {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}

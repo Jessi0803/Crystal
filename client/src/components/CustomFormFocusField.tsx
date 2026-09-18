@@ -90,14 +90,14 @@ export default function CustomFormFocusField({
             key={opt.id}
             type="button"
             onClick={() => toggleChoice(opt.id)}
-            className={`px-4 py-3.5 text-sm font-body border-2 transition-colors rounded-sm ${
+            className={`px-4 py-3.5 text-sm font-body border transition-colors rounded-md ${
               opt.id === "designer" || opt.id === "other"
                 ? "col-span-2 sm:col-span-3"
                 : ""
             } ${
               value.includes(opt.id)
-                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
-                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+                ? "border-sf-accent bg-sf-selected text-sf-ink font-medium"
+                : "border-sf-line-strong text-sf-text hover:border-sf-accent/50"
             }`}
           >
             {opt.label}
@@ -107,7 +107,7 @@ export default function CustomFormFocusField({
 
       {value.includes("other") && (
         <div>
-          <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+          <label className="block text-xs font-body text-sf-muted mb-1.5">
             可以跟我們說明你的故事
           </label>
           <textarea
@@ -115,7 +115,7 @@ export default function CustomFormFocusField({
             onChange={e => onOtherStoryChange(e.target.value)}
             placeholder="寫下你的狀況或想調整的地方，越詳細越好"
             rows={4}
-            className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+            className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none leading-relaxed"
           />
         </div>
       )}

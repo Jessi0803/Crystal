@@ -39,7 +39,7 @@ const plans = [
       "如愛情、溝通能力、財運、疾病等等，",
       "提供初版免費修改 1 次。",
     ],
-    bgColor: "bg-[#F5EDD8]",
+    bgColor: "bg-sf-cream-deep",
     formPath: "/custom/form",
     productId: "custom-deposit-product" as CustomDepositProductId,
   },
@@ -56,7 +56,7 @@ const plans = [
       "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
       "提供初版免費修改 1 次。",
     ],
-    bgColor: "bg-[#E8E6F5]",
+    bgColor: "bg-sf-rose-bg",
     formPath: "/custom/form-b",
     productId: "tarot-crystal-deposit-product" as CustomDepositProductId,
   },
@@ -71,7 +71,7 @@ const plans = [
       "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
       "提供初版免費修改 1 次。",
     ],
-    bgColor: "bg-[#D8EFED]",
+    bgColor: "bg-brand-lace/70",
     formPath: "/custom/form-c",
     productId: "chakra-crystal-deposit-product" as CustomDepositProductId,
   },
@@ -86,7 +86,7 @@ const plans = [
       "（可以偷偷許願喜歡款式、色系、特別想加強的功效）",
       "提供初版免費修改 1 次。",
     ],
-    bgColor: "bg-[#F0DEDE]",
+    bgColor: "bg-sf-selected",
     formPath: "/custom/form-d",
     productId: "numerology-crystal-deposit-product" as CustomDepositProductId,
   },
@@ -126,7 +126,7 @@ export default function Custom() {
   };
 
   return (
-    <div className="bg-[#FAF9F6] text-[#4A4A4A] min-h-screen font-sans selection:bg-[#D8C3BD] selection:text-white overflow-x-hidden">
+    <div className="bg-sf-cream text-sf-text min-h-screen font-sans selection:bg-brand-peach selection:text-white overflow-x-hidden">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Noto+Serif+TC:wght@200;300;400;500&display=swap');
         .font-serif-en { font-family: 'Cormorant Garamond', serif; }
@@ -137,9 +137,9 @@ export default function Custom() {
 
       {/* 背景柔和光暈 */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[70%] bg-[#E8E2DE] opacity-40 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[70%] bg-sf-line opacity-40 rounded-full blur-[120px] animate-pulse" />
         <div
-          className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-[#D8C3BD] opacity-20 rounded-full blur-[100px] animate-pulse"
+          className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-brand-peach opacity-20 rounded-full blur-[100px] animate-pulse"
           style={{ animationDelay: "3s" }}
         />
       </div>
@@ -147,19 +147,19 @@ export default function Custom() {
       {/* Hero Section */}
       <section className="relative h-screen flex flex-col items-center justify-center text-center px-6">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-[1500ms] ease-out">
-          <span className="font-serif-zh text-xs letter-spacing-huge text-[#8E735B] mb-8 block font-light">
+          <span className="font-serif-zh text-xs letter-spacing-huge text-sf-accent mb-8 block font-light">
             椛．crystal
           </span>
           <h1 className="text-4xl md:text-5xl font-serif-zh font-light leading-relaxed text-[#333] mb-10 tracking-[0.3em]">
             遇見您的 <br />
-            <span className="italic text-[#8E735B]">專屬能量對話</span>
+            <span className="italic text-sf-accent">專屬能量對話</span>
           </h1>
           <p className="text-[#666] max-w-xl mx-auto leading-[2.2] font-serif-zh font-light tracking-widest text-sm md:text-base">
             店家透過不同維度的媒介，<br />
             為您的當下狀態找尋最合適的礦石震動。
           </p>
         </div>
-        <div className="absolute bottom-12 animate-bounce opacity-30 text-[#8E735B]">
+        <div className="absolute bottom-12 animate-bounce opacity-30 text-sf-accent">
           <ChevronDown size={28} strokeWidth={1} />
         </div>
       </section>
@@ -168,13 +168,13 @@ export default function Custom() {
       <section className="max-w-7xl mx-auto px-6 py-32 relative">
         <div className="text-center mb-16 md:mb-20 reveal opacity-0 translate-y-10 transition-all duration-1000 max-w-lg mx-auto">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Star size={14} className="text-[#D8C3BD] fill-[#D8C3BD]" />
+            <Star size={14} className="text-brand-peach fill-brand-peach" />
             <h2 className="text-2xl md:text-[1.65rem] font-serif-zh text-[#333] tracking-[0.25em] font-light italic">
               四大客製方案
             </h2>
-            <Star size={14} className="text-[#D8C3BD] fill-[#D8C3BD]" />
+            <Star size={14} className="text-brand-peach fill-brand-peach" />
           </div>
-          <p className="text-[10px] text-[#8E735B] tracking-[0.28em] uppercase opacity-60 mb-3">
+          <p className="text-[10px] text-sf-accent tracking-[0.28em] uppercase opacity-60 mb-3">
             Professional Consultation
           </p>
           <p className="text-[13px] text-[#666] font-serif-zh font-light leading-relaxed tracking-wide">
@@ -190,51 +190,51 @@ export default function Custom() {
               style={{ transitionDelay: `${i * 150}ms` }}
             >
               {/* 背景編號 */}
-              <div className="absolute top-[-10px] right-4 text-[12rem] font-serif-en font-light text-[#8E735B] opacity-[0.03] pointer-events-none italic select-none">
+              <div className="absolute top-[-10px] right-4 text-[12rem] font-serif-en font-light text-sf-accent opacity-[0.03] pointer-events-none italic select-none">
                 {plan.id}
               </div>
 
               <div className="p-8 md:p-11 flex flex-col h-full relative z-10">
                 {/* Header */}
                 <div className="mb-7 text-center">
-                  <div className="w-11 h-11 rounded-2xl bg-white/90 flex items-center justify-center text-[#8E735B] shadow-sm mx-auto mb-5 group-hover:scale-[1.03] transition-transform duration-500 ring-1 ring-[#8E735B]/10">
+                  <div className="w-11 h-11 rounded-2xl bg-white/90 flex items-center justify-center text-sf-accent shadow-sm mx-auto mb-5 group-hover:scale-[1.03] transition-transform duration-500 ring-1 ring-sf-accent/10">
                     {plan.icon}
                   </div>
-                  <h3 className="text-xl md:text-2xl font-serif-zh text-[#2f2f2f] mb-3 tracking-[0.12em] font-medium leading-snug">
+                  <h3 className="text-xl md:text-2xl font-serif-zh text-sf-ink mb-3 tracking-[0.12em] font-medium leading-snug">
                     {plan.title}
                   </h3>
                   <div className="inline-flex max-w-full flex-col gap-1">
-                    <p className="text-xs md:text-sm font-serif-zh text-[#8E735B]/65 tracking-[0.03em] font-light leading-relaxed">
+                    <p className="text-xs md:text-sm font-serif-zh text-sf-accent/65 tracking-[0.03em] font-light leading-relaxed">
                       費用
                     </p>
                     {plan.priceLines.map((priceLine) => (
                       <p
                         key={priceLine}
-                        className="text-xs md:text-sm font-serif-zh text-[#8E735B] tracking-[0.03em] font-light leading-relaxed"
+                        className="text-xs md:text-sm font-serif-zh text-sf-accent tracking-[0.03em] font-light leading-relaxed"
                       >
                         {priceLine}
                       </p>
                     ))}
                     {"priceNote" in plan && plan.priceNote && (
-                      <p className="text-[10px] md:text-xs font-serif-zh text-[#8E735B]/65 tracking-[0.03em] font-light leading-relaxed">
+                      <p className="text-[10px] md:text-xs font-serif-zh text-sf-accent/65 tracking-[0.03em] font-light leading-relaxed">
                         {plan.priceNote}
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="w-12 max-w-full h-px bg-gradient-to-r from-transparent via-[#8E735B]/15 to-transparent mx-auto mb-8" />
+                <div className="w-12 max-w-full h-px bg-gradient-to-r from-transparent via-sf-accent/15 to-transparent mx-auto mb-8" />
 
                 {/* 服務內容 */}
                 <div className="flex-grow rounded-2xl bg-white/35 ring-1 ring-white/60 px-5 py-6 md:px-6 md:py-7">
-                  <span className="text-[11px] text-[#8E735B]/75 tracking-[0.35em] uppercase block mb-5 text-center font-medium">
+                  <span className="text-[11px] text-sf-accent/75 tracking-[0.35em] uppercase block mb-5 text-center font-medium">
                     服務內容
                   </span>
                   <ul className="space-y-5">
                     {plan.features.map((feature, idx) => (
                       <li
                         key={idx}
-                        className="text-[15px] md:text-base text-[#4a4a4a] leading-[1.75] font-light tracking-wide text-left border-l-[3px] border-[#D8C3BD]/45 pl-4"
+                        className="text-[15px] md:text-base text-sf-text leading-[1.75] font-light tracking-wide text-left border-l-[3px] border-brand-peach/45 pl-4"
                       >
                         {feature}
                       </li>
@@ -243,11 +243,11 @@ export default function Custom() {
                 </div>
 
                 {/* 按鈕 */}
-                <div className="mt-9 pt-7 border-t border-[#8E735B]/8">
+                <div className="mt-9 pt-7 border-t border-sf-accent/8">
                   <button
                     type="button"
                     onClick={() => handleStartPayment(plan.productId)}
-                    className="w-full py-4 rounded-xl bg-[#8E735B] text-white text-sm tracking-[0.35em] border border-[#7a634e] shadow-md shadow-[#8E735B]/15 hover:bg-[#7a634e] hover:shadow-lg hover:shadow-[#8E735B]/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
+                    className="w-full py-4 rounded-xl bg-sf-accent text-white text-sm tracking-[0.35em] border border-sf-accent-hover shadow-md shadow-sf-accent/15 hover:bg-sf-accent-hover hover:shadow-lg hover:shadow-sf-accent/20 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
                   >
                     支付訂金，開始客製
                     <ArrowRight
@@ -263,18 +263,18 @@ export default function Custom() {
       </section>
 
       {/* 流程說明 */}
-      <section className="py-40 px-6 relative bg-[#FDFCFB]/50 border-t border-[#E8E2DE]/30">
+      <section className="py-40 px-6 relative bg-sf-cream/50 border-t border-sf-line/30">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-28 reveal opacity-0 translate-y-10 transition-all duration-1000">
-            <Flower2 size={24} className="mx-auto text-[#D8C3BD] mb-6 opacity-60" />
+            <Flower2 size={24} className="mx-auto text-brand-peach mb-6 opacity-60" />
             <h2 className="text-2xl font-serif-zh text-[#333] mb-4 tracking-[0.4em] font-light italic">
               手鍊誕生的儀式感
             </h2>
-            <div className="w-8 h-px bg-[#8E735B] mx-auto opacity-30" />
+            <div className="w-8 h-px bg-sf-accent mx-auto opacity-30" />
           </div>
 
           <div className="space-y-32 relative">
-            <div className="absolute left-[20px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[#D8C3BD]/40 to-transparent hidden md:block" />
+            <div className="absolute left-[20px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-brand-peach/40 to-transparent hidden md:block" />
             {[
               {
                 step: "I",
@@ -308,7 +308,7 @@ export default function Custom() {
                 }`}
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-end md:px-16 mb-8 md:mb-0">
-                  <div className="w-10 h-10 rounded-full border border-[#D8C3BD] flex items-center justify-center text-[#8E735B] font-serif-en text-xs bg-white z-10 shadow-sm">
+                  <div className="w-10 h-10 rounded-full border border-brand-peach flex items-center justify-center text-sf-accent font-serif-en text-xs bg-white z-10 shadow-sm">
                     {item.step}
                   </div>
                 </div>
@@ -329,8 +329,8 @@ export default function Custom() {
       {/* 底部導引 */}
       <section className="py-48 px-6 text-center relative">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-1000 max-w-2xl mx-auto">
-          <Sparkles className="mx-auto text-[#D8C3BD] mb-10 opacity-60" size={32} />
-          <h2 className="text-3xl font-serif-zh text-[#8E735B] mb-12 tracking-[0.3em] leading-relaxed font-light italic">
+          <Sparkles className="mx-auto text-brand-peach mb-10 opacity-60" size={32} />
+          <h2 className="text-3xl font-serif-zh text-sf-accent mb-12 tracking-[0.3em] leading-relaxed font-light italic">
             讓水晶，指引您回到最好的頻率
           </h2>
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
@@ -338,7 +338,7 @@ export default function Custom() {
               href={LINE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-12 py-5 bg-[#8E735B] text-white rounded-full transition-all shadow-[0_15px_35px_rgba(142,115,91,0.15)] hover:shadow-[0_20px_45px_rgba(142,115,91,0.25)] hover:-translate-y-1 flex items-center gap-3 tracking-widest text-sm font-serif-zh"
+              className="px-12 py-5 bg-sf-accent text-white rounded-full transition-all shadow-[0_15px_35px_rgba(142,115,91,0.15)] hover:shadow-[0_20px_45px_rgba(142,115,91,0.25)] hover:-translate-y-1 flex items-center gap-3 tracking-widest text-sm font-serif-zh"
             >
               私訊店長 Lana <MessageCircle size={18} />
             </a>
@@ -346,8 +346,8 @@ export default function Custom() {
         </div>
       </section>
 
-      <footer className="py-16 text-center border-t border-[#E8E2DE]/30 bg-white/20">
-        <span className="font-serif-zh text-[10px] letter-spacing-huge text-[#8E735B] opacity-60">
+      <footer className="py-16 text-center border-t border-sf-line/30 bg-white/20">
+        <span className="font-serif-zh text-[10px] letter-spacing-huge text-sf-accent opacity-60">
           椛．crystal
         </span>
       </footer>

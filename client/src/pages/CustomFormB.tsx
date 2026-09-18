@@ -427,7 +427,7 @@ export default function CustomFormB() {
     return (
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+          <label className="block text-xs font-body text-sf-muted mb-1.5">
             {needsPartner ? "自己的姓名" : "姓名"}
           </label>
           <input
@@ -435,11 +435,11 @@ export default function CustomFormB() {
             value={tarot.selfName}
             onChange={e => setTarot({ ...tarot, selfName: e.target.value })}
             placeholder="請填寫真實姓名"
-            className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+            className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
           />
         </div>
         <div>
-          <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+          <label className="block text-xs font-body text-sf-muted mb-1.5">
             {needsPartner ? "自己的西元生日" : "西元生日"}
           </label>
           <input
@@ -447,14 +447,14 @@ export default function CustomFormB() {
             value={tarot.selfBirthday}
             onChange={e => setTarot({ ...tarot, selfBirthday: e.target.value })}
             placeholder="例如：1995/08/22"
-            className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+            className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
           />
         </div>
 
         {needsPartner && (
           <>
             <div>
-              <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              <label className="block text-xs font-body text-sf-muted mb-1.5">
                 對方的姓名
               </label>
               <input
@@ -464,11 +464,11 @@ export default function CustomFormB() {
                   setTarot({ ...tarot, partnerName: e.target.value })
                 }
                 placeholder="請填寫對方真實姓名"
-                className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
               />
             </div>
             <div>
-              <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              <label className="block text-xs font-body text-sf-muted mb-1.5">
                 對方的西元生日
               </label>
               <input
@@ -478,7 +478,7 @@ export default function CustomFormB() {
                   setTarot({ ...tarot, partnerBirthday: e.target.value })
                 }
                 placeholder="例如：1993/03/15"
-                className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
               />
             </div>
           </>
@@ -486,7 +486,7 @@ export default function CustomFormB() {
 
         {(g === "couple" || g === "love_solo") && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               感情概況
             </label>
             <textarea
@@ -494,13 +494,13 @@ export default function CustomFormB() {
               onChange={e => setTarot({ ...tarot, situation: e.target.value })}
               placeholder="例如：目前的相處狀況、發生什麼事、為什麼想占卜……"
               rows={4}
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
+              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
             />
           </div>
         )}
         {g === "friendship" && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               友情概況
             </label>
             <textarea
@@ -508,13 +508,13 @@ export default function CustomFormB() {
               onChange={e => setTarot({ ...tarot, situation: e.target.value })}
               placeholder="例如：目前的相處狀況、發生什麼事、為什麼想占卜……"
               rows={4}
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
+              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
             />
           </div>
         )}
         {g === "startup" && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               想創業的項目
             </label>
             <input
@@ -524,13 +524,13 @@ export default function CustomFormB() {
                 setTarot({ ...tarot, startupItem: e.target.value })
               }
               placeholder="例如：手作飾品、餐飲業……"
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
           </div>
         )}
         {g === "career" && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               工作概況
             </label>
             <textarea
@@ -538,13 +538,13 @@ export default function CustomFormB() {
               onChange={e => setTarot({ ...tarot, situation: e.target.value })}
               placeholder="例如：目前從事什麼工作、工作上有沒有發生什麼事、為什麼想占卜……"
               rows={4}
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
+              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
             />
           </div>
         )}
         {g === "interview" && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               面試的公司及職位
             </label>
             <input
@@ -554,14 +554,14 @@ export default function CustomFormB() {
                 setTarot({ ...tarot, interviewTarget: e.target.value })
               }
               placeholder="例如：XX 公司，行銷專員"
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
           </div>
         )}
         {g === "dual_path" && (
           <>
             <div>
-              <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              <label className="block text-xs font-body text-sf-muted mb-1.5">
                 A 是什麼？
               </label>
               <input
@@ -569,11 +569,11 @@ export default function CustomFormB() {
                 value={tarot.optionA}
                 onChange={e => setTarot({ ...tarot, optionA: e.target.value })}
                 placeholder="例如：繼續現在的工作"
-                className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
               />
             </div>
             <div>
-              <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              <label className="block text-xs font-body text-sf-muted mb-1.5">
                 B 是什麼？
               </label>
               <input
@@ -581,11 +581,11 @@ export default function CustomFormB() {
                 value={tarot.optionB}
                 onChange={e => setTarot({ ...tarot, optionB: e.target.value })}
                 placeholder="例如：轉職到新公司"
-                className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
               />
             </div>
             <div>
-              <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              <label className="block text-xs font-body text-sf-muted mb-1.5">
                 目前情況
               </label>
               <textarea
@@ -595,11 +595,11 @@ export default function CustomFormB() {
                 }
                 placeholder="描述目前的狀況"
                 rows={3}
-                className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
+                className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+              <label className="block text-xs font-body text-sf-muted mb-1.5">
                 為什麼想占卜？
               </label>
               <textarea
@@ -607,14 +607,14 @@ export default function CustomFormB() {
                 onChange={e => setTarot({ ...tarot, reason: e.target.value })}
                 placeholder="說說您的想法"
                 rows={3}
-                className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
+                className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
               />
             </div>
           </>
         )}
         {g === "healing" && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               內心想療癒的內容
             </label>
             <textarea
@@ -624,13 +624,13 @@ export default function CustomFormB() {
               }
               placeholder="說說您想療癒的事情……"
               rows={4}
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none"
+              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
             />
           </div>
         )}
         {g === "past_life_2" && (
           <div>
-            <label className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5">
+            <label className="block text-xs font-body text-sf-muted mb-1.5">
               今生關係
             </label>
             <input
@@ -640,7 +640,7 @@ export default function CustomFormB() {
                 setTarot({ ...tarot, relationship: e.target.value })
               }
               placeholder="例如：戀人、朋友、同事……"
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
           </div>
         )}
@@ -680,7 +680,7 @@ export default function CustomFormB() {
           }
           placeholder="寫下喜歡或不喜歡的顏色，沒有指定可以留空"
           rows={5}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+          className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none leading-relaxed"
         />
       ),
     },
@@ -712,11 +712,11 @@ export default function CustomFormB() {
               step={CUSTOM_WRIST_SIZE_STEP}
               min={CUSTOM_WRIST_SIZE_MIN}
               max={CUSTOM_WRIST_SIZE_MAX}
-              className="w-48 border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-48 border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
-            <span className="text-sm font-body text-[oklch(0.5_0_0)]">cm</span>
+            <span className="text-sm font-body text-sf-muted">cm</span>
           </div>
-          <p className="text-xs font-body text-[oklch(0.6_0_0)] leading-relaxed">
+          <p className="text-xs font-body text-sf-muted leading-relaxed">
             不知道怎麼量？拿皮尺平貼在想戴的位置，繞一圈的長度就是淨手圍。
           </p>
         </div>
@@ -746,7 +746,7 @@ export default function CustomFormB() {
           }
           placeholder="例如：不喜歡太華麗、容易過敏不要某種材質、想放入某個紀念意義……"
           rows={7}
-          className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)] resize-none leading-relaxed"
+          className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none leading-relaxed"
         />
       ),
     },
@@ -757,13 +757,13 @@ export default function CustomFormB() {
       field: (
         <div className="space-y-6">
           <div
-            className="p-5 rounded-sm"
+            className="p-5 rounded-md"
             style={{
               backgroundColor: "oklch(0.97 0.03 145)",
               border: "1px solid oklch(0.85 0.06 145)",
             }}
           >
-            <p className="text-sm font-body text-[oklch(0.15_0_0)] leading-relaxed mb-4">
+            <p className="text-sm font-body text-sf-ink leading-relaxed mb-4">
               付完訂金後，請加入官方 LINE 並傳送
               <br />
               <strong>「訂單編號 ＋ 姓名」</strong>，<br />
@@ -773,7 +773,7 @@ export default function CustomFormB() {
               href="https://line.me/R/ti/p/@011tymeh"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-sm transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-body text-white rounded-full transition-opacity hover:opacity-90"
               style={{ backgroundColor: "#06C755" }}
             >
               加入官方 LINE
@@ -782,7 +782,7 @@ export default function CustomFormB() {
           <div>
             <label
               htmlFor="custom-contact-handle"
-              className="block text-xs font-body text-[oklch(0.5_0_0)] mb-1.5"
+              className="block text-xs font-body text-sf-muted mb-1.5"
             >
               Instagram 帳號 / LINE ID <span className="text-red-400">*</span>
             </label>
@@ -795,9 +795,9 @@ export default function CustomFormB() {
                 setBracelet({ ...bracelet, igHandle: e.target.value })
               }
               placeholder="例如：@your_ig_handle 或 LINE ID"
-              className="w-full border border-[oklch(0.88_0_0)] px-4 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.4_0_0)]"
+              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50"
             />
-            <p className="mt-1.5 text-xs font-body text-[oklch(0.6_0_0)]">
+            <p className="mt-1.5 text-xs font-body text-sf-muted">
               請填寫 IG 帳號；若沒有 IG，請填寫 LINE ID
             </p>
           </div>
@@ -928,21 +928,21 @@ export default function CustomFormB() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[oklch(0.98_0.005_240)] page-enter">
+    <div className="min-h-screen bg-sf-cream page-enter">
       {/* Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] bg-white">
+      <div className="border-b border-sf-line bg-white">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/custom">
-            <button className="flex items-center gap-1.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] transition-colors">
+            <button className="flex items-center gap-1.5 text-sm font-body text-sf-muted hover:text-sf-ink transition-colors">
               <ArrowLeft className="w-4 h-4" />
               返回
             </button>
           </Link>
           <div>
-            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">
+            <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase">
               塔羅 × 水晶手鍊
             </p>
-            <p className="text-sm font-body font-medium text-[oklch(0.1_0_0)]">
+            <p className="text-sm font-body font-medium text-sf-ink">
               報名表單
             </p>
           </div>
@@ -959,24 +959,24 @@ export default function CustomFormB() {
         <div className="max-w-2xl mx-auto px-4 py-8">
           <div className="space-y-5 mb-8">
             <CustomFormOrderingIntro />
-            <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
+            <section className="bg-white border border-sf-line rounded-md p-6 sm:p-8">
               <h2
-                className="text-xl font-medium text-[oklch(0.1_0_0)] mb-3"
+                className="text-xl font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
               >
                 1. 占卜主題
               </h2>
               {isTopicLocked ? (
-                <div className="mb-5 border border-[oklch(0.82_0.04_290)] bg-[oklch(0.97_0.01_290)] px-4 py-4">
-                  <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-1">
+                <div className="mb-5 border border-sf-line bg-sf-cream px-4 py-4">
+                  <p className="text-xs font-body text-sf-muted mb-1">
                     付款前已選擇
                   </p>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-xl font-medium text-[oklch(0.15_0_0)]">
+                    <p className="text-xl font-medium text-sf-ink">
                       {paidTopicFormOption?.label}
                     </p>
                     {formSubmission.matchingOrderItem?.unitPrice != null && (
-                      <p className="text-sm font-body text-[oklch(0.4_0_0)]">
+                      <p className="text-sm font-body text-sf-text">
                         已付訂金 NT${" "}
                         {Number(
                           formSubmission.matchingOrderItem.unitPrice
@@ -984,7 +984,7 @@ export default function CustomFormB() {
                       </p>
                     )}
                   </div>
-                  <p className="mt-2 text-xs font-body text-[oklch(0.55_0_0)]">
+                  <p className="mt-2 text-xs font-body text-sf-muted">
                     此主題已隨訂單確認，表單內不可更換。
                   </p>
                 </div>
@@ -1008,17 +1008,17 @@ export default function CustomFormB() {
                               group: t.group,
                             })
                           }
-                          className={`px-3 py-2.5 text-sm font-body border-2 transition-colors rounded-sm text-center ${
+                          className={`px-3 py-2.5 text-sm font-body border transition-colors rounded-md text-center ${
                             isSelected
-                              ? "border-[oklch(0.65_0.12_290)] bg-[oklch(0.97_0_0)] font-semibold text-[oklch(0.1_0_0)]"
+                              ? "border-sf-accent bg-sf-selected text-sf-ink font-medium"
                               : t.group === "single_q"
-                                ? "border-[oklch(0.88_0_0)] text-[oklch(0.6_0_0)] hover:border-[oklch(0.6_0_0)]"
-                                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+                                ? "border-sf-line-strong text-sf-muted hover:border-sf-accent/50"
+                                : "border-sf-line-strong text-sf-text hover:border-sf-accent/50"
                           }`}
                         >
                           <span className="block">{t.label}</span>
                           {hasImage && !isSelected && (
-                            <span className="block text-[0.6rem] mt-1 text-[oklch(0.65_0.12_290)] font-normal">
+                            <span className="block text-[0.6rem] mt-1 text-brand-blush font-normal">
                               點選查看內容 ↓
                             </span>
                           )}
@@ -1031,12 +1031,12 @@ export default function CustomFormB() {
 
               {/* 主題說明文字預覽 */}
               {tarot.topic && TOPIC_CONTENT[tarot.topic] && (
-                <div className="mt-5 p-5 rounded-sm border border-[oklch(0.88_0.04_290)] bg-[oklch(0.97_0.01_290)]">
-                  <p className="text-xs font-body font-semibold text-[oklch(0.55_0.12_290)] tracking-widest uppercase mb-3">
+                <div className="mt-5 p-5 rounded-md border border-sf-line bg-sf-cream">
+                  <p className="text-xs font-body font-semibold text-sf-accent tracking-widest uppercase mb-3">
                     {tarot.topic} ── 占卜內容
                   </p>
                   {TOPIC_CONTENT[tarot.topic].desc && (
-                    <p className="text-sm font-body text-[oklch(0.4_0_0)] leading-relaxed mb-3">
+                    <p className="text-sm font-body text-sf-text leading-relaxed mb-3">
                       {TOPIC_CONTENT[tarot.topic].desc}
                     </p>
                   )}
@@ -1044,9 +1044,9 @@ export default function CustomFormB() {
                     {TOPIC_CONTENT[tarot.topic].items.map((item, idx) => (
                       <li
                         key={idx}
-                        className="flex items-start gap-2 text-sm font-body text-[oklch(0.25_0_0)]"
+                        className="flex items-start gap-2 text-sm font-body text-sf-text"
                       >
-                        <span className="text-[oklch(0.65_0.12_290)] mt-0.5 shrink-0">
+                        <span className="text-brand-blush mt-0.5 shrink-0">
                           ·
                         </span>
                         <span>{item}</span>
@@ -1058,7 +1058,7 @@ export default function CustomFormB() {
 
               {/* 單題制提示 */}
               {tarot.group === "single_q" && (
-                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-sm">
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-md">
                   <p className="text-sm font-body text-amber-800 mb-3">
                     單題制（題數制）需要直接聯絡官方小編預約，無法透過此表單下單，謝謝！
                   </p>
@@ -1066,7 +1066,7 @@ export default function CustomFormB() {
                     href={LINE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-md"
                     style={{ backgroundColor: "#06C755" }}
                   >
                     <svg
@@ -1085,14 +1085,14 @@ export default function CustomFormB() {
             </section>
 
             {canShowDetails && (
-              <section className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8">
+              <section className="bg-white border border-sf-line rounded-md p-6 sm:p-8">
                 <h2
-                  className="text-xl font-medium text-[oklch(0.1_0_0)] mb-1"
+                  className="text-xl font-medium text-sf-ink mb-1"
                   style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
                 >
                   2. {tarot.topic} — 占卜所需資料
                 </h2>
-                <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body">
+                <p className="text-sm text-sf-muted mb-6 font-body">
                   請填寫以下資料，讓老師為您進行解析
                 </p>
                 {tarotDataFields()}
@@ -1103,27 +1103,27 @@ export default function CustomFormB() {
               braceletSteps.map((item, index) => (
                 <section
                   key={item.title}
-                  className="bg-white border border-[oklch(0.92_0_0)] rounded-sm p-6 sm:p-8"
+                  className="bg-white border border-sf-line rounded-md p-6 sm:p-8"
                 >
-                  <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase mb-2">
+                  <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase mb-2">
                     水晶手鍊偏好
                   </p>
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <h2
-                      className="text-lg font-medium text-[oklch(0.1_0_0)]"
+                      className="text-lg font-medium text-sf-ink"
                       style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
                     >
                       {index + 3}. {item.title}
                     </h2>
                     {!item.required &&
                       item.title !== "完成！付完訂金後記得加入 LINE" && (
-                        <span className="shrink-0 text-xs font-body text-[oklch(0.65_0_0)]">
+                        <span className="shrink-0 text-xs font-body text-sf-muted">
                           選填
                         </span>
                       )}
                   </div>
                   {item.subtitle && (
-                    <p className="text-sm text-[oklch(0.55_0_0)] mb-6 font-body leading-relaxed">
+                    <p className="text-sm text-sf-muted mb-6 font-body leading-relaxed">
                       {item.subtitle}
                     </p>
                   )}
@@ -1136,7 +1136,7 @@ export default function CustomFormB() {
             <Link href="/custom">
               <button
                 type="button"
-                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-[oklch(0.5_0_0)] hover:text-[oklch(0.2_0_0)] border border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)] transition-colors rounded-sm"
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-body text-sf-muted hover:text-sf-ink border border-sf-line-strong hover:border-sf-accent/50 transition-colors rounded-full"
               >
                 <ArrowLeft className="w-4 h-4" />
                 返回方案頁
@@ -1148,8 +1148,8 @@ export default function CustomFormB() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={formSubmission.isSubmitting}
-                className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-sm"
-                style={{ backgroundColor: "oklch(0.65 0.12 290)" }}
+                className="flex items-center gap-2 px-8 py-2.5 text-sm font-body text-white transition-opacity hover:opacity-90 rounded-full"
+                style={{ backgroundColor: "var(--sf-accent)" }}
               >
                 <Check className="w-4 h-4" />
                 {formSubmission.isSubmitting ? "送出中..." : "送出客製需求"}

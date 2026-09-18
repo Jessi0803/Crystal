@@ -121,7 +121,7 @@ export function CustomFormAccessGate({
   if (!merchantTradeNo) {
     return (
       <CustomFormGateMessage
-        icon={<LockKeyhole className="h-10 w-10 text-amber-500" />}
+        icon={<LockKeyhole className="h-10 w-10 text-brand-blush" strokeWidth={1.5} />}
         title="請先完成訂金付款"
         description="付款成功後，訂單頁會出現填寫客製需求的按鈕。"
       />
@@ -131,7 +131,7 @@ export function CustomFormAccessGate({
   if (isLoading) {
     return (
       <CustomFormGateMessage
-        icon={<div className="h-8 w-8 rounded-full border-2 border-[oklch(0.2_0_0)] border-t-transparent animate-spin" />}
+        icon={<div className="h-8 w-8 rounded-full border-2 border-sf-accent border-t-transparent animate-spin" />}
         title="正在確認訂單"
         description="請稍候，我們正在確認付款狀態。"
       />
@@ -173,13 +173,13 @@ function CustomFormGateMessage({
   description: string;
 }) {
   return (
-    <div className="min-h-[60vh] bg-[oklch(0.98_0.005_240)] px-4 py-16">
-      <div className="mx-auto max-w-md border border-[oklch(0.9_0_0)] bg-white p-8 text-center">
+    <div className="min-h-[60vh] bg-sf-cream px-4 py-16">
+      <div className="mx-auto max-w-md rounded-lg border border-sf-line bg-white p-8 text-center">
         <div className="mb-4 flex justify-center">{icon}</div>
-        <h1 className="mb-2 text-xl font-medium text-[oklch(0.15_0_0)]">{title}</h1>
-        <p className="mb-6 text-sm font-body leading-relaxed text-[oklch(0.5_0_0)]">{description}</p>
+        <h1 className="mb-2 text-xl font-light tracking-[0.08em] text-sf-ink" style={{ fontFamily: "'Noto Serif TC', serif" }}>{title}</h1>
+        <p className="mb-6 text-sm font-body leading-relaxed text-sf-muted">{description}</p>
         <Link href="/custom">
-          <button className="btn-primary w-full">前往客製方案頁</button>
+          <button className="btn-primary w-full justify-center">前往客製方案頁</button>
         </Link>
       </div>
     </div>
