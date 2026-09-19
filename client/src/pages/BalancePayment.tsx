@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { CircleCheck } from "lucide-react";
 import { useParams, useLocation } from "wouter";
 import {
   CheckCircle,
@@ -669,7 +670,7 @@ export default function BalancePayment() {
                 {isPaid
                   ? "已付款"
                   : isTransferPending
-                    ? "⏳ 轉帳待確認"
+                    ? "轉帳待確認"
                     : latestCreditFailed
                       ? "待重新付款"
                       : data.paymentStatus === "cancelled"
@@ -1249,8 +1250,9 @@ export default function BalancePayment() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
-                      ✅ 已收到您的匯款末五碼：
+                    <div className="rounded-md text-sm font-body text-sf-text bg-sf-selected px-3 py-2 text-center">
+                      <CircleCheck className="mr-1 inline h-4 w-4 -translate-y-px text-emerald-600" strokeWidth={1.6} aria-hidden="true" />
+                      已收到您的匯款末五碼：
                       <strong>{data.transferLastFive}</strong>
                       ，設計師確認後將更新訂單狀態。
                     </div>

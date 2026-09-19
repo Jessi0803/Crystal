@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { IconBadge } from "@/components/LineIcon";
+import { ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -245,7 +247,7 @@ export default function MemberCenter() {
               </div>
             ) : !orders || orders.length === 0 ? (
               <div className="text-center py-16">
-                <div className="text-5xl mb-4">🛍️</div>
+                <IconBadge icon={ShoppingBag} />
                 <p className="text-sm text-sf-muted font-body mb-6">還沒有任何訂單</p>
                 <Link href="/products">
                   <button className="rounded-full text-sm font-body border border-sf-accent text-sf-accent px-6 py-2.5 hover:bg-sf-accent hover:text-white transition-colors">

@@ -1,6 +1,7 @@
 // 日日好日 — Knowledge Page
 // Design: Vacanza-inspired minimal accordion layout
 import { useState } from "react";
+import { LineIcon } from "@/components/LineIcon";
 import { Link } from "wouter";
 import { ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 import { crystalKnowledge, energyQuotes } from "@/lib/data";
@@ -11,28 +12,28 @@ const additionalKnowledge = [
     title: "水晶的顏色代表什麼意思？",
     category: "水晶入門",
     content: "水晶的顏色與其能量特性密切相關。粉色（粉水晶）對應心輪，主愛情與療癒；紫色（紫水晶）對應頂輪，主靈性與智慧；黃色（黃水晶）對應太陽神經叢，主財富與自信；黑色（黑曜石）對應根輪，主保護與接地氣；白色（白水晶）被稱為萬用水晶，可放大其他水晶的能量。",
-    icon: "◈"
+    icon: "palette"
   },
   {
     id: 6,
     title: "第一次買水晶，從哪裡開始？",
     category: "選購指南",
     content: "建議初學者從白水晶或粉水晶開始。白水晶是最通用的能量石，適合所有人；粉水晶能量溫柔，適合想提升自我愛與人際關係者。選購時，最重要的是「感覺」——哪顆讓你有吸引力就選哪顆，直覺往往是最好的嚮導。",
-    icon: "◇"
+    icon: "gem"
   },
   {
     id: 7,
     title: "水晶可以多人共用嗎？",
     category: "常見問題",
     content: "能量學說認為水晶會吸收配戴者的能量，因此不建議多人共用，尤其是用於個人能量調整的手鍊。若要送人，建議在送出前先進行淨化，讓水晶恢復中性狀態，再由新主人重新設定意圖。",
-    icon: "◉"
+    icon: "users"
   },
   {
     id: 8,
     title: "水晶碎了或裂了，代表什麼？",
     category: "常見問題",
     content: "水晶碎裂可能有幾個原因：物理碰撞、溫差過大、或能量飽和。部分能量學說認為水晶碎裂是因為它「完成了使命」或「吸收了過多負能量」。無論如何，碎裂的水晶可以感謝它的陪伴，然後以自然方式處理（如埋入土中）。",
-    icon: "◆"
+    icon: "heart-crack"
   }
 ];
 
@@ -65,7 +66,7 @@ export default function Knowledge() {
           {/* Left: Accordion */}
           <div className="lg:col-span-2">
             {/* Category Filter */}
-            <div className="flex items-center gap-0 overflow-x-auto mb-8 border-b border-sf-line">
+            <div className="scrollbar-hide flex items-center gap-0 overflow-x-auto mb-8 border-b border-sf-line">
               {categories.map((cat) => (
                 <button
                   key={cat}
@@ -90,7 +91,9 @@ export default function Knowledge() {
                     className="w-full flex items-center justify-between py-5 text-left group"
                   >
                     <div className="flex items-center gap-4">
-                      <span className="text-lg text-brand-blush">{item.icon}</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sf-selected text-sf-accent">
+                        <LineIcon name={item.icon} />
+                      </span>
                       <div>
                         <span className="tag mb-1 inline-block">{item.category}</span>
                         <h3 className="text-sm font-body font-medium text-sf-ink group-hover:text-sf-accent transition-colors">

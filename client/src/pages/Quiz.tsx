@@ -1,6 +1,7 @@
 // 日日好日 — Energy Quiz Page
 // Design: Vacanza-inspired minimal quiz
 import { useState } from "react";
+import { LineIcon } from "@/components/LineIcon";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, RotateCcw, ShoppingBag } from "lucide-react";
 import { quizQuestions, categoryResultMap, products } from "@/lib/data";
@@ -111,13 +112,15 @@ export default function Quiz() {
                 <button
                   key={option.value}
                   onClick={() => handleAnswer(option.value)}
-                  className={`p-6 text-left border transition-all duration-200 ${
+                  className={`rounded-lg p-6 text-left border transition-all duration-200 ${
                     selectedOption === option.value
                       ? "border-sf-accent bg-sf-selected"
                       : "border-sf-line bg-white hover:border-sf-accent/50"
                   }`}
                 >
-                  <div className="text-2xl mb-3">{option.icon}</div>
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-sf-selected text-sf-accent">
+                    <LineIcon name={option.icon} className={option.icon.startsWith("swatch:") ? "h-5 w-5" : "h-[18px] w-[18px]"} />
+                  </div>
                   <p className="text-sm font-body font-light text-sf-text leading-relaxed">
                     {option.text}
                   </p>

@@ -43,11 +43,11 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   deposit_paid: "已付訂金",
   paid: "已付款・待出貨",
   processing: "備貨中",
-  shipped: "🚚 已出貨",
-  arrived: "📦 已到店",
-  picked_up: "✅ 已取貨",
+  shipped: "已出貨",
+  arrived: "已到店",
+  picked_up: "已取貨",
   not_picked: "未取貨",
-  completed: "✅ 已完成",
+  completed: "已完成",
   cancelled: "已取消",
 };
 
@@ -611,13 +611,13 @@ export default function OrderResult() {
                 value:
                   order.paymentStatus === "paid" ||
                   order.paymentStatus === "confirmed"
-                    ? "✅ 已付款"
+                    ? "已付款"
                     : order.paymentStatus === "transfer_pending"
-                      ? "⏳ 轉帳待確認"
+                      ? "轉帳待確認"
                       : order.paymentStatus === "pending"
-                        ? "⏳ 待付款"
+                        ? "待付款"
                         : order.paymentStatus === "failed"
-                          ? "❌ 付款失敗"
+                          ? "付款失敗"
                           : "已取消",
               },
               {
@@ -720,7 +720,7 @@ export default function OrderResult() {
         {order.paymentMethod === "credit" && order.paymentSandbox && (
           <div className="mt-8 p-4 bg-sf-cream border border-sf-line">
             <p className="text-xs font-body text-sf-muted font-medium mb-1">
-              🧪 沙盒測試環境
+              沙盒測試環境
             </p>
             <p className="text-xs font-body text-sf-muted">
               目前為綠界沙盒測試模式，所有交易均為模擬，不會產生真實扣款。

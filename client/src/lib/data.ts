@@ -388,7 +388,7 @@ export const products: Product[] = [
 export const categories = [
   {
     id: "love",
-    icon: "💖",
+    icon: "heart",
     name: "愛情桃花",
     description: "吸引正緣，提升魅力與人緣",
     crystals: "粉水晶・草莓晶",
@@ -398,7 +398,7 @@ export const categories = [
   },
   {
     id: "wealth",
-    icon: "💰",
+    icon: "coins",
     name: "財運事業",
     description: "招財納福，開啟豐盛能量場",
     crystals: "黃水晶・金髮晶",
@@ -408,7 +408,7 @@ export const categories = [
   },
   {
     id: "protect",
-    icon: "🛡️",
+    icon: "shield",
     name: "能量防護",
     description: "遠離負能量，建立能量防護罩",
     crystals: "黑曜石・黑碧璽",
@@ -418,7 +418,7 @@ export const categories = [
   },
   {
     id: "healing",
-    icon: "🧘",
+    icon: "leaf",
     name: "療癒系列",
     description: "安撫焦慮，找回內在平靜",
     crystals: "紫水晶・月光石",
@@ -428,7 +428,7 @@ export const categories = [
   },
   {
     id: "necklace",
-    icon: "📿",
+    icon: "gem",
     name: "項鍊",
     description: "日常疊戴，展現優雅與個人風格",
     crystals: "鎖骨鍊・能量鍊",
@@ -438,7 +438,7 @@ export const categories = [
   },
   {
     id: "pendant",
-    icon: "🧿",
+    icon: "eye",
     name: "吊飾",
     description: "隨身點綴，帶著能量一起出門",
     crystals: "守護吊飾・隨身掛件",
@@ -448,7 +448,7 @@ export const categories = [
   },
   {
     id: "other",
-    icon: "✨",
+    icon: "sparkles",
     name: "其他",
     description: "更多特別款與周邊配件",
     crystals: "限定品・配件",
@@ -508,28 +508,28 @@ export const crystalKnowledge = [
     title: "如何辨別天然水晶與人工玻璃？",
     category: "選購指南",
     content: "天然水晶通常有細微的內含物（冰裂紋、雲霧感），溫度比玻璃低，用手觸摸有涼感。人工玻璃則過於完美透明，且溫度與室溫相近。購買時可請店家說明來源，並索取產品說明。",
-    icon: "🔍"
+    icon: "search"
   },
   {
     id: 2,
     title: "水晶需要多久淨化一次？",
     category: "保養方法",
     content: "建議每月至少淨化一次，若頻繁配戴或感覺能量沉重，可每週淨化。常見方法：月光淨化（滿月前後放在窗台）、白水晶簇淨化（放置其上24小時）、煙燻淨化（鼠尾草煙霧繞過）。注意：黑曜石、粉水晶等不適合水淨化。",
-    icon: "🌙"
+    icon: "moon"
   },
   {
     id: 3,
     title: "左手戴還是右手戴？",
     category: "配戴方式",
     content: "傳統能量學說：左手為接收能量的手，適合戴需要吸收能量的水晶（如粉水晶吸引愛情、紫水晶吸收療癒能量）；右手為輸出能量的手，適合戴需要向外散發的水晶（如黃水晶散發財富能量）。最重要的是聆聽自己的感覺。",
-    icon: "✋"
+    icon: "hand"
   },
   {
     id: 4,
     title: "水晶的能量說法有科學依據嗎？",
     category: "常見問題",
     content: "目前水晶能量的說法尚無嚴格科學實證。然而，許多人反映配戴水晶後心態更積極、更有意識地關注自己的情緒狀態。這可能與「意圖設定」的心理效應有關——當你有意識地為自己設定目標，行為自然會朝那個方向改變。日日好日 的水晶是心理與能量支持工具，非醫療用品。",
-    icon: "💡"
+    icon: "lightbulb"
   }
 ];
 
@@ -538,30 +538,30 @@ export const quizQuestions = [
     id: 1,
     question: "最近最困擾你的是什麼？",
     options: [
-      { text: "感情問題，渴望找到對的人", value: "love", icon: "💕" },
-      { text: "財務壓力，希望改善收入", value: "wealth", icon: "💰" },
-      { text: "感覺被負能量包圍，身心俱疲", value: "protection", icon: "🛡️" },
-      { text: "情緒不穩定，焦慮睡不好", value: "healing", icon: "🧘" }
+      { text: "感情問題，渴望找到對的人", value: "love", icon: "heart" },
+      { text: "財務壓力，希望改善收入", value: "wealth", icon: "coins" },
+      { text: "感覺被負能量包圍，身心俱疲", value: "protection", icon: "shield" },
+      { text: "情緒不穩定，焦慮睡不好", value: "healing", icon: "moon" }
     ]
   },
   {
     id: 2,
     question: "你最希望在生活中增加什麼？",
     options: [
-      { text: "更多溫暖的連結與愛", value: "love", icon: "💖" },
-      { text: "更多豐盛與機會", value: "wealth", icon: "✨" },
-      { text: "更強的內心力量與邊界感", value: "protection", icon: "💪" },
-      { text: "更深的平靜與自我了解", value: "healing", icon: "🌸" }
+      { text: "更多溫暖的連結與愛", value: "love", icon: "heart-handshake" },
+      { text: "更多豐盛與機會", value: "wealth", icon: "sparkles" },
+      { text: "更強的內心力量與邊界感", value: "protection", icon: "mountain" },
+      { text: "更深的平靜與自我了解", value: "healing", icon: "flower" }
     ]
   },
   {
     id: 3,
     question: "你最喜歡哪種顏色的能量？",
     options: [
-      { text: "粉色・溫柔・浪漫", value: "love", icon: "🌸" },
-      { text: "金色・陽光・豐盛", value: "wealth", icon: "🌟" },
-      { text: "黑色・神秘・穩定", value: "protection", icon: "🖤" },
-      { text: "紫色・靈性・智慧", value: "healing", icon: "💜" }
+      { text: "粉色・溫柔・浪漫", value: "love", icon: "swatch:#efc9c6" },
+      { text: "金色・陽光・豐盛", value: "wealth", icon: "swatch:#d9b77a" },
+      { text: "黑色・神秘・穩定", value: "protection", icon: "swatch:#3f3431" },
+      { text: "紫色・靈性・智慧", value: "healing", icon: "swatch:#b8a4cc" }
     ]
   }
 ];

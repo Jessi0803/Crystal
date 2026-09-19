@@ -1,4 +1,5 @@
 import { CUSTOM_BRACELET_NOTICES, CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
+import { CircleAlert } from "lucide-react";
 
 /**
  * 客製報名表單頂部：訂購流程 + 手鍊注意事項（與官網 /custom、商品詳情文案一致）
@@ -45,9 +46,7 @@ export default function CustomFormOrderingIntro() {
 
       <div className="rounded-md border border-sf-line bg-sf-cream px-4 py-4 sm:px-5 sm:py-5">
         <p className="text-sm font-body text-sf-text mb-3 flex items-center gap-2 tracking-wide font-medium">
-          <span className="text-brand-blush" aria-hidden>
-            ⚠️
-          </span>
+          <CircleAlert className="h-4 w-4 text-brand-blush" strokeWidth={1.6} aria-hidden="true" />
           手鍊注意事項
         </p>
         <div className="space-y-3 text-[0.8125rem] font-body font-light text-sf-text leading-[1.8] tracking-wide">

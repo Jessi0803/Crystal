@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { IconBadge } from "@/components/LineIcon";
+import { Mail } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -41,7 +43,7 @@ export default function ForgotPassword() {
         <div className="rounded-lg bg-white border border-sf-line p-8 sm:p-10">
           {sent ? (
             <div className="text-center py-4">
-              <div className="text-4xl mb-4">✉️</div>
+              <IconBadge icon={Mail} />
               <h2
                 className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}

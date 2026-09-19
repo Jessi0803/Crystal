@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { IconBadge } from "@/components/LineIcon";
+import { CircleCheck, CircleX } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 
@@ -54,7 +56,7 @@ export default function VerifyEmail() {
 
           {status === "success" && (
             <>
-              <div className="text-4xl mb-4">✅</div>
+              <IconBadge icon={CircleCheck} tone="success" />
               <h2
                 className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
@@ -81,7 +83,7 @@ export default function VerifyEmail() {
 
           {status === "error" && (
             <>
-              <div className="text-4xl mb-4">❌</div>
+              <IconBadge icon={CircleX} tone="danger" />
               <h2
                 className="text-lg font-medium text-sf-ink mb-3"
                 style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
