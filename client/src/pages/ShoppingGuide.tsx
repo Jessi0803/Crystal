@@ -162,18 +162,19 @@ export default function ShoppingGuide() {
               <div className="pointer-events-none absolute -bottom-24 -right-10 w-72 h-72 rounded-full bg-brand-peach/20 blur-3xl" />
               <p className="eyebrow text-[0.55rem] text-brand-blush mb-3">STILL HAVE QUESTIONS?</p>
               <h3 className="text-base font-light tracking-[0.06em] mb-5 text-sf-ink" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>還有其他問題？</h3>
-              <div className="flex flex-col items-center justify-center gap-5 mt-6">
-                <Link href="/contact">
-                  <button className="w-full sm:w-[560px] h-14 rounded-full border border-sf-line-strong bg-white text-sf-ink hover:border-sf-accent hover:bg-sf-selected transition-all duration-300 flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.05em] font-light shadow-[0_6px_20px_rgba(120,100,80,0.08)]"
+              <div className="flex flex-col items-center justify-center gap-3 mt-6">
+                {/* Link 是行內元素，要設成 block 並給寬度，按鈕的 w-full 才會撐滿 */}
+                <Link href="/contact" className="block w-full sm:w-[420px]">
+                  <button className="w-full h-12 rounded-full border border-sf-line-strong bg-white text-sf-ink hover:border-sf-accent hover:bg-sf-selected transition-all duration-300 flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.05em] font-light shadow-[0_6px_20px_rgb(75_52_44/0.06)]"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}>
                     <MessageCircle className="w-4 h-4 text-sf-accent" strokeWidth={1.8} />
                     聯絡我們
                   </button>
                 </Link>
-                <div className="w-full sm:w-[560px]">
+                <div className="w-full sm:w-[420px]">
                   <button
                     onClick={() => window.dispatchEvent(new Event("open-chatbot"))}
-                    className="w-full h-14 rounded-full bg-gradient-to-r from-sf-accent via-sf-accent to-sf-accent-hover text-white hover:brightness-105 transition-all duration-300 shadow-[0_10px_24px_rgb(75_52_44/0.18)] hover:shadow-[0_14px_28px_rgb(75_52_44/0.24)] flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.02em] font-light"
+                    className="w-full h-12 rounded-full bg-sf-accent text-white hover:bg-sf-accent-hover transition-all duration-300 shadow-[0_8px_20px_rgb(75_52_44/0.14)] flex items-center justify-center gap-2.5 text-sm sm:text-base tracking-[0.02em] font-light"
                     style={{ fontFamily: "'Noto Serif TC', serif" }}
                   >
                     <CircleHelp className="w-4 h-4 text-sf-cream" strokeWidth={1.8} />
