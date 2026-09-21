@@ -289,7 +289,6 @@ html.storefront {
   .eyebrow {
     /* 標題上方小字：Cormorant 斜體、玫瑰粉（中文會落到明體） */
     font-family: 'Cormorant Garamond', 'Noto Serif TC', serif;
-    font-style: italic;
     font-size: 0.7rem;
     font-weight: 400;
     letter-spacing: 0.16em;
