@@ -249,13 +249,13 @@ export default function Home() {
               <br className="hidden sm:inline" />
               讓能量陪你走過生活的每一段旅程。
             </p>
-            <div className="inline-flex flex-col gap-3">
-              <Link href="/products" className="home-hero-button">
+            <div className="flex flex-col items-start gap-1">
+              <Link href="/products" className="home-hero-link">
                 探索水晶飾品 <ArrowRight className="h-4 w-4" />
               </Link>
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/products?category=monthly" className="home-hero-button-outline">每月限量</Link>
-                <Link href="/custom" className="home-hero-button-outline">客製款</Link>
+              <div className="flex items-center gap-5">
+                <Link href="/products?category=monthly" className="home-hero-link-sub">每月限量</Link>
+                <Link href="/custom" className="home-hero-link-sub">客製款</Link>
               </div>
             </div>
 

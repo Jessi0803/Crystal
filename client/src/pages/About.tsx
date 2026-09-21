@@ -53,7 +53,7 @@ export default function About() {
           <h1 className="text-2xl md:text-4xl font-serif-zh leading-tight letter-spacing-wide mb-6 font-medium">
             每一顆水晶，都在等一個對的人
           </h1>
-          <div className="w-16 h-px bg-brand-peach mx-auto mt-12 opacity-60" />
+          <div className="rule-ornament mt-12" aria-hidden="true">✦</div>
         </div>
       </section>
 
@@ -69,13 +69,18 @@ export default function About() {
           </div>
 
           <div className="flex flex-col md:flex-row items-center gap-16 mt-24">
-            <div className="w-full md:w-5/12 aspect-[4/5] bg-sf-line rounded-t-full overflow-hidden relative group">
-              <img
-                src="/images/about-crystal.jpg"
-                alt="水晶手鍊細節"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-500" />
+            {/* 拱形圖：形狀不變，外圍加兩道細線與角落星點 */}
+            <div className="arch-line-frame mx-auto w-[calc(100%-2.5rem)] md:mx-0 md:w-5/12">
+              <span className="arch-corner arch-corner-left" aria-hidden="true">✦</span>
+              <span className="arch-corner arch-corner-right" aria-hidden="true">✦</span>
+              <div className="aspect-[4/5] w-full overflow-hidden rounded-t-full bg-sf-line relative group">
+                <img
+                  src="/images/about-crystal.jpg"
+                  alt="水晶手鍊細節"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-sf-ink/10 group-hover:bg-transparent transition-colors duration-500" />
+              </div>
             </div>
             <div className="w-full md:w-7/12">
               <p className="text-lg font-sans-zh leading-[2.2] font-light text-sf-text tracking-wide">
@@ -89,11 +94,18 @@ export default function About() {
       </section>
 
       {/* Meaning Section - Momiji */}
-      <section className="bg-sf-cream-deep py-48 px-6 relative overflow-hidden">
+      <section
+        className="paper-emboss lace-top lace-bottom py-40 px-6 relative overflow-hidden"
+        style={{ ["--lace-outside" as string]: "var(--sf-cream)" }}
+      >
         {/* 背景裝飾 */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif-zh text-[18rem] opacity-[0.03] pointer-events-none select-none">
+        {/* 背景的「椛」字：以浮雕方式壓印在紙上 */}
+        <span
+          aria-hidden="true"
+          className="emboss-motif font-serif-zh pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none text-[clamp(11rem,34vw,20rem)] leading-none"
+        >
           椛
-        </div>
+        </span>
 
         <div className="max-w-3xl mx-auto text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out z-10 relative">
           <Leaf className="w-6 h-6 mx-auto mb-12 text-sf-accent opacity-50" />
@@ -139,10 +151,14 @@ export default function About() {
       </section>
 
       {/* 天然水晶保證 */}
-      <section className="bg-sf-cream-deep px-6 py-24">
+      <section
+        className="paper-surface lace-top lace-bottom px-6 py-24"
+        style={{ ["--lace-outside" as string]: "var(--sf-cream)" }}
+      >
         <div className="mx-auto max-w-4xl text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
           <Gem className="mx-auto mb-6 h-5 w-5 text-sf-accent" aria-hidden="true" />
-          <h2 className="mb-6 font-serif-zh text-2xl font-medium letter-spacing-wide">100% 天然水晶</h2>
+          <h2 className="mb-4 font-serif-zh text-2xl font-medium letter-spacing-wide">100% 天然水晶</h2>
+          <div className="rule-ornament mb-6" aria-hidden="true">✦</div>
           <p className="font-sans-zh text-base font-light leading-[2.2] text-sf-text">
             無染色、無酸洗，與合作檢定廠商把關品質。
             <br />
@@ -160,6 +176,7 @@ export default function About() {
           <div className="mb-12 text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
             <p className="mb-3 font-serif-en text-[10px] uppercase tracking-[0.4em] text-sf-accent">Customer Reviews</p>
             <h2 className="font-serif-zh text-2xl font-medium letter-spacing-wide">來自顧客的真實回饋</h2>
+            <div className="rule-ornament mt-4" aria-hidden="true">✦</div>
             <p className="mt-4 font-sans-zh text-sm font-light text-sf-muted">謝謝每一位把能量故事分享給我們的人。</p>
           </div>
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">

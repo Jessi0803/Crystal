@@ -709,39 +709,49 @@ html.storefront {
 .home-hero-accent {
   color: var(--brand-taupe);
 }
-.home-hero-button {
+/* Hero 連結：底線款。手機沒有 hover，所以底線常駐顯示，不靠滑過才出現 */
+.home-hero-link {
   display: inline-flex;
   align-items: center;
+  gap: 0.7rem;
+  /* 底線左緣對齊段落，文字在底線內置中 */
   justify-content: center;
-  gap: 0.9rem;
-  border-radius: 9999px;
-  background: var(--brand-taupe);
-  padding: 0.6rem 1.9rem;
-  font-size: 0.875rem;
+  padding: 0.45rem 1.6rem;
+  /* 底線左右淡出 */
+  background-image: linear-gradient(to right, transparent 0%, var(--brand-taupe) 22%, var(--brand-taupe) 78%, transparent 100%);
+  background-size: 100% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  font-size: 0.95rem;
   letter-spacing: 0.16em;
-  color: #fff;
-  transition: background-color 0.3s ease;
+  color: var(--brand-taupe);
+  transition: color 0.3s ease, border-color 0.3s ease;
 }
-.home-hero-button:hover {
-  background: var(--brand-umber);
+
+.home-hero-link:hover {
+  color: var(--brand-umber);
+  background-image: linear-gradient(to right, transparent 0%, var(--brand-umber) 22%, var(--brand-umber) 78%, transparent 100%);
 }
-.home-hero-button-outline {
+
+.home-hero-link-sub {
   display: inline-flex;
   align-items: center;
+  /* 手機點擊區維持 44px 高 */
   justify-content: center;
-  border: 1px solid var(--brand-taupe);
-  border-radius: 9999px;
-  background: var(--hero-bg);
-  padding: 0.45rem 1rem;
+  padding: 0.7rem 1.2rem;
   font-size: 0.8125rem;
   letter-spacing: 0.14em;
   color: var(--brand-taupe);
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: color 0.3s ease, background-image 0.3s ease;
+  background-image: linear-gradient(to right, transparent 0%, var(--brand-peach) 22%, var(--brand-peach) 78%, transparent 100%);
+  background-size: 100% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
 }
-.home-hero-button-outline:hover {
-  border-color: var(--brand-umber);
-  background: var(--brand-umber);
-  color: #fff;
+
+.home-hero-link-sub:hover {
+  color: var(--brand-umber);
+  background-image: linear-gradient(to right, transparent 0%, var(--brand-umber) 22%, var(--brand-umber) 78%, transparent 100%);
 }
 
 /* ─── 功效說明富文字（後台 Editor 與前台共用；class 需與 shared/richText.ts 一致）─── */
@@ -883,4 +893,128 @@ html.storefront {
   .paper-emboss {
     background-image: none;
   }
+}
+
+/* ─── 蕾絲邊與線條點綴 ───────────────────────────────────────────────────────
+   .lace-top / .lace-bottom：區塊上下緣的蕾絲線條（扇貝弧線＋小圓點），
+   用線條而非色塊，因此不受相鄰區塊底色影響 */
+.lace-top,
+.lace-bottom {
+  position: relative;
+}
+
+.lace-top::before,
+.lace-bottom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 16px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='16'%3E%3Cpath d='M0 4 Q7 14 14 4 Q21 14 28 4' fill='none' stroke='%23d8b69f' stroke-width='1'/%3E%3Ccircle cx='7' cy='7.5' r='1' fill='%23d8b69f'/%3E%3Ccircle cx='21' cy='7.5' r='1' fill='%23d8b69f'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 28px 16px;
+  opacity: 0.75;
+}
+
+.lace-top::before {
+  top: 10px;
+}
+
+.lace-bottom::after {
+  bottom: 10px;
+  transform: scaleY(-1);
+}
+
+/* 細線＋中央菱形的段落分隔 */
+.rule-ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--brand-peach);
+}
+
+.rule-ornament::before,
+.rule-ornament::after {
+  content: "";
+  height: 1px;
+  width: clamp(2rem, 8vw, 4.5rem);
+  background: linear-gradient(to right, transparent, var(--sf-line-strong), transparent);
+}
+
+/* 拱形線框：沿著圖片的拱形外緣加兩道細線與角落星點（不改變圖片形狀） */
+.arch-line-frame {
+  position: relative;
+}
+
+.arch-line-frame::before,
+.arch-line-frame::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid var(--brand-peach);
+  border-radius: 9999px 9999px 0 0;
+  /* 與 .rule-ornament 相同的淡入淡出：拱頂與兩側維持清楚，接近底部才化開。
+     只用上下向的遮罩；若再加左右向遮罩，兩側直線正好落在淡出範圍內會整條消失 */
+  mask-image: linear-gradient(to bottom, #000 0%, #000 82%, rgb(0 0 0 / 0.45) 94%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 82%, rgb(0 0 0 / 0.45) 94%, transparent 100%);
+}
+
+.arch-line-frame::before {
+  inset: -10px;
+  opacity: 0.8;
+}
+
+.arch-line-frame::after {
+  inset: -18px;
+  opacity: 0.35;
+}
+
+.arch-line-frame > .arch-corner {
+  position: absolute;
+  bottom: -26px;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--brand-peach);
+}
+
+.arch-line-frame > .arch-corner-left {
+  left: -22px;
+}
+
+.arch-line-frame > .arch-corner-right {
+  right: -22px;
+}
+
+@media (max-width: 767px) {
+  .arch-line-frame::before {
+    inset: -10px;
+  }
+
+  .arch-line-frame::after {
+    inset: -17px;
+  }
+
+  .arch-line-frame > .arch-corner {
+    bottom: -23px;
+  }
+
+  .arch-line-frame > .arch-corner-left {
+    left: -19px;
+  }
+
+  .arch-line-frame > .arch-corner-right {
+    right: -19px;
+  }
+}
+
+/* 壓印（凹字）：字本身不上色讓紙紋透出，只靠左上暗、右下亮的邊緣陰影成形 */
+.emboss-motif {
+  color: transparent;
+  text-shadow:
+    -1px -1px 1px rgb(75 52 44 / 0.035),
+    -2px -2px 3px rgb(75 52 44 / 0.018),
+    1px 1px 0 rgb(255 255 255 / 0.35),
+    2px 2px 3px rgb(255 255 255 / 0.18);
 }
