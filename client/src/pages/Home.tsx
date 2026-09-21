@@ -292,7 +292,7 @@ export default function Home() {
       </section>
 
       {/* ─── TOP 6 ─── */}
-      <section className="py-12 sm:py-14">
+      <section className="paper-surface py-12 sm:py-14">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6 text-center reveal sm:mb-8">
             <p className="eyebrow mb-2">BEST SELLERS</p>
