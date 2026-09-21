@@ -3,6 +3,7 @@
 // Layout: Announcement → Hero (carousel + tagline) → Top 6 → Categories → Daily quote → Monthly limited → Workshop/Custom banner
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ProductCardTags from "@/components/ProductCardTags";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
@@ -117,11 +118,7 @@ function ProductCard({
             </button>
           </div>
           <div className="product-card-info">
-            <div className="tag-scroll mb-1.5">
-              {product.tags.map((tag) => (
-                <span key={tag} className="tag">{tag}</span>
-              ))}
-            </div>
+            <ProductCardTags product={product} />
             <p className="product-card-name">{product.name}</p>
             <div className="flex flex-col gap-0.5 mt-1">
               {product.originalPrice && product.originalPrice > product.price ? (
@@ -329,7 +326,7 @@ export default function Home() {
       </section>
 
       {/* ─── TODAY'S ENERGY QUOTE ─── */}
-      <section className="bg-white px-4 py-8 sm:py-10">
+      <section className="paper-emboss px-4 py-8 sm:py-10">
         <div className="relative mx-auto w-full max-w-[1280px] pt-7 sm:pt-9">
           <div className="relative isolate overflow-hidden rounded-[1.65rem] bg-[#fff7f1] px-6 pb-6 pt-12 text-center shadow-[0_12px_34px_rgba(128,103,81,0.07)] sm:px-14 sm:pb-7 sm:pt-14">
             <div aria-hidden="true" className="absolute -left-12 -top-16 -z-10 size-48 rounded-full bg-[#efd8c8]/12" />
@@ -376,7 +373,7 @@ export default function Home() {
 
       {/* ─── MONTHLY LIMITED ─── */}
       {monthlyProducts.length > 0 && (
-        <section className="py-12 border-t border-sf-line bg-sf-cream sm:py-14">
+        <section className="paper-surface py-12 border-t border-sf-line sm:py-14">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-6 text-center reveal sm:mb-8">
               <p className="eyebrow mb-2">MONTHLY LIMITED</p>

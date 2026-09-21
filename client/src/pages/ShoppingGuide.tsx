@@ -32,7 +32,7 @@ export default function ShoppingGuide() {
       <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto">
           <div className="flex items-center gap-2 mb-3">
-            <Link href="/"><span className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors">首頁</span></Link>
+            <Link href="/" className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors">首頁</Link>
             <ChevronRight className="w-3 h-3 text-sf-muted" />
             <span className="text-[0.65rem] font-body text-sf-ink">購物說明</span>
           </div>

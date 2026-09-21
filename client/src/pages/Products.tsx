@@ -1,6 +1,7 @@
 // 日日好日 — Products Page
 // Design: Vacanza-inspired minimal grid layout
 import { useState, useEffect, useMemo, useRef } from "react";
+import ProductCardTags from "@/components/ProductCardTags";
 import { Link, useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
@@ -283,11 +284,7 @@ export default function Products() {
                     )}
                   </div>
                   <div className="product-card-info">
-                    <div className="tag-scroll mb-1.5">
-                      {product.tags.map((tag) => (
-                        <span key={tag} className="tag">{tag}</span>
-                      ))}
-                    </div>
+                    <ProductCardTags product={product} />
                     <p className="product-card-name">{product.name}</p>
                     <div className="flex flex-col gap-0.5 mt-1">
                       {product.originalPrice && product.originalPrice > product.price ? (

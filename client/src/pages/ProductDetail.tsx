@@ -1,6 +1,7 @@
 // 日日好日 — Product Detail Page
 // Design: Vacanza-inspired — large image + clean product info
 import { useState, useEffect, useMemo, useRef } from "react";
+import ProductCardTags from "@/components/ProductCardTags";
 import { useParams, Link } from "wouter";
 import { Plus, Minus, ShoppingBag } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
@@ -449,10 +450,12 @@ export default function ProductDetail() {
       {/* Breadcrumb */}
       <div className="border-b border-sf-line px-4 sm:px-6 lg:px-8 py-3">
         <div className="max-w-[1440px] mx-auto flex items-center gap-2">
-          <Link href="/products">
-            <span className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors tracking-wide">
-              所有商品
-            </span>
+          {/* 連結本身就帶上字級，避免 <a> 以預設字級撐出不同高度、與後面文字對不齊 */}
+          <Link
+            href="/products"
+            className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors tracking-wide"
+          >
+            所有商品
           </Link>
           <span className="text-[0.65rem] text-sf-muted">/</span>
           <span className="text-[0.65rem] font-body text-sf-ink tracking-wide">{product.name}</span>
@@ -506,16 +509,9 @@ export default function ProductDetail() {
           <div id="product-options" className="flex flex-col justify-center scroll-mt-20">
             {/* Category + Tags */}
             {product.category !== "custom" && (
-              <div className="flex items-center gap-2 mb-5 flex-wrap">
+              <div className="mb-5">
                 <span className="eyebrow">{product.categoryLabel}</span>
-                {visibleTags.length > 0 && <span className="text-sf-muted">·</span>}
-                {visibleTags.length > 0 && (
-                  <div className="tag-scroll max-w-full sm:max-w-[28rem]">
-                    {visibleTags.map((tag) => (
-                      <span key={tag} className="tag">{tag}</span>
-                    ))}
-                  </div>
-                )}
+                <ProductCardTags product={{ tags: visibleTags }} className="mt-1.5 text-[0.68rem] sm:max-w-[32rem]" />
               </div>
             )}
 
