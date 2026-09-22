@@ -248,7 +248,13 @@ export async function getCouponTemplateDetail(id: number, now = new Date()) {
 
 export async function issueCouponInTx(
   tx: Tx,
-  opts: { templateId: number; userId: number; source: CouponSource; issuedByUserId?: number | null }
+  opts: {
+    templateId: number;
+    userId: number;
+    source: CouponSource;
+    issuedByUserId?: number | null;
+    campaignKey?: string | null;
+  }
 ): Promise<MemberCoupon> {
   // 鎖住模板列，讓同一模板的發放依序進行，每位會員的領取上限才不會被並行請求突破
   const [template] = await tx
@@ -269,26 +275,48 @@ export async function issueCouponInTx(
   const [{ issuedCount }] = await tx
     .select({ issuedCount: count() })
     .from(memberCoupons)
-    .where(and(eq(memberCoupons.couponTemplateId, template.id), eq(memberCoupons.userId, opts.userId)));
+    .where(
+      opts.campaignKey
+        ? and(
+            eq(memberCoupons.source, opts.source),
+            eq(memberCoupons.campaignKey, opts.campaignKey),
+            eq(memberCoupons.userId, opts.userId)
+          )
+        : and(eq(memberCoupons.couponTemplateId, template.id), eq(memberCoupons.userId, opts.userId))
+    );
   if (issuedCount >= template.maxPerUser) {
-    throw new CouponError("LIMIT_REACHED", `此會員已達這張優惠券的領取上限（${template.maxPerUser} 張）`);
+    throw new CouponError(
+      "LIMIT_REACHED",
+      opts.campaignKey
+        ? "此會員已領取本年度生日優惠"
+        : `此會員已達這張優惠券的領取上限（${template.maxPerUser} 張）`
+    );
   }
 
-  const [created] = await tx
-    .insert(memberCoupons)
-    .values({
-      couponTemplateId: template.id,
-      userId: opts.userId,
-      name: template.name,
-      discountAmount: template.discountAmount,
-      minOrderAmount: template.minOrderAmount,
-      issuedAt,
-      expiresAt,
-      status: "available",
-      source: opts.source,
-      issuedByUserId: opts.issuedByUserId ?? null,
-    })
-    .$returningId();
+  let created: { id: number };
+  try {
+    [created] = await tx
+      .insert(memberCoupons)
+      .values({
+        couponTemplateId: template.id,
+        userId: opts.userId,
+        name: template.name,
+        discountAmount: template.discountAmount,
+        minOrderAmount: template.minOrderAmount,
+        issuedAt,
+        expiresAt,
+        status: "available",
+        source: opts.source,
+        campaignKey: opts.campaignKey ?? null,
+        issuedByUserId: opts.issuedByUserId ?? null,
+      })
+      .$returningId();
+  } catch (error) {
+    if (opts.campaignKey && isDuplicateKeyError(error)) {
+      throw new CouponError("LIMIT_REACHED", "此會員已領取本年度生日優惠");
+    }
+    throw error;
+  }
 
   const [coupon] = await tx.select().from(memberCoupons).where(eq(memberCoupons.id, created.id)).limit(1);
   return coupon;
@@ -299,6 +327,7 @@ export async function issueCoupon(opts: {
   userId: number;
   source: CouponSource;
   issuedByUserId?: number | null;
+  campaignKey?: string | null;
 }) {
   const db = await requireDb();
   return db.transaction((tx) => issueCouponInTx(tx, opts));

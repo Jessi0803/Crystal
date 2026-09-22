@@ -56,6 +56,9 @@ describe("adminMembers router", () => {
     await expect(caller.list({ limit: 50, offset: 0 })).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
+    await expect(caller.birthdays({ month: 9, year: 2026, limit: 100, offset: 0 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
   });
 
   it("lists members with purchase summary", async () => {
@@ -158,6 +161,52 @@ describe("adminMembers router", () => {
       itemCount: 1,
     });
     expect(db.execute).toHaveBeenCalledTimes(2);
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists the selected month's birthdays with annual issuance status", async () => {
+    const db = createMockDb([
+      [{ count: 2, issued: 1, lineBound: 1 }],
+      [
+        {
+          id: 7,
+          name: "九月壽星",
+          email: "birthday@example.com",
+          birthYear: null,
+          birthMonth: 9,
+          birthDay: 3,
+          lineBound: 1,
+          lineDisplayName: "壽星 LINE",
+          birthdayCouponIssued: 1,
+        },
+        {
+          id: 8,
+          name: "尚未發券",
+          email: "pending@example.com",
+          birthYear: 1998,
+          birthMonth: 9,
+          birthDay: 18,
+          lineBound: 0,
+          lineDisplayName: null,
+          birthdayCouponIssued: 0,
+        },
+      ],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    const result = await createCaller({ id: 1, role: "admin" }).birthdays({
+      month: 9,
+      year: 2026,
+      limit: 100,
+      offset: 0,
+    });
+
+    expect(result.campaignKey).toBe("birthday:2026");
+    expect(result.total).toBe(2);
+    expect(result.issuedTotal).toBe(1);
+    expect(result.lineBoundTotal).toBe(1);
+    expect(result.items[0]).toMatchObject({ lineBound: true, birthdayCouponIssued: true });
+    expect(result.items[1]).toMatchObject({ lineBound: false, birthdayCouponIssued: false });
     expect(db.select).toHaveBeenCalledTimes(2);
   });
 

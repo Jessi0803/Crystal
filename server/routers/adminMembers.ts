@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { users, orders, orderItems } from "../../drizzle/schema";
 import { getDb } from "../db";
@@ -158,6 +158,71 @@ export const adminMembersRouter = router({
           };
         }),
         total: Number(totalRow?.count ?? 0),
+      };
+    }),
+
+  /** 指定月份的壽星名單，以及該年度生日優惠是否已發放。 */
+  birthdays: adminProcedure
+    .input(
+      z.object({
+        month: z.number().int().min(1).max(12),
+        year: z.number().int().min(2020).max(2100),
+        search: z.string().trim().max(100).optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+        offset: z.number().int().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await ensureMemberVipColumns();
+      const searchWhere = buildMemberSearchWhere(input.search);
+      const where = and(eq(users.birthMonth, input.month), sql`${users.birthDay} IS NOT NULL`, searchWhere);
+      const campaignKey = `birthday:${input.year}`;
+      const issuedSql = sql`EXISTS(
+        SELECT 1 FROM \`memberCoupons\` mc
+        WHERE mc.\`userId\` = ${users.id}
+          AND mc.\`source\` = 'BIRTHDAY'
+          AND mc.\`campaignKey\` = ${campaignKey}
+      )`;
+      const lineBoundSql = sql`${users.openId} LIKE 'line:%'`;
+
+      // 統計數字以整份名單計算，不受每頁 200 筆限制
+      const [totalRow] = await db
+        .select({
+          count: sql<number>`CAST(COUNT(*) AS SIGNED)`,
+          issued: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${issuedSql} THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+          lineBound: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${lineBoundSql} THEN 1 ELSE 0 END), 0) AS SIGNED)`,
+        })
+        .from(users)
+        .where(where);
+
+      const rows = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          birthYear: users.birthYear,
+          birthMonth: users.birthMonth,
+          birthDay: users.birthDay,
+          lineBound: sql<number>`CASE WHEN ${lineBoundSql} THEN 1 ELSE 0 END`,
+          lineDisplayName: users.lineDisplayName,
+          birthdayCouponIssued: sql<number>`${issuedSql}`,
+        })
+        .from(users)
+        .where(where)
+        .orderBy(asc(users.birthDay), asc(users.name), asc(users.id))
+        .limit(input.limit)
+        .offset(input.offset);
+
+      return {
+        campaignKey,
+        total: Number(totalRow?.count ?? 0),
+        issuedTotal: Number(totalRow?.issued ?? 0),
+        lineBoundTotal: Number(totalRow?.lineBound ?? 0),
+        items: rows.map((row) => ({
+          ...row,
+          lineBound: Number(row.lineBound) === 1,
+          birthdayCouponIssued: Number(row.birthdayCouponIssued) === 1,
+        })),
       };
     }),
 

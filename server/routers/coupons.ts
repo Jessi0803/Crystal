@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { users } from "../../drizzle/schema";
 import { adminProcedure, protectedProcedure, rateLimitedProtectedProcedure, router } from "../_core/trpc";
@@ -157,6 +157,77 @@ export const couponRouter = router({
         return { id: coupon.id, name: coupon.name, expiresAt: coupon.expiresAt };
       })
     ),
+
+  /** 第一版生日優惠：由管理員選取當月壽星後人工批次發放，不含自動排程或通知。 */
+  adminIssueBirthdayBatch: adminProcedure
+    .input(
+      z.object({
+        userIds: z.array(z.number().int().positive()).min(1).max(200),
+        templateId: z.number().int().positive(),
+        birthdayMonth: z.number().int().min(1).max(12),
+        campaignYear: z.number().int().min(2020).max(2100),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const template = await getCouponTemplate(input.templateId);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "找不到優惠券" });
+      if (!template.isActive) throw new TRPCError({ code: "BAD_REQUEST", message: "此優惠券已停用，無法發放" });
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      const userIds = Array.from(new Set(input.userIds));
+      const members = await db
+        .select({ id: users.id, birthMonth: users.birthMonth })
+        .from(users)
+        .where(inArray(users.id, userIds));
+      const memberById = new Map(members.map((member) => [member.id, member]));
+      const campaignKey = `birthday:${input.campaignYear}`;
+      const results: Array<{ userId: number; status: "issued" | "skipped" | "failed"; message?: string }> = [];
+
+      for (const userId of userIds) {
+        const member = memberById.get(userId);
+        if (!member) {
+          results.push({ userId, status: "failed", message: "找不到會員" });
+          continue;
+        }
+        if (member.birthMonth !== input.birthdayMonth) {
+          results.push({ userId, status: "failed", message: "會員不屬於所選生日月份" });
+          continue;
+        }
+
+        try {
+          await issueCoupon({
+            templateId: input.templateId,
+            userId,
+            source: "BIRTHDAY",
+            campaignKey,
+            issuedByUserId: ctx.user.id,
+          });
+          results.push({ userId, status: "issued" });
+        } catch (error) {
+          if (error instanceof CouponError && error.code === "LIMIT_REACHED") {
+            results.push({ userId, status: "skipped", message: error.message });
+          } else {
+            console.error("[birthdayCoupon] issue failed", { userId, campaignKey, error });
+            results.push({
+              userId,
+              status: "failed",
+              message: error instanceof CouponError ? error.message : "發放失敗，請稍後重試",
+            });
+          }
+        }
+      }
+
+      return {
+        campaignKey,
+        templateName: template.name,
+        issued: results.filter((result) => result.status === "issued").length,
+        skipped: results.filter((result) => result.status === "skipped").length,
+        failed: results.filter((result) => result.status === "failed").length,
+        results,
+      };
+    }),
 
   adminLineRewardSettings: adminProcedure.query(() => getLineFriendRewardSettings()),
 
