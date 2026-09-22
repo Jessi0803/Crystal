@@ -39,6 +39,7 @@ async function getOrderEmailPayload(orderId: number) {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       subtotal: item.subtotal,
+      productImage: item.productImage,
     })),
   };
 }
