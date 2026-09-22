@@ -3,6 +3,7 @@
 // Layout: Announcement → Hero (carousel + tagline) → Top 6 → Categories → Daily quote → Monthly limited → Workshop/Custom banner
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ResponsiveImage from "@/components/ResponsiveImage";
 import ProductCardTags from "@/components/ProductCardTags";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, Sparkles } from "lucide-react";
@@ -108,7 +109,7 @@ function ProductCard({
     <Link href={`/products/${product.id}`}>
         <div className="product-card home-product-card">
           <div className="product-card-image">
-            <img src={product.image} alt={product.name} loading="lazy" />
+            <ResponsiveImage src={product.image} sizes="(min-width: 1024px) 33vw, 50vw" alt={product.name} loading="lazy" decoding="async" />
             <button
               onClick={(event) => onAddToCart(product, event)}
               className="absolute bottom-0 left-0 right-0 bg-sf-accent text-white text-[0.65rem] tracking-[0.15em] py-2.5 font-body translate-y-full group-hover:translate-y-0 transition-transform duration-300 opacity-0 hover:opacity-100 focus:opacity-100"
@@ -220,9 +221,11 @@ export default function Home() {
         <div className="relative h-[82vw] max-h-[520px] sm:h-[60vw] lg:absolute lg:inset-y-0 lg:right-0 lg:h-auto lg:max-h-none lg:w-[64%]">
           <Link href="/products" className="absolute inset-0 block" aria-label="查看全部商品" tabIndex={-1}>
             {heroSlides.map((slide, index) => (
-              <img
+              <ResponsiveImage
                 key={slide.src}
                 src={slide.src}
+                sizes="(min-width: 1024px) 64vw, 100vw"
+                fetchPriority={index === 0 ? "high" : "auto"}
                 alt={index === heroSlide ? slide.alt : ""}
                 aria-hidden={index !== heroSlide}
                 loading={index === 0 ? "eager" : "lazy"}
@@ -314,7 +317,7 @@ export default function Home() {
           {categoryCards.map((cat, i) => (
             <Link key={i} href={cat.href}>
               <div className="split-card h-[38vw] min-h-[150px] sm:h-[26vw] lg:h-[30vh]">
-                <img src={cat.img} alt={cat.zh} loading="lazy" />
+                <ResponsiveImage src={cat.img} sizes="(min-width: 1024px) 25vw, 50vw" alt={cat.zh} loading="lazy" decoding="async" />
                 <div className="split-card-overlay">
                   <h3 className="category-title-en">{cat.en}</h3>
                   <p className="category-title-zh">{cat.zh}</p>
@@ -397,7 +400,7 @@ export default function Home() {
       {/* ─── SECOND BANNER: 2-col split ─── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 border-t border-sf-line">
         <Link href="/crystal-workshop" className="split-card h-[62vw] min-h-[320px] sm:h-[42vw] lg:h-[45vh]">
-          <img src={HERO_BANNER2_IMG} alt="水晶創業班課程作品" loading="lazy" />
+          <ResponsiveImage src={HERO_BANNER2_IMG} sizes="(min-width: 1024px) 50vw, 100vw" alt="水晶創業班課程作品" loading="lazy" decoding="async" />
           {/* 圖片較亮，文字加深色遮罩維持可讀性 */}
           <div className="split-card-overlay bg-sf-ink/40">
             <p className="eyebrow text-white/80 mb-1">CRYSTAL WORKSHOP</p>

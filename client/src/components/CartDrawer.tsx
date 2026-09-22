@@ -1,6 +1,7 @@
 // 日日好日 — Cart Drawer
 // Design: Vacanza-inspired minimal slide-in cart
 import { X, Minus, Plus, ShoppingBag } from "lucide-react";
+import ResponsiveImage from "@/components/ResponsiveImage";
 import { useCart } from "@/contexts/CartContext";
 import { Link } from "wouter";
 import { toast } from "sonner"; // still used for remove toast
@@ -89,8 +90,10 @@ export default function CartDrawer() {
                 <div key={id} className="flex gap-4 px-6 py-5">
                   {/* Image */}
                   <div className="w-20 h-24 bg-sf-cream shrink-0 overflow-hidden">
-                    <img
+                    <ResponsiveImage
                       src={getPurchaseOptionImage(product, purchaseOptionId)}
+                      sizes="80px"
+                      maxWidth={256}
                       alt={product.name}
                       className="w-full h-full object-cover"
                     />
@@ -177,8 +180,10 @@ export default function CartDrawer() {
               <div className="mb-5 rounded-md border border-sf-line bg-sf-cream px-3 py-3">
                 <div className="flex items-start gap-3">
                   {clearQuartzChipsProduct.image && (
-                    <img
+                    <ResponsiveImage
                       src={clearQuartzChipsProduct.image}
+                      sizes="48px"
+                      maxWidth={128}
                       alt={clearQuartzChipsProduct.name}
                       className="h-12 w-12 shrink-0 rounded border border-sf-line object-cover"
                     />

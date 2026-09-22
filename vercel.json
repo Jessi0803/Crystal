@@ -2,20 +2,84 @@
   "framework": "vite",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm run build",
+  "images": {
+    "sizes": [
+      128,
+      256,
+      384,
+      640,
+      828,
+      1080,
+      1600
+    ],
+    "qualities": [
+      75
+    ],
+    "formats": [
+      "image/avif",
+      "image/webp"
+    ],
+    "minimumCacheTTL": 2592000,
+    "localPatterns": [
+      {
+        "pathname": "^/(images|reviews)/.*$",
+        "search": ""
+      },
+      {
+        "pathname": "^/hero-cover\\.jpg$",
+        "search": ""
+      }
+    ],
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "hpjrd3k3iz79xk5k.public.blob.vercel-storage.com",
+        "pathname": "^/(products|product-benefits)/.*$"
+      }
+    ]
+  },
   "functions": {
-    "api/trpc/[trpc].js": { "maxDuration": 60 },
-    "api/cron/custom-form-reminders.js": { "maxDuration": 60 }
+    "api/trpc/[trpc].js": {
+      "maxDuration": 60
+    },
+    "api/cron/custom-form-reminders.js": {
+      "maxDuration": 60
+    }
   },
   "crons": [
-    { "path": "/api/cron/custom-form-reminders", "schedule": "*/3 * * * *" }
+    {
+      "path": "/api/cron/custom-form-reminders",
+      "schedule": "*/3 * * * *"
+    }
   ],
   "rewrites": [
-    { "source": "/api/oauth/callback", "destination": "/api/trpc/line-oauth-callback" },
-    { "source": "/api/oauth/line/start", "destination": "/api/trpc/line-oauth-start" },
-    { "source": "/api/oauth/line/callback", "destination": "/api/trpc/line-oauth-callback" },
-    { "source": "/api/line/webhook", "destination": "/api/trpc/line-webhook" },
-    { "source": "/api/oauth-line-start", "destination": "/api/trpc/line-oauth-start" },
-    { "source": "/api/oauth-line-callback", "destination": "/api/trpc/line-oauth-callback" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/oauth/callback",
+      "destination": "/api/trpc/line-oauth-callback"
+    },
+    {
+      "source": "/api/oauth/line/start",
+      "destination": "/api/trpc/line-oauth-start"
+    },
+    {
+      "source": "/api/oauth/line/callback",
+      "destination": "/api/trpc/line-oauth-callback"
+    },
+    {
+      "source": "/api/line/webhook",
+      "destination": "/api/trpc/line-webhook"
+    },
+    {
+      "source": "/api/oauth-line-start",
+      "destination": "/api/trpc/line-oauth-start"
+    },
+    {
+      "source": "/api/oauth-line-callback",
+      "destination": "/api/trpc/line-oauth-callback"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

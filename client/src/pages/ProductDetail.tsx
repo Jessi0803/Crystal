@@ -1,6 +1,7 @@
 // 日日好日 — Product Detail Page
 // Design: Vacanza-inspired — large image + clean product info
 import { useState, useEffect, useMemo, useRef } from "react";
+import ResponsiveImage from "@/components/ResponsiveImage";
 import ProductCardTags from "@/components/ProductCardTags";
 import { useParams, Link } from "wouter";
 import { Plus, Minus, ShoppingBag } from "lucide-react";
@@ -469,8 +470,10 @@ export default function ProductDetail() {
           {/* Left: Gallery */}
           <div className="space-y-3">
             <div className="relative bg-sf-cream aspect-square overflow-hidden">
-              <img
+              <ResponsiveImage
                 src={activeGalleryImage}
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                fetchPriority="high"
                 alt={product.name}
                 className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-6" : "object-cover"}`}
               />
@@ -492,8 +495,10 @@ export default function ProductDetail() {
                           : "border-sf-line hover:border-sf-accent/50"
                       }`}
                     >
-                      <img
+                      <ResponsiveImage
                         src={image}
+                        sizes="(min-width: 1024px) 8vw, 20vw"
+                        maxWidth={384}
                         alt={`${product.name} 圖片 ${index + 1}`}
                         loading={index === 0 ? "eager" : "lazy"}
                         className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-1.5" : "object-cover"}`}
@@ -1046,7 +1051,7 @@ export default function ProductDetail() {
                 <Link key={p.id} href={`/products/${p.id}`}>
                   <div className="product-card group">
                     <div className="product-card-image">
-                      <img src={p.image} alt={p.name} loading="lazy" />
+                      <ResponsiveImage src={p.image} sizes="(min-width: 640px) 25vw, 50vw" alt={p.name} loading="lazy" decoding="async" />
                     </div>
                     <div className="product-card-info">
                       <p className="product-card-name">{p.name}</p>

@@ -1,6 +1,7 @@
 // 日日好日 — Products Page
 // Design: Vacanza-inspired minimal grid layout
 import { useState, useEffect, useMemo, useRef } from "react";
+import ResponsiveImage from "@/components/ResponsiveImage";
 import ProductCardTags from "@/components/ProductCardTags";
 import { Link, useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
@@ -57,8 +58,9 @@ function ProductCardImage({
   }
 
   return (
-    <img
+    <ResponsiveImage
       src={src}
+      sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
       alt={alt}
       loading={priority ? "eager" : "lazy"}
       decoding="async"
