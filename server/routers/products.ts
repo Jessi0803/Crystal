@@ -13,6 +13,24 @@ import { RICH_TEXT_MAX_LENGTH, richTextToPlainText } from "@shared/richText";
 import { sanitizeBenefits } from "../richTextSanitize";
 import { BlobUploadError, UPLOADABLE_IMAGE_TYPES, putPublicImage } from "../blobStorage";
 
+const ImageUploadInputSchema = z.object({
+  contentType: z.enum(Object.keys(UPLOADABLE_IMAGE_TYPES) as [keyof typeof UPLOADABLE_IMAGE_TYPES]),
+  // base64 約為原始大小的 4/3，實際大小由 putPublicImage 檢查
+  dataBase64: z.string().min(1).max(4_200_000, "圖片太大，請小於 3MB"),
+});
+
+async function uploadImageToBlob(folder: string, input: z.infer<typeof ImageUploadInputSchema>) {
+  try {
+    const { url } = await putPublicImage(folder, Buffer.from(input.dataBase64, "base64"), input.contentType);
+    return { url };
+  } catch (error) {
+    if (error instanceof BlobUploadError) {
+      throw new TRPCError({ code: error.code === "TOO_LARGE" ? "BAD_REQUEST" : "PRECONDITION_FAILED", message: error.message });
+    }
+    throw error;
+  }
+}
+
 let tableEnsured = false;
 
 async function trySyncChatbotKnowledge(action: () => Promise<void>, productIds: string[] = []) {
@@ -629,24 +647,15 @@ export const productRouter = router({
       return { url: result.url };
     }),
 
-  /** 功效說明富文字內的圖片，上傳到 Vercel Blob */
+  /** 功效說明富文字內的圖片，上傳到 Vercel Blob（product-benefits/） */
   uploadRichTextImage: adminProcedure
-    .input(z.object({
-      contentType: z.enum(Object.keys(UPLOADABLE_IMAGE_TYPES) as [keyof typeof UPLOADABLE_IMAGE_TYPES]),
-      // base64 約為原始大小的 4/3，實際大小由 putPublicImage 檢查
-      dataBase64: z.string().min(1).max(4_200_000, "圖片太大，請小於 3MB"),
-    }))
-    .mutation(async ({ input }) => {
-      try {
-        const { url } = await putPublicImage("product-benefits", Buffer.from(input.dataBase64, "base64"), input.contentType);
-        return { url };
-      } catch (error) {
-        if (error instanceof BlobUploadError) {
-          throw new TRPCError({ code: error.code === "TOO_LARGE" ? "BAD_REQUEST" : "PRECONDITION_FAILED", message: error.message });
-        }
-        throw error;
-      }
-    }),
+    .input(ImageUploadInputSchema)
+    .mutation(({ input }) => uploadImageToBlob("product-benefits", input)),
+
+  /** 商品主圖、相簿與購買方案圖，上傳到 Vercel Blob（products/） */
+  uploadProductImage: adminProcedure
+    .input(ImageUploadInputSchema)
+    .mutation(({ input }) => uploadImageToBlob("products", input)),
 
   seed: adminProcedure
     .input(z.array(ProductInputSchema.safeExtend({ id: z.string() })))

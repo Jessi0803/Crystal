@@ -550,6 +550,17 @@ function ProductModal({
   const [compressing, setCompressing] = useState(false);
   // 所有方案共用一個檔案選擇器，用索引記住上傳目標
   const optionImageInputRef = useRef<HTMLInputElement>(null);
+  const uploadProductImage = trpc.product.uploadProductImage.useMutation();
+
+  /** 壓縮後上傳到 Vercel Blob，回傳圖片網址（不再把 base64 存進商品資料） */
+  const uploadCompressedImage = async (file: File) => {
+    const dataUrl = await compressImage(file, { maxSize: 1600, quality: 0.82 });
+    const { url } = await uploadProductImage.mutateAsync({
+      contentType: "image/jpeg",
+      dataBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
+    });
+    return url;
+  };
   const [pendingOptionIndex, setPendingOptionIndex] = useState<number | null>(null);
   const [showMoreFields, setShowMoreFields] = useState(false);
 
@@ -821,10 +832,10 @@ function ProductModal({
     }
     setCompressing(true);
     try {
-      const dataUrl = await compressImage(file);
-      updatePurchaseOption(targetIndex, "image", dataUrl);
-    } catch {
-      toast.error("圖片讀取失敗，請改用圖片網址");
+      const url = await uploadCompressedImage(file);
+      updatePurchaseOption(targetIndex, "image", url);
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "圖片上傳失敗，請改用圖片網址");
     }
     setCompressing(false);
   };
@@ -877,13 +888,16 @@ function ProductModal({
     }
     setCompressing(true);
     try {
-      const dataUrls = await Promise.all(files.map((file) => compressImage(file)));
-      setForm((p) => {
-        const images = [...p.images, ...dataUrls];
-        return { ...p, images, image: images[0] ?? "" };
-      });
-    } catch {
-      toast.error("圖片讀取失敗，請改用圖片網址");
+      // 逐張上傳，避免單次請求過大
+      for (const file of files) {
+        const url = await uploadCompressedImage(file);
+        setForm((p) => {
+          const images = [...p.images, url];
+          return { ...p, images, image: images[0] ?? "" };
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "圖片上傳失敗，請改用圖片網址");
     }
     setCompressing(false);
     e.target.value = "";
@@ -1182,7 +1196,7 @@ function ProductModal({
                   className="flex items-center gap-2 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] w-full"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {compressing ? "處理中…" : "選擇圖片（可多選）"}
+                  {compressing ? "上傳中…" : "選擇圖片（可多選）"}
                 </button>
                 <div className="flex gap-2">
                   <input
@@ -1900,7 +1914,7 @@ function ProductModal({
             className="flex items-center gap-2 px-5 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
-            {compressing ? "處理圖片中…" : isPending ? "儲存中…" : (editing ? "儲存變更" : "新增商品")}
+            {compressing ? "圖片上傳中…" : isPending ? "儲存中…" : (editing ? "儲存變更" : "新增商品")}
           </button>
         </div>
       </div>
