@@ -673,15 +673,6 @@ html.storefront {
   --hero-bg: var(--sf-cream-deep);
   background: var(--hero-bg);
 }
-/* 主圖調色：暖化冷白色調，再疊一層米杏／玫瑰粉蒙版，貼近品牌色系 */
-.home-hero-image {
-  filter: sepia(0.06) saturate(0.97) hue-rotate(-3deg) contrast(0.98);
-}
-.home-hero-tint {
-  background: linear-gradient(135deg, var(--brand-lace) 0%, var(--brand-peach) 55%, var(--brand-blush) 100%);
-  mix-blend-mode: soft-light;
-  opacity: 0.65;
-}
 /* 手機：圖片在上，往下漸層融入文字區 */
 .home-hero-fade {
   background: linear-gradient(to bottom, transparent 72%, color-mix(in srgb, var(--hero-bg) 70%, transparent) 90%, var(--hero-bg) 100%);
@@ -709,19 +700,14 @@ html.storefront {
 .home-hero-accent {
   color: var(--brand-taupe);
 }
-/* Hero 連結：底線款。手機沒有 hover，所以底線常駐顯示，不靠滑過才出現 */
+/* Hero 連結：主連結為整條底線，次要連結為細線框方塊 */
 .home-hero-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  /* 底線左緣對齊段落，文字在底線內置中 */
   justify-content: center;
+  gap: 0.7rem;
   padding: 0.45rem 1.6rem;
-  /* 底線左右淡出 */
-  background-image: linear-gradient(to right, transparent 0%, var(--brand-taupe) 22%, var(--brand-taupe) 78%, transparent 100%);
-  background-size: 100% 1px;
-  background-position: 0 100%;
-  background-repeat: no-repeat;
+  border-bottom: 1px solid var(--brand-taupe);
   font-size: 0.95rem;
   letter-spacing: 0.16em;
   color: var(--brand-taupe);
@@ -730,28 +716,25 @@ html.storefront {
 
 .home-hero-link:hover {
   color: var(--brand-umber);
-  background-image: linear-gradient(to right, transparent 0%, var(--brand-umber) 22%, var(--brand-umber) 78%, transparent 100%);
+  border-bottom-color: var(--brand-umber);
 }
 
 .home-hero-link-sub {
   display: inline-flex;
   align-items: center;
-  /* 手機點擊區維持 44px 高 */
   justify-content: center;
-  padding: 0.7rem 1.2rem;
+  padding: 0.35rem 1.1rem;
+  border: 1px solid var(--brand-peach);
   font-size: 0.8125rem;
   letter-spacing: 0.14em;
   color: var(--brand-taupe);
-  transition: color 0.3s ease, background-image 0.3s ease;
-  background-image: linear-gradient(to right, transparent 0%, var(--brand-peach) 22%, var(--brand-peach) 78%, transparent 100%);
-  background-size: 100% 1px;
-  background-position: 0 100%;
-  background-repeat: no-repeat;
+  transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
 }
 
 .home-hero-link-sub:hover {
+  border-color: var(--brand-taupe);
+  background: rgb(255 255 255 / 0.5);
   color: var(--brand-umber);
-  background-image: linear-gradient(to right, transparent 0%, var(--brand-umber) 22%, var(--brand-umber) 78%, transparent 100%);
 }
 
 /* ─── 功效說明富文字（後台 Editor 與前台共用；class 需與 shared/richText.ts 一致）─── */

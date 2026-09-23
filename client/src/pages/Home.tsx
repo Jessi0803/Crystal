@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ResponsiveImage from "@/components/ResponsiveImage";
 import ProductCardTags from "@/components/ProductCardTags";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { products as staticProducts, type Product } from "@/lib/data";
@@ -24,8 +24,6 @@ const CATEGORY_WEALTH_IMG = "/images/categories/wealth.jpg";
 const CATEGORY_PROTECT_IMG = "/images/categories/protect.jpg";
 const CATEGORY_HEALING_IMG = "/images/categories/healing.jpg";
 const HERO_BANNER2_IMG = "/images/best-sellers.jpg";
-const DAILY_ENERGY_BOTANICAL_IMG = "/images/home/daily-energy-botanical-transparent-web.png";
-const DAILY_ENERGY_RIGHT_BOTANICAL_IMG = "/images/home/daily-energy-right-botanical-transparent-web.png";
 const DAILY_ENERGY_SUN_GLYPH_IMG = "/images/home/daily-energy-sun-glyph-web.png";
 const categoryCards = [
   {
@@ -229,13 +227,12 @@ export default function Home() {
                 alt={index === heroSlide ? slide.alt : ""}
                 aria-hidden={index !== heroSlide}
                 loading={index === 0 ? "eager" : "lazy"}
-                className={`home-hero-image absolute inset-0 w-full h-full object-cover object-[center_42%] transition-opacity duration-[800ms] ease-out ${
+                className={`absolute inset-0 w-full h-full object-cover object-[center_42%] transition-opacity duration-[800ms] ease-out ${
                   index === heroSlide ? "opacity-100" : "opacity-0"
                 }`}
               />
             ))}
           </Link>
-          <div className="home-hero-tint pointer-events-none absolute inset-0" aria-hidden="true" />
           <div className="home-hero-fade pointer-events-none absolute inset-x-0 top-0 -bottom-px" aria-hidden="true" />
         </div>
 
@@ -252,11 +249,11 @@ export default function Home() {
               <br className="hidden sm:inline" />
               讓能量陪你走過生活的每一段旅程。
             </p>
-            <div className="flex flex-col items-start gap-1">
+            <div className="flex flex-col items-start gap-3">
               <Link href="/products" className="home-hero-link">
                 探索水晶飾品 <ArrowRight className="h-4 w-4" />
               </Link>
-              <div className="flex items-center gap-5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Link href="/products?category=monthly" className="home-hero-link-sub">每月限量</Link>
                 <Link href="/custom" className="home-hero-link-sub">客製款</Link>
               </div>
@@ -335,20 +332,6 @@ export default function Home() {
             <div aria-hidden="true" className="absolute -left-12 -top-16 -z-10 size-48 rounded-full bg-[#efd8c8]/12" />
             <div aria-hidden="true" className="absolute -bottom-24 right-[7%] -z-10 size-56 rounded-full bg-[#f2dfd2]/14" />
             <div aria-hidden="true" className="absolute right-[30%] top-5 -z-10 h-16 w-28 rotate-[-12deg] rounded-full bg-white/15" />
-            <img
-              src={DAILY_ENERGY_BOTANICAL_IMG}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[clamp(5.5rem,10vw,8rem)] object-contain opacity-40"
-            />
-            <img
-              src={DAILY_ENERGY_RIGHT_BOTANICAL_IMG}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-0 right-0 -z-10 h-auto w-[clamp(4.75rem,8vw,6.5rem)] object-contain opacity-40"
-            />
-            <Sparkles aria-hidden="true" className="absolute left-[22%] top-7 -z-10 h-auto w-4 text-[#d4ad91]/65 sm:left-[24%] sm:top-9 sm:w-5" strokeWidth={1.25} />
-            <Sparkles aria-hidden="true" className="absolute right-[20%] top-8 -z-10 h-auto w-3.5 text-[#d4ad91]/60 sm:right-[23%] sm:top-10 sm:w-4" strokeWidth={1.25} />
 
             <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center">
               <p className="mb-2 text-[0.62rem] font-body font-medium tracking-[0.18em] text-brand-blush sm:mb-3 sm:text-xs sm:tracking-[0.28em]">
