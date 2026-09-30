@@ -7,7 +7,6 @@ import { Link, useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
-import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import { getDiscountLabel } from "@/lib/pricing";
 import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
@@ -173,7 +172,7 @@ export default function Products() {
   };
 
   return (
-    <div className="min-h-screen bg-white page-enter">
+    <div className="min-h-screen paper-surface page-enter">
 
       {/* Page Header */}
       <div className="border-b border-sf-line py-10 px-4 sm:px-6 lg:px-8">
@@ -297,13 +296,13 @@ export default function Products() {
                           <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
                         </div>
                       ) : product.priceRange ? (
-                        <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
+                        <p className="product-card-price">{product.priceRange}</p>
                       ) : (
                         <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
                       )}
                       {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
                         <p className="text-[0.7rem] font-body text-sf-muted">
-                          {getCustomPriceDisplay(product.id, product.priceRange)}
+                          {product.priceRange}
                         </p>
                       )}
                     </div>

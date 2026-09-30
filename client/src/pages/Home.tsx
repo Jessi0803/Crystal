@@ -8,7 +8,6 @@ import ProductCardTags from "@/components/ProductCardTags";
 import { Link, useLocation } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
-import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
 import ClauseText from "@/components/ClauseText";
 import { products as staticProducts, type Product } from "@/lib/data";
 import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
@@ -129,13 +128,13 @@ function ProductCard({
                   <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
                 </div>
               ) : product.priceRange ? (
-                <p className="product-card-price">{getCustomPriceDisplay(product.id, product.priceRange)}</p>
+                <p className="product-card-price">{product.priceRange}</p>
               ) : (
                 <p className="product-card-price">NT$ {product.price.toLocaleString()}</p>
               )}
               {product.originalPrice && product.originalPrice > product.price && product.priceRange && (
                 <p className="text-[0.7rem] font-body text-sf-muted">
-                  {getCustomPriceDisplay(product.id, product.priceRange)}
+                  {product.priceRange}
                 </p>
               )}
             </div>
