@@ -4,6 +4,9 @@ import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { fillDomesticHomeCheckout, fillTransferCheckoutFields, login } from "./helpers";
 
+// 手機版有固定購買列（StickyBuyBar），頁面上會有兩顆「加入購物袋」，
+// 所以一律從商品選項區 #product-options 內點。
+
 test.beforeEach(({}, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Inventory order database assertions only need one browser project.");
 });
@@ -58,7 +61,7 @@ async function addProductAndCreateAtmOrder(page: Page, productName: string, emai
   await page.goto("/products");
   await page.getByText(productName).first().click();
   await expect(page.getByRole("heading", { name: productName })).toBeVisible();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   await page.getByRole("button", { name: "前往結帳" }).click();
   await fillDomesticHomeCheckout(page, email);
   await page.getByRole("button", { name: /^轉帳/ }).click();
@@ -107,8 +110,8 @@ test("ATM preorder order is displayed as preorder after it is stored", async ({ 
   await page.goto("/products/e2e-bracelet-preorder");
   await expect(page.locator("body")).toContainText("預購");
   await expect(page.locator("body")).not.toContainText("出貨時間");
-  await page.getByRole("button", { name: /彈力繩/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /彈力繩/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("E2E 預購手鍊（預購）");
   await page.getByRole("button", { name: "前往結帳" }).click();
@@ -139,7 +142,7 @@ test("zero-stock preorder and sold-out monthly fixtures produce distinct storefr
   await expect(page.getByRole("button", { name: "編輯 E2E 預購手鍊 庫存" })).toHaveText("0");
 
   await page.goto("/products/e2e-bracelet-preorder");
-  await expect(page.getByRole("button", { name: /加入購物袋/ })).toBeEnabled();
+  await expect(page.locator("#product-options").getByRole("button", { name: /加入購物袋/ })).toBeEnabled();
   await expect(page.locator("body")).toContainText("預購");
 
   await page.goto("/products/e2e-monthly-sold-out");

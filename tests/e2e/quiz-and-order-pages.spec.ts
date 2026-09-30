@@ -13,6 +13,7 @@ test("energy quiz completes, recommends a product, and can add it to the cart", 
   }
 
   await expect(page.locator("body")).toContainText("你的能量水晶是");
+  // 測驗結果頁不是商品詳細頁，沒有 #product-options，維持原本的選擇器
   await page.getByRole("button", { name: /加入購物袋/ }).click();
   await expect(page.locator("body")).toContainText("已加入購物袋");
   await expect(page.getByRole("button", { name: "前往結帳" })).toBeVisible();

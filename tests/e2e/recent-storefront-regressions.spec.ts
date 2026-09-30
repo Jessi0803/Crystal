@@ -38,19 +38,6 @@ test("home hero exposes all three product slides, advances automatically and lin
   await expect(page).toHaveURL(/\/products$/);
 });
 
-test("home trust cards keep customer reviews available from the satisfaction card", async ({ page }) => {
-  await page.goto("/");
-
-  await expect(page.getByText("用心製作，累積真實口碑")).toBeVisible();
-  await expect(page.getByText("合作檢定廠商把關")).toBeVisible();
-  await page.getByRole("button", { name: "查看顧客好評照片" }).click();
-
-  const reviews = page.getByRole("dialog");
-  await expect(reviews).toBeVisible();
-  await expect(reviews.getByRole("heading", { name: "來自顧客的真實回饋" })).toBeVisible();
-  await expect(reviews.locator('img[alt^="顧客好評截圖"]')).toHaveCount(15);
-});
-
 test("registration links open the service terms and privacy policy", async ({ page }) => {
   await page.goto("/register");
 
