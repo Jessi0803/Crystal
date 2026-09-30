@@ -85,7 +85,9 @@
   --brand-peach: #d8b69f;  /* Soft Peach 柔米杏 */
   --brand-blush: #c38380;  /* Rosy Blush 玫瑰粉 */
   --brand-taupe: #9c7164;  /* Rose Taupe 玫瑰棕 */
-  --brand-umber: #4b342c;  /* Deep Umber 深棕 */
+  /* 深棕：色相刻意與 brand-taupe 對齊（15° vs 14°），是玫瑰棕的深色版。
+     要柔化只調飽和度與亮度，動到色相就會與按鈕脫節。 */
+  --brand-umber: #4e3c36;  /* Soft Umber 柔和深棕 */
   --brand-greige: #857670; /* 灰棕色 */
 
   /* 前台用途色：頁面與元件只引用這一層，之後調整色系只改這裡 */

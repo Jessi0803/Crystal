@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { Anchor, Gem, Leaf } from "lucide-react";
 import { Link } from "wouter";
+import ClauseText from "@/components/ClauseText";
+
+/** 顧客回饋區塊先隱藏；之後要恢復就改回 true */
+const SHOW_CUSTOMER_REVIEWS = false;
 
 const customerReviewImages = Array.from(
   { length: 15 },
@@ -150,27 +154,40 @@ export default function About() {
         </div>
       </section>
 
-      {/* 天然水晶保證 */}
+      {/* 水晶品質 */}
       <section
         className="paper-surface lace-top lace-bottom px-6 py-24"
         style={{ ["--lace-outside" as string]: "var(--sf-cream)" }}
       >
-        <div className="mx-auto max-w-4xl text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
+        <div className="mx-auto max-w-3xl text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
+          <p className="mb-5 font-serif-en text-[10px] uppercase tracking-[0.4em] text-sf-accent">Energy Bracelet</p>
           <Gem className="mx-auto mb-6 h-5 w-5 text-sf-accent" aria-hidden="true" />
-          <h2 className="mb-4 font-serif-zh text-2xl font-medium letter-spacing-wide">100% 天然水晶</h2>
-          <div className="rule-ornament mb-6" aria-hidden="true">✦</div>
-          <p className="font-sans-zh text-base font-light leading-[2.2] text-sf-text">
-            無染色、無酸洗，與合作檢定廠商把關品質。
-            <br />
-            每一顆水晶都是大地億萬年的結晶，我們只想把最真實的能量交到你手上。
+          <h2 className="mb-4 font-serif-zh text-2xl font-medium letter-spacing-wide">水晶品質</h2>
+          <div className="rule-ornament mb-8" aria-hidden="true">✦</div>
+
+          <p className="font-serif-zh text-lg font-light leading-[2.1] text-sf-ink sm:text-xl">
+            <ClauseText text="其實⋯水晶的價值不在於戴得多，而在於你「品質」！" />
           </p>
-          <p className="mt-8 font-serif-en text-[10px] uppercase tracking-[0.4em] text-sf-accent">
-            天然水晶 · 能量淨化 · 手工設計 · 正緣桃花 · 招財轉運 · 情緒療癒
+
+          <div className="mx-auto mt-10 max-w-2xl space-y-6 font-sans-zh text-base font-light leading-[2.2] text-sf-text">
+            <p>
+              因此我們堅持以 <span className="whitespace-nowrap">7A–9A</span> 高品晶石作為主要選品標準，從晶體、色澤、天然紋理、完整度到切磨質感層層篩選，不以大量堆疊取代品質。
+            </p>
+            <p>
+              我們相信水晶所承載的能量與晶石本身的品質有所連結，因此比起「戴很多」，我們更重視「選得好」。
+            </p>
+          </div>
+
+          <div className="rule-ornament my-10" aria-hidden="true">✦</div>
+
+          <p className="font-serif-zh text-base leading-[2.1] text-sf-ink sm:text-lg">
+            <ClauseText text="少一點堆疊，多一點講究——這就是 Gooday 對水晶的選擇。" />
           </p>
         </div>
       </section>
 
-      {/* 顧客回饋 */}
+      {/* 顧客回饋（暫時隱藏，改 true 即可恢復） */}
+      {SHOW_CUSTOMER_REVIEWS && (
       <section className="px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center fade-in-section opacity-0 translate-y-10 transition-all duration-1000 ease-out">
@@ -193,6 +210,7 @@ export default function About() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Final Section */}
       <section className="h-[80vh] flex items-center justify-center px-6 bg-sf-ink text-sf-cream">
