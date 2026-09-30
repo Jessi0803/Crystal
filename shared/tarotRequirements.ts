@@ -69,9 +69,16 @@ export const TAROT_GROUP_REQUIREMENTS: Record<
   },
 };
 
+/**
+ * 商品頁與表單的主題名稱空白寫法不一致（「前世今生 1」vs「前世今生1」），
+ * 比對前先去除空白，與 tarotPricing 的 getTarotTopicByLabel 同一套規則。
+ */
 export function getTarotGroupByLabel(label: string | null | undefined) {
   if (!label) return undefined;
-  return TAROT_TOPIC_GROUPS.find((topic) => topic.label === label)?.group;
+  const normalized = label.replace(/\s+/g, "");
+  return TAROT_TOPIC_GROUPS.find(
+    (topic) => topic.label.replace(/\s+/g, "") === normalized
+  )?.group;
 }
 
 export type TarotRequirementRow = {
