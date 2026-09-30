@@ -4,17 +4,16 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import ResponsiveImage from "@/components/ResponsiveImage";
 import ProductCardTags from "@/components/ProductCardTags";
 import { useParams, Link } from "wouter";
-import { Plus, Minus, ShoppingBag } from "lucide-react";
+import { CircleAlert, Minus, Plus, ShoppingBag } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import {
-  CUSTOM_BRACELET_NOTICES,
+  CUSTOM_BRACELET_DEPOSIT,
   CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
-  getCustomPriceDisplay,
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
 import {
@@ -161,7 +160,7 @@ export default function ProductDetail() {
   const product = dbProduct ?? (isLoading ? cachedProduct ?? staticProduct : staticProduct);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<
-    "benefits" | "content" | "howto" | "notices" | "warranty" | "wrist"
+    "benefits" | "content" | "howto" | "warranty" | "wrist"
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
   const [selectedTarotReadingName, setSelectedTarotReadingName] = useState("");
@@ -228,7 +227,7 @@ export default function ProductDetail() {
 
   if (isLoading && !product) {
     return (
-      <div className="min-h-screen bg-white page-enter">
+      <div className="min-h-screen paper-surface page-enter">
         <div className="border-b border-sf-line px-4 sm:px-6 lg:px-8 py-3">
           <div className="max-w-[1440px] mx-auto h-4 w-44 bg-sf-cream animate-pulse" />
         </div>
@@ -342,6 +341,9 @@ export default function ProductDetail() {
     : isNumerologyDepositProduct
       ? "生命靈數解析價格"
       : "";
+  // 「脈輪檢測價格」→「脈輪檢測」，供訂金組成說明使用
+  const splitCustomFeeName = splitCustomFeeLabel.replace("價格", "");
+  const splitCustomReadingFee = Math.max(0, product.price - CUSTOM_BRACELET_DEPOSIT);
   const activeTarotPriceList =
     tarotReadingCategories.find((category) => category.id === activeTarotCategory)?.items ??
     tarotReadingCategories[0].items;
@@ -435,9 +437,6 @@ export default function ProductDetail() {
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
     ...(showHowToTab ? [{ id: "howto" as const, label: "下單流程" }] : []),
-    ...(product.category === "custom" && product.disclaimer
-      ? [{ id: "notices" as const, label: "注意事項" }]
-      : []),
     ...(product.category !== "custom" ? [{ id: "warranty" as const, label: "保固與維修" }] : []),
     ...(hasWristSizeOption ? [{ id: "wrist" as const, label: "手圍測量" }] : []),
   ];
@@ -446,7 +445,7 @@ export default function ProductDetail() {
     : product.crystalType.split("、");
 
   return (
-    <div className={`min-h-screen bg-white page-enter ${hasStickyBuyBar ? "pb-20 lg:pb-0" : ""}`}>
+    <div className={`min-h-screen paper-surface page-enter ${hasStickyBuyBar ? "pb-20 lg:pb-0" : ""}`}>
 
       {/* Breadcrumb */}
       <div className="border-b border-sf-line px-4 sm:px-6 lg:px-8 py-3">
@@ -671,15 +670,26 @@ export default function ProductDetail() {
                       <CustomPriceTile label="訂金" value="NT$500" note="尾款由店家確認後另行通知" />
                     </div>
                   ) : splitCustomFeeLabel ? (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
-                      <CustomPriceTile label={splitCustomFeeLabel} value="NT$500" />
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
+                        <CustomPriceTile
+                          label={splitCustomFeeLabel}
+                          value={`NT$${splitCustomReadingFee.toLocaleString()}`}
+                        />
+                      </div>
+                      {/* 這兩個方案的訂金含解析費，金額直接用商品售價，避免與實收脫節 */}
+                      <CustomPriceTile
+                        label="訂金"
+                        value={`NT$${product.price.toLocaleString()}`}
+                        note={`${splitCustomFeeName} NT$${splitCustomReadingFee.toLocaleString()} ＋ 客製手鍊訂金 NT$${CUSTOM_BRACELET_DEPOSIT.toLocaleString()}；尾款由店家確認後另行通知`}
+                      />
                     </div>
                   ) : (
                     <>
                       <div className="flex items-baseline gap-3">
                         <span className="text-[1.75rem] font-light tracking-[0.04em] text-sf-ink" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                          {getCustomPriceDisplay(product.id, product.priceRange)}
+                          {product.priceRange}
                         </span>
                       </div>
                     </>
@@ -880,6 +890,21 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {/* 客製商品的注意事項：直接顯示在下單按鈕上方，不收進分欄 */}
+            {product.category === "custom" && product.disclaimer && (
+              <div className="mb-4 rounded-md border border-sf-line bg-sf-cream px-4 py-4">
+                <p className="mb-2 flex items-center gap-2 text-[0.7rem] font-body font-medium tracking-[0.12em] text-sf-text">
+                  <CircleAlert className="h-3.5 w-3.5 text-brand-blush" strokeWidth={1.6} aria-hidden="true" />
+                  注意事項
+                </p>
+                <div className="space-y-2 text-[0.8125rem] font-body font-light leading-[1.75] tracking-wide text-sf-text">
+                  {product.disclaimer.split("\n").filter(Boolean).map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Custom product: payment-first CTA */}
             {product.category === "custom" && isCustomDepositProduct(product.id) && (
               <div ref={ctaRef} className="mb-4">
@@ -993,15 +1018,6 @@ export default function ProductDetail() {
                     </li>
                   ))}
                 </ul>
-              )}
-              {product.category === "custom" && product.disclaimer && activeTab === "notices" && (
-                <div className="rounded-md border border-sf-line bg-sf-cream px-4 py-4">
-                  <div className="space-y-2 text-[0.8125rem] font-body font-light text-sf-text leading-[1.75] tracking-wide">
-                    {product.disclaimer.split("\n").filter(Boolean).map((line, i) => (
-                      <p key={i}>{line}</p>
-                    ))}
-                  </div>
-                </div>
               )}
               {product.category !== "custom" && activeTab === "warranty" && (
                 <ul className="space-y-2">
