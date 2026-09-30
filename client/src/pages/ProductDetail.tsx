@@ -33,6 +33,7 @@ import {
   getTarotTopicByLabel,
   tarotTopicOptionId,
 } from "@shared/tarotPricing";
+import { getTarotGroupByLabel, getTarotRequirementRows } from "@shared/tarotRequirements";
 import {
   Dialog,
   DialogContent,
@@ -344,6 +345,8 @@ export default function ProductDetail() {
   // 「脈輪檢測價格」→「脈輪檢測」，供訂金組成說明使用
   const splitCustomFeeName = splitCustomFeeLabel.replace("價格", "");
   const splitCustomReadingFee = Math.max(0, product.price - CUSTOM_BRACELET_DEPOSIT);
+  const tarotRequirementRows = getTarotRequirementRows();
+  const selectedTarotGroup = getTarotGroupByLabel(selectedTarotReadingName);
   const activeTarotPriceList =
     tarotReadingCategories.find((category) => category.id === activeTarotCategory)?.items ??
     tarotReadingCategories[0].items;
@@ -662,6 +665,65 @@ export default function ProductDetail() {
                             請選擇一個占卜主題，系統會在付款前確認本次金額。
                           </p>
                         )}
+                      </div>
+
+                      {/* 占卜前需提供：與客製表單共用 shared/tarotRequirements.ts，兩邊不會不一致 */}
+                      <div className="bg-sf-cream border border-sf-line px-4 py-4 sm:px-5 sm:py-5">
+                        <p className="text-[0.68rem] tracking-[0.18em] font-body text-sf-muted mb-1">
+                          占卜前需提供
+                        </p>
+                        <p className="text-sm font-body text-sf-text leading-relaxed mb-4">
+                          付款後填寫客製表單時會請你提供以下資訊，建議先準備好
+                        </p>
+                        <div className="space-y-2">
+                          {tarotRequirementRows.map((row) => {
+                            const isSelected = row.group === selectedTarotGroup;
+                            return (
+                              <div
+                                key={row.group}
+                                className={`border px-4 py-3 transition-colors ${
+                                  isSelected ? "border-sf-accent bg-sf-selected" : "border-sf-line bg-white"
+                                }`}
+                              >
+                                <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                  <p className="text-sm font-body font-medium text-sf-ink">
+                                    {row.topics.join("、")}
+                                  </p>
+                                  {isSelected && (
+                                    <span className="rounded-full bg-sf-accent px-2 py-0.5 text-[0.6rem] font-body text-white">
+                                      你選擇的方案
+                                    </span>
+                                  )}
+                                </div>
+                                {row.requirements.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {row.requirements.map((item) => (
+                                      <span
+                                        key={item}
+                                        className="border border-sf-line-strong bg-white px-2 py-0.5 text-xs font-body text-sf-text"
+                                      >
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {row.note && (
+                                  <p className="text-xs font-body leading-relaxed text-sf-muted">
+                                    {row.note}
+                                    <a
+                                      href={CUSTOM_LINE_URL}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="ml-1 underline decoration-brand-peach underline-offset-2 hover:text-sf-accent"
+                                    >
+                                      前往官方 LINE
+                                    </a>
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ) : isBasicCustomDepositProduct ? (

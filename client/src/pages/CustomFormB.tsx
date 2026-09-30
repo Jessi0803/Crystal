@@ -29,23 +29,12 @@ import {
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
 import { getTarotTopicByOptionId } from "@shared/tarotPricing";
+import { TAROT_TOPIC_GROUPS, type TarotGroup } from "@shared/tarotRequirements";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
 // ── 塔羅主題定義 ────────────────────────────────────────────────────────────
 
-type TarotGroup =
-  | "couple" // 雙方姓名 + 雙方生日 + 感情概況
-  | "love_solo" // 姓名 + 生日 + 感情概況
-  | "basic" // 姓名 + 生日
-  | "startup" // 姓名 + 生日 + 創業項目
-  | "career" // 姓名 + 生日 + 工作概況
-  | "interview" // 姓名 + 生日 + 面試公司職位
-  | "dual_path" // 姓名 + 生日 + A/B + 目前情況 + 原因
-  | "friendship" // 雙方姓名 + 雙方生日 + 友情概況
-  | "healing" // 姓名 + 生日 + 想療癒的內容
-  | "past_life_2" // 雙方姓名 + 雙方生日 + 今生關係
-  | "single_q"; // 單題制 → 導向 LINE
 
 // 各主題對應的方案說明文字
 const TOPIC_CONTENT: Record<string, { desc?: string; items: string[] }> = {
@@ -229,28 +218,7 @@ const TOPIC_CONTENT: Record<string, { desc?: string; items: string[] }> = {
   },
 };
 
-const tarotTopics: { label: string; group: TarotGroup }[] = [
-  { label: "戀愛指南", group: "couple" },
-  { label: "感情復合", group: "couple" },
-  { label: "緣來暗戀", group: "couple" },
-  { label: "旺桃花運", group: "love_solo" },
-  { label: "財富密碼", group: "basic" },
-  { label: "進化人生", group: "basic" },
-  { label: "前世今生1", group: "basic" },
-  { label: "前世今生3", group: "basic" },
-  { label: "流年運勢1", group: "basic" },
-  { label: "流年運勢2", group: "basic" },
-  { label: "流年運勢3", group: "basic" },
-  { label: "守護神", group: "basic" },
-  { label: "創業衝衝", group: "startup" },
-  { label: "職涯探索", group: "career" },
-  { label: "面試勝經", group: "interview" },
-  { label: "雙向之路", group: "dual_path" },
-  { label: "友情可貴", group: "friendship" },
-  { label: "心靈療癒", group: "healing" },
-  { label: "前世今生2", group: "past_life_2" },
-  { label: "單題制（題數制）", group: "single_q" },
-];
+const tarotTopics = TAROT_TOPIC_GROUPS;
 
 // ── Form State ──────────────────────────────────────────────────────────────
 
