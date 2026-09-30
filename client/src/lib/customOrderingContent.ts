@@ -34,7 +34,7 @@ export function getCustomFormPath(productId: string) {
   return isCustomDepositProduct(productId) ? CUSTOM_FORM_PATH_BY_PRODUCT_ID[productId] : null;
 }
 
-export const CUSTOM_BRACELET_PRICE_DISPLAY = "NT$1,500 ± NT$300";
+export const CUSTOM_BRACELET_PRICE_DISPLAY = "NT$2,500 ± NT$500";
 
 /**
  * 客製手鍊本身的訂金。
