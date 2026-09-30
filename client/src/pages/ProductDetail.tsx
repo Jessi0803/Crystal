@@ -700,6 +700,20 @@ export default function ProductDetail() {
                             請選擇一個占卜主題，系統會在付款前確認本次金額。
                           </p>
                         )}
+
+                        {/* 單題制不在價目表內（沒有固定方案與欄位），引導客人私訊詢問 */}
+                        <p className="mt-3 text-xs font-body leading-relaxed text-sf-muted">
+                          想要單題制（題數制）嗎？需求依題目而定，請
+                          <a
+                            href={CUSTOM_LINE_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mx-1 underline decoration-brand-peach underline-offset-2 hover:text-sf-accent"
+                          >
+                            透過官方 LINE
+                          </a>
+                          與店家確認。
+                        </p>
                       </div>
 
                     </div>
