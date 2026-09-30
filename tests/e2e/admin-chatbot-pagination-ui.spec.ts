@@ -1,13 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 function trpcSuccess(data: unknown) {
   return [{ result: { data: { json: data } } }];
 }
 
 test("admin chatbot log UI paginates and exposes recommendation metadata", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.route("**/api/trpc/chatbot.listLogs**", async (route) => {
     const secondPage = decodeURIComponent(route.request().url()).includes('"offset":20');

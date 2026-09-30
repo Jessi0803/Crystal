@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { createAtmHomeDeliveryOrder, login, loginAsAdminByCookie } from "./helpers";
+import { createAtmHomeDeliveryOrder, loginAsAdminByCookie } from "./helpers";
 
 test("admin revenue dashboard shows confirmed order metrics and top products", async ({ page }) => {
   test.setTimeout(60_000);
   const merchantTradeNo = await createAtmHomeDeliveryOrder(page, `e2e-revenue-${Date.now()}@example.com`);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.locator("button").filter({ hasText: merchantTradeNo }).click();
   await page.getByRole("button", { name: "確認收款" }).click();
   await expect(page.locator("body")).toContainText("已確認收款");
@@ -49,8 +48,7 @@ test("admin revenue dashboard shows confirmed order metrics and top products", a
 });
 
 test("admin chatbot log page can search and expand seeded conversations", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/chatbot");
   await expect(page.getByRole("heading", { name: "AI 客服紀錄" })).toBeVisible();
@@ -72,8 +70,7 @@ test("admin chatbot log page can search and expand seeded conversations", async 
 });
 
 test("legacy admin inventory route redirects admins to product management", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/inventory");
 
@@ -143,7 +140,7 @@ test("admin revenue removes a paid test order after it is cancelled", async ({ p
   const orderAmount = Number(amountText.replaceAll(",", ""));
   expect(orderAmount).toBeGreaterThan(0);
 
-  await login(page, "e2e-admin@example.com");
+  await loginAsAdminByCookie(page);
   await page.locator("button").filter({ hasText: merchantTradeNo }).click();
   await page.getByRole("button", { name: "確認收款" }).click();
   await expect(page.locator("body")).toContainText("已確認收款");

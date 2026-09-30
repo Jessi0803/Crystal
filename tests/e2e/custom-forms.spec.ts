@@ -1,14 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import {
-  addCustomDepositToCart,
-  addPureCustomDepositToCart,
-  fillProfileCustomOrderForm,
-  fillPureCustomOrderForm,
-  fillTarotCustomOrderForm,
-  login,
-  proceedToCheckoutFromCart,
-  submitAtmCustomDepositCheckout,
-} from "./helpers";
+import { addCustomDepositToCart, addPureCustomDepositToCart, fillProfileCustomOrderForm, fillPureCustomOrderForm, fillTarotCustomOrderForm, loginAsAdminByCookie, proceedToCheckoutFromCart, submitAtmCustomDepositCheckout } from "./helpers";
 
 const customProducts = [
   { path: "/custom/form", id: "custom-deposit-product", name: "客製化商品" },
@@ -18,8 +9,7 @@ const customProducts = [
 ] as const;
 
 async function expectConsultationNoteInAdmin(page: Page, orderNo: string, expectedText: string) {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.getByText(orderNo).click();
   await expect(page.locator("body")).toContainText("客製化諮詢內容");
   await expect(page.locator("body")).toContainText(expectedText);

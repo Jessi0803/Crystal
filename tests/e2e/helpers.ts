@@ -51,8 +51,15 @@ async function createE2eSessionToken(openId: string, name: string) {
     .sign(new TextEncoder().encode(E2E_JWT_SECRET));
 }
 
-export async function loginAsAdminByCookie(page: Page) {
-  const token = await createE2eSessionToken("e2e-admin-openid", "E2E Admin");
+/**
+ * 直接把 session cookie 塞進瀏覽器，不走登入 API。
+ *
+ * 表單登入會受 member-auth 限流（20 次 / 15 分鐘），全套 e2e 的登入次數遠超過這個上限，
+ * 並行執行時會互相擠爆而大量失敗。只是「需要一個已登入身分」的測試改用這個；
+ * 真正在測登入行為的測試（auth-admin、member-security、checkout-account-gate）仍用表單登入。
+ */
+async function setSessionCookie(page: Page, openId: string, name: string) {
+  const token = await createE2eSessionToken(openId, name);
   await page.context().addCookies([
     {
       name: COOKIE_NAME,
@@ -64,8 +71,17 @@ export async function loginAsAdminByCookie(page: Page) {
       expires: Math.floor((Date.now() + ONE_YEAR_MS) / 1000),
     },
   ]);
+}
+
+export async function loginAsAdminByCookie(page: Page) {
+  await setSessionCookie(page, "e2e-admin-openid", "E2E Admin");
   await page.goto("/admin/orders");
   await expect(page).toHaveURL(/\/admin\/orders/);
+}
+
+/** 一般會員身分；不導頁，呼叫端自行決定要去哪一頁 */
+export async function loginAsUserByCookie(page: Page) {
+  await setSessionCookie(page, "e2e-user-openid", "E2E User");
 }
 
 // 手機版有固定購買列（StickyBuyBar，lg:hidden），頁面上會出現兩顆「加入購物袋」，

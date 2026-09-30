@@ -1,11 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import {
-  createAtmHomeDeliveryOrder,
-  fillDomesticHomeCheckout,
-  goToCheckoutWithSeededBracelet,
-  login,
-  uploadTransferReceipt,
-} from "./helpers";
+import { createAtmHomeDeliveryOrder, fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet, loginAsAdminByCookie, loginAsUserByCookie, uploadTransferReceipt } from "./helpers";
 
 async function openAdminOrder(page: Page, merchantTradeNo: string) {
   await page.goto("/admin/orders");
@@ -58,8 +52,7 @@ test("ATM home-delivery checkout creates an order and accepts transfer last five
   await expect(page.locator("body")).toContainText("已收到您的匯款末五碼");
   await expect(page.locator("body")).toContainText("54321");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.locator("button").filter({ hasText: merchantTradeNo }).click();
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
   await expect(page.locator("body")).toContainText("x1 ・ NT$ 1,400");
@@ -88,8 +81,9 @@ test("ATM checkout requires last five and transfer receipt before submit", async
 });
 
 test("logged-in member sees a newly created ATM order in member center", async ({ page }) => {
-  await login(page, "e2e-user@example.com");
-  await expect(page).toHaveURL(/\/products/);
+  // 這支在測會員中心看得到訂單，重點不是登入流程
+  await loginAsUserByCookie(page);
+  await page.goto("/products");
 
   const merchantTradeNo = await createAtmHomeDeliveryOrder(page, "e2e-user@example.com");
   expect(merchantTradeNo.length).toBeGreaterThan(0);

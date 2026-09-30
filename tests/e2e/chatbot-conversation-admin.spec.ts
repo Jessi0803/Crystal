@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 function trpcSuccess(data: unknown) {
   return [{ result: { data: { json: data } } }];
@@ -251,8 +251,7 @@ test("storefront chatbot refuses medical and investment guarantees without produ
 });
 
 test("admin chatbot logs can be searched and expanded to inspect the matched answer", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   const requestedUrls: string[] = [];
   await page.route("**/api/trpc/chatbot.listLogs**", async (route) => {
@@ -306,8 +305,7 @@ test("admin chatbot logs can be searched and expanded to inspect the matched ans
 });
 
 test("admin chatbot logs show an empty search state and can clear back to the full list", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.route("**/api/trpc/chatbot.listLogs**", async (route) => {
     const url = decodeURIComponent(route.request().url());

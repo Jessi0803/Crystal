@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import { fillDomesticHomeCheckout, fillTransferCheckoutFields, login } from "./helpers";
+import { fillDomesticHomeCheckout, fillTransferCheckoutFields, loginAsAdminByCookie } from "./helpers";
 
 // 手機版有固定購買列（StickyBuyBar），頁面上會有兩顆「加入購物袋」，
 // 所以一律從商品選項區 #product-options 內點。
@@ -38,8 +38,7 @@ async function getInventoryDeducted(orderNo: string) {
 }
 
 async function createUniqueStockProduct(page: Page, productName: string, stock: number) {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
   await page.getByRole("button", { name: "新增商品" }).click();
@@ -127,16 +126,14 @@ test("ATM preorder order is displayed as preorder after it is stored", async ({ 
   await expect(page.locator("body")).toContainText("預購商品");
   await expect(page.locator("body")).toContainText(/E2E 預購手鍊.*（預購）/);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.getByRole("button", { name: "轉帳待確認" }).click();
   await page.getByText(orderNo).click();
   await expect(page.locator("body")).toContainText("預購");
 });
 
 test("zero-stock preorder and sold-out monthly fixtures produce distinct storefront outcomes", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.goto("/admin/products");
   await page.locator('input[placeholder="搜尋商品名稱或分類"]').fill("E2E 預購手鍊");
   await expect(page.getByRole("button", { name: "編輯 E2E 預購手鍊 庫存" })).toHaveText("0");

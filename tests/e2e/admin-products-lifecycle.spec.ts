@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { resolve } from "node:path";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 // 手機版有固定購買列（StickyBuyBar），頁面上會有兩顆「加入購物袋」，
 // 所以一律從商品選項區 #product-options 內點。
@@ -8,8 +8,7 @@ import { login } from "./helpers";
 const productSearch = 'input[placeholder="搜尋商品名稱或分類"]';
 
 async function openProductsAdmin(page: Page) {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.goto("/admin/products");
   await expect(page.getByRole("heading", { name: "商品管理" })).toBeVisible();
 }
