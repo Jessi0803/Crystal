@@ -9,11 +9,12 @@ const customProductPaths = [
 
 test("custom service plans and product details use the updated bracelet price notation", async ({ page }) => {
   await page.goto("/custom");
-  await expect(page.getByText("手鍊價格：NT$1,500 ± NT$300")).toHaveCount(4);
+  await expect(page.getByText("手鍊價格：NT$2,500 ± NT$500")).toHaveCount(4);
 
   for (const path of customProductPaths) {
     await page.goto(path);
-    await expect(page.locator("body")).toContainText("NT$1,500 ± NT$300");
+    await expect(page.locator("body")).toContainText("NT$2,500 ± NT$500");
+    await expect(page.locator("body")).not.toContainText("NT$1,500 ± NT$300");
     await expect(page.locator("body")).not.toContainText("NT$1,200 ~ 1,800");
   }
 });
@@ -33,7 +34,7 @@ test("home hero exposes all three product slides, advances automatically and lin
   await expect(slideButtons.nth(2)).toHaveAttribute("aria-current", "true");
   await expect(hero.locator('img[alt="D004 淡粉色水晶設計手鍊"]')).toHaveAttribute("aria-hidden", "false");
 
-  await hero.getByRole("link", { name: "查看全部商品" }).click({ position: { x: 20, y: 20 } });
+  await hero.getByRole("link", { name: "探索水晶飾品" }).click({ position: { x: 20, y: 20 } });
   await expect(page).toHaveURL(/\/products$/);
 });
 
