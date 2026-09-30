@@ -4,6 +4,7 @@
 import { eq, desc, and, gte, sql, inArray, SQL, or } from "drizzle-orm";
 import crypto from "node:crypto";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
+import { upsertCustomConsultationNote } from "../shared/customFormNote";
 import { getDb } from "./db";
 import {
   orders,
@@ -1705,4 +1706,69 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
 
     return attachItemsAndLogisticsForOrders(db, normalizedOrders as OrderRow[]);
   }
+}
+
+/** 同一筆訂單同時有人寫入時的重試次數 */
+const MAX_CUSTOM_NOTE_ATTEMPTS = 4;
+
+/**
+ * 寫入／更新某一件客製商品的需求內容。
+ *
+ * customerNote 是整欄讀出、改完再整欄寫回：多件客製商品分別送出時，
+ * 後寫的會蓋掉先寫的，其中一件的需求就消失了。這裡用「條件式 UPDATE
+ * （比對讀到的舊值）＋重試」，中間有人先寫入時就重讀最新值再套用一次，
+ * 做法與 reserveCoupon 的併發保護一致。
+ *
+ * @returns 寫入成功為 true；連續重試仍被搶先則為 false
+ */
+export async function saveCustomConsultationNote(input: {
+  merchantTradeNo: string;
+  productId: string;
+  customerNote: string;
+  orderItemId?: number;
+  itemIndex?: number;
+  /** 呼叫端稍早讀到的 customerNote，用來偵測中途被改掉 */
+  expectedNote: string | null;
+}): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  let expected = input.expectedNote;
+
+  for (let attempt = 1; attempt <= MAX_CUSTOM_NOTE_ATTEMPTS; attempt += 1) {
+    const nextNote = upsertCustomConsultationNote(expected, {
+      productId: input.productId,
+      customerNote: input.customerNote,
+      orderItemId: input.orderItemId,
+      itemIndex: input.itemIndex,
+    });
+
+    // 內容完全沒變就不必寫入；MySQL 在新舊值相同時 affectedRows 也是 0，
+    // 直接送出去會被誤判成併發衝突。
+    if (nextNote === expected) return true;
+
+    const result = await db
+      .update(orders)
+      .set({ customerNote: nextNote })
+      .where(
+        and(
+          eq(orders.merchantTradeNo, input.merchantTradeNo),
+          // NULL-safe 比對：沒填過的訂單 customerNote 是 NULL
+          sql`${orders.customerNote} <=> ${expected}`
+        )
+      );
+
+    if (getAffectedRows(result) > 0) return true;
+
+    // 被別人搶先寫入（或訂單不存在）：重讀最新值再試一次
+    const [row] = await db
+      .select({ customerNote: orders.customerNote })
+      .from(orders)
+      .where(eq(orders.merchantTradeNo, input.merchantTradeNo))
+      .limit(1);
+    if (!row) return false;
+    expected = row.customerNote;
+  }
+
+  return false;
 }

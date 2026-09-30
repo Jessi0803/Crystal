@@ -18,20 +18,13 @@ import {
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
-import {
-  CUSTOM_DEPOSIT_PRODUCT_IDS,
-  getCustomFormPath,
-} from "@/lib/customOrderingContent";
+import { canFillCustomForm, getCustomFormEntries } from "@/lib/customFormEntries";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS,
-  getRecentCustomFormSubmissionKey,
-} from "@/lib/customFormSubmission";
 import {
   getSavedOrderAccess,
   saveOrderAccess,
@@ -50,82 +43,6 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   completed: "已完成",
   cancelled: "已取消",
 };
-
-type CustomDepositItemInstance = {
-  id: number;
-  productId: string;
-  productName: string;
-  itemIndex: number;
-  quantity: number;
-};
-
-function getCustomConsultationStartMarker(item: CustomDepositItemInstance) {
-  return `【客製需求開始：${item.productId}:${item.id}:${item.itemIndex}】`;
-}
-
-function hasCustomConsultationNote(
-  customerNote: string | null | undefined,
-  item: CustomDepositItemInstance
-) {
-  if (customerNote?.includes(getCustomConsultationStartMarker(item)))
-    return true;
-  return (
-    item.itemIndex === 1 &&
-    Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`))
-  );
-}
-
-function wasCustomFormRecentlySubmitted(
-  merchantTradeNo: string | undefined,
-  item: CustomDepositItemInstance
-) {
-  if (!merchantTradeNo || typeof window === "undefined") return false;
-
-  const keys = [
-    getRecentCustomFormSubmissionKey({
-      merchantTradeNo,
-      productId: item.productId,
-      orderItemId: item.id,
-      itemIndex: item.itemIndex,
-    }),
-  ];
-  if (item.itemIndex === 1) {
-    keys.push(
-      getRecentCustomFormSubmissionKey({
-        merchantTradeNo,
-        productId: item.productId,
-      })
-    );
-  }
-
-  const now = Date.now();
-  return keys.some(key => {
-    const submittedAt = Number(sessionStorage.getItem(key) ?? "");
-    if (!submittedAt) return false;
-    if (now - submittedAt > RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS) {
-      sessionStorage.removeItem(key);
-      return false;
-    }
-    return true;
-  });
-}
-
-function expandCustomDepositItemInstances(
-  items: any[]
-): CustomDepositItemInstance[] {
-  return items.flatMap((item: any) =>
-    Array.from(
-      { length: Math.max(1, Number(item.quantity) || 1) },
-      (_, index) => ({
-        id: item.id,
-        productId: item.productId,
-        productName: item.productName,
-        itemIndex: index + 1,
-        quantity: Math.max(1, Number(item.quantity) || 1),
-      })
-    )
-  );
-}
 
 export default function OrderResult() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
@@ -307,24 +224,13 @@ export default function OrderResult() {
     ...STORE_BANK_INFO,
     ...((order as any)?.bankInfo ?? {}),
   };
-  const customDepositItems =
-    order?.items?.filter((item: any) =>
-      CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)
-    ) ?? [];
-  const customDepositItemInstances =
-    expandCustomDepositItemInstances(customDepositItems);
-  const pendingCustomDepositItems = customDepositItemInstances.filter(
-    item =>
-      !hasCustomConsultationNote(order?.customerNote, item) &&
-      !wasCustomFormRecentlySubmitted(order?.merchantTradeNo, item)
-  );
-  const canFillCustomForm =
-    customDepositItems.length > 0 &&
-    (order?.paymentStatus === "paid" ||
-      order?.paymentStatus === "confirmed" ||
-      order?.paymentStatus === "transfer_pending");
+  // 與會員中心共用同一份判斷（client/src/lib/customFormEntries.ts）
+  const customFormEntries = getCustomFormEntries(order);
+  const pendingCustomFormEntries = customFormEntries.filter(entry => !entry.isSubmitted);
+  const showCustomFormSection =
+    customFormEntries.length > 0 && canFillCustomForm(order?.paymentStatus);
   const shouldPromptForCustomForm =
-    canFillCustomForm && pendingCustomDepositItems.length > 0;
+    showCustomFormSection && pendingCustomFormEntries.length > 0;
 
   useEffect(() => {
     const orderNo = order?.merchantTradeNo ?? "";
@@ -511,18 +417,13 @@ export default function OrderResult() {
               </div>
             </div>
             <div className="space-y-3 px-6 py-5 sm:px-8 sm:py-6">
-              {pendingCustomDepositItems.map(item => {
-                const customFormPath = getCustomFormPath(item.productId);
-                if (!customFormPath) return null;
+              {pendingCustomFormEntries.map(({ item, formUrl }) => {
+                if (!formUrl) return null;
                 return (
                   <button
                     key={`${item.id}-${item.itemIndex}`}
                     className="group flex w-full items-center justify-between gap-4 rounded-md border border-sf-line bg-white px-5 py-4 text-left transition-colors hover:border-sf-accent hover:bg-sf-selected"
-                    onClick={() =>
-                      setLocation(
-                        `${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}&orderItemId=${item.id}&itemIndex=${item.itemIndex}`
-                      )
-                    }
+                    onClick={() => setLocation(formUrl)}
                   >
                     <span className="min-w-0">
                       <span className="mb-1 block text-[0.68rem] font-body tracking-[0.16em] text-brand-blush">
@@ -540,6 +441,59 @@ export default function OrderResult() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/*
+          常駐的客製表單入口。上面的彈窗關掉後就不會再出現，
+          客人填到一半離開會找不到路回來，所以這裡一定要有一個不會消失的入口。
+        */}
+        {showCustomFormSection && (
+          <div className="rounded-md border border-sf-line bg-white p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-sf-accent" strokeWidth={1.5} />
+              <div className="w-full min-w-0">
+                <p className="mb-1 text-sm font-body font-medium text-sf-ink">客製需求表單</p>
+                <p className="mb-4 text-xs font-body leading-relaxed text-sf-muted">
+                  {pendingCustomFormEntries.length > 0
+                    ? "填寫完成後，設計師才會開始為你進行設計。"
+                    : "所有表單都已送出，設計師已經收到你的需求。"}
+                </p>
+
+                <div className="space-y-2">
+                  {customFormEntries.map(({ item, isSubmitted, formUrl }) => {
+                    if (!formUrl) return null;
+                    return (
+                      <div
+                        key={`persistent-${item.id}-${item.itemIndex}`}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sf-line bg-sf-cream px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-body text-sf-ink">
+                            {item.productName}
+                            {item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
+                          </p>
+                          <p
+                            className={`mt-0.5 text-[0.68rem] font-body tracking-[0.08em] ${
+                              isSubmitted ? "text-emerald-700" : "text-brand-blush"
+                            }`}
+                          >
+                            {isSubmitted ? "已送出" : "尚未填寫"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLocation(formUrl)}
+                          className={isSubmitted ? "btn-ghost shrink-0" : "btn-primary shrink-0"}
+                        >
+                          {isSubmitted ? "查看 / 修改" : "填寫客製需求"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 轉帳資訊 */}
         {order.paymentMethod === "atm" &&

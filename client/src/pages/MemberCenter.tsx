@@ -5,6 +5,8 @@ import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { lineLinkUrl, MemberCouponList } from "@/components/MemberCoupons";
+import { canFillCustomForm, getCustomFormEntries } from "@/lib/customFormEntries";
+import { rememberOrderAccess } from "@/lib/orderAccess";
 import BirthdayFields, { EMPTY_BIRTHDAY_DRAFT, parseBirthdayDraft, type BirthdayDraft } from "@/components/BirthdayFields";
 import { CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
 import { birthdayFromUser, formatBirthday } from "@shared/birthday";
@@ -78,6 +80,67 @@ function StatusBadge({ status }: { status: string }) {
     >
       {ORDER_STATUS_LABEL[status] ?? status}
     </span>
+  );
+}
+
+/**
+ * 會員訂單裡的客製表單入口。
+ *
+ * 這裡會出現兩種訂單：掛在會員底下的（orders.userId 相符），以及當初用訪客身分
+ * 下單、之後才註冊同一個 Email 的（userId 是 NULL，靠已驗證 Email 比對列出來）。
+ * 後者在伺服器端只能靠「訂購 Email」通過 hasOrderAccess，所以導向表單前要把
+ * Email 帶上；伺服器仍會重新驗證，這裡不放寬任何權限。
+ */
+function CustomFormEntries({ order }: { order: any }) {
+  const [, navigate] = useLocation();
+  if (!canFillCustomForm(order.paymentStatus)) return null;
+
+  const entries = getCustomFormEntries(order);
+  if (entries.length === 0) return null;
+
+  const openForm = (formUrl: string) => {
+    rememberOrderAccess(order.merchantTradeNo, { buyerEmail: order.buyerEmail });
+    navigate(formUrl);
+  };
+
+  return (
+    <div className="border-t border-sf-line pt-3 pb-3 space-y-2">
+      <p className="text-xs tracking-[0.08em] text-sf-text font-body">客製需求表單</p>
+      {entries.map(({ item, isSubmitted, formUrl }) => {
+        if (!formUrl) return null;
+        return (
+          <div
+            key={`${item.id}-${item.itemIndex}`}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sf-line bg-white px-3 py-2.5"
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-body text-sf-text">
+                {item.productName}
+                {item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
+              </p>
+              <p
+                className={`mt-0.5 text-[0.65rem] font-body tracking-[0.08em] ${
+                  isSubmitted ? "text-emerald-700" : "text-brand-blush"
+                }`}
+              >
+                {isSubmitted ? "已送出" : "尚未填寫"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openForm(formUrl)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-body transition-colors ${
+                isSubmitted
+                  ? "border border-sf-line-strong text-sf-text hover:bg-sf-selected"
+                  : "bg-sf-accent text-white hover:bg-sf-accent-hover"
+              }`}
+            >
+              {isSubmitted ? "查看 / 修改" : "填寫客製需求"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -318,6 +381,9 @@ export default function MemberCenter() {
                             </div>
                           ))}
                         </div>
+
+                        {/* 客製表單入口：填到一半離開的人要在這裡找得回來 */}
+                        <CustomFormEntries order={order} />
 
                         {/* 訂單資訊 */}
                         <div className="border-t border-sf-line pt-3 space-y-1.5">

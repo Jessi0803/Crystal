@@ -300,6 +300,7 @@ export default function CustomForm() {
         isError={formSubmission.isError}
         canFillForm={formSubmission.canFillForm}
         hasExistingNote={formSubmission.hasExistingNote}
+        existingNote={formSubmission.existingNote}
       >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">

@@ -35,6 +35,7 @@ import {
   updateBalancePaymentTransferCode,
   confirmBalanceTransfer,
   settleZeroBalancePayment,
+  saveCustomConsultationNote,
 } from "../orderDb";
 import {
   deductInventoryAfterBalancePayment,
@@ -677,44 +678,6 @@ function isCustomCheckoutItem(item: { id: string; baseProductId?: string }) {
   return CUSTOM_PRODUCT_IDS.includes(item.baseProductId ?? item.id);
 }
 
-function getCustomConsultationKey(productId: string, orderItemId?: number, itemIndex?: number) {
-  if (orderItemId && itemIndex) return `${productId}:${orderItemId}:${itemIndex}`;
-  return productId;
-}
-
-function getCustomConsultationStartMarker(productId: string, orderItemId?: number, itemIndex?: number) {
-  return `【客製需求開始：${getCustomConsultationKey(productId, orderItemId, itemIndex)}】`;
-}
-
-function upsertCustomConsultationNote(
-  existingNote: string | null,
-  productId: string,
-  customerNote: string,
-  orderItemId?: number,
-  itemIndex?: number
-) {
-  const key = getCustomConsultationKey(productId, orderItemId, itemIndex);
-  const startMarker = `【客製需求開始：${key}】`;
-  const endMarker = `【客製需求結束：${key}】`;
-  const noteBlock = [startMarker, customerNote.trim(), endMarker].join("\n");
-  const current = existingNote?.trim() ?? "";
-  if (!current) return noteBlock;
-
-  const startIndex = current.indexOf(startMarker);
-  const endIndex = current.indexOf(endMarker);
-  if (startIndex >= 0 && endIndex > startIndex) {
-    return [
-      current.slice(0, startIndex).trimEnd(),
-      noteBlock,
-      current.slice(endIndex + endMarker.length).trimStart(),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-  }
-
-  return [current, noteBlock].join("\n\n");
-}
-
 async function attachTwoItemFreeShippingEligibility<
   T extends { id: string; baseProductId?: string; twoItemFreeShippingEligible?: boolean },
 >(items: T[]) {
@@ -1333,18 +1296,21 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此訂單狀態無法填寫客製需求" });
       }
 
-      const customerNote = upsertCustomConsultationNote(
-        order.customerNote,
-        input.productId,
-        input.customerNote,
-        input.orderItemId,
-        input.itemIndex
-      );
-
-      await db
-        .update(orders)
-        .set({ customerNote })
-        .where(eq(orders.merchantTradeNo, input.merchantTradeNo));
+      // 多件客製商品可能同時送出，交由條件式 UPDATE 保證不會互相覆蓋
+      const saved = await saveCustomConsultationNote({
+        merchantTradeNo: input.merchantTradeNo,
+        productId: input.productId,
+        customerNote: input.customerNote,
+        orderItemId: input.orderItemId,
+        itemIndex: input.itemIndex,
+        expectedNote: order.customerNote,
+      });
+      if (!saved) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "這筆訂單剛才有其他更新，請重新整理後再送出一次",
+        });
+      }
 
       return { success: true };
     }),
