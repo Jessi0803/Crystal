@@ -1,4 +1,5 @@
-import { CUSTOM_BRACELET_NOTICES, CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
+import { CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
+import CustomRevisionNotice from "@/components/CustomRevisionNotice";
 import { CircleAlert } from "lucide-react";
 
 /**
@@ -49,14 +50,7 @@ export default function CustomFormOrderingIntro() {
           <CircleAlert className="h-4 w-4 text-brand-blush" strokeWidth={1.6} aria-hidden="true" />
           手鍊注意事項
         </p>
-        <div className="space-y-3 text-[0.8125rem] font-body font-light text-sf-text leading-[1.8] tracking-wide">
-          {CUSTOM_BRACELET_NOTICES.map((n, idx) => (
-            <div key={idx}>
-              {n.title ? <p className="font-medium text-sf-text mb-1">{n.title}</p> : null}
-              <p>{n.body}</p>
-            </div>
-          ))}
-        </div>
+        <CustomRevisionNotice />
       </div>
     </section>
   );
