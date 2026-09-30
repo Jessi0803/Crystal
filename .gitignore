@@ -128,3 +128,6 @@ _gitdir/
 /.git
 .vercel
 .env*
+
+# 本機開發時寫入的上傳檔（含客戶轉帳收據等個資），不可進版控
+uploads/
