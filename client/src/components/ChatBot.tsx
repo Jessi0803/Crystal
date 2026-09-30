@@ -106,6 +106,8 @@ export default function ChatBot() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [showQuickQuestions, setShowQuickQuestions] = useState(true);
+  /** 捲到頁尾時收起懸浮按鈕，避免擋住頁尾的聯絡按鈕 */
+  const [isTucked, setIsTucked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isAtMessageLimit = input.length >= MAX_CHATBOT_MESSAGE_LENGTH;
@@ -145,6 +147,43 @@ export default function ChatBot() {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
+  }, [isOpen]);
+
+  /**
+   * 捲到頁尾時讓開。
+   *
+   * 頁尾的「聯絡我們」社群按鈕就在右下角，跟懸浮按鈕重疊會點不到。
+   * 兩者都是聯絡入口，頁尾已經提供同樣的功能，所以這裡收起而不是搬位置。
+   * 對話框開著時不收，免得使用者打到一半被藏起來。
+   */
+  useEffect(() => {
+    if (isOpen) {
+      setIsTucked(false);
+      return;
+    }
+
+    const footer = document.querySelector("footer");
+    if (!footer) return;
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      // 懸浮按鈕約佔畫面底部 96px；頁尾進到這個範圍就收起
+      setIsTucked(footer.getBoundingClientRect().top < window.innerHeight - 96);
+    };
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, [isOpen]);
 
   // Allow other pages to open chatbot programmatically.
@@ -202,7 +241,12 @@ export default function ChatBot() {
   return (
     <>
       {/* 懸浮按鈕區域 */}
-      <div className="chatbot-launcher fixed bottom-6 right-6 z-50 flex items-center gap-3">
+      <div
+        className={`chatbot-launcher fixed bottom-6 right-6 z-50 flex items-center gap-3 transition-[opacity,transform] duration-300 ease-out ${
+          isTucked ? "pointer-events-none translate-y-3 opacity-0" : "translate-y-0 opacity-100"
+        }`}
+        aria-hidden={isTucked}
+      >
         {/* 浮動標籤（聊天關閉時常駐顯示） */}
         {!isOpen && (
           <div

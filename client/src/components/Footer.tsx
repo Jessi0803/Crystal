@@ -1,8 +1,9 @@
 // 日日好日 — Footer
 // Design: 法式氣質＋溫柔浪漫 — 深棕底頁尾，品牌與聯絡資訊
 import { Link } from "wouter";
-import { Instagram, MessageCircle } from "lucide-react";
+import { Instagram } from "lucide-react";
 import { BrandTextMark } from "./BrandMark";
+import LineLogo from "./LineLogo";
 
 export default function Footer() {
   return (
@@ -45,7 +46,7 @@ export default function Footer() {
                 className="w-8 h-8 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition-colors"
                 aria-label="LINE"
               >
-                <MessageCircle className="w-3.5 h-3.5 text-white/70" />
+                <LineLogo className="w-4 h-4 text-white/70" />
               </a>
             </div>
           </div>

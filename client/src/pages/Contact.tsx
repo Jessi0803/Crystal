@@ -1,7 +1,8 @@
 // 日日好日 — 聯絡我們頁面
 // Design: Vacanza-inspired minimal contact page
 import { Link } from "wouter";
-import { ChevronRight, Phone, Instagram } from "lucide-react";
+import { ChevronRight, Instagram } from "lucide-react";
+import LineLogo from "@/components/LineLogo";
 
 export default function Contact() {
   return (
@@ -39,7 +40,7 @@ export default function Contact() {
                   href: "https://instagram.com/gooday_tarot_",
                 },
                 {
-                  icon: <Phone className="w-4 h-4" strokeWidth={1.5} />,
+                  icon: <LineLogo className="w-[1.15rem] h-[1.15rem]" />,
                   label: "LINE 官方帳號",
                   value: "@011tymeh",
                   sub: "",

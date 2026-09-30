@@ -9,6 +9,7 @@ import { Link, useLocation } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getCustomPriceDisplay } from "@/lib/customOrderingContent";
+import ClauseText from "@/components/ClauseText";
 import { products as staticProducts, type Product } from "@/lib/data";
 import { getQuickCartActionLabel, requiresCustomFormBeforeCart, requiresDetailSelectionBeforeCart } from "@/lib/productOptions";
 import { trpc } from "@/lib/trpc";
@@ -335,12 +336,16 @@ export default function Home() {
 
             <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center">
               <p className="mb-2 text-[0.62rem] font-body font-medium tracking-[0.18em] text-brand-blush sm:mb-3 sm:text-xs sm:tracking-[0.28em]">
-                TODAY&apos;S ENERGY <span className="mx-1 text-brand-peach sm:mx-1.5">•</span> 今日能量語錄
+                <span className="whitespace-nowrap">TODAY&apos;S ENERGY</span>
+                <span className="mx-1 text-brand-peach sm:mx-1.5">•</span>
+                <span className="whitespace-nowrap">今日能量語錄</span>
               </p>
               <blockquote className="max-w-3xl px-3 text-base font-light leading-[1.75] text-sf-ink [text-wrap:balance] sm:px-12 sm:text-[1.35rem] md:text-2xl" style={{fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif"}}>
-                <span aria-hidden="true" className="mr-1 text-[1.4em] leading-none text-brand-peach">“</span>
-                {quote}
-                <span aria-hidden="true" className="ml-1 text-[1.4em] leading-none text-brand-peach">”</span>
+                <ClauseText
+                  text={quote}
+                  prefix={<span aria-hidden="true" className="mr-1 text-[1.4em] leading-none text-brand-peach">“</span>}
+                  suffix={<span aria-hidden="true" className="ml-1 text-[1.4em] leading-none text-brand-peach">”</span>}
+                />
               </blockquote>
             </div>
           </div>
