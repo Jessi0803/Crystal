@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fillDomesticHomeCheckout, fillTransferCheckoutFields, goToCheckoutWithSeededBracelet, login } from "./helpers";
+import { fillDomesticHomeCheckout, fillTransferCheckoutFields, goToCheckoutWithSeededBracelet, loginAsAdminByCookie } from "./helpers";
 
 const sandboxTest = process.env.RUN_ECPAY_SANDBOX === "true" ? test : test.skip;
 
@@ -58,8 +58,7 @@ sandboxTest("admin creates a convenience-store logistics order through the ECPay
   const merchantTradeNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";
   expect(merchantTradeNo).not.toBe("");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.getByText(merchantTradeNo).click();
   await page.getByRole("button", { name: "確認收款" }).click();
   await expect(page.getByRole("button", { name: "建立沙盒物流訂單" })).toBeVisible();
@@ -84,8 +83,7 @@ sandboxTest("admin creates a home-delivery logistics order through the ECPay san
   const merchantTradeNo = page.url().split("/order/")[1]?.split("?")[0] ?? "";
   expect(merchantTradeNo).not.toBe("");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.getByText(merchantTradeNo).click();
   await page.getByRole("button", { name: "確認收款" }).click();
   await expect(page.getByRole("button", { name: "建立沙盒物流訂單" })).toBeVisible();

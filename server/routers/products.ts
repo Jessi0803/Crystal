@@ -7,6 +7,29 @@ import { dbProducts, productInventory, type DbProduct } from "../../drizzle/sche
 import { storagePut } from "../storage";
 import { removeProductKnowledge, syncProductKnowledge, syncProductKnowledgeById } from "../crystalKnowledge";
 import { recordAuditEventSafely } from "../auditDb";
+import { getProductSalesTotals } from "../orderDb";
+import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { RICH_TEXT_MAX_LENGTH, richTextToPlainText } from "@shared/richText";
+import { sanitizeBenefits } from "../richTextSanitize";
+import { BlobUploadError, UPLOADABLE_IMAGE_TYPES, putPublicImage } from "../blobStorage";
+
+const ImageUploadInputSchema = z.object({
+  contentType: z.enum(Object.keys(UPLOADABLE_IMAGE_TYPES) as [keyof typeof UPLOADABLE_IMAGE_TYPES]),
+  // base64 約為原始大小的 4/3，實際大小由 putPublicImage 檢查
+  dataBase64: z.string().min(1).max(4_200_000, "圖片太大，請小於 3MB"),
+});
+
+async function uploadImageToBlob(folder: string, input: z.infer<typeof ImageUploadInputSchema>) {
+  try {
+    const { url } = await putPublicImage(folder, Buffer.from(input.dataBase64, "base64"), input.contentType);
+    return { url };
+  } catch (error) {
+    if (error instanceof BlobUploadError) {
+      throw new TRPCError({ code: error.code === "TOO_LARGE" ? "BAD_REQUEST" : "PRECONDITION_FAILED", message: error.message });
+    }
+    throw error;
+  }
+}
 
 let tableEnsured = false;
 
@@ -57,7 +80,7 @@ function inferProductCategories(p: Pick<DbProduct, "id" | "category" | "benefits
   if (override) return override;
 
   const text = [
-    ...((p.benefits as string[] | null) ?? []),
+    ...((p.benefits as string[] | null) ?? []).map(richTextToPlainText),
     ...((p.tags as string[] | null) ?? []),
     p.crystalType ?? "",
   ].join(" ");
@@ -339,7 +362,8 @@ const ProductInputSchema = z.object({
   tags: z.array(z.string()).default([]),
   description: z.string().default(""),
   story: z.string().default(""),
-  benefits: z.array(z.string()).default([]),
+  // 功效說明可為富文字 HTML，存檔前一律清理
+  benefits: z.array(z.string().max(RICH_TEXT_MAX_LENGTH, "功效說明內容過長")).default([]).transform(sanitizeBenefits),
   suitableFor: z.array(z.string()).default([]),
   howToUse: z.array(z.string()).default([]),
   disclaimer: z.string().default(""),
@@ -380,7 +404,48 @@ const BulkTwoItemFreeShippingInputSchema = z.object({
   eligible: z.boolean(),
 });
 
+/**
+ * 首頁熱銷：依實際銷量排序，後台勾選「精選」的商品優先。
+ * 排除測試、客製化訂金與已下架商品；沒有銷售紀錄時以排序值遞補，避免首頁開天窗。
+ */
+export function rankTopSellers<T extends { id: string; featured?: boolean; sortOrder?: number }>(
+  products: T[],
+  salesByProductId: Map<string, number>,
+  limit: number
+) {
+  return [...products]
+    .sort((a, b) => {
+      if (Boolean(b.featured) !== Boolean(a.featured)) return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+      const sales = (salesByProductId.get(b.id) ?? 0) - (salesByProductId.get(a.id) ?? 0);
+      if (sales !== 0) return sales;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    })
+    .slice(0, limit);
+}
+
 export const productRouter = router({
+  topSellers: publicProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(12).default(6) }).default({ limit: 6 }))
+    .query(async ({ input }) => {
+      await ensureProductsTable();
+      await publishDueProducts();
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.select().from(dbProducts).where(eq(dbProducts.active, true));
+      const sellable = rows.filter((p) => p.category !== "test" && !CUSTOM_PRODUCT_IDS.includes(p.id));
+
+      let salesByProductId = new Map<string, number>();
+      try {
+        const totals = await getProductSalesTotals();
+        salesByProductId = new Map(totals.map((total) => [total.productId, total.totalQty]));
+      } catch (error) {
+        // 沒有銷量資料時仍以排序值顯示商品
+        console.warn("[product.topSellers] failed to load sales totals:", error);
+      }
+
+      return rankTopSellers(sellable, salesByProductId, input.limit).map(toFrontendProduct);
+    }),
+
   list: publicProcedure.query(async () => {
     await ensureProductsTable();
     await publishDueProducts();
@@ -581,6 +646,16 @@ export const productRouter = router({
       const result = await storagePut(key, buf, input.contentType);
       return { url: result.url };
     }),
+
+  /** 功效說明富文字內的圖片，上傳到 Vercel Blob（product-benefits/） */
+  uploadRichTextImage: adminProcedure
+    .input(ImageUploadInputSchema)
+    .mutation(({ input }) => uploadImageToBlob("product-benefits", input)),
+
+  /** 商品主圖、相簿與購買方案圖，上傳到 Vercel Blob（products/） */
+  uploadProductImage: adminProcedure
+    .input(ImageUploadInputSchema)
+    .mutation(({ input }) => uploadImageToBlob("products", input)),
 
   seed: adminProcedure
     .input(z.array(ProductInputSchema.safeExtend({ id: z.string() })))

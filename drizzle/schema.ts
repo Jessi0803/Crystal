@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, longtext, decimal, smallint, tinyint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, uniqueIndex, longtext, decimal, smallint, tinyint } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -525,6 +525,8 @@ export const memberCoupons = mysqlTable("memberCoupons", {
   usedAt: timestamp("usedAt"),
   // LINE_FRIEND / BIRTHDAY / ADMIN_GIFT / CAMPAIGN
   source: varchar("source", { length: 32 }).notNull(),
+  // 週期性活動的防重複鍵，例如 birthday:2026；一般人工發券維持 null
+  campaignKey: varchar("campaignKey", { length: 64 }),
   issuedByUserId: int("issuedByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -532,6 +534,7 @@ export const memberCoupons = mysqlTable("memberCoupons", {
   index("member_coupons_user_status_idx").on(table.userId, table.status),
   index("member_coupons_template_idx").on(table.couponTemplateId),
   index("member_coupons_order_idx").on(table.orderId),
+  uniqueIndex("member_coupons_campaign_user_unique").on(table.source, table.campaignKey, table.userId),
 ]);
 
 export type MemberCoupon = typeof memberCoupons.$inferSelect;

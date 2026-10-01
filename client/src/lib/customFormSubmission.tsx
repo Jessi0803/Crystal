@@ -1,10 +1,11 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { CheckCircle, LockKeyhole, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, LockKeyhole, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import type { CustomDepositProductId } from "@/lib/customOrderingContent";
 import { getSavedOrderAccess } from "@/lib/orderAccess";
+import { extractCustomConsultationNote } from "@shared/customFormNote";
 
 export const RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS = 2 * 60 * 1000;
 
@@ -55,6 +56,11 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     order?.paymentStatus === "transfer_pending";
   const canFillForm = Boolean(order?.isCustomOrder && hasMatchingProduct && isPaymentReady);
 
+  const existingNote = extractCustomConsultationNote(order?.customerNote, {
+    productId,
+    ...(hasItemInstance ? { orderItemId, itemIndex } : {}),
+  });
+
   const submitCustomNote = async (customerNote: string) => {
     if (!merchantTradeNo) {
       toast.error("請先完成訂金付款後再填寫客製需求");
@@ -90,14 +96,9 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     isLoading: orderQuery.isLoading,
     isError: orderQuery.isError,
     canFillForm,
-    hasExistingNote: Boolean(
-      order?.customerNote?.includes(
-        hasItemInstance
-          ? `【客製需求開始：${productId}:${orderItemId}:${itemIndex}】`
-          : `【客製需求開始：${productId}】`
-      ) ||
-        (hasItemInstance && itemIndex === 1 && order?.customerNote?.includes(`【客製需求開始：${productId}】`))
-    ),
+    // 已送出的內容：用來讓客人先看到自己填過什麼，而不是直接看到一張空白表單
+    existingNote,
+    hasExistingNote: Boolean(existingNote),
     submitCustomNote,
     isSubmitting: submitMutation.isPending,
   };
@@ -109,6 +110,7 @@ export function CustomFormAccessGate({
   isError,
   canFillForm,
   hasExistingNote,
+  existingNote,
   children,
 }: {
   merchantTradeNo: string;
@@ -116,12 +118,15 @@ export function CustomFormAccessGate({
   isError: boolean;
   canFillForm: boolean;
   hasExistingNote: boolean;
+  /** 已送出的需求內容；有值時先顯示唯讀版本，避免客人看到空白表單而誤送覆蓋 */
+  existingNote?: string | null;
   children: ReactNode;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
   if (!merchantTradeNo) {
     return (
       <CustomFormGateMessage
-        icon={<LockKeyhole className="h-10 w-10 text-amber-500" />}
+        icon={<LockKeyhole className="h-10 w-10 text-brand-blush" strokeWidth={1.5} />}
         title="請先完成訂金付款"
         description="付款成功後，訂單頁會出現填寫客製需求的按鈕。"
       />
@@ -131,7 +136,7 @@ export function CustomFormAccessGate({
   if (isLoading) {
     return (
       <CustomFormGateMessage
-        icon={<div className="h-8 w-8 rounded-full border-2 border-[oklch(0.2_0_0)] border-t-transparent animate-spin" />}
+        icon={<div className="h-8 w-8 rounded-full border-2 border-sf-accent border-t-transparent animate-spin" />}
         title="正在確認訂單"
         description="請稍候，我們正在確認付款狀態。"
       />
@@ -148,13 +153,63 @@ export function CustomFormAccessGate({
     );
   }
 
+  // 已填寫過：先給唯讀畫面。表單無法從純文字還原成欄位，
+  // 直接顯示空白表單會讓客人一送出就把先前的內容覆蓋掉。
+  if (existingNote && !isEditing) {
+    return (
+      <div className="min-h-[60vh] bg-sf-cream px-4 py-12">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-lg border border-sf-line bg-white p-6 sm:p-8">
+            <div className="mb-5 flex items-center gap-2 text-emerald-700">
+              <CheckCircle className="h-5 w-5" />
+              <h1
+                className="text-lg font-light tracking-[0.08em] text-sf-ink"
+                style={{ fontFamily: "'Noto Serif TC', serif" }}
+              >
+                你已經填寫過這份表單
+              </h1>
+            </div>
+            <p className="mb-5 text-sm font-body leading-relaxed text-sf-muted">
+              以下是你送出的內容，設計師已經收到。如果需要調整，請點下方的「修改內容」。
+            </p>
+
+            <div className="mb-6 whitespace-pre-wrap rounded-md border border-sf-line bg-sf-cream px-4 py-4 text-sm font-body leading-relaxed text-sf-text">
+              {existingNote}
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="btn-primary w-full justify-center sm:w-auto"
+              >
+                修改內容
+              </button>
+              <Link
+                href={`/order/${encodeURIComponent(merchantTradeNo)}`}
+                className="block w-full sm:w-auto"
+              >
+                <button type="button" className="btn-ghost w-full justify-center sm:w-auto">
+                  返回訂單
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {hasExistingNote && (
-        <div className="mx-auto mb-6 max-w-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-body text-emerald-800">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            這筆訂單已送出過客製需求，再次送出會更新訂單內的需求內容。
+        <div className="mx-auto mb-6 max-w-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-body text-amber-900">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              這是<strong className="font-medium">重新填寫</strong>。表單不會帶入先前的內容，
+              送出後會以這次填寫的內容<strong className="font-medium">完全取代</strong>原本已送出的需求。
+            </span>
           </div>
         </div>
       )}
@@ -173,13 +228,13 @@ function CustomFormGateMessage({
   description: string;
 }) {
   return (
-    <div className="min-h-[60vh] bg-[oklch(0.98_0.005_240)] px-4 py-16">
-      <div className="mx-auto max-w-md border border-[oklch(0.9_0_0)] bg-white p-8 text-center">
+    <div className="min-h-[60vh] bg-sf-cream px-4 py-16">
+      <div className="mx-auto max-w-md rounded-lg border border-sf-line bg-white p-8 text-center">
         <div className="mb-4 flex justify-center">{icon}</div>
-        <h1 className="mb-2 text-xl font-medium text-[oklch(0.15_0_0)]">{title}</h1>
-        <p className="mb-6 text-sm font-body leading-relaxed text-[oklch(0.5_0_0)]">{description}</p>
+        <h1 className="mb-2 text-xl font-light tracking-[0.08em] text-sf-ink" style={{ fontFamily: "'Noto Serif TC', serif" }}>{title}</h1>
+        <p className="mb-6 text-sm font-body leading-relaxed text-sf-muted">{description}</p>
         <Link href="/custom">
-          <button className="btn-primary w-full">前往客製方案頁</button>
+          <button className="btn-primary w-full justify-center">前往客製方案頁</button>
         </Link>
       </div>
     </div>

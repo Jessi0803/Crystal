@@ -1,12 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import { resolve } from "node:path";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
+
+// 手機版有固定購買列（StickyBuyBar），頁面上會有兩顆「加入購物袋」，
+// 所以一律從商品選項區 #product-options 內點。
 
 const productSearch = 'input[placeholder="搜尋商品名稱或分類"]';
 
 async function openProductsAdmin(page: Page) {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.goto("/admin/products");
   await expect(page.getByRole("heading", { name: "商品管理" })).toBeVisible();
 }
@@ -108,7 +110,7 @@ test("admin can hide fit preference controls per product", async ({ page }, test
 
   const productHref = await expectProductVisibleOnStorefront(page, name);
   await expect(page.getByText("鬆緊度", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /剛好/ })).toBeVisible();
+  await expect(page.locator("#product-options").getByRole("button", { name: /剛好/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /微鬆/ })).toBeVisible();
 
   await findProduct(page, name);
@@ -124,10 +126,10 @@ test("admin can hide fit preference controls per product", async ({ page }, test
   await page.goto(productHref);
   await expect(page.getByRole("heading", { name })).toBeVisible();
   await expect(page.getByText("鬆緊度", { exact: true })).toBeHidden();
-  await expect(page.getByRole("button", { name: /剛好/ })).toHaveCount(0);
+  await expect(page.locator("#product-options").getByRole("button", { name: /剛好/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /微鬆/ })).toHaveCount(0);
 
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText(name);
   await expect(drawer).not.toContainText("剛好");

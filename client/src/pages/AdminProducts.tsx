@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, type ChangeEvent } from "react";
+import { lazy, Suspense, useRef, useState, useMemo, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   Package, Plus, Search, Save, X, Upload, ImageIcon,
@@ -10,6 +10,10 @@ import { products as staticProducts } from "@/lib/data";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
+import { compressImage } from "@/lib/imageCompression";
+
+// 富文字編輯器較大，開啟商品表單時才載入
+const BenefitsEditor = lazy(() => import("@/components/admin/BenefitsEditor"));
 import type { DbProduct } from "../../../drizzle/schema";
 
 const CATEGORY_OPTIONS = [
@@ -246,29 +250,6 @@ function getProductCategoryLabels(product: DbProduct) {
 function getProductImages(product: Pick<DbProduct, "image" | "images">) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
-}
-
-function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const MAX = 900;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-        else { width = Math.round(width * MAX / height); height = MAX; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.78));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("圖片讀取失敗")); };
-    img.src = url;
-  });
 }
 
 // ── 庫存行內編輯（沿用 AdminInventory 的模式）──────────────────────────────
@@ -569,6 +550,17 @@ function ProductModal({
   const [compressing, setCompressing] = useState(false);
   // 所有方案共用一個檔案選擇器，用索引記住上傳目標
   const optionImageInputRef = useRef<HTMLInputElement>(null);
+  const uploadProductImage = trpc.product.uploadProductImage.useMutation();
+
+  /** 壓縮後上傳到 Vercel Blob，回傳圖片網址（不再把 base64 存進商品資料） */
+  const uploadCompressedImage = async (file: File) => {
+    const dataUrl = await compressImage(file, { maxSize: 1600, quality: 0.82 });
+    const { url } = await uploadProductImage.mutateAsync({
+      contentType: "image/jpeg",
+      dataBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
+    });
+    return url;
+  };
   const [pendingOptionIndex, setPendingOptionIndex] = useState<number | null>(null);
   const [showMoreFields, setShowMoreFields] = useState(false);
 
@@ -840,10 +832,10 @@ function ProductModal({
     }
     setCompressing(true);
     try {
-      const dataUrl = await compressImage(file);
-      updatePurchaseOption(targetIndex, "image", dataUrl);
-    } catch {
-      toast.error("圖片讀取失敗，請改用圖片網址");
+      const url = await uploadCompressedImage(file);
+      updatePurchaseOption(targetIndex, "image", url);
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "圖片上傳失敗，請改用圖片網址");
     }
     setCompressing(false);
   };
@@ -896,13 +888,16 @@ function ProductModal({
     }
     setCompressing(true);
     try {
-      const dataUrls = await Promise.all(files.map(compressImage));
-      setForm((p) => {
-        const images = [...p.images, ...dataUrls];
-        return { ...p, images, image: images[0] ?? "" };
-      });
-    } catch {
-      toast.error("圖片讀取失敗，請改用圖片網址");
+      // 逐張上傳，避免單次請求過大
+      for (const file of files) {
+        const url = await uploadCompressedImage(file);
+        setForm((p) => {
+          const images = [...p.images, url];
+          return { ...p, images, image: images[0] ?? "" };
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "圖片上傳失敗，請改用圖片網址");
     }
     setCompressing(false);
     e.target.value = "";
@@ -1201,7 +1196,7 @@ function ProductModal({
                   className="flex items-center gap-2 px-3 py-2 text-xs font-body border border-[oklch(0.86_0_0)] text-[oklch(0.35_0_0)] hover:border-[oklch(0.2_0_0)] w-full"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {compressing ? "處理中…" : "選擇圖片（可多選）"}
+                  {compressing ? "上傳中…" : "選擇圖片（可多選）"}
                 </button>
                 <div className="flex gap-2">
                   <input
@@ -1644,16 +1639,12 @@ function ProductModal({
 
           {/* 非客製化：功效說明 / 客製化：下單流程 + 注意事項 */}
           {primaryCategory !== "custom" ? (
-            <label className="block">
-              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明（依輸入格式顯示）</span>
-              <textarea
-                value={form.benefits}
-                onChange={(e) => setForm((p) => ({ ...p, benefits: e.target.value }))}
-                rows={4}
-                placeholder={"提升桃花運與人際魅力\n增強直覺力與情緒穩定\n\n帶來平靜、安定的能量"}
-                className="w-full border border-[oklch(0.86_0_0)] px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] resize-none"
-              />
-            </label>
+            <div>
+              <span className="block text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body mb-1">功效說明</span>
+              <Suspense fallback={<div className="h-72 border border-[oklch(0.86_0_0)] bg-[oklch(0.985_0_0)]" />}>
+                <BenefitsEditor value={form.benefits} onChange={(benefits) => setForm((p) => ({ ...p, benefits }))} />
+              </Suspense>
+            </div>
           ) : (
             <>
               <label className="block">
@@ -1923,7 +1914,7 @@ function ProductModal({
             className="flex items-center gap-2 px-5 py-2 text-xs font-body bg-[oklch(0.15_0_0)] text-white disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
-            {compressing ? "處理圖片中…" : isPending ? "儲存中…" : (editing ? "儲存變更" : "新增商品")}
+            {compressing ? "圖片上傳中…" : isPending ? "儲存中…" : (editing ? "儲存變更" : "新增商品")}
           </button>
         </div>
       </div>

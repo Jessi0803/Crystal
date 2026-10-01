@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql from "mysql2/promise";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 const productSearch = 'input[placeholder="搜尋商品名稱或分類"]';
 
@@ -125,8 +125,7 @@ test("admin can bulk discount selected regular and custom products", async ({ pa
   await insertDiscountProduct(customProduct);
 
   try {
-    await login(page, "e2e-admin@example.com");
-    await expect(page).toHaveURL(/\/admin\/orders/);
+    await loginAsAdminByCookie(page);
 
     await page.goto("/admin/products");
     await expect(page.getByRole("heading", { name: "商品管理" })).toBeVisible();

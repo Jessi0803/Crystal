@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { loginAsAdminByCookie } from "./helpers";
 
+// 手機版有固定購買列（StickyBuyBar），頁面上會有兩顆「加入購物袋」，
+// 所以一律從商品選項區 #product-options 內點。
+
 test.describe.configure({ mode: "serial" });
 
 function uniqueProductName(prefix: string, projectName: string) {
@@ -69,11 +72,11 @@ test("admin can choose which clasp options a product shows", async ({ page }, te
   await productLink.click();
 
   await expect(page.getByRole("heading", { name: productName })).toBeVisible();
-  await expect(page.getByRole("button", { name: /磁扣/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /龍蝦扣/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /彈力繩/ })).toHaveCount(0);
+  await expect(page.locator("#product-options").getByRole("button", { name: /磁扣/ })).toBeVisible();
+  await expect(page.locator("#product-options").getByRole("button", { name: /龍蝦扣/ })).toHaveCount(0);
+  await expect(page.locator("#product-options").getByRole("button", { name: /彈力繩/ })).toHaveCount(0);
 
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("磁扣");
   await expect(drawer).toContainText("NT$ 1,088");
@@ -221,7 +224,7 @@ test("admin can set a purchase option image shown on storefront and in cart", as
 
   // 購物袋顯示所選方案的圖片
   await page.getByRole("button", { name: /男款/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("男款");
   await expect(drawer.locator(`img[src="${optionImage}"]`)).toBeVisible();

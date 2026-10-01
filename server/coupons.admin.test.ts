@@ -71,6 +71,14 @@ function userLookupDb(rows: unknown[]) {
   return { select: () => chain } as any;
 }
 
+function birthdayBatchDb(rows: unknown[]) {
+  const chain: any = {
+    from: () => chain,
+    where: () => Promise.resolve(rows),
+  };
+  return { select: () => chain } as any;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -86,6 +94,8 @@ describe("coupon admin authorization", () => {
     await expect(c.adminUpdate({ id: 1, data: templateInput() })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(c.adminSetActive({ id: 1, isActive: false })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(c.adminIssue({ userId: 3, templateId: 1 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(c.adminIssueBirthdayBatch({ userIds: [3], templateId: 1, birthdayMonth: 9, campaignYear: 2026 }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(c.adminMemberCoupons({ userId: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(c.adminSaveLineRewardSettings({ enabled: true, templateId: 1 })).rejects.toMatchObject({
       code: "FORBIDDEN",
@@ -196,6 +206,62 @@ describe("coupons.adminIssue", () => {
       code: "BAD_REQUEST",
       message: "此優惠券已停用，無法發放",
     });
+  });
+});
+
+describe("coupons.adminIssueBirthdayBatch", () => {
+  const birthdayTemplate = {
+    id: 5,
+    name: "生日優惠",
+    discountAmount: 200,
+    minOrderAmount: 1000,
+    validityType: "days_after_issue",
+    validDays: 30,
+    fixedExpiresAt: null,
+    maxPerUser: 1,
+    isActive: true,
+  };
+
+  it("issues only to matching birthday members and skips an annual duplicate", async () => {
+    getCouponTemplateMock.mockResolvedValue(birthdayTemplate as any);
+    getDbMock.mockResolvedValue(birthdayBatchDb([
+      { id: 3, birthMonth: 9 },
+      { id: 4, birthMonth: 9 },
+    ]));
+    issueCouponMock
+      .mockResolvedValueOnce({ id: 80, name: "生日優惠", expiresAt: new Date() } as any)
+      .mockRejectedValueOnce(new CouponError("LIMIT_REACHED", "此會員已領取本年度生日優惠"));
+
+    const result = await admin.adminIssueBirthdayBatch({
+      userIds: [3, 4],
+      templateId: 5,
+      birthdayMonth: 9,
+      campaignYear: 2026,
+    });
+
+    expect(result).toMatchObject({ campaignKey: "birthday:2026", issued: 1, skipped: 1, failed: 0 });
+    expect(issueCouponMock).toHaveBeenNthCalledWith(1, {
+      templateId: 5,
+      userId: 3,
+      source: "BIRTHDAY",
+      campaignKey: "birthday:2026",
+      issuedByUserId: 1,
+    });
+  });
+
+  it("does not issue to a member outside the selected birthday month", async () => {
+    getCouponTemplateMock.mockResolvedValue(birthdayTemplate as any);
+    getDbMock.mockResolvedValue(birthdayBatchDb([{ id: 3, birthMonth: 8 }]));
+
+    const result = await admin.adminIssueBirthdayBatch({
+      userIds: [3],
+      templateId: 5,
+      birthdayMonth: 9,
+      campaignYear: 2026,
+    });
+
+    expect(result).toMatchObject({ issued: 0, skipped: 0, failed: 1 });
+    expect(issueCouponMock).not.toHaveBeenCalled();
   });
 });
 

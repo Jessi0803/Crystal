@@ -64,7 +64,7 @@ export default function CustomFormBraceletPreferenceFields({
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-3">
+        <p className="text-sm font-body font-medium text-sf-ink mb-3">
           手圍的鬆緊偏好？
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -84,10 +84,10 @@ export default function CustomFormBraceletPreferenceFields({
               key={opt.id}
               type="button"
               onClick={() => onChange({ fitPreference: opt.id })}
-              className={`px-5 py-4 text-sm font-body border-2 text-left transition-colors rounded-sm ${
+              className={`px-5 py-4 text-sm font-body border text-left transition-colors rounded-md ${
                 value.fitPreference === opt.id
-                  ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)]"
-                  : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+                  ? "border-sf-accent bg-sf-selected text-sf-ink font-medium"
+                  : "border-sf-line-strong text-sf-text hover:border-sf-accent/50"
               }`}
             >
               <span className="block font-semibold text-base mb-1">
@@ -102,7 +102,7 @@ export default function CustomFormBraceletPreferenceFields({
       </div>
 
       <div>
-        <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-3">
+        <p className="text-sm font-body font-medium text-sf-ink mb-3">
           喜歡金飾還是銀飾？
         </p>
         <div className="space-y-4">
@@ -115,10 +115,10 @@ export default function CustomFormBraceletPreferenceFields({
                 key={opt.id}
                 type="button"
                 onClick={() => onChange({ metalPreference: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-left transition-colors ${
+                className={`border rounded-md overflow-hidden text-left transition-colors ${
                   value.metalPreference === opt.id
-                    ? "border-[oklch(0.1_0_0)]"
-                    : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
+                    ? "border-sf-accent"
+                    : "border-sf-line-strong hover:border-sf-accent/50"
                 }`}
               >
                 <img
@@ -129,8 +129,8 @@ export default function CustomFormBraceletPreferenceFields({
                 <p
                   className={`text-sm font-body text-center py-2.5 ${
                     value.metalPreference === opt.id
-                      ? "bg-[oklch(0.97_0_0)] font-semibold"
-                      : "text-[oklch(0.45_0_0)]"
+                      ? "bg-sf-cream font-semibold"
+                      : "text-sf-text"
                   }`}
                 >
                   {opt.label}
@@ -141,10 +141,10 @@ export default function CustomFormBraceletPreferenceFields({
           <button
             type="button"
             onClick={() => onChange({ metalPreference: "either" })}
-            className={`w-full px-4 py-3 text-sm font-body border-2 transition-colors rounded-sm ${
+            className={`w-full px-4 py-3 text-sm font-body border transition-colors rounded-md ${
               value.metalPreference === "either"
-                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold"
-                : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"
+                ? "border-sf-accent bg-sf-selected text-sf-ink font-medium"
+                : "border-sf-line-strong text-sf-text hover:border-sf-accent/50"
             }`}
           >
             都可以
@@ -153,22 +153,22 @@ export default function CustomFormBraceletPreferenceFields({
       </div>
 
       <div>
-        <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
+        <p className="text-sm font-body font-medium text-sf-ink mb-1">
           要加銀管或珠框嗎？
         </p>
-        <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
+        <p className="text-xs font-body text-sf-muted mb-3">
           可分開選擇，以下附上參考圖片
         </p>
         <div className="space-y-5">
           <AccessoryReferenceGallery images={ACCESSORY_REFERENCE_IMAGES} />
-          <p className="-mt-2 text-center text-[0.68rem] font-body text-[oklch(0.58_0_0)]">
+          <p className="-mt-2 text-center text-[0.68rem] font-body text-sf-muted">
             點擊圖片可查看完整原圖；手機可雙指縮放，電腦可使用滾輪
           </p>
           <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
+            <p className="text-sm font-body font-medium text-sf-ink mb-1">
               銀管
             </p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
+            <p className="text-xs font-body text-sf-muted mb-3">
               穿在水晶珠之間的小金屬管，可增加層次感與精緻度
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -180,7 +180,7 @@ export default function CustomFormBraceletPreferenceFields({
                   key={opt.id}
                   type="button"
                   onClick={() => onChange({ silverTube: opt.id })}
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${value.silverTube === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
+                  className={`px-4 py-4 text-base font-body border transition-colors rounded-md ${value.silverTube === opt.id ? "border-sf-accent bg-sf-selected text-sf-ink font-medium" : "border-sf-line-strong text-sf-text hover:border-sf-accent/50"}`}
                 >
                   {opt.label}
                 </button>
@@ -188,10 +188,10 @@ export default function CustomFormBraceletPreferenceFields({
             </div>
           </div>
           <div>
-            <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-1">
+            <p className="text-sm font-body font-medium text-sf-ink mb-1">
               珠框
             </p>
-            <p className="text-xs font-body text-[oklch(0.55_0_0)] mb-3">
+            <p className="text-xs font-body text-sf-muted mb-3">
               套在主石外的金屬框，可突顯主石、增加立體感
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -203,7 +203,7 @@ export default function CustomFormBraceletPreferenceFields({
                   key={opt.id}
                   type="button"
                   onClick={() => onChange({ beadFrame: opt.id })}
-                  className={`px-4 py-4 text-base font-body border-2 transition-colors rounded-sm ${value.beadFrame === opt.id ? "border-[oklch(0.1_0_0)] bg-[oklch(0.97_0_0)] font-semibold" : "border-[oklch(0.88_0_0)] text-[oklch(0.45_0_0)] hover:border-[oklch(0.6_0_0)]"}`}
+                  className={`px-4 py-4 text-base font-body border transition-colors rounded-md ${value.beadFrame === opt.id ? "border-sf-accent bg-sf-selected text-sf-ink font-medium" : "border-sf-line-strong text-sf-text hover:border-sf-accent/50"}`}
                 >
                   {opt.label}
                 </button>
@@ -214,7 +214,7 @@ export default function CustomFormBraceletPreferenceFields({
       </div>
 
       <div>
-        <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-3">
+        <p className="text-sm font-body font-medium text-sf-ink mb-3">
           要換龍蝦扣或磁扣嗎？
         </p>
         <div className="space-y-3">
@@ -243,13 +243,13 @@ export default function CustomFormBraceletPreferenceFields({
                 key={opt.id}
                 type="button"
                 onClick={() => onChange({ claspType: opt.id })}
-                className={`border-2 rounded-sm overflow-hidden text-center transition-colors ${
+                className={`border rounded-md overflow-hidden text-center transition-colors ${
                   value.claspType === opt.id
-                    ? "border-[oklch(0.1_0_0)]"
-                    : "border-[oklch(0.88_0_0)] hover:border-[oklch(0.6_0_0)]"
+                    ? "border-sf-accent"
+                    : "border-sf-line-strong hover:border-sf-accent/50"
                 }`}
               >
-                <div className="flex aspect-square items-center justify-center bg-[oklch(0.97_0_0)] p-1">
+                <div className="flex aspect-square items-center justify-center bg-sf-cream p-1">
                   <img
                     src={opt.img}
                     alt={opt.label}
@@ -257,11 +257,11 @@ export default function CustomFormBraceletPreferenceFields({
                   />
                 </div>
                 <p
-                  className={`text-xs font-body py-2 ${value.claspType === opt.id ? "bg-[oklch(0.97_0_0)] font-semibold" : "text-[oklch(0.45_0_0)]"}`}
+                  className={`text-xs font-body py-2 ${value.claspType === opt.id ? "bg-sf-cream font-semibold" : "text-sf-text"}`}
                 >
                   {opt.label}
                   <br />
-                  <span className="text-[0.6rem] text-[oklch(0.55_0_0)]">
+                  <span className="text-[0.6rem] text-sf-muted">
                     （{opt.sub}）
                   </span>
                 </p>
@@ -273,7 +273,7 @@ export default function CustomFormBraceletPreferenceFields({
       </div>
 
       <div>
-        <p className="text-sm font-body font-medium text-[oklch(0.15_0_0)] mb-3">
+        <p className="text-sm font-body font-medium text-sf-ink mb-3">
           要加吊飾嗎？
         </p>
         <CustomFormPendantCharmField

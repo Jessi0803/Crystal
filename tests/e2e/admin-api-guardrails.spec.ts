@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Browser } from "@playwright/test";
-import { login } from "./helpers";
+import { loginAsUserByCookie } from "./helpers";
 
 async function callTrpc(
   request: APIRequestContext,
@@ -31,8 +31,9 @@ async function expectAdminProcedureForbidden(
 async function regularMemberRequest(browser: Browser) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await login(page, "e2e-user@example.com");
-  await expect(page).toHaveURL(/\/products/);
+  // 這支在測「一般會員不能呼叫後台 API」，重點是角色不是登入流程
+  await loginAsUserByCookie(page);
+  await page.goto("/products");
   return { context, request: context.request };
 }
 

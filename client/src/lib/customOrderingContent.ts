@@ -34,12 +34,14 @@ export function getCustomFormPath(productId: string) {
   return isCustomDepositProduct(productId) ? CUSTOM_FORM_PATH_BY_PRODUCT_ID[productId] : null;
 }
 
-export const CUSTOM_BRACELET_PRICE_DISPLAY = "NT$1,500 ± NT$300";
+export const CUSTOM_BRACELET_PRICE_DISPLAY = "NT$2,500 ± NT$500";
 
-export function getCustomPriceDisplay(productId: string, priceRange: string) {
-  if (!isCustomDepositProduct(productId)) return priceRange;
-  return priceRange.replace("NT$1,200 ~ 1,800", CUSTOM_BRACELET_PRICE_DISPLAY);
-}
+/**
+ * 客製手鍊本身的訂金。
+ * 脈輪／生命靈數商品的訂金 = 這筆 + 解析（檢測）費，所以解析費可由商品售價反推，
+ * 不需要另外寫死，顯示金額也就不會和實際收款脫節。
+ */
+export const CUSTOM_BRACELET_DEPOSIT = 500;
 
 export const CUSTOM_WRIST_SIZE_MIN = 13;
 export const CUSTOM_WRIST_SIZE_MAX = 19;
@@ -53,20 +55,36 @@ export function isValidCustomWristSize(value: string) {
   return Number.isInteger((size - CUSTOM_WRIST_SIZE_MIN) / CUSTOM_WRIST_SIZE_STEP);
 }
 
-/** 手鍊初版／維修與修改規範（與 Custom 頁一致） */
-export const CUSTOM_BRACELET_NOTICES: { title: string | null; body: string }[] = [
-  {
-    title: "《初版、維修》",
-    body:
-      "我們提供免費一次改初版和維修，但是不接受改手圍、新增條件（要銀管、要珠框、不要紫色、要磁扣等等）～因為這樣屬重新打掉設計，需加收費用 200 元，請在預約時直接跟店家說🤍",
-  },
-  {
-    title: null,
-    body:
-      "初版、維修可調整的部分為有不喜歡的配飾可以更改、水晶／配飾擺放順序，有不清楚的也可以詢問店家～🤍",
-  },
-  {
-    title: null,
-    body: "另外，如想要再改第二次，需加收 200 元的費用～",
-  },
-];
+/**
+ * 初版設計與修改規範；由 <CustomRevisionNotice /> 渲染在四份客製表單開頭。
+ *
+ * 商品詳細頁的「注意事項」分欄不使用這份，那邊是後台各商品自填的 product.disclaimer。
+ */
+export const CUSTOM_REVISION_NOTICE = {
+  title: "《初版設計＆修改注意事項》",
+  lead: "✨ 初版享有 1 次免費修改",
+  leadNote: "收到初版後，如有不喜歡或想調整的地方，第一次皆可免費修改",
+  groups: [
+    {
+      heading: "【第一次免費修改包含】",
+      items: [
+        "更換水晶／配飾",
+        "調整水晶顏色",
+        "增加／減少配飾",
+        "調整水晶、配飾排列順序",
+        "更改整體風格或配色",
+        "其他設計上的調整需求",
+      ],
+    },
+    {
+      heading: "【以下情況需加收 $200】",
+      items: [
+        "第 1 次修改完成後，再提出第 2 次修改",
+        "原「彈力繩款」改為「龍蝦扣款」",
+        "原「彈力繩款」改為「磁扣款」",
+      ],
+    },
+  ],
+  warning: "⚠️ 龍蝦扣／磁扣屬於製作結構上的更改，因此即使是第一次修改，也需酌收 $200",
+  footer: "有任何不清楚的也可以再私訊官方詢問🤍",
+} as const;

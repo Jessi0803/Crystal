@@ -33,3 +33,19 @@ export function getSavedOrderAccess(merchantTradeNo?: string): SavedOrderAccess 
     return {};
   }
 }
+
+/**
+ * 補上存取憑證但保留已有的欄位。
+ *
+ * 會員中心要把訂購 Email 帶給表單頁（訪客單靠 Email 比對才過得了 hasOrderAccess），
+ * 但不能因此洗掉結帳當下存下來的 accessToken，所以這裡用合併而不是覆蓋。
+ */
+export function rememberOrderAccess(merchantTradeNo: string, patch: SavedOrderAccess) {
+  if (!merchantTradeNo) return;
+  const saved = getSavedOrderAccess(merchantTradeNo);
+  saveOrderAccess(
+    merchantTradeNo,
+    patch.accessToken ?? saved.accessToken,
+    patch.buyerEmail ?? saved.buyerEmail
+  );
+}

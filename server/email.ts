@@ -180,6 +180,8 @@ type OrderItem = {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  /** 下單當下的商品圖（訂單明細快照），可能是站內路徑、完整網址或空值 */
+  productImage?: string | null;
 };
 
 type OrderConfirmPayload = {
@@ -243,6 +245,50 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/'/g, "&#39;");
 }
 
+// ─── 商品明細列（含縮圖）────────────────────────────────────────────────────
+
+const EMAIL_THUMB_SIZE = 56;
+
+/** 轉成信箱讀得到的完整網址；站內路徑補上網站網址，base64 與空值不顯示圖 */
+export function toEmailImageUrl(image: string | null | undefined) {
+  const value = image?.trim();
+  if (!value || value.startsWith("data:")) return null;
+  if (/^https:\/\//i.test(value)) return value;
+  if (value.startsWith("/") && !value.startsWith("//")) return `${getSiteUrl()}${value}`;
+  return null;
+}
+
+/**
+ * 訂單信的商品列：縮圖＋名稱放在第一格，維持「品名／數量／小計」三欄，
+ * 各封信的總計列不需改 colspan。折抵列（負金額）不放縮圖。
+ */
+export function renderEmailItemRows(items: OrderItem[], borderColor = "#f0ece7") {
+  const cell = `padding:10px 0;border-bottom:1px solid ${borderColor};font-size:13px;`;
+  return items
+    .map((item) => {
+      const name = escapeHtml(item.productName);
+      const imageUrl = item.subtotal >= 0 ? toEmailImageUrl(item.productImage) : null;
+      const thumb = item.subtotal < 0
+        ? ""
+        : imageUrl
+          ? `<img src="${escapeHtml(imageUrl)}" width="${EMAIL_THUMB_SIZE}" height="${EMAIL_THUMB_SIZE}" alt="${name}" style="display:block;width:${EMAIL_THUMB_SIZE}px;height:${EMAIL_THUMB_SIZE}px;object-fit:cover;border:0;border-radius:6px;background:#f2eae2;">`
+          : `<div style="width:${EMAIL_THUMB_SIZE}px;height:${EMAIL_THUMB_SIZE}px;border-radius:6px;background:#f2eae2;"></div>`;
+      const nameCell = thumb
+        ? `<table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="${EMAIL_THUMB_SIZE}" style="padding-right:12px;vertical-align:middle;">${thumb}</td>
+            <td style="vertical-align:middle;font-size:13px;color:#333;line-height:1.5;">${name}</td>
+          </tr></table>`
+        : name;
+      return `
+      <tr>
+        <td style="${cell}color:#333;">${nameCell}</td>
+        <td style="${cell}color:#666;text-align:center;white-space:nowrap;">× ${item.quantity}</td>
+        <td style="${cell}color:#333;text-align:right;white-space:nowrap;">NT$ ${item.subtotal.toLocaleString()}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
 export async function sendAdminOrderNotificationEmail(payload: AdminOrderNotificationPayload) {
   const resend = getResend();
   const {
@@ -268,16 +314,7 @@ export async function sendAdminOrderNotificationEmail(payload: AdminOrderNotific
       ? `配送地址：${receiverAddress ?? "—"}`
       : `取貨門市：${cvsStoreName ?? "—"}`;
 
-  const itemRows = items
-    .map(
-      (item) => `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #eee;font-size:13px;color:#333;">${escapeHtml(item.productName)}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #eee;font-size:13px;color:#666;text-align:center;">× ${item.quantity}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #eee;font-size:13px;color:#333;text-align:right;">NT$ ${item.subtotal.toLocaleString()}</td>
-      </tr>`
-    )
-    .join("");
+  const itemRows = renderEmailItemRows(items, "#eee");
 
   const html = `
 <!DOCTYPE html>
@@ -347,16 +384,7 @@ export async function sendOrderConfirmEmail(payload: OrderConfirmPayload) {
     items,
   } = payload;
 
-  const itemRows = items
-    .map(
-      (item) => `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;">${item.productName}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#666;text-align:center;">× ${item.quantity}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;text-align:right;">NT$ ${item.subtotal.toLocaleString()}</td>
-      </tr>`
-    )
-    .join("");
+  const itemRows = renderEmailItemRows(items, "#f0ece7");
 
   const deliveryInfo =
     shippingMethod === "home"
@@ -542,16 +570,7 @@ export async function sendOrderShippedEmail(payload: OrderConfirmPayload) {
     items,
   } = payload;
 
-  const itemRows = items
-    .map(
-      (item) => `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;">${escapeHtml(item.productName)}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#666;text-align:center;">× ${item.quantity}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ece7;font-size:13px;color:#333;text-align:right;">NT$ ${item.subtotal.toLocaleString()}</td>
-      </tr>`
-    )
-    .join("");
+  const itemRows = renderEmailItemRows(items, "#f0ece7");
 
   const deliveryInfo =
     shippingMethod === "home"

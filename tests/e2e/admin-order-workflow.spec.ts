@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import { login } from "./helpers";
+import { loginAsAdminByCookie } from "./helpers";
 
 async function createDirectAtmOrder(
   prefix: string,
@@ -86,8 +86,7 @@ test("admin can progress an ATM test order through safe pickup statuses", async 
   test.setTimeout(120_000);
   const orderNo = await createDirectAtmOrder("E2ESTA");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await confirmTransferPayment(page, orderNo);
   await updateStatus(page, orderNo, "已付款", "processing", "備貨中");
   await updateStatus(page, orderNo, "備貨中", "arrived", "已到店");
@@ -101,8 +100,7 @@ test("admin can progress an ATM test order through safe pickup statuses", async 
 test("admin order filters and page size include a newly created pending transfer order", async ({ page }) => {
   const orderNo = await createDirectAtmOrder("E2EFIL");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await page.goto("/admin/orders");
   await page.getByRole("button", { name: "轉帳待確認" }).click();
   await expect(page.locator("body")).toContainText(orderNo);
@@ -119,8 +117,7 @@ test("admin can mark a delivery test order as shipped and then not picked up", a
   test.setTimeout(120_000);
   const orderNo = await createDirectAtmOrder("E2ESHP");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
   await confirmTransferPayment(page, orderNo);
   await updateStatus(page, orderNo, "已付款", "processing", "備貨中");
   await updateStatus(page, orderNo, "備貨中", "shipped", "已出貨");
@@ -132,8 +129,7 @@ test("admin order detail shows the uploaded transfer receipt exactly once", asyn
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lZn+7QAAAABJRU5ErkJggg==";
   const orderNo = await createDirectAtmOrder("E2ERCP", { transferReceiptUrl: receiptDataUrl });
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/orders");
   await page.getByRole("button", { name: "轉帳待確認" }).click();

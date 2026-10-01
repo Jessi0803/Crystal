@@ -1,18 +1,19 @@
 // 日日好日 — Product Detail Page
 // Design: Vacanza-inspired — large image + clean product info
-import { Fragment, useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import ResponsiveImage from "@/components/ResponsiveImage";
+import ProductCardTags from "@/components/ProductCardTags";
 import { useParams, Link } from "wouter";
-import { Plus, Minus, ShoppingBag } from "lucide-react";
+import { CircleAlert, Minus, Plus, ShoppingBag } from "lucide-react";
 import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import {
-  CUSTOM_BRACELET_NOTICES,
+  CUSTOM_BRACELET_DEPOSIT,
   CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
-  getCustomPriceDisplay,
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
 import {
@@ -25,11 +26,14 @@ import {
 } from "@/lib/pricing";
 import { normalizeImageUrl } from "@/lib/purchaseOptions";
 import { IN_STOCK_FULFILLMENT_NOTE } from "@shared/fulfillment";
+import { RichTextContent } from "@/components/RichTextContent";
+import StickyBuyBar from "@/components/StickyBuyBar";
 import {
   getTarotDepositPrice,
   getTarotTopicByLabel,
   tarotTopicOptionId,
 } from "@shared/tarotPricing";
+import { TAROT_GROUP_REQUIREMENTS, getTarotGroupByLabel } from "@shared/tarotRequirements";
 import {
   Dialog,
   DialogContent,
@@ -124,15 +128,15 @@ function CustomPriceTile({
   note?: string;
 }) {
   return (
-    <div className="bg-[oklch(0.985_0_0)] border-l border-[oklch(0.75_0_0)] px-4 py-3.5">
-      <p className="text-[0.68rem] tracking-[0.16em] font-body text-[oklch(0.48_0_0)] mb-1.5">
+    <div className="bg-sf-cream border-l border-sf-line-strong px-4 py-3.5">
+      <p className="text-[0.68rem] tracking-[0.16em] font-body text-sf-muted mb-1.5">
         {label}
       </p>
-      <p className="text-xl sm:text-2xl font-light text-[oklch(0.12_0_0)] leading-snug" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+      <p className="text-xl sm:text-2xl font-light text-sf-ink leading-snug" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
         {value}
       </p>
       {note && (
-        <p className="text-xs font-body text-[oklch(0.5_0_0)] mt-1.5 leading-relaxed">
+        <p className="text-xs font-body text-sf-muted mt-1.5 leading-relaxed">
           {note}
         </p>
       )}
@@ -143,20 +147,6 @@ function CustomPriceTile({
 function getProductImages(product: { image: string; images?: string[] }) {
   const images = product.images?.length ? product.images : [product.image].filter(Boolean);
   return images.map(normalizeImageUrl);
-}
-
-function MultilineText({ text }: { text: string }) {
-  const lines = text.split("\n");
-  return (
-    <>
-      {lines.map((line, index) => (
-        <Fragment key={index}>
-          {line}
-          {index < lines.length - 1 && <br />}
-        </Fragment>
-      ))}
-    </>
-  );
 }
 
 export default function ProductDetail() {
@@ -171,11 +161,12 @@ export default function ProductDetail() {
   const product = dbProduct ?? (isLoading ? cachedProduct ?? staticProduct : staticProduct);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<
-    "benefits" | "content" | "howto" | "notices" | "warranty" | "wrist"
+    "benefits" | "content" | "howto" | "warranty" | "wrist"
   >((product?.benefits?.length ?? 0) > 0 ? "benefits" : "content");
   const [activeTarotCategory, setActiveTarotCategory] = useState(tarotReadingCategories[0].id);
   const [selectedTarotReadingName, setSelectedTarotReadingName] = useState("");
   const [selectedGalleryImage, setSelectedGalleryImage] = useState("");
+  const ctaRef = useRef<HTMLDivElement>(null);
   const wristSizes = useMemo(
     () => buildWristSizes(product?.wristSizeMin, product?.wristSizeMax),
     [product?.wristSizeMin, product?.wristSizeMax]
@@ -237,18 +228,18 @@ export default function ProductDetail() {
 
   if (isLoading && !product) {
     return (
-      <div className="min-h-screen bg-white page-enter">
-        <div className="border-b border-[oklch(0.93_0_0)] px-4 sm:px-6 lg:px-8 py-3">
-          <div className="max-w-[1440px] mx-auto h-4 w-44 bg-[oklch(0.95_0_0)] animate-pulse" />
+      <div className="min-h-screen paper-surface page-enter">
+        <div className="border-b border-sf-line px-4 sm:px-6 lg:px-8 py-3">
+          <div className="max-w-[1440px] mx-auto h-4 w-44 bg-sf-cream animate-pulse" />
         </div>
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
-            <div className="bg-[oklch(0.96_0_0)] aspect-square animate-pulse" />
+            <div className="bg-sf-cream aspect-square animate-pulse" />
             <div className="space-y-5 py-3">
-              <div className="h-4 w-24 bg-[oklch(0.95_0_0)] animate-pulse" />
-              <div className="h-10 w-2/3 bg-[oklch(0.94_0_0)] animate-pulse" />
-              <div className="h-4 w-full max-w-md bg-[oklch(0.95_0_0)] animate-pulse" />
-              <div className="h-8 w-28 bg-[oklch(0.94_0_0)] animate-pulse mt-8" />
+              <div className="h-4 w-24 bg-sf-cream animate-pulse" />
+              <div className="h-10 w-2/3 bg-sf-cream animate-pulse" />
+              <div className="h-4 w-full max-w-md bg-sf-cream animate-pulse" />
+              <div className="h-8 w-28 bg-sf-cream animate-pulse mt-8" />
             </div>
           </div>
         </div>
@@ -259,7 +250,7 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-white">
-        <p className="text-3xl font-light text-[oklch(0.7_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>找不到此商品</p>
+        <p className="text-3xl font-light text-sf-muted" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>找不到此商品</p>
         <Link href="/products">
           <button className="btn-primary">返回商品列表</button>
         </Link>
@@ -351,6 +342,13 @@ export default function ProductDetail() {
     : isNumerologyDepositProduct
       ? "生命靈數解析價格"
       : "";
+  // 「脈輪檢測價格」→「脈輪檢測」，供訂金組成說明使用
+  const splitCustomFeeName = splitCustomFeeLabel.replace("價格", "");
+  const splitCustomReadingFee = Math.max(0, product.price - CUSTOM_BRACELET_DEPOSIT);
+  const selectedTarotGroup = getTarotGroupByLabel(selectedTarotReadingName);
+  const selectedTarotRequirement = selectedTarotGroup
+    ? TAROT_GROUP_REQUIREMENTS[selectedTarotGroup]
+    : undefined;
   const activeTarotPriceList =
     tarotReadingCategories.find((category) => category.id === activeTarotCategory)?.items ??
     tarotReadingCategories[0].items;
@@ -367,6 +365,25 @@ export default function ProductDetail() {
   const fulfillmentNote = isSoldOutItem
       ? "本月限量商品已售完"
       : IN_STOCK_FULFILLMENT_NOTE;
+
+  // 有購買按鈕的商品才顯示手機底部固定購買列
+  const hasStickyBuyBar = product.category !== "custom" || isCustomDepositProduct(product.id);
+  // 固定購買列顯示目前（或預設）的規格：方案・占卜主題・手圍・扣具・鬆緊
+  const stickySelectionSummary = [
+    purchaseOptions.length > 1 ? selectedPurchaseOption?.label : null,
+    isTarotDepositProduct && selectedTarotTopic ? `占卜主題 ${selectedTarotTopic.label}` : null,
+    hasWristSizeOption
+      ? isComboPurchaseOption
+        ? selectedWristSizeGroups
+            .map((group) => `${group.label} ${selectedWristSizeSelections[group.id] ?? wristSizes[0]} cm`)
+            .join("、")
+        : `手圍 ${selectedWristSize} cm`
+      : null,
+    hasClaspOption ? claspChoices.find((choice) => choice.id === effectiveSelectedClaspType)?.label : null,
+    hasFitPreferenceOption ? fitOptions.find((option) => option.id === selectedFitPreference)?.label : null,
+  ]
+    .filter(Boolean)
+    .join("・");
 
   const handleAddToCart = () => {
     if (isSoldOutItem) {
@@ -425,9 +442,6 @@ export default function ProductDetail() {
     ...(product.benefits.length > 0 ? [{ id: "benefits" as const, label: "功效說明" }] : []),
     { id: "content" as const, label: "商品內容" },
     ...(showHowToTab ? [{ id: "howto" as const, label: "下單流程" }] : []),
-    ...(product.category === "custom" && product.disclaimer
-      ? [{ id: "notices" as const, label: "注意事項" }]
-      : []),
     ...(product.category !== "custom" ? [{ id: "warranty" as const, label: "保固與維修" }] : []),
     ...(hasWristSizeOption ? [{ id: "wrist" as const, label: "手圍測量" }] : []),
   ];
@@ -436,18 +450,20 @@ export default function ProductDetail() {
     : product.crystalType.split("、");
 
   return (
-    <div className="min-h-screen bg-white page-enter">
+    <div className={`min-h-screen paper-surface page-enter ${hasStickyBuyBar ? "pb-20 lg:pb-0" : ""}`}>
 
       {/* Breadcrumb */}
-      <div className="border-b border-[oklch(0.93_0_0)] px-4 sm:px-6 lg:px-8 py-3">
+      <div className="border-b border-sf-line px-4 sm:px-6 lg:px-8 py-3">
         <div className="max-w-[1440px] mx-auto flex items-center gap-2">
-          <Link href="/products">
-            <span className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors tracking-wide">
-              所有商品
-            </span>
+          {/* 連結本身就帶上字級，避免 <a> 以預設字級撐出不同高度、與後面文字對不齊 */}
+          <Link
+            href="/products"
+            className="text-[0.65rem] font-body text-sf-muted hover:text-sf-ink transition-colors tracking-wide"
+          >
+            所有商品
           </Link>
-          <span className="text-[0.65rem] text-[oklch(0.7_0_0)]">/</span>
-          <span className="text-[0.65rem] font-body text-[oklch(0.1_0_0)] tracking-wide">{product.name}</span>
+          <span className="text-[0.65rem] text-sf-muted">/</span>
+          <span className="text-[0.65rem] font-body text-sf-ink tracking-wide">{product.name}</span>
         </div>
       </div>
 
@@ -457,9 +473,11 @@ export default function ProductDetail() {
 
           {/* Left: Gallery */}
           <div className="space-y-3">
-            <div className="relative bg-[oklch(0.97_0_0)] aspect-square overflow-hidden">
-              <img
+            <div className="relative bg-sf-cream aspect-square overflow-hidden">
+              <ResponsiveImage
                 src={activeGalleryImage}
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                fetchPriority="high"
                 alt={product.name}
                 className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-6" : "object-cover"}`}
               />
@@ -475,14 +493,16 @@ export default function ProductDetail() {
                       type="button"
                       onClick={() => setSelectedGalleryImage(image)}
                       aria-label={`查看商品圖片 ${index + 1}`}
-                      className={`aspect-square overflow-hidden border bg-[oklch(0.97_0_0)] transition-colors ${
+                      className={`aspect-square overflow-hidden border bg-sf-cream transition-colors ${
                         isActive
-                          ? "border-[oklch(0.16_0_0)]"
-                          : "border-[oklch(0.9_0_0)] hover:border-[oklch(0.55_0_0)]"
+                          ? "border-sf-accent"
+                          : "border-sf-line hover:border-sf-accent/50"
                       }`}
                     >
-                      <img
+                      <ResponsiveImage
                         src={image}
+                        sizes="(min-width: 1024px) 8vw, 20vw"
+                        maxWidth={384}
                         alt={`${product.name} 圖片 ${index + 1}`}
                         loading={index === 0 ? "eager" : "lazy"}
                         className={`w-full h-full ${product.id === "d002-honey-realm" ? "object-contain p-1.5" : "object-cover"}`}
@@ -495,30 +515,23 @@ export default function ProductDetail() {
           </div>
 
           {/* Right: Info */}
-          <div className="flex flex-col justify-center">
+          <div id="product-options" className="flex flex-col justify-center scroll-mt-20">
             {/* Category + Tags */}
             {product.category !== "custom" && (
-              <div className="flex items-center gap-2 mb-5 flex-wrap">
+              <div className="mb-5">
                 <span className="eyebrow">{product.categoryLabel}</span>
-                {visibleTags.length > 0 && <span className="text-[oklch(0.7_0_0)]">·</span>}
-                {visibleTags.length > 0 && (
-                  <div className="tag-scroll max-w-full sm:max-w-[28rem]">
-                    {visibleTags.map((tag) => (
-                      <span key={tag} className="tag">{tag}</span>
-                    ))}
-                  </div>
-                )}
+                <ProductCardTags product={{ tags: visibleTags }} className="mt-1.5 text-[0.68rem] sm:max-w-[32rem]" />
               </div>
             )}
 
             {/* Name */}
             {product.category === "custom" && (
-              <p className="text-[0.68rem] tracking-[0.22em] font-body text-[oklch(0.48_0_0)] mb-3">
+              <p className="text-[0.68rem] tracking-[0.22em] font-body text-sf-muted mb-3">
                 客製化服務
               </p>
             )}
             <h1 className="heading-lg mb-2">{product.name}</h1>
-            <p className="text-sm font-body font-light text-[oklch(0.45_0_0)] mb-6 leading-relaxed">
+            <p className="text-sm font-body font-light text-sf-text mb-6 leading-relaxed">
               {product.category === "custom"
                 ? ({
                     "custom-deposit-product": "依您的功效需求，量身打造專屬能量水晶手鍊",
@@ -530,18 +543,18 @@ export default function ProductDetail() {
             </p>
 
             {/* Price */}
-            <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-[oklch(0.93_0_0)]">
+            <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-sf-line">
               {shouldShowCurrentPrice ? (
                 <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                  <span className="text-[1.75rem] font-light tracking-[0.04em] text-sf-ink" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                     NT$ {currentPrice.toLocaleString()}
                   </span>
                   {hasCurrentPriceSale && (
                     <>
-                      <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
+                      <span className="text-sm font-body text-sf-muted line-through">
                         NT$ {originalCurrentPrice.toLocaleString()}
                       </span>
-                      <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
+                      <span className="text-xs font-body rounded-full text-sf-rose bg-sf-rose-bg px-2.5 py-0.5">
                         {discountLabel ?? `省 NT$ ${(originalCurrentPrice - currentPrice).toLocaleString()}`}
                       </span>
                     </>
@@ -560,21 +573,21 @@ export default function ProductDetail() {
                         value={selectedTarotTopic ? `NT$${currentPrice.toLocaleString()}` : "請先選擇占卜主題"}
                         note="此金額包含手鍊訂金與所選塔羅方案；付款後主題不可更換"
                       />
-                      <div className="bg-[oklch(0.99_0_0)] border border-[oklch(0.92_0_0)] px-4 py-4 sm:px-5 sm:py-5">
+                      <div className="bg-sf-cream border border-sf-line px-4 py-4 sm:px-5 sm:py-5">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-3">
                           <div>
-                            <p className="text-[0.68rem] tracking-[0.18em] font-body text-[oklch(0.48_0_0)] mb-1">
+                            <p className="text-[0.68rem] tracking-[0.18em] font-body text-sf-muted mb-1">
                               塔羅價目表
                             </p>
-                            <p className="text-sm font-body text-[oklch(0.38_0_0)] leading-relaxed">
+                            <p className="text-sm font-body text-sf-text leading-relaxed">
                               客製水晶搭配塔羅解析時，以下價格依原價 9 折計算
                             </p>
                           </div>
-                          <span className="text-xs font-body text-[oklch(0.42_0_0)] bg-white px-2.5 py-1 border border-[oklch(0.9_0_0)]">
+                          <span className="rounded-full text-xs font-body text-sf-rose bg-sf-rose-bg px-2.5 py-1">
                             9 折優惠
                           </span>
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
+                        <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1 mb-4">
                           {tarotReadingCategories.map((category) => {
                             const isActive = category.id === activeTarotCategory;
                             return (
@@ -585,10 +598,10 @@ export default function ProductDetail() {
                                   setActiveTarotCategory(category.id);
                                   setSelectedTarotReadingName("");
                                 }}
-                                className={`shrink-0 border px-3.5 py-2 text-xs font-body transition-colors ${
+                                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-body transition-colors ${
                                   isActive
-                                    ? "border-[oklch(0.16_0_0)] bg-[oklch(0.16_0_0)] text-white"
-                                    : "border-[oklch(0.88_0_0)] bg-white text-[oklch(0.35_0_0)] hover:border-[oklch(0.58_0_0)]"
+                                    ? "border-sf-accent bg-sf-selected text-sf-ink"
+                                    : "border-sf-line-strong bg-white text-sf-text hover:border-sf-accent/50"
                                 }`}
                               >
                                 {category.label}
@@ -602,18 +615,18 @@ export default function ProductDetail() {
                               key={item.name}
                               type="button"
                               onClick={() => setSelectedTarotReadingName(item.name)}
-                              className={`flex items-center justify-between gap-3 border px-3.5 py-3 text-left transition-colors ${
+                              className={`flex items-center justify-between gap-3 rounded-md border px-3.5 py-3 text-left transition-colors ${
                                 selectedTarotReading?.name === item.name
-                                  ? "border-[oklch(0.18_0_0)] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
-                                  : "border-[oklch(0.92_0_0)] bg-white hover:border-[oklch(0.68_0_0)]"
+                                  ? "border-sf-accent bg-sf-selected"
+                                  : "border-sf-line bg-white hover:border-sf-accent/50"
                               }`}
                             >
-                              <p className="text-sm font-body text-[oklch(0.18_0_0)] leading-snug">{item.name}</p>
+                              <p className="text-sm font-body text-sf-ink leading-snug">{item.name}</p>
                               <div className="text-right shrink-0">
-                                <p className="text-sm font-medium text-[oklch(0.1_0_0)]">
+                                <p className="text-sm font-medium text-sf-ink">
                                   NT$ {item.discountedPrice.toLocaleString()}
                                 </p>
-                                <p className="text-[0.65rem] font-body text-[oklch(0.65_0_0)] line-through">
+                                <p className="text-[0.65rem] font-body text-sf-muted line-through">
                                   NT$ {item.originalPrice.toLocaleString()}
                                 </p>
                               </div>
@@ -621,40 +634,88 @@ export default function ProductDetail() {
                           ))}
                         </div>
                         {selectedTarotReading ? (
-                        <div className="mt-4 border-l border-[oklch(0.68_0_0)] bg-white px-4 py-4 sm:px-5 sm:py-5">
+                        <div className="mt-4 border-l border-sf-line-strong bg-white px-4 py-4 sm:px-5 sm:py-5">
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div>
-                              <p className="text-[0.68rem] tracking-[0.18em] font-body text-[oklch(0.48_0_0)] mb-1">
+                              <p className="text-[0.68rem] tracking-[0.18em] font-body text-sf-muted mb-1">
                                 方案內容
                               </p>
-                              <p className="text-lg font-light text-[oklch(0.12_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                              <p className="text-lg font-light text-sf-ink" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                                 {selectedTarotReading.name}
                               </p>
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="text-sm font-medium text-[oklch(0.1_0_0)]">
+                              <p className="text-sm font-medium text-sf-ink">
                                 NT$ {selectedTarotReading.discountedPrice.toLocaleString()}
                               </p>
-                              <p className="text-[0.65rem] font-body text-[oklch(0.65_0_0)] line-through">
+                              <p className="text-[0.65rem] font-body text-sf-muted line-through">
                                 NT$ {selectedTarotReading.originalPrice.toLocaleString()}
                               </p>
                             </div>
                           </div>
                           <ul className="space-y-2">
                             {selectedTarotReading.details.map((detail) => (
-                              <li key={detail} className="flex gap-2 text-sm font-body leading-relaxed text-[oklch(0.28_0_0)]">
-                                <span className="mt-[0.58em] h-1 w-1 shrink-0 rounded-full bg-[oklch(0.5_0_0)]" />
+                              <li key={detail} className="flex gap-2 text-sm font-body leading-relaxed text-sf-text">
+                                <span className="mt-[0.58em] h-1 w-1 shrink-0 rounded-full bg-brand-blush" />
                                 <span>{detail}</span>
                               </li>
                             ))}
                           </ul>
+
+                          {/* 占卜前需提供：欄位定義與客製表單共用 shared/tarotRequirements.ts */}
+                          {selectedTarotRequirement && (
+                            <div className="mt-4 border-t border-sf-line pt-3">
+                              <p className="text-[0.68rem] tracking-[0.16em] font-body text-sf-muted mb-2">
+                                占卜前需提供
+                              </p>
+                              {selectedTarotRequirement.requirements.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedTarotRequirement.requirements.map((item) => (
+                                    <span
+                                      key={item}
+                                      className="border border-sf-line-strong bg-sf-cream px-2 py-0.5 text-xs font-body text-sf-text"
+                                    >
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs font-body leading-relaxed text-sf-muted">
+                                  {selectedTarotRequirement.note}
+                                  <a
+                                    href={CUSTOM_LINE_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="ml-1 underline decoration-brand-peach underline-offset-2 hover:text-sf-accent"
+                                  >
+                                    前往官方 LINE
+                                  </a>
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                         ) : (
-                          <p className="mt-4 border border-dashed border-[oklch(0.82_0_0)] bg-white px-4 py-4 text-sm font-body text-[oklch(0.48_0_0)]">
+                          <p className="mt-4 border border-dashed border-sf-line-strong bg-white px-4 py-4 text-sm font-body text-sf-muted">
                             請選擇一個占卜主題，系統會在付款前確認本次金額。
                           </p>
                         )}
+
+                        {/* 單題制不在價目表內（沒有固定方案與欄位），引導客人私訊詢問 */}
+                        <p className="mt-3 text-xs font-body leading-relaxed text-sf-muted">
+                          想要單題制（題數制）嗎？需求依題目而定，請
+                          <a
+                            href={CUSTOM_LINE_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mx-1 underline decoration-brand-peach underline-offset-2 hover:text-sf-accent"
+                          >
+                            透過官方 LINE
+                          </a>
+                          與店家確認。
+                        </p>
                       </div>
+
                     </div>
                   ) : isBasicCustomDepositProduct ? (
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -662,15 +723,26 @@ export default function ProductDetail() {
                       <CustomPriceTile label="訂金" value="NT$500" note="尾款由店家確認後另行通知" />
                     </div>
                   ) : splitCustomFeeLabel ? (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
-                      <CustomPriceTile label={splitCustomFeeLabel} value="NT$500" />
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
+                        <CustomPriceTile
+                          label={splitCustomFeeLabel}
+                          value={`NT$${splitCustomReadingFee.toLocaleString()}`}
+                        />
+                      </div>
+                      {/* 這兩個方案的訂金含解析費，金額直接用商品售價，避免與實收脫節 */}
+                      <CustomPriceTile
+                        label="訂金"
+                        value={`NT$${product.price.toLocaleString()}`}
+                        note={`${splitCustomFeeName} NT$${splitCustomReadingFee.toLocaleString()} ＋ 客製手鍊訂金 NT$${CUSTOM_BRACELET_DEPOSIT.toLocaleString()}；尾款由店家確認後另行通知`}
+                      />
                     </div>
                   ) : (
                     <>
                       <div className="flex items-baseline gap-3">
-                        <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
-                          {getCustomPriceDisplay(product.id, product.priceRange)}
+                        <span className="text-[1.75rem] font-light tracking-[0.04em] text-sf-ink" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+                          {product.priceRange}
                         </span>
                       </div>
                     </>
@@ -678,21 +750,21 @@ export default function ProductDetail() {
                 </>
               ) : (
               <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-medium text-[oklch(0.1_0_0)]" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
+              <span className="text-[1.75rem] font-light tracking-[0.04em] text-sf-ink" style={{fontFamily: "'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif"}}>
                 NT$ {currentPrice.toLocaleString()}
               </span>
               {product.category === "custom" && (
-                <span className="text-xs font-body text-[oklch(0.55_0_0)] bg-[oklch(0.95_0_0)] px-2 py-0.5">
+                <span className="text-xs font-body text-sf-muted bg-sf-cream px-2 py-0.5">
                   此為訂金價格
                 </span>
               )}
               {hasProductDiscount && (selectedPurchaseOption?.originalPrice || product.originalPrice) && (
-                <span className="text-sm font-body text-[oklch(0.65_0_0)] line-through">
+                <span className="text-sm font-body text-sf-muted line-through">
                   NT$ {(selectedPurchaseOption?.originalPrice ?? product.originalPrice ?? 0).toLocaleString()}
                 </span>
               )}
               {hasProductDiscount && (selectedPurchaseOption?.originalPrice || product.originalPrice) && (
-                <span className="text-xs font-body text-[oklch(0.55_0.07_15)] bg-[oklch(0.97_0.02_15)] px-2 py-0.5">
+                <span className="text-xs font-body rounded-full text-sf-rose bg-sf-rose-bg px-2.5 py-0.5">
                   {discountLabel ?? `省 NT$ ${((selectedPurchaseOption?.originalPrice ?? product.originalPrice ?? 0) - currentPrice).toLocaleString()}`}
                 </span>
               )}
@@ -701,10 +773,10 @@ export default function ProductDetail() {
             </div>
 
             {product.category !== "custom" && (
-              <div className="mb-8 pb-8 border-b border-[oklch(0.93_0_0)] space-y-5">
+              <div className="mb-8 pb-8 border-b border-sf-line space-y-5">
                 {purchaseOptions.length > 0 && (
                   <div>
-                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">選擇方案</p>
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text mb-2">選擇方案</p>
                     <div className={`grid gap-2 ${purchaseOptions.length === 1 ? "grid-cols-1" : purchaseOptions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
                       {purchaseOptions.map((option) => {
                         const optionSoldOut = option.stock != null && option.stock !== -1 && option.stock <= 0;
@@ -719,10 +791,10 @@ export default function ProductDetail() {
                               // 交還主圖控制權給方案圖，直到使用者再次點選相簿縮圖
                               setSelectedGalleryImage("");
                             }}
-                            className={`px-3 py-3 text-xs font-body border transition-colors text-left disabled:cursor-not-allowed disabled:opacity-45 ${
+                            className={`rounded-md px-3 py-3 text-xs font-body border transition-colors text-left disabled:cursor-not-allowed disabled:opacity-45 ${
                               isActive
-                                ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                                : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                                ? "border-sf-accent bg-sf-selected text-sf-ink"
+                                : "border-sf-line-strong text-sf-muted hover:border-sf-accent/50"
                             }`}
                           >
                             <span className="block font-medium">{option.label}</span>
@@ -743,13 +815,13 @@ export default function ProductDetail() {
                 {hasWristSizeOption && (
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">
+                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text">
                         {isComboPurchaseOption ? "組合手圍" : "手圍尺寸"}
                       </p>
                       <button
                         type="button"
                         onClick={() => setShowWristMeasureGuide((current) => !current)}
-                        className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2 hover:text-[oklch(0.38_0.08_250)]"
+                        className="text-[0.65rem] font-body text-sf-accent underline decoration-brand-peach underline-offset-2 hover:text-sf-ink"
                       >
                         手圍怎麼測量？
                       </button>
@@ -758,7 +830,7 @@ export default function ProductDetail() {
                       <div className="grid gap-3 sm:grid-cols-2">
                         {selectedWristSizeGroups.map((group) => (
                           <label key={group.id} className="block">
-                            <span className="block text-[0.65rem] font-body text-[oklch(0.48_0_0)] mb-1">
+                            <span className="block text-[0.65rem] font-body text-sf-muted mb-1">
                               {group.label}
                             </span>
                             <select
@@ -767,7 +839,7 @@ export default function ProductDetail() {
                                 ...current,
                                 [group.id]: e.target.value,
                               }))}
-                              className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                              className="w-full border border-sf-line-strong px-3 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent"
                             >
                               {wristSizes.map((size) => (
                                 <option key={size} value={size}>
@@ -782,7 +854,7 @@ export default function ProductDetail() {
                       <select
                         value={selectedWristSize}
                         onChange={(e) => setSelectedWristSize(e.target.value)}
-                        className="w-full border border-[oklch(0.88_0_0)] px-3 py-2.5 text-sm font-body focus:outline-none focus:border-[oklch(0.1_0_0)]"
+                        className="w-full border border-sf-line-strong px-3 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent"
                       >
                         {wristSizes.map((size) => (
                           <option key={size} value={size}>
@@ -792,8 +864,8 @@ export default function ProductDetail() {
                       </select>
                     )}
                     {showWristMeasureGuide && (
-                      <div className="mt-3 bg-[oklch(0.98_0_0)] border border-[oklch(0.92_0_0)] px-3 py-2.5">
-                        <p className="text-xs font-body leading-relaxed text-[oklch(0.5_0_0)]">
+                      <div className="mt-3 bg-sf-cream border border-sf-line px-3 py-2.5">
+                        <p className="text-xs font-body leading-relaxed text-sf-muted">
                           拿軟尺平貼手圍繞一圈。如果沒有軟尺，也可以拿一段棉線或紙條繞手圍，拿筆做記號後，再用一般直尺量那段線的長度。
                         </p>
                       </div>
@@ -803,11 +875,11 @@ export default function ProductDetail() {
                 {hasClaspOption && (
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)]">扣件類型</p>
+                      <p className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text">扣件類型</p>
                       <button
                         type="button"
                         onClick={() => setShowClaspGuide(true)}
-                        className="text-[0.65rem] font-body text-[oklch(0.5_0.06_250)] underline underline-offset-2 hover:text-[oklch(0.38_0.08_250)]"
+                        className="text-[0.65rem] font-body text-sf-accent underline decoration-brand-peach underline-offset-2 hover:text-sf-ink"
                       >
                         點選看示意圖
                       </button>
@@ -818,10 +890,10 @@ export default function ProductDetail() {
                           type="button"
                           key={opt.id}
                           onClick={() => { setSelectedClaspType(opt.id); setHasSelectedClasp(true); }}
-                          className={`px-2 py-2.5 text-xs font-body border-2 transition-colors text-center rounded-sm ${
+                          className={`px-2 py-2.5 text-xs font-body border transition-colors text-center rounded-md ${
                             selectedClaspType === opt.id && hasSelectedClasp
-                              ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                              : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                              ? "border-sf-accent bg-sf-selected text-sf-ink"
+                              : "border-sf-line-strong text-sf-muted hover:border-sf-accent/50"
                           }`}
                         >
                           <span className="block font-medium">{opt.label}</span>
@@ -848,7 +920,7 @@ export default function ProductDetail() {
                 )}
                 {hasFitPreferenceOption && (
                   <div>
-                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.45_0_0)] mb-2">鬆緊度</p>
+                    <p className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text mb-2">鬆緊度</p>
                     <div className="grid grid-cols-2 gap-2">
                       {fitOptions.map((opt) => (
                         <button
@@ -857,8 +929,8 @@ export default function ProductDetail() {
                           onClick={() => setSelectedFitPreference(opt.id)}
                           className={`px-3 py-2.5 text-xs font-body border transition-colors text-left ${
                             selectedFitPreference === opt.id
-                              ? "border-[oklch(0.1_0_0)] bg-[oklch(0.98_0_0)] text-[oklch(0.1_0_0)]"
-                              : "border-[oklch(0.88_0_0)] text-[oklch(0.5_0_0)] hover:border-[oklch(0.6_0_0)]"
+                              ? "border-sf-accent bg-sf-selected text-sf-ink"
+                              : "border-sf-line-strong text-sf-muted hover:border-sf-accent/50"
                           }`}
                         >
                           <span className="block font-medium">{opt.label}</span>
@@ -871,29 +943,44 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {/* 客製商品的注意事項：直接顯示在下單按鈕上方，不收進分欄 */}
+            {product.category === "custom" && product.disclaimer && (
+              <div className="mb-4 rounded-md border border-sf-line bg-sf-cream px-4 py-4">
+                <p className="mb-2 flex items-center gap-2 text-[0.7rem] font-body font-medium tracking-[0.12em] text-sf-text">
+                  <CircleAlert className="h-3.5 w-3.5 text-brand-blush" strokeWidth={1.6} aria-hidden="true" />
+                  注意事項
+                </p>
+                <div className="space-y-2 text-[0.8125rem] font-body font-light leading-[1.75] tracking-wide text-sf-text">
+                  {product.disclaimer.split("\n").filter(Boolean).map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Custom product: payment-first CTA */}
             {product.category === "custom" && isCustomDepositProduct(product.id) && (
-              <div className="mb-4">
+              <div ref={ctaRef} className="mb-4">
                 <button
                   type="button"
                   onClick={handleAddToCart}
                   disabled={isTarotDepositProduct && !selectedTarotTopic}
-                  className="w-full py-3.5 text-sm font-body tracking-widest text-white transition-opacity hover:opacity-90 bg-[oklch(0.25_0_0)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="w-full rounded-full py-3 text-sm font-body tracking-widest text-white transition-colors bg-sf-accent hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isTarotDepositProduct && !selectedTarotTopic ? "請先選擇占卜主題" : "加入購物袋"}
                 </button>
-                <p className="text-[0.65rem] font-body text-[oklch(0.55_0_0)] text-center mt-2">
+                <p className="text-[0.65rem] font-body text-sf-muted text-center mt-2">
                   完成付款後，訂單頁會引導您填寫客製需求
                 </p>
               </div>
             )}
 
             {/* Qty + Add to Cart */}
-            {product.category !== "custom" && <div className="flex items-center gap-4 mb-6">
-              <div className="flex items-center border border-[oklch(0.9_0_0)]">
+            {product.category !== "custom" && <div ref={ctaRef} className="flex items-center gap-4 mb-6">
+              <div className="flex items-center rounded-full border border-sf-line-strong">
                 <button
                   onClick={() => setQty(Math.max(1, qty - 1))}
-                  className="w-10 h-10 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                  className="w-10 h-10 flex items-center justify-center text-sf-text hover:text-sf-ink transition-colors"
                   aria-label="減少"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -901,7 +988,7 @@ export default function ProductDetail() {
                 <span className="w-10 text-center text-sm font-body">{qty}</span>
                 <button
                   onClick={() => setQty(qty + 1)}
-                  className="w-10 h-10 flex items-center justify-center text-[oklch(0.4_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors"
+                  className="w-10 h-10 flex items-center justify-center text-sf-text hover:text-sf-ink transition-colors"
                   aria-label="增加"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -918,11 +1005,11 @@ export default function ProductDetail() {
             </div>}
 
             {product.category !== "custom" && !isPreorderItem && (
-              <div className="mb-6 border border-[oklch(0.9_0_0)] bg-[oklch(0.985_0_0)] px-4 py-3">
-                <p className="text-[0.68rem] tracking-[0.14em] font-body text-[oklch(0.5_0_0)] mb-1">
+              <div className="mb-6 border border-sf-line bg-sf-cream px-4 py-3">
+                <p className="text-[0.68rem] tracking-[0.14em] font-body text-sf-muted mb-1">
                   出貨時間
                 </p>
-                <p className="text-sm font-body text-[oklch(0.22_0_0)] leading-relaxed">
+                <p className="text-sm font-body text-sf-text leading-relaxed">
                   {fulfillmentNote}
                 </p>
               </div>
@@ -930,7 +1017,7 @@ export default function ProductDetail() {
 
             {/* LINE contact for custom products */}
             {product.category === "custom" && (
-              <p className="text-xs font-body text-[oklch(0.5_0_0)] mb-6 leading-relaxed">
+              <p className="text-xs font-body text-sf-muted mb-6 leading-relaxed">
                 有任何問題請私訊官方 LINE：
                 <a
                   href={CUSTOM_LINE_URL}
@@ -946,15 +1033,15 @@ export default function ProductDetail() {
 
             {/* Tabs */}
             <div>
-              <div className="flex border-b border-[oklch(0.93_0_0)] mb-5">
+              <div className="flex border-b border-sf-line mb-5">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`px-4 py-2.5 text-[0.7rem] tracking-[0.1em] font-body border-b-2 transition-colors ${
                       activeTab === tab.id
-                        ? "border-[oklch(0.1_0_0)] text-[oklch(0.1_0_0)]"
-                        : "border-transparent text-[oklch(0.55_0_0)] hover:text-[oklch(0.1_0_0)]"
+                        ? "border-sf-accent text-sf-ink"
+                        : "border-transparent text-sf-muted hover:text-sf-ink"
                     }`}
                   >
                     {tab.label}
@@ -963,15 +1050,13 @@ export default function ProductDetail() {
               </div>
 
               {activeTab === "benefits" && (
-                <div className="text-sm font-body font-light text-[oklch(0.35_0_0)] leading-[1.8]">
-                  <MultilineText text={benefitText} />
-                </div>
+                <RichTextContent value={benefitText} />
               )}
               {activeTab === "content" && (
                 <ul className="space-y-2">
                   {contentItems.map((item) => (
-                    <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                    <li key={item} className="flex gap-3 text-sm font-body font-light text-sf-text">
+                      <span className="text-brand-blush shrink-0 mt-0.5">◇</span>
                       {item}
                     </li>
                   ))}
@@ -980,21 +1065,12 @@ export default function ProductDetail() {
               {showHowToTab && activeTab === "howto" && (
                 <ul className="space-y-2">
                   {product.howToUse.map((h, i) => (
-                    <li key={i} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5 font-body">{i + 1}.</span>
+                    <li key={i} className="flex gap-3 text-sm font-body font-light text-sf-text">
+                      <span className="text-brand-blush shrink-0 mt-0.5 font-body">{i + 1}.</span>
                       {h}
                     </li>
                   ))}
                 </ul>
-              )}
-              {product.category === "custom" && product.disclaimer && activeTab === "notices" && (
-                <div className="rounded-sm border border-[oklch(0.9_0.02_85)] bg-[oklch(0.985_0.005_85)] px-4 py-4">
-                  <div className="space-y-2 text-[0.8125rem] font-body font-light text-[oklch(0.4_0_0)] leading-[1.75] tracking-wide">
-                    {product.disclaimer.split("\n").filter(Boolean).map((line, i) => (
-                      <p key={i}>{line}</p>
-                    ))}
-                  </div>
-                </div>
               )}
               {product.category !== "custom" && activeTab === "warranty" && (
                 <ul className="space-y-2">
@@ -1004,8 +1080,8 @@ export default function ProductDetail() {
                     "水晶不見要補差額",
                     "如需改尺寸、改設計屬於重新設計，不包含在免費保固的範圍內，如有需要，需酌收200$重新設計費",
                   ].map((item) => (
-                    <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                    <li key={item} className="flex gap-3 text-sm font-body font-light text-sf-text">
+                      <span className="text-brand-blush shrink-0 mt-0.5">◇</span>
                       {item}
                     </li>
                   ))}
@@ -1018,8 +1094,8 @@ export default function ProductDetail() {
                     "請不要自行 +0.5cm、+1cm",
                     "如果需要微鬆、很鬆，可以跟我們說！我們會幫你調整",
                   ].map((item) => (
-                    <li key={item} className="flex gap-3 text-sm font-body font-light text-[oklch(0.35_0_0)]">
-                      <span className="text-[oklch(0.72_0.09_70)] shrink-0 mt-0.5">◇</span>
+                    <li key={item} className="flex gap-3 text-sm font-body font-light text-sf-text">
+                      <span className="text-brand-blush shrink-0 mt-0.5">◇</span>
                       {item}
                     </li>
                   ))}
@@ -1033,7 +1109,7 @@ export default function ProductDetail() {
 
       {/* Related Products */}
       {related.length > 0 && (
-        <section className="border-t border-[oklch(0.93_0_0)] py-14">
+        <section className="border-t border-sf-line py-14">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-8">
               <p className="eyebrow mb-2">YOU MAY ALSO LIKE</p>
@@ -1044,7 +1120,7 @@ export default function ProductDetail() {
                 <Link key={p.id} href={`/products/${p.id}`}>
                   <div className="product-card group">
                     <div className="product-card-image">
-                      <img src={p.image} alt={p.name} loading="lazy" />
+                      <ResponsiveImage src={p.image} sizes="(min-width: 640px) 25vw, 50vw" alt={p.name} loading="lazy" decoding="async" />
                     </div>
                     <div className="product-card-info">
                       <p className="product-card-name">{p.name}</p>
@@ -1056,6 +1132,24 @@ export default function ProductDetail() {
             </div>
           </div>
         </section>
+      )}
+      {hasStickyBuyBar && (
+        <StickyBuyBar
+          targetRef={ctaRef}
+          priceLabel={isTarotDepositProduct && !selectedTarotTopic ? "請先選擇占卜主題" : `NT$ ${currentPrice.toLocaleString()}`}
+          detail={stickySelectionSummary}
+          onEditDetail={() => document.getElementById("product-options")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          buttonLabel={isSoldOutItem ? "售完" : "加入購物袋"}
+          disabled={isSoldOutItem}
+          onBuy={() => {
+            if (isTarotDepositProduct && !selectedTarotTopic) {
+              document.getElementById("product-options")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              toast.message("請先選擇塔羅占卜主題");
+              return;
+            }
+            handleAddToCart();
+          }}
+        />
       )}
     </div>
   );

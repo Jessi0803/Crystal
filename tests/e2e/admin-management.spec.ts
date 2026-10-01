@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { createAtmHomeDeliveryOrder, login } from "./helpers";
+import { createAtmHomeDeliveryOrder, loginAsAdminByCookie } from "./helpers";
 
 test("admin products page can search seeded products", async ({ page }) => {
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.goto("/admin/products");
   await expect(page.locator("body")).toContainText("商品管理");
@@ -17,8 +16,7 @@ test("admin can find and confirm a transfer-pending test order", async ({ page }
   const merchantTradeNo = await createAtmHomeDeliveryOrder(page, `e2e-admin-flow-${Date.now()}@example.com`);
   expect(merchantTradeNo.length).toBeGreaterThan(0);
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.getByRole("button", { name: "轉帳待確認" }).click();
   await expect(page.locator("body")).toContainText(merchantTradeNo);

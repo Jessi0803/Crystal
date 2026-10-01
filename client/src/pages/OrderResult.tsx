@@ -18,20 +18,13 @@ import {
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
-import {
-  CUSTOM_DEPOSIT_PRODUCT_IDS,
-  getCustomFormPath,
-} from "@/lib/customOrderingContent";
+import { canFillCustomForm, getCustomFormEntries } from "@/lib/customFormEntries";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS,
-  getRecentCustomFormSubmissionKey,
-} from "@/lib/customFormSubmission";
 import {
   getSavedOrderAccess,
   saveOrderAccess,
@@ -43,89 +36,13 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   deposit_paid: "已付訂金",
   paid: "已付款・待出貨",
   processing: "備貨中",
-  shipped: "🚚 已出貨",
-  arrived: "📦 已到店",
-  picked_up: "✅ 已取貨",
+  shipped: "已出貨",
+  arrived: "已到店",
+  picked_up: "已取貨",
   not_picked: "未取貨",
-  completed: "✅ 已完成",
+  completed: "已完成",
   cancelled: "已取消",
 };
-
-type CustomDepositItemInstance = {
-  id: number;
-  productId: string;
-  productName: string;
-  itemIndex: number;
-  quantity: number;
-};
-
-function getCustomConsultationStartMarker(item: CustomDepositItemInstance) {
-  return `【客製需求開始：${item.productId}:${item.id}:${item.itemIndex}】`;
-}
-
-function hasCustomConsultationNote(
-  customerNote: string | null | undefined,
-  item: CustomDepositItemInstance
-) {
-  if (customerNote?.includes(getCustomConsultationStartMarker(item)))
-    return true;
-  return (
-    item.itemIndex === 1 &&
-    Boolean(customerNote?.includes(`【客製需求開始：${item.productId}】`))
-  );
-}
-
-function wasCustomFormRecentlySubmitted(
-  merchantTradeNo: string | undefined,
-  item: CustomDepositItemInstance
-) {
-  if (!merchantTradeNo || typeof window === "undefined") return false;
-
-  const keys = [
-    getRecentCustomFormSubmissionKey({
-      merchantTradeNo,
-      productId: item.productId,
-      orderItemId: item.id,
-      itemIndex: item.itemIndex,
-    }),
-  ];
-  if (item.itemIndex === 1) {
-    keys.push(
-      getRecentCustomFormSubmissionKey({
-        merchantTradeNo,
-        productId: item.productId,
-      })
-    );
-  }
-
-  const now = Date.now();
-  return keys.some(key => {
-    const submittedAt = Number(sessionStorage.getItem(key) ?? "");
-    if (!submittedAt) return false;
-    if (now - submittedAt > RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS) {
-      sessionStorage.removeItem(key);
-      return false;
-    }
-    return true;
-  });
-}
-
-function expandCustomDepositItemInstances(
-  items: any[]
-): CustomDepositItemInstance[] {
-  return items.flatMap((item: any) =>
-    Array.from(
-      { length: Math.max(1, Number(item.quantity) || 1) },
-      (_, index) => ({
-        id: item.id,
-        productId: item.productId,
-        productName: item.productName,
-        itemIndex: index + 1,
-        quantity: Math.max(1, Number(item.quantity) || 1),
-      })
-    )
-  );
-}
 
 export default function OrderResult() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
@@ -212,11 +129,11 @@ export default function OrderResult() {
     }
     if (order.paymentStatus === "transfer_pending") {
       return {
-        icon: <Banknote className="w-12 h-12 text-blue-400" />,
+        icon: <Banknote className="w-12 h-12 text-sf-accent" />,
         title: "等待轉帳確認",
         desc: "我們已收到您的匯款末五碼，設計師確認收款後將為您處理出貨。",
-        color: "text-blue-600",
-        bg: "bg-blue-50",
+        color: "text-sf-accent",
+        bg: "bg-sf-cream",
       };
     }
     if (
@@ -307,24 +224,13 @@ export default function OrderResult() {
     ...STORE_BANK_INFO,
     ...((order as any)?.bankInfo ?? {}),
   };
-  const customDepositItems =
-    order?.items?.filter((item: any) =>
-      CUSTOM_DEPOSIT_PRODUCT_IDS.includes(item.productId)
-    ) ?? [];
-  const customDepositItemInstances =
-    expandCustomDepositItemInstances(customDepositItems);
-  const pendingCustomDepositItems = customDepositItemInstances.filter(
-    item =>
-      !hasCustomConsultationNote(order?.customerNote, item) &&
-      !wasCustomFormRecentlySubmitted(order?.merchantTradeNo, item)
-  );
-  const canFillCustomForm =
-    customDepositItems.length > 0 &&
-    (order?.paymentStatus === "paid" ||
-      order?.paymentStatus === "confirmed" ||
-      order?.paymentStatus === "transfer_pending");
+  // 與會員中心共用同一份判斷（client/src/lib/customFormEntries.ts）
+  const customFormEntries = getCustomFormEntries(order);
+  const pendingCustomFormEntries = customFormEntries.filter(entry => !entry.isSubmitted);
+  const showCustomFormSection =
+    customFormEntries.length > 0 && canFillCustomForm(order?.paymentStatus);
   const shouldPromptForCustomForm =
-    canFillCustomForm && pendingCustomDepositItems.length > 0;
+    showCustomFormSection && pendingCustomFormEntries.length > 0;
 
   useEffect(() => {
     const orderNo = order?.merchantTradeNo ?? "";
@@ -365,8 +271,8 @@ export default function OrderResult() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[oklch(0.1_0_0)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+          <div className="w-8 h-8 border-2 border-sf-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-body text-sf-muted">
             查詢訂單中...
           </p>
         </div>
@@ -385,7 +291,7 @@ export default function OrderResult() {
         >
           {requiresVerification ? "驗證訪客訂單" : "查詢訂單失敗"}
         </p>
-        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
+        <p className="text-sm font-body text-sf-muted mb-8">
           訂單編號：{merchantTradeNo}
           <br />
           {requiresVerification
@@ -440,7 +346,7 @@ export default function OrderResult() {
         >
           找不到訂單
         </p>
-        <p className="text-sm font-body text-[oklch(0.5_0_0)] mb-8">
+        <p className="text-sm font-body text-sf-muted mb-8">
           訂單編號：{merchantTradeNo}
         </p>
         <button className="btn-primary" onClick={() => setLocation("/")}>
@@ -455,9 +361,9 @@ export default function OrderResult() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b border-[oklch(0.93_0_0)] py-4 px-4 sm:px-8">
+      <div className="border-b border-sf-line py-4 px-4 sm:px-8">
         <div className="max-w-2xl mx-auto">
-          <span className="text-xs tracking-widest font-body text-[oklch(0.5_0_0)]">
+          <span className="text-xs tracking-widest font-body text-sf-muted">
             訂單確認
           </span>
         </div>
@@ -478,12 +384,12 @@ export default function OrderResult() {
           >
             {statusConfig.title}
           </h1>
-          <p className="text-sm font-body text-[oklch(0.5_0_0)]">
+          <p className="text-sm font-body text-sf-muted">
             {statusConfig.desc}
           </p>
           {(order.paymentStatus === "pending" ||
             order.paymentStatus === "transfer_pending") && (
-            <p className="text-xs font-body text-[oklch(0.6_0_0)] mt-3">
+            <p className="text-xs font-body text-sf-muted mt-3">
               頁面每 5 秒自動更新訂單狀態
             </p>
           )}
@@ -493,47 +399,42 @@ export default function OrderResult() {
           open={isCustomReminderOpen && shouldPromptForCustomForm}
           onOpenChange={handleCustomReminderOpenChange}
         >
-          <DialogContent className="max-w-2xl border border-rose-100 bg-[oklch(0.995_0.012_20)] p-0 shadow-2xl shadow-black/12">
-            <div className="border-b border-rose-100 px-6 pb-5 pt-7 sm:px-8 sm:pt-8">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-700 shadow-sm ring-1 ring-rose-100">
+          <DialogContent className="max-w-2xl border border-sf-line bg-sf-cream p-0 shadow-2xl shadow-[rgb(75_52_44/0.12)]">
+            <div className="border-b border-sf-line px-6 pb-5 pt-7 sm:px-8 sm:pt-8">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-sf-accent shadow-sm ring-1 ring-sf-line">
                 <Sparkles className="h-5 w-5" />
               </div>
-              <DialogTitle className="text-2xl font-body font-semibold leading-snug tracking-wide text-[oklch(0.28_0.11_20)]">
+              <DialogTitle className="text-2xl font-body font-medium leading-snug tracking-wide text-sf-ink">
                 接下來，告訴我們你的故事。
               </DialogTitle>
-              <DialogDescription className="mt-3 text-sm font-body leading-relaxed text-[oklch(0.43_0.08_20)]">
+              <DialogDescription className="mt-3 text-sm font-body leading-relaxed text-sf-text">
                 大約需要 3–5 分鐘，我們會根據你提供的內容開始專屬設計。
               </DialogDescription>
-              <div className="mt-4 border-l-2 border-[oklch(0.72_0.12_25)] bg-white/70 px-4 py-3">
-                <p className="text-xs font-body leading-relaxed text-[oklch(0.42_0.04_25)]">
+              <div className="mt-4 border-l-2 border-brand-blush bg-white/70 px-4 py-3">
+                <p className="text-xs font-body leading-relaxed text-sf-text">
                   客製商品將於資料填寫完成後開始計算製作工作天；若尚未完成資料填寫，訂單會先保留，暫不進入設計階段。
                 </p>
               </div>
             </div>
             <div className="space-y-3 px-6 py-5 sm:px-8 sm:py-6">
-              {pendingCustomDepositItems.map(item => {
-                const customFormPath = getCustomFormPath(item.productId);
-                if (!customFormPath) return null;
+              {pendingCustomFormEntries.map(({ item, formUrl }) => {
+                if (!formUrl) return null;
                 return (
                   <button
                     key={`${item.id}-${item.itemIndex}`}
-                    className="group flex w-full items-center justify-between gap-4 border border-[oklch(0.84_0.03_20)] bg-white px-5 py-4 text-left transition-colors hover:border-[oklch(0.45_0.08_20)] hover:bg-[oklch(0.985_0.01_20)]"
-                    onClick={() =>
-                      setLocation(
-                        `${customFormPath}?order=${encodeURIComponent(order.merchantTradeNo)}&orderItemId=${item.id}&itemIndex=${item.itemIndex}`
-                      )
-                    }
+                    className="group flex w-full items-center justify-between gap-4 rounded-md border border-sf-line bg-white px-5 py-4 text-left transition-colors hover:border-sf-accent hover:bg-sf-selected"
+                    onClick={() => setLocation(formUrl)}
                   >
                     <span className="min-w-0">
-                      <span className="mb-1 block text-[0.68rem] font-body tracking-[0.16em] text-[oklch(0.54_0.06_20)]">
+                      <span className="mb-1 block text-[0.68rem] font-body tracking-[0.16em] text-brand-blush">
                         填寫客製需求
                       </span>
-                      <span className="block text-sm font-body font-medium leading-relaxed text-[oklch(0.16_0_0)]">
+                      <span className="block text-sm font-body font-medium leading-relaxed text-sf-ink">
                         {item.productName}
                         {item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
                       </span>
                     </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-[oklch(0.4_0_0)] transition-transform group-hover:translate-x-1" />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-sf-text transition-transform group-hover:translate-x-1" />
                   </button>
                 );
               })}
@@ -541,46 +442,99 @@ export default function OrderResult() {
           </DialogContent>
         </Dialog>
 
+        {/*
+          常駐的客製表單入口。上面的彈窗關掉後就不會再出現，
+          客人填到一半離開會找不到路回來，所以這裡一定要有一個不會消失的入口。
+        */}
+        {showCustomFormSection && (
+          <div className="rounded-md border border-sf-line bg-white p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-sf-accent" strokeWidth={1.5} />
+              <div className="w-full min-w-0">
+                <p className="mb-1 text-sm font-body font-medium text-sf-ink">客製需求表單</p>
+                <p className="mb-4 text-xs font-body leading-relaxed text-sf-muted">
+                  {pendingCustomFormEntries.length > 0
+                    ? "填寫完成後，設計師才會開始為你進行設計。"
+                    : "所有表單都已送出，設計師已經收到你的需求。"}
+                </p>
+
+                <div className="space-y-2">
+                  {customFormEntries.map(({ item, isSubmitted, formUrl }) => {
+                    if (!formUrl) return null;
+                    return (
+                      <div
+                        key={`persistent-${item.id}-${item.itemIndex}`}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sf-line bg-sf-cream px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-body text-sf-ink">
+                            {item.productName}
+                            {item.quantity > 1 ? `（第 ${item.itemIndex} 件）` : ""}
+                          </p>
+                          <p
+                            className={`mt-0.5 text-[0.68rem] font-body tracking-[0.08em] ${
+                              isSubmitted ? "text-emerald-700" : "text-brand-blush"
+                            }`}
+                          >
+                            {isSubmitted ? "已送出" : "尚未填寫"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLocation(formUrl)}
+                          className={isSubmitted ? "btn-ghost shrink-0" : "btn-primary shrink-0"}
+                        >
+                          {isSubmitted ? "查看 / 修改" : "填寫客製需求"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 轉帳資訊 */}
         {order.paymentMethod === "atm" &&
           order.paymentStatus === "transfer_pending" && (
-            <div className="border border-blue-200 bg-blue-50 p-5 mb-6">
+            <div className="rounded-md border border-sf-line bg-sf-cream p-5 mb-6">
               <div className="flex items-start gap-3">
-                <Banknote className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <Banknote className="w-5 h-5 text-sf-accent shrink-0 mt-0.5" />
                 <div className="w-full">
-                  <p className="text-sm font-body font-medium text-blue-800 mb-3">
+                  <p className="text-sm font-body font-medium text-sf-ink mb-3">
                     轉帳資訊
                   </p>
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm font-body">
-                      <span className="text-blue-700">銀行</span>
-                      <span className="font-medium text-blue-900">
+                      <span className="text-sf-muted">銀行</span>
+                      <span className="font-medium text-sf-ink">
                         {bankInfo.bankName}
                       </span>
                     </div>
                     {bankInfo.accountName && (
                       <div className="flex justify-between text-sm font-body">
-                        <span className="text-blue-700">戶名</span>
-                        <span className="font-medium text-blue-900">
+                        <span className="text-sf-muted">戶名</span>
+                        <span className="font-medium text-sf-ink">
                           {bankInfo.accountName}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm font-body">
-                      <span className="text-blue-700">帳號</span>
-                      <span className="font-medium text-blue-900 tracking-wider">
+                      <span className="text-sf-muted">帳號</span>
+                      <span className="font-medium text-sf-ink tracking-wider">
                         {bankInfo.accountNumber}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm font-body border-t border-blue-200 pt-2 mt-2">
-                      <span className="text-blue-700">轉帳金額</span>
-                      <span className="font-bold text-blue-900">
+                    <div className="flex justify-between text-sm font-body border-t border-sf-line pt-2 mt-2">
+                      <span className="text-sf-muted">轉帳金額</span>
+                      <span className="font-bold text-sf-ink">
                         NT$ {order.totalAmount.toLocaleString()}
                       </span>
                     </div>
                   </div>
 
-                  <div className="text-sm font-body text-blue-700 bg-blue-100 px-3 py-2 text-center">
+                  <div className="rounded-md text-sm font-body text-sf-text bg-sf-selected px-3 py-2 text-center">
                     {order.transferLastFive ? (
                       <>
                         已收到您的匯款末五碼：
@@ -597,8 +551,8 @@ export default function OrderResult() {
           )}
 
         {/* Order Info */}
-        <div className="border border-[oklch(0.93_0_0)] p-6 mb-6">
-          <h2 className="text-xs tracking-[0.2em] font-body mb-4 pb-3 border-b border-[oklch(0.93_0_0)]">
+        <div className="border border-sf-line p-6 mb-6">
+          <h2 className="text-xs tracking-[0.2em] font-body mb-4 pb-3 border-b border-sf-line">
             訂單資訊
           </h2>
           <div className="space-y-3">
@@ -611,13 +565,13 @@ export default function OrderResult() {
                 value:
                   order.paymentStatus === "paid" ||
                   order.paymentStatus === "confirmed"
-                    ? "✅ 已付款"
+                    ? "已付款"
                     : order.paymentStatus === "transfer_pending"
-                      ? "⏳ 轉帳待確認"
+                      ? "轉帳待確認"
                       : order.paymentStatus === "pending"
-                        ? "⏳ 待付款"
+                        ? "待付款"
                         : order.paymentStatus === "failed"
-                          ? "❌ 付款失敗"
+                          ? "付款失敗"
                           : "已取消",
               },
               {
@@ -648,8 +602,8 @@ export default function OrderResult() {
                 key={row.label}
                 className="flex justify-between text-sm font-body"
               >
-                <span className="text-[oklch(0.5_0_0)]">{row.label}</span>
-                <span className="text-[oklch(0.1_0_0)] font-medium text-right max-w-[60%] break-all">
+                <span className="text-sf-muted">{row.label}</span>
+                <span className="text-sf-ink font-medium text-right max-w-[60%] break-all">
                   {row.value}
                 </span>
               </div>
@@ -659,8 +613,8 @@ export default function OrderResult() {
 
         {/* 商品明細 */}
         {order.items && order.items.length > 0 && (
-          <div className="border border-[oklch(0.93_0_0)] p-6 mb-6">
-            <h2 className="text-xs tracking-[0.2em] font-body mb-4 pb-3 border-b border-[oklch(0.93_0_0)]">
+          <div className="border border-sf-line p-6 mb-6">
+            <h2 className="text-xs tracking-[0.2em] font-body mb-4 pb-3 border-b border-sf-line">
               商品明細
             </h2>
             <div className="space-y-3">
@@ -678,15 +632,15 @@ export default function OrderResult() {
                       />
                     )}
                     <div>
-                      <p className="text-[oklch(0.1_0_0)]">
+                      <p className="text-sf-ink">
                         {item.productName}
                         {item.isPreorder && (
-                          <span className="text-[oklch(0.58_0_0)]">
+                          <span className="text-sf-muted">
                             （預購）
                           </span>
                         )}
                       </p>
-                      <p className="text-xs text-[oklch(0.5_0_0)]">
+                      <p className="text-xs text-sf-muted">
                         x {item.quantity}
                       </p>
                     </div>
@@ -718,11 +672,11 @@ export default function OrderResult() {
 
         {/* Sandbox Note */}
         {order.paymentMethod === "credit" && order.paymentSandbox && (
-          <div className="mt-8 p-4 bg-[oklch(0.97_0_0)] border border-[oklch(0.93_0_0)]">
-            <p className="text-xs font-body text-[oklch(0.5_0_0)] font-medium mb-1">
-              🧪 沙盒測試環境
+          <div className="mt-8 p-4 bg-sf-cream border border-sf-line">
+            <p className="text-xs font-body text-sf-muted font-medium mb-1">
+              沙盒測試環境
             </p>
-            <p className="text-xs font-body text-[oklch(0.6_0_0)]">
+            <p className="text-xs font-body text-sf-muted">
               目前為綠界沙盒測試模式，所有交易均為模擬，不會產生真實扣款。
               正式上線前請替換為正式商店憑證。
             </p>

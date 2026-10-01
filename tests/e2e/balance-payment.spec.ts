@@ -2,12 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import {
-  createAtmCustomDepositOrder,
-  fillPureCustomOrderForm,
-  login,
-  uploadTransferReceipt,
-} from "./helpers";
+import { createAtmCustomDepositOrder, fillPureCustomOrderForm, loginAsAdminByCookie, uploadTransferReceipt } from "./helpers";
 import { generateCheckMacValue } from "../../server/ecpay";
 
 const CLEAR_QUARTZ_CHIPS_PRODUCT_ID = "prod-1781070485343";
@@ -261,8 +256,7 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
   await expect(page.getByRole("heading", { name: "接下來，告訴我們你的故事。" })).toBeVisible();
   await expect(page.locator("body")).toContainText("客製化商品");
 
-  await login(page, "e2e-admin@example.com");
-  await expect(page).toHaveURL(/\/admin\/orders/);
+  await loginAsAdminByCookie(page);
 
   await page.locator("button").filter({ hasText: depositOrderNo }).click();
   await page.getByRole("button", { name: "確認收款" }).click();

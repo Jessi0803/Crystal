@@ -11,6 +11,22 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* 前台用途色 → Tailwind class：text-sf-ink、border-sf-line、bg-sf-cream… */
+  --color-sf-ink: var(--sf-ink);
+  --color-sf-text: var(--sf-text);
+  --color-sf-muted: var(--sf-text-muted);
+  --color-sf-line: var(--sf-line);
+  --color-sf-line-strong: var(--sf-line-strong);
+  --color-sf-cream: var(--sf-cream);
+  --color-sf-cream-deep: var(--sf-cream-deep);
+  --color-sf-accent: var(--sf-accent);
+  --color-sf-accent-hover: var(--sf-accent-hover);
+  --color-sf-selected: var(--sf-selected-bg);
+  --color-brand-lace: var(--brand-lace);
+  --color-brand-peach: var(--brand-peach);
+  --color-brand-blush: var(--brand-blush);
+  --color-sf-rose: #9c5f5b;
+  --color-sf-rose-bg: #f3e3e0;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -64,6 +80,29 @@
   --crystal-gold: oklch(0.72 0.09 70);
   --crystal-gold-light: oklch(0.88 0.06 70);
 
+  /* 品牌色（法式氣質＋溫柔浪漫）：首頁 hero、功效說明文字顏色共用 */
+  --brand-lace: #e8e1d1;   /* Antique Lace 奶油米 */
+  --brand-peach: #d8b69f;  /* Soft Peach 柔米杏 */
+  --brand-blush: #c38380;  /* Rosy Blush 玫瑰粉 */
+  --brand-taupe: #9c7164;  /* Rose Taupe 玫瑰棕 */
+  /* 深棕：色相刻意與 brand-taupe 對齊（15° vs 14°），是玫瑰棕的深色版。
+     要柔化只調飽和度與亮度，動到色相就會與按鈕脫節。 */
+  --brand-umber: #4e3c36;  /* Soft Umber 柔和深棕 */
+  --brand-greige: #857670; /* 灰棕色 */
+
+  /* 前台用途色：頁面與元件只引用這一層，之後調整色系只改這裡 */
+  --sf-ink: var(--brand-umber);        /* 標題、主要文字 */
+  --sf-text: #5e4a43;                  /* 內文 */
+  --sf-text-muted: #8a7a72;            /* 次要文字、說明 */
+  --sf-line: #eadfd5;                  /* 分隔線、卡片外框 */
+  --sf-line-strong: #d9c7b8;           /* 輸入框、選項外框 */
+  --sf-cream: #fbf7f2;                 /* 淺米底：資訊區塊、次要按鈕 */
+  --sf-cream-deep: #f2eae2;            /* 深米底：hero、強調區塊 */
+  --sf-accent: var(--brand-taupe);     /* 主按鈕、連結、選中外框 */
+  --sf-accent-hover: var(--brand-umber);
+  --sf-selected-bg: #f5ede6;           /* 選項選中底色 */
+  --sf-focus-ring: rgb(195 131 128 / 0.2);
+
   /* Shadcn tokens */
   --radius: 0;
   --background: oklch(1 0 0);
@@ -100,6 +139,26 @@
   --sidebar-ring: oklch(0.1 0 0);
 }
 
+/* 前台：shadcn 元件（彈窗、下拉、Switch 等）改用品牌色與小圓角；後台維持原本的黑白直角 */
+html.storefront {
+  --radius: 0.375rem;
+  --foreground: var(--sf-ink);
+  --card-foreground: var(--sf-ink);
+  --popover-foreground: var(--sf-ink);
+  --primary: var(--sf-accent);
+  --primary-foreground: #fff;
+  --secondary: var(--sf-cream);
+  --secondary-foreground: var(--sf-ink);
+  --muted: var(--sf-cream);
+  --muted-foreground: var(--sf-text-muted);
+  --accent: var(--sf-selected-bg);
+  --accent-foreground: var(--sf-ink);
+  --border: var(--sf-line);
+  --input: var(--sf-line-strong);
+  --ring: var(--sf-accent);
+  accent-color: var(--sf-accent);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -124,6 +183,19 @@
   input[type="checkbox"]:not(:disabled),
   input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
+  }
+
+  /* 前台表單：小圓角、聚焦時玫瑰棕柔光（個別元件的 class 仍可覆蓋） */
+  html.storefront :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), select, textarea) {
+    border-radius: var(--radius);
+  }
+  html.storefront :is(input, select, textarea):focus-visible {
+    border-color: var(--sf-accent);
+    box-shadow: 0 0 0 3px var(--sf-focus-ring);
+  }
+  html.storefront ::selection {
+    background: rgb(195 131 128 / 0.22);
+    color: var(--sf-ink);
   }
 }
 
@@ -170,7 +242,15 @@
 
   .marquee-track {
     display: flex;
+    width: max-content;
     animation: marquee 28s linear infinite;
+  }
+
+  .marquee-group {
+    display: flex;
+    flex-shrink: 0;
+    min-width: 100vw;
+    justify-content: space-around;
   }
 
   @keyframes marquee {
@@ -190,32 +270,32 @@
   }
 
   .heading-xl {
-    /* Vacanza-style: Noto Sans TC, medium weight, tight tracking */
-    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: clamp(2rem, 5vw, 3.5rem);
-    font-weight: 500;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
-    color: oklch(0.1 0 0);
+    /* 法式氣質：明體細字、深棕 */
+    font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 300;
+    line-height: 1.3;
+    letter-spacing: 0.08em;
+    color: var(--sf-ink);
   }
 
   .heading-lg {
-    /* Vacanza-style: Noto Sans TC, medium weight */
-    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: clamp(1.4rem, 3vw, 2.2rem);
-    font-weight: 500;
-    line-height: 1.25;
-    color: oklch(0.1 0 0);
+    font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+    font-size: clamp(1.4rem, 3vw, 2.1rem);
+    font-weight: 300;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    color: var(--sf-ink);
   }
 
   .eyebrow {
-    /* Vacanza nav style: Noto Sans TC, very small, wide tracking */
-    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 0.65rem;
+    /* 標題上方小字：Cormorant 斜體、玫瑰粉（中文會落到明體） */
+    font-family: 'Cormorant Garamond', 'Noto Serif TC', serif;
+    font-size: 0.7rem;
     font-weight: 400;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: oklch(0.55 0 0);
+    color: var(--brand-blush);
   }
 
   /* ── Buttons ── */
@@ -280,14 +360,15 @@
   .product-card {
     display: flex;
     flex-direction: column;
-    background: oklch(1 0 0);
+    /* 透明底：卡片放在白底、米色區塊都能融入 */
+    background: transparent;
     cursor: pointer;
   }
 
   .product-card-image {
     aspect-ratio: 3/4;
     overflow: hidden;
-    background: oklch(0.97 0 0);
+    background: var(--sf-cream);
     position: relative;
   }
 
@@ -296,6 +377,11 @@
     height: 100%;
     object-fit: cover;
     transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* 首頁卡片用正方形圖，避免圖片面積過大 */
+  .home-product-card .product-card-image {
+    aspect-ratio: 1/1;
   }
 
   .product-card:hover .product-card-image img {
@@ -309,8 +395,9 @@
     transform: translateX(-50%);
     z-index: 2;
     min-width: 5.5rem;
-    border: 1px solid oklch(1 0 0 / 0.72);
-    background: oklch(0.12 0 0 / 0.82);
+    border: 1px solid oklch(1 0 0 / 0.6);
+    border-radius: 9999px;
+    background: rgb(75 52 44 / 0.78);
     color: oklch(1 0 0);
     padding: 0.45rem 0.9rem;
     text-align: center;
@@ -320,7 +407,7 @@
     letter-spacing: 0.18em;
     line-height: 1;
     pointer-events: none;
-    box-shadow: 0 10px 24px rgb(0 0 0 / 0.14);
+    box-shadow: 0 10px 24px rgb(75 52 44 / 0.16);
   }
 
   .product-card-info {
@@ -328,21 +415,21 @@
   }
 
   .product-card-name {
-    /* Vacanza product name style: Noto Sans TC, small, normal weight */
-    font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 0.75rem;
+    font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+    font-size: 0.8rem;
     font-weight: 400;
-    color: oklch(0.1 0 0);
+    letter-spacing: 0.06em;
+    color: var(--sf-ink);
     line-height: 1.5;
     margin-bottom: 0.2rem;
   }
 
   .product-card-price {
-    /* Vacanza price style: same font, slightly muted */
     font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 0.75rem;
     font-weight: 400;
-    color: oklch(0.4 0 0);
+    letter-spacing: 0.04em;
+    color: var(--sf-accent);
   }
 
   /* ── Category Split Card ── */
@@ -377,9 +464,9 @@
     text-align: center;
     background: linear-gradient(
       to bottom,
-      oklch(0 0 0 / 0.1) 0%,
-      oklch(0 0 0 / 0.28) 48%,
-      oklch(0 0 0 / 0.12) 100%
+      rgb(75 52 44 / 0.08) 0%,
+      rgb(75 52 44 / 0.3) 48%,
+      rgb(75 52 44 / 0.12) 100%
     );
   }
 
@@ -479,7 +566,7 @@
   /* ── Divider ── */
   .divider {
     height: 1px;
-    background: oklch(0.9 0 0);
+    background: var(--sf-line);
   }
 
   /* ── Tag/Badge ── */
@@ -489,9 +576,11 @@
     font-size: 0.6rem;
     font-weight: 400;
     letter-spacing: 0.08em;
-    padding: 0.2rem 0.6rem;
-    border: 1px solid oklch(0.85 0 0);
-    color: oklch(0.4 0 0);
+    padding: 0.2rem 0.7rem;
+    border: 1px solid var(--sf-line-strong);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--sf-text-muted);
   }
 
   .tag-scroll {
@@ -514,15 +603,51 @@
   }
 
   .tag-rose {
-    border-color: oklch(0.88 0.04 15);
-    color: oklch(0.55 0.07 15);
-    background: oklch(0.97 0.02 15);
+    border-color: transparent;
+    color: #9c5f5b;
+    background: #f3e3e0;
   }
 
   .tag-gold {
-    border-color: oklch(0.88 0.06 70);
-    color: oklch(0.55 0.09 70);
-    background: oklch(0.97 0.03 70);
+    border-color: transparent;
+    color: #8a6547;
+    background: #f1e6da;
+  }
+
+  /* 前台按鈕：圓角膠囊、玫瑰棕；後台沿用上方的黑色直角版本 */
+  html.storefront .btn-primary {
+    border-radius: 9999px;
+    background-color: var(--sf-accent);
+    padding: 0.7rem 1.8rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    transition: background-color 0.3s ease;
+  }
+  html.storefront .btn-primary:hover {
+    background-color: var(--sf-accent-hover);
+  }
+  html.storefront .btn-outline {
+    border-radius: 9999px;
+    border-color: var(--sf-accent);
+    background-color: var(--sf-cream);
+    color: var(--sf-accent);
+    padding: 0.65rem 1.8rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  html.storefront .btn-outline:hover {
+    border-color: var(--sf-accent-hover);
+    background-color: var(--sf-accent-hover);
+    color: #fff;
+  }
+  html.storefront .btn-ghost {
+    color: var(--sf-accent);
+    border-bottom-color: var(--brand-peach);
+  }
+  html.storefront .btn-ghost:hover {
+    opacity: 1;
+    color: var(--sf-accent-hover);
   }
 }
 
@@ -543,4 +668,338 @@
     transform: scale(1.8);
     opacity: 0;
   }
+}
+
+/* ─── Home hero（配色：#E8E1D1 奶油米 / #D8B69F 柔米杏 / #C38380 玫瑰粉 / #9C7164 玫瑰棕 / #4B342C 深棕）─── */
+.home-hero {
+  --hero-bg: var(--sf-cream-deep);
+  background: var(--hero-bg);
+}
+/* 手機：圖片在上，往下漸層融入文字區 */
+.home-hero-fade {
+  background: linear-gradient(to bottom, transparent 72%, color-mix(in srgb, var(--hero-bg) 70%, transparent) 90%, var(--hero-bg) 100%);
+}
+/* 寬螢幕：圖片在右，往左漸層融入文字區 */
+@media (min-width: 1024px) {
+  .home-hero-fade {
+    background: linear-gradient(to right, var(--hero-bg) 0%, color-mix(in srgb, var(--hero-bg) 55%, transparent) 22%, transparent 48%);
+  }
+}
+.home-hero-script {
+  font-family: 'Allura', 'Cormorant Garamond', cursive;
+  font-size: clamp(1.6rem, 3.2vw, 2.25rem);
+  line-height: 1;
+  color: var(--brand-blush);
+}
+.home-hero-title {
+  font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+  font-size: clamp(2rem, 4.6vw, 3.25rem);
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  color: var(--brand-umber);
+}
+.home-hero-accent {
+  color: var(--brand-taupe);
+}
+/* Hero 連結：主連結為整條底線，次要連結為細線框方塊 */
+.home-hero-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 0.45rem 1.6rem;
+  border-bottom: 1px solid var(--brand-taupe);
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  color: var(--brand-taupe);
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.home-hero-link:hover {
+  color: var(--brand-umber);
+  border-bottom-color: var(--brand-umber);
+}
+
+.home-hero-link-sub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 1.1rem;
+  border: 1px solid var(--brand-peach);
+  font-size: 0.8125rem;
+  letter-spacing: 0.14em;
+  color: var(--brand-taupe);
+  transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
+}
+
+.home-hero-link-sub:hover {
+  border-color: var(--brand-taupe);
+  background: rgb(255 255 255 / 0.5);
+  color: var(--brand-umber);
+}
+
+/* ─── 功效說明富文字（後台 Editor 與前台共用；class 需與 shared/richText.ts 一致）─── */
+.rich-content {
+  font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.85;
+  letter-spacing: 0.02em;
+  color: var(--sf-text);
+  overflow-wrap: anywhere;
+}
+.rich-content > :first-child { margin-top: 0; }
+.rich-content > :last-child { margin-bottom: 0; }
+.rich-content p { margin: 0 0 0.9em; }
+/* 連按兩次 Enter 產生的空段落保留為空行；Editor 自動補在最後的空段落不顯示 */
+.rich-content p:empty::before { content: "\00a0"; }
+.rich-content > p:last-child:empty { display: none; }
+.rich-content h2 {
+  margin: 1.6em 0 0.6em;
+  font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  color: var(--brand-umber);
+}
+.rich-content h3 {
+  margin: 1.3em 0 0.5em;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  color: var(--brand-umber);
+}
+.rich-content strong { font-weight: 500; color: var(--sf-ink); }
+.rich-content em { font-style: italic; }
+.rich-content u { text-underline-offset: 3px; }
+.rich-content a {
+  color: var(--brand-taupe);
+  text-decoration: underline;
+  text-decoration-color: var(--brand-peach);
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+.rich-content a:hover { color: var(--brand-umber); }
+.rich-content ul,
+.rich-content ol { margin: 0 0 0.9em; padding-left: 1.4em; }
+.rich-content ul { list-style: disc; }
+.rich-content ol { list-style: decimal; }
+.rich-content li { margin: 0.25em 0; }
+.rich-content li::marker { color: var(--brand-taupe); }
+.rich-content li > p { margin: 0; }
+.rich-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.4em auto;
+}
+.rich-content img.rt-img-left { margin-left: 0; margin-right: auto; }
+.rich-content img.rt-img-right { margin-left: auto; margin-right: 0; }
+.rich-content img.rt-img-sm { width: 40%; }
+.rich-content img.rt-img-md { width: 65%; }
+.rich-content img.rt-img-lg { width: 85%; }
+.rich-content img.rt-img-full { width: 100%; }
+@media (max-width: 639px) {
+  .rich-content img.rt-img-sm { width: 60%; }
+  .rich-content img.rt-img-md,
+  .rich-content img.rt-img-lg { width: 100%; }
+}
+.rich-content .rt-align-center { text-align: center; }
+.rich-content .rt-align-right { text-align: right; }
+.rich-content .rt-size-14 { font-size: 14px; }
+.rich-content .rt-size-16 { font-size: 16px; }
+.rich-content .rt-size-18 { font-size: 18px; }
+.rich-content .rt-size-20 { font-size: 20px; }
+.rich-content .rt-size-24 { font-size: 24px; line-height: 1.5; }
+.rich-content .rt-size-28 { font-size: 28px; line-height: 1.45; }
+.rich-content .rt-color-umber { color: var(--brand-umber); }
+.rich-content .rt-color-taupe { color: var(--brand-taupe); }
+.rich-content .rt-color-blush { color: var(--brand-blush); }
+.rich-content .rt-color-greige { color: var(--brand-greige); }
+
+/* 後台 Editor 編輯區 */
+.rich-content-editor {
+  min-height: 260px;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid oklch(0.86 0 0);
+  background: #fff;
+  padding: 14px 16px;
+  outline: none;
+}
+.rich-content-editor:focus { border-color: oklch(0.2 0 0); }
+.rich-content-editor img { cursor: pointer; }
+.rich-content-editor img.ProseMirror-selectednode { outline: 2px solid var(--brand-taupe); outline-offset: 2px; }
+
+/* 商品頁手機底部固定購買列出現時，AI 客服按鈕與對話框往上讓位（不放在 layer 內，才能蓋過 bottom-* utility） */
+@media (max-width: 1023px) {
+  html.has-sticky-buy-bar .chatbot-launcher {
+    bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    transition: bottom 0.3s ease;
+  }
+  html.has-sticky-buy-bar .chatbot-panel {
+    bottom: calc(10rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* ─── 紙質感背景 ─────────────────────────────────────────────────────────────
+   奶油米底 + SVG 細顆粒（模擬紙纖維）+ 兩道淡光暈（模擬紙張受光不均）。
+   純 CSS、約 300 bytes，不需要圖檔。 */
+.paper-surface {
+  background-color: var(--sf-cream);
+  background-image:
+    radial-gradient(60% 55% at 18% 8%, rgb(255 255 255 / 0.6) 0%, transparent 60%),
+    radial-gradient(50% 45% at 85% 95%, rgb(216 182 159 / 0.2) 0%, transparent 65%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23p)' opacity='0.12'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-size: auto, auto, 180px 180px;
+}
+
+@media (prefers-contrast: more) {
+  .paper-surface {
+    background-image: none;
+  }
+}
+
+/* 浮雕紙紋：雜訊經打光後產生凹凸與陰影，疊在米底上（multiply）模擬手工紙 */
+.paper-emboss {
+  /* 比米底更白的紙色 */
+  background-color: #fdfcfa;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='e' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.045' numOctaves='5' seed='7' stitchTiles='stitch' result='n'/%3E%3CfeDiffuseLighting in='n' lighting-color='%23ffffff' surfaceScale='1.4' result='l'%3E%3CfeDistantLight azimuth='140' elevation='72'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23e)' opacity='0.38'/%3E%3C/svg%3E");
+  background-size: 320px 320px;
+  background-repeat: repeat;
+  background-blend-mode: multiply;
+}
+
+@media (prefers-contrast: more) {
+  .paper-emboss {
+    background-image: none;
+  }
+}
+
+/* ─── 蕾絲邊與線條點綴 ───────────────────────────────────────────────────────
+   .lace-top / .lace-bottom：區塊上下緣的蕾絲線條（扇貝弧線＋小圓點），
+   用線條而非色塊，因此不受相鄰區塊底色影響 */
+.lace-top,
+.lace-bottom {
+  position: relative;
+}
+
+.lace-top::before,
+.lace-bottom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 16px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='16'%3E%3Cpath d='M0 4 Q7 14 14 4 Q21 14 28 4' fill='none' stroke='%23d8b69f' stroke-width='1'/%3E%3Ccircle cx='7' cy='7.5' r='1' fill='%23d8b69f'/%3E%3Ccircle cx='21' cy='7.5' r='1' fill='%23d8b69f'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 28px 16px;
+  opacity: 0.75;
+}
+
+.lace-top::before {
+  top: 10px;
+}
+
+.lace-bottom::after {
+  bottom: 10px;
+  transform: scaleY(-1);
+}
+
+/* 細線＋中央菱形的段落分隔 */
+.rule-ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--brand-peach);
+}
+
+.rule-ornament::before,
+.rule-ornament::after {
+  content: "";
+  height: 1px;
+  width: clamp(2rem, 8vw, 4.5rem);
+  background: linear-gradient(to right, transparent, var(--sf-line-strong), transparent);
+}
+
+/* 拱形線框：沿著圖片的拱形外緣加兩道細線與角落星點（不改變圖片形狀） */
+.arch-line-frame {
+  position: relative;
+}
+
+.arch-line-frame::before,
+.arch-line-frame::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid var(--brand-peach);
+  border-radius: 9999px 9999px 0 0;
+  /* 與 .rule-ornament 相同的淡入淡出：拱頂與兩側維持清楚，接近底部才化開。
+     只用上下向的遮罩；若再加左右向遮罩，兩側直線正好落在淡出範圍內會整條消失 */
+  mask-image: linear-gradient(to bottom, #000 0%, #000 82%, rgb(0 0 0 / 0.45) 94%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 82%, rgb(0 0 0 / 0.45) 94%, transparent 100%);
+}
+
+.arch-line-frame::before {
+  inset: -10px;
+  opacity: 0.8;
+}
+
+.arch-line-frame::after {
+  inset: -18px;
+  opacity: 0.35;
+}
+
+.arch-line-frame > .arch-corner {
+  position: absolute;
+  bottom: -26px;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--brand-peach);
+}
+
+.arch-line-frame > .arch-corner-left {
+  left: -22px;
+}
+
+.arch-line-frame > .arch-corner-right {
+  right: -22px;
+}
+
+@media (max-width: 767px) {
+  .arch-line-frame::before {
+    inset: -10px;
+  }
+
+  .arch-line-frame::after {
+    inset: -17px;
+  }
+
+  .arch-line-frame > .arch-corner {
+    bottom: -23px;
+  }
+
+  .arch-line-frame > .arch-corner-left {
+    left: -19px;
+  }
+
+  .arch-line-frame > .arch-corner-right {
+    right: -19px;
+  }
+}
+
+/* 壓印（凹字）：字本身不上色讓紙紋透出，只靠左上暗、右下亮的邊緣陰影成形 */
+.emboss-motif {
+  color: transparent;
+  text-shadow:
+    -1px -1px 1px rgb(75 52 44 / 0.035),
+    -2px -2px 3px rgb(75 52 44 / 0.018),
+    1px 1px 0 rgb(255 255 255 / 0.35),
+    2px 2px 3px rgb(255 255 255 / 0.18);
 }

@@ -7,7 +7,10 @@ const E2E_BASE_URL = `http://127.0.0.1:${process.env.E2E_PORT || 3100}`;
 
 async function selectCustomFormChoice(button: Locator) {
   await button.click();
-  await expect(button).toHaveClass(/border-\[oklch\(0\.1_0_0\)\]/);
+  // 前台改版後選中狀態改用品牌色。各元件一致的標記是「單獨的 border-sf-accent」，
+  // 未選中則是 border-sf-line-strong + hover:border-sf-accent/50，
+  // 所以要比對完整的 class token，避免把 hover: 的那個當成已選中。
+  await expect(button).toHaveClass(/(?:^|\s)border-sf-accent(?:\s|$)/);
 }
 
 async function submitCustomOrderForm(page: Page, orderNo: string) {
@@ -48,8 +51,15 @@ async function createE2eSessionToken(openId: string, name: string) {
     .sign(new TextEncoder().encode(E2E_JWT_SECRET));
 }
 
-export async function loginAsAdminByCookie(page: Page) {
-  const token = await createE2eSessionToken("e2e-admin-openid", "E2E Admin");
+/**
+ * 直接把 session cookie 塞進瀏覽器，不走登入 API。
+ *
+ * 表單登入會受 member-auth 限流（20 次 / 15 分鐘），全套 e2e 的登入次數遠超過這個上限，
+ * 並行執行時會互相擠爆而大量失敗。只是「需要一個已登入身分」的測試改用這個；
+ * 真正在測登入行為的測試（auth-admin、member-security、checkout-account-gate）仍用表單登入。
+ */
+async function setSessionCookie(page: Page, openId: string, name: string) {
+  const token = await createE2eSessionToken(openId, name);
   await page.context().addCookies([
     {
       name: COOKIE_NAME,
@@ -61,15 +71,26 @@ export async function loginAsAdminByCookie(page: Page) {
       expires: Math.floor((Date.now() + ONE_YEAR_MS) / 1000),
     },
   ]);
+}
+
+export async function loginAsAdminByCookie(page: Page) {
+  await setSessionCookie(page, "e2e-admin-openid", "E2E Admin");
   await page.goto("/admin/orders");
   await expect(page).toHaveURL(/\/admin\/orders/);
 }
 
+/** 一般會員身分；不導頁，呼叫端自行決定要去哪一頁 */
+export async function loginAsUserByCookie(page: Page) {
+  await setSessionCookie(page, "e2e-user-openid", "E2E User");
+}
+
+// 手機版有固定購買列（StickyBuyBar，lg:hidden），頁面上會出現兩顆「加入購物袋」，
+// 所以加入購物袋一律從商品選項區 #product-options 內點，避免 strict mode 失敗。
 export async function addSeededBraceletToCart(page: Page) {
   await page.goto("/products/e2e-bracelet-in-stock");
   await expect(page.getByRole("heading", { name: "E2E 現貨手鍊" })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: /龍蝦扣/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   await expect(page.locator("body")).toContainText("龍蝦扣");
 }
 
@@ -151,7 +172,7 @@ export async function addCustomDepositToCart(
     }
     await page.getByRole("button", { name: new RegExp(options.tarotTopic) }).click();
   }
-  await page.getByRole("button", { name: "加入購物袋" }).click();
+  await page.locator("#product-options").getByRole("button", { name: "加入購物袋" }).click();
   await expect(page.getByRole("heading", { name: /購物袋/ })).toBeVisible();
   await expect(page.locator("body")).toContainText(productName);
   if (proceedToCheckout) {

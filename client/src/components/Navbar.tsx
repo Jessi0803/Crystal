@@ -2,21 +2,22 @@
 // Design: Vacanza-inspired — announcement bar + centered logo + full nav row + icons
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, User, Menu, X, ChevronDown, Heart, Coins, Shield, Leaf, Gem, Ribbon, Droplet, Sparkles, type LucideIcon } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { BrandTextMark } from "./BrandMark";
 
-const effectSeriesLinks = [
-  { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: "💖" },
-  { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: "💰" },
-  { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: "🪄" },
-  { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: "🧘🏻" },
-  { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: "💎" },
-  { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: "🎀" },
-  { label: "能量香水", href: "/products?category=energy-perfume", desc: "香氣能量・即將推出", icon: "🌙" },
-  { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: "✨" },
+// 功效分類圖示：Lucide 細線圖示（ISC 授權，可免費商用），風格與導覽列其他圖示一致
+const effectSeriesLinks: { label: string; href: string; desc: string; icon: LucideIcon }[] = [
+  { label: "愛情桃花", href: "/products?category=love", desc: "粉水晶・草莓晶", icon: Heart },
+  { label: "財運事業", href: "/products?category=wealth", desc: "黃水晶・金髮晶", icon: Coins },
+  { label: "能量防護", href: "/products?category=protect", desc: "黑曜石・黑碧璽", icon: Shield },
+  { label: "療癒系列", href: "/products?category=healing", desc: "紫水晶・月光石", icon: Leaf },
+  { label: "項鍊", href: "/products?category=necklace", desc: "日常疊戴・優雅配搭", icon: Gem },
+  { label: "吊飾", href: "/products?category=pendant", desc: "隨身小物・能量點綴", icon: Ribbon },
+  { label: "能量香水", href: "/products?category=energy-perfume", desc: "香氣能量・即將推出", icon: Droplet },
+  { label: "其他", href: "/products?category=other", desc: "更多周邊與特別款", icon: Sparkles },
 ];
 
 // 購物說明下拉選單
@@ -46,7 +47,7 @@ function ShoppingGuideDropdown() {
       <button
         onClick={() => setOpen((v) => !v)}
         className={`h-4 inline-flex items-center gap-1 text-[0.7rem] leading-none tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
-          open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
+          open ? "text-sf-ink" : "text-sf-text hover:text-sf-accent"
         }`}
       >
         購物說明
@@ -54,14 +55,14 @@ function ShoppingGuideDropdown() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-44 bg-white border border-[oklch(0.93_0_0)] shadow-lg z-50">
-          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-l border-t border-[oklch(0.93_0_0)] rotate-45" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-44 rounded-md bg-white border border-sf-line shadow-[0_12px_32px_rgb(75_52_44/0.1)] z-50">
+          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-l border-t border-sf-line rotate-45" />
           <div className="py-1.5">
             {guideItems.map((item) => (
               <Link key={item.href} href={item.href}>
                 <div
                   onClick={() => setOpen(false)}
-                  className="px-4 py-2.5 text-[0.7rem] tracking-[0.05em] text-[oklch(0.3_0_0)] hover:bg-[oklch(0.97_0_0)] hover:text-[oklch(0.1_0_0)] transition-colors cursor-pointer"
+                  className="px-4 py-2.5 text-[0.7rem] tracking-[0.05em] text-sf-text hover:bg-sf-selected hover:text-sf-ink transition-colors cursor-pointer"
                 >
                   {item.label}
                 </div>
@@ -121,7 +122,7 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
           setOpen((v) => !v);
         }}
         className={`h-4 inline-flex items-center gap-1 text-[0.7rem] leading-none tracking-[0.12em] font-body transition-colors duration-200 whitespace-nowrap ${
-          open ? "text-[oklch(0.1_0_0)]" : "text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)]"
+          open ? "text-sf-ink" : "text-sf-text hover:text-sf-accent"
         }`}
       >
         商品分類
@@ -132,35 +133,35 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
       </button>
 
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-64 bg-white border border-[oklch(0.93_0_0)] shadow-lg z-50">
-          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-l border-t border-[oklch(0.93_0_0)] rotate-45" />
-          <div className="px-5 pt-4 pb-3 border-b border-[oklch(0.95_0_0)]">
-            <p className="text-[0.6rem] tracking-[0.2em] text-[oklch(0.55_0_0)] uppercase">SHOP BY CATEGORY</p>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-64 rounded-md bg-white border border-sf-line shadow-[0_12px_32px_rgb(75_52_44/0.1)] z-50">
+          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-l border-t border-sf-line rotate-45" />
+          <div className="px-5 pt-4 pb-3 border-b border-sf-line">
+            <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase">SHOP BY CATEGORY</p>
           </div>
-          <div className="border-b border-[oklch(0.95_0_0)] px-5 py-3">
+          <div className="border-b border-sf-line px-5 py-3">
             <Link href="/products">
               <div
                 onMouseEnter={onProductsIntent}
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-between cursor-pointer group"
               >
-                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.4_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">
+                <span className="text-[0.65rem] tracking-[0.15em] text-sf-text group-hover:text-sf-ink transition-colors">
                   查看全部商品
                 </span>
-                <span className="text-[0.65rem] text-[oklch(0.6_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">→</span>
+                <span className="text-[0.65rem] text-sf-muted group-hover:text-sf-ink transition-colors">→</span>
               </div>
             </Link>
           </div>
-          <div className="border-b border-[oklch(0.95_0_0)] px-5 py-3" style={{background: "oklch(0.97 0.01 70)"}}>
+          <div className="border-b border-sf-line bg-sf-selected px-5 py-3">
             <Link href="/products?category=custom" onMouseEnter={onProductsIntent} onFocus={onProductsIntent}>
               <div
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-between cursor-pointer group"
               >
-                <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.55_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors font-medium">
+                <span className="text-[0.65rem] tracking-[0.15em] text-sf-accent group-hover:text-sf-ink transition-colors font-medium">
                   客製化方案
                 </span>
-                <span className="text-[0.65rem] text-[oklch(0.65_0.08_70)] group-hover:text-[oklch(0.4_0.1_70)] transition-colors">→</span>
+                <span className="text-[0.65rem] text-brand-blush group-hover:text-sf-ink transition-colors">→</span>
               </div>
             </Link>
           </div>
@@ -168,13 +169,13 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
             <button
               type="button"
               onClick={() => setEffectOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.97_0_0)] transition-colors group"
+              className="w-full flex items-center justify-between px-5 py-3 hover:bg-sf-selected transition-colors group"
             >
-              <span className="text-[0.65rem] tracking-[0.15em] text-[oklch(0.4_0_0)] group-hover:text-[oklch(0.1_0_0)] transition-colors">
+              <span className="text-[0.65rem] tracking-[0.15em] text-sf-text group-hover:text-sf-ink transition-colors">
                 功效系列
               </span>
               <ChevronDown
-                className={`w-3 h-3 text-[oklch(0.6_0_0)] transition-transform duration-200 ${effectOpen ? "rotate-180" : ""}`}
+                className={`w-3 h-3 text-sf-muted transition-transform duration-200 ${effectOpen ? "rotate-180" : ""}`}
                 strokeWidth={1.5}
               />
             </button>
@@ -184,14 +185,14 @@ function CategoryDropdown({ onProductsIntent }: { onProductsIntent?: () => void 
                   <Link key={cat.href} href={cat.href}>
                     <div
                       onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-[oklch(0.97_0_0)] transition-colors group cursor-pointer"
+                      className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-sf-selected transition-colors group cursor-pointer"
                     >
-                      <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
+                      <CategoryIcon icon={cat.icon} />
                       <div className="min-w-0">
-                        <p className="text-[0.75rem] font-medium text-[oklch(0.1_0_0)] tracking-[0.05em] group-hover:text-[oklch(0.3_0_0)] transition-colors">
+                        <p className="text-[0.75rem] font-medium text-sf-ink tracking-[0.05em] group-hover:text-sf-accent transition-colors">
                           {cat.label}
                         </p>
-                        <p className="text-[0.6rem] text-[oklch(0.6_0_0)] mt-0.5 tracking-wide">
+                        <p className="text-[0.6rem] text-sf-muted mt-0.5 tracking-wide">
                           {cat.desc}
                         </p>
                       </div>
@@ -224,7 +225,7 @@ export default function Navbar() {
     refetchOnWindowFocus: true,
     staleTime: 0,
   });
-  const announcementText = siteSettings?.announcementText.trim() ?? "任選兩件商品免運 · 6/1–6/10 全面九折 ·";
+  const announcementText = siteSettings?.announcementText.trim() ?? "任選 2 件即免運 ·";
   const showAnnouncement = siteSettings?.announcementEnabled !== false && announcementText.length > 0;
 
   useEffect(() => {
@@ -284,7 +285,7 @@ export default function Navbar() {
       {/* ── Main Header ── */}
       <header
         className={`${mobileOpen ? "fixed inset-x-0 top-0" : "sticky top-0"} z-50 bg-white transition-shadow duration-300 ${
-          scrolled ? "shadow-[0_1px_0_0_oklch(0.9_0_0)]" : "border-b border-[oklch(0.93_0_0)]"
+          scrolled ? "shadow-[0_1px_0_0_var(--sf-line)]" : "border-b border-sf-line"
         }`}
       >
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -298,19 +299,19 @@ export default function Navbar() {
               {/* Left nav: 每月限量、商品分類、購物說明 */}
               <nav className="hidden lg:flex items-center gap-6">
                 <Link href="/products?category=monthly" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text hover:text-sf-accent transition-colors duration-200 whitespace-nowrap">
                     每月限量
                   </span>
                 </Link>
                 <CategoryDropdown onProductsIntent={prefetchProducts} />
                 <Link href="/crystal-workshop">
-                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text hover:text-sf-accent transition-colors duration-200 whitespace-nowrap">
                     水晶創業班
                   </span>
                 </Link>
                 <ShoppingGuideDropdown />
                 <Link href="/about">
-                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors duration-200 whitespace-nowrap">
+                  <span className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text hover:text-sf-accent transition-colors duration-200 whitespace-nowrap">
                     品牌故事
                   </span>
                 </Link>
@@ -326,19 +327,19 @@ export default function Navbar() {
                 <MemberIconButton />
                 <button
                   onClick={() => setIsOpen(true)}
-                  className="relative p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                  className="relative p-1.5 text-sf-text hover:text-sf-accent transition-colors"
                   aria-label="購物車"
                 >
                   <ShoppingBag className="w-4 h-4" strokeWidth={1.5} />
                   {totalItems > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[oklch(0.1_0_0)] text-white text-[0.55rem] flex items-center justify-center font-body">
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-sf-accent text-white text-[0.55rem] flex items-center justify-center font-body">
                       {totalItems}
                     </span>
                   )}
                 </button>
                 <button
                   onClick={() => setMobileOpen(!mobileOpen)}
-                  className="lg:hidden p-1.5 text-[oklch(0.25_0_0)]"
+                  className="lg:hidden p-1.5 text-sf-text"
                   aria-label="選單"
                   aria-expanded={mobileOpen}
                 >
@@ -351,10 +352,10 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="fixed inset-x-0 bottom-0 top-14 z-50 overflow-y-auto overscroll-contain border-t border-[oklch(0.93_0_0)] bg-white lg:hidden">
+          <div className="fixed inset-x-0 bottom-0 top-14 z-50 overflow-y-auto overscroll-contain border-t border-sf-line bg-white lg:hidden">
             <nav className="mx-auto flex min-h-full max-w-[1440px] flex-col gap-0 px-4 py-4">
               <Link href="/products?category=monthly" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors">
                   每月限量
                 </span>
               </Link>
@@ -366,42 +367,42 @@ export default function Navbar() {
                     prefetchProducts();
                     setMobileCatOpen((v) => !v);
                   }}
-                  className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                  className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors"
                 >
                   <span>商品分類</span>
                   <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileCatOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
                 </button>
                 {mobileCatOpen && (
-                  <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
+                  <div className="bg-sf-cream border-b border-sf-line">
                     <Link href="/products" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                      <div onClick={closeMobileMenu} className="flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
-                        <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">查看全部商品</span>
-                        <span className="text-xs text-[oklch(0.6_0_0)]">→</span>
+                      <div onClick={closeMobileMenu} className="flex items-center justify-between px-5 py-3 hover:bg-sf-selected transition-colors cursor-pointer">
+                        <span className="text-xs tracking-[0.1em] text-sf-text">查看全部商品</span>
+                        <span className="text-xs text-sf-muted">→</span>
                       </div>
                     </Link>
                     <Link href="/products?category=custom" onMouseEnter={prefetchProducts} onFocus={prefetchProducts}>
-                      <div onClick={closeMobileMenu} className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer" style={{background: "oklch(0.97 0.01 70)"}}>
-                        <span className="text-xs tracking-[0.1em] text-[oklch(0.55_0.08_70)] font-medium">客製化方案</span>
-                        <span className="text-xs text-[oklch(0.65_0.08_70)]">→</span>
+                      <div onClick={closeMobileMenu} className="flex items-center justify-between bg-sf-selected px-5 py-3 transition-colors cursor-pointer">
+                        <span className="text-xs tracking-[0.1em] text-sf-accent font-medium">客製化方案</span>
+                        <span className="text-xs text-brand-blush">→</span>
                       </div>
                     </Link>
                     <button
                       type="button"
                       onClick={() => setMobileEffectOpen((v) => !v)}
-                      className="w-full flex items-center justify-between px-5 py-3 hover:bg-[oklch(0.95_0_0)] transition-colors"
+                      className="w-full flex items-center justify-between px-5 py-3 hover:bg-sf-selected transition-colors"
                     >
-                      <span className="text-xs tracking-[0.1em] text-[oklch(0.4_0_0)]">功效系列</span>
-                      <ChevronDown className={`w-4 h-4 text-[oklch(0.6_0_0)] transition-transform duration-200 ${mobileEffectOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
+                      <span className="text-xs tracking-[0.1em] text-sf-text">功效系列</span>
+                      <ChevronDown className={`w-4 h-4 text-sf-muted transition-transform duration-200 ${mobileEffectOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
                     </button>
                     {mobileEffectOpen && (
                       <div className="pb-1">
                         {effectSeriesLinks.map((cat) => (
                           <Link key={cat.href} href={cat.href}>
-                            <div onClick={closeMobileMenu} className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
-                              <span className="text-base w-5 shrink-0">{cat.icon}</span>
+                            <div onClick={closeMobileMenu} className="flex items-center gap-3 px-5 py-3 pl-7 hover:bg-sf-selected transition-colors cursor-pointer">
+                              <CategoryIcon icon={cat.icon} />
                               <div>
-                                <p className="text-sm font-medium text-[oklch(0.1_0_0)]">{cat.label}</p>
-                                <p className="text-[0.6rem] text-[oklch(0.6_0_0)]">{cat.desc}</p>
+                                <p className="text-sm font-medium text-sf-ink">{cat.label}</p>
+                                <p className="text-[0.6rem] text-sf-muted">{cat.desc}</p>
                               </div>
                             </div>
                           </Link>
@@ -413,7 +414,7 @@ export default function Navbar() {
               </div>
 
               <Link href="/crystal-workshop">
-                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors">
                   水晶創業班
                 </span>
               </Link>
@@ -422,13 +423,13 @@ export default function Navbar() {
               <div>
                 <button
                   onClick={() => setMobileGuideOpen((v) => !v)}
-                  className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors"
+                  className="w-full flex items-center justify-between py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors"
                 >
                   <span>購物說明</span>
                   <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileGuideOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
                 </button>
                 {mobileGuideOpen && (
-                  <div className="bg-[oklch(0.98_0_0)] border-b border-[oklch(0.95_0_0)]">
+                  <div className="bg-sf-cream border-b border-sf-line">
                     {[
                       { label: "退換貨說明", href: "/shopping-guide#return" },
                       { label: "運送說明", href: "/shopping-guide#shipping" },
@@ -436,7 +437,7 @@ export default function Navbar() {
                       { label: "常見問題", href: "/shopping-guide#faq" },
                     ].map((item) => (
                       <Link key={item.href} href={item.href}>
-                        <div onClick={closeMobileMenu} className="px-5 py-3 text-sm text-[oklch(0.3_0_0)] hover:bg-[oklch(0.95_0_0)] transition-colors cursor-pointer">
+                        <div onClick={closeMobileMenu} className="px-5 py-3 text-sm text-sf-text hover:bg-sf-selected transition-colors cursor-pointer">
                           {item.label}
                         </div>
                       </Link>
@@ -447,7 +448,7 @@ export default function Navbar() {
 
               {/* 品牌故事 */}
               <Link href="/about">
-                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+                <span onClick={closeMobileMenu} className="block py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors">
                   品牌故事
                 </span>
               </Link>
@@ -463,17 +464,30 @@ export default function Navbar() {
 
       {/* ── 跑馬燈公告 ── */}
       {showAnnouncement && (
-        <div className="bg-[oklch(0.985_0_0)] border-b border-[oklch(0.95_0_0)] py-2 overflow-hidden">
+        <div className="bg-sf-cream-deep border-b border-sf-line py-2 overflow-hidden">
+          {/* 兩組相同內容、每組至少滿版寬，往左捲一組的寬度後無縫接回，寬螢幕也不會出現空白 */}
           <div className="marquee-track">
-            {Array(8).fill(null).map((_, i) => (
-              <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-[oklch(0.45_0_0)] uppercase">
-                {announcementText}&nbsp;
-              </span>
+            {[0, 1].map((group) => (
+              <div key={group} className="marquee-group" aria-hidden={group === 1}>
+                {Array(6).fill(null).map((_, i) => (
+                  <span key={i} className="px-8 shrink-0 text-[0.6rem] tracking-[0.25em] font-body text-sf-text uppercase">
+                    {announcementText}&nbsp;
+                  </span>
+                ))}
+              </div>
             ))}
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function CategoryIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sf-selected text-sf-accent" aria-hidden="true">
+      <Icon className="h-[15px] w-[15px]" strokeWidth={1.4} />
+    </span>
   );
 }
 
@@ -487,7 +501,7 @@ function AdminDashboardButton() {
   return (
     <button
       onClick={() => navigate("/admin/orders")}
-      className="relative p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors hidden sm:block"
+      className="relative p-1.5 text-sf-text hover:text-sf-accent transition-colors hidden sm:block"
       aria-label="前往後台"
       title="後台"
     >
@@ -503,13 +517,13 @@ function MemberIconButton() {
   return (
     <button
       onClick={() => navigate(user ? "/member" : "/login")}
-      className="relative p-1.5 text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors hidden sm:block"
+      className="relative p-1.5 text-sf-text hover:text-sf-accent transition-colors hidden sm:block"
       aria-label={user ? "會員中心" : "登入"}
       title={user ? `${user.name ?? user.email}` : "登入 / 註冊"}
     >
       <User className="w-4 h-4" strokeWidth={1.5} />
       {user && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[oklch(0.6_0.12_60)] rounded-full" />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-brand-blush rounded-full" />
       )}
     </button>
   );
@@ -532,13 +546,13 @@ function MobileMemberLinks({ onNavigate }: { onNavigate: () => void }) {
       <>
         {user.role === "admin" && (
           <Link href="/admin/orders">
-            <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+            <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors">
               後台
             </span>
           </Link>
         )}
         <Link href="/member">
-          <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] border-b border-[oklch(0.95_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+          <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-sf-text border-b border-sf-line hover:text-sf-accent transition-colors">
             會員中心（{user.name ?? user.email}）
           </span>
         </Link>
@@ -547,7 +561,7 @@ function MobileMemberLinks({ onNavigate }: { onNavigate: () => void }) {
             onNavigate();
             logoutMutation.mutate();
           }}
-          className="w-full text-left py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.55_0_0)] hover:text-[oklch(0.35_0_0)] transition-colors"
+          className="w-full text-left py-3 text-sm tracking-[0.1em] font-body text-sf-muted hover:text-sf-accent transition-colors"
         >
           登出
         </button>
@@ -557,7 +571,7 @@ function MobileMemberLinks({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <Link href="/login">
-      <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-[oklch(0.25_0_0)] hover:text-[oklch(0.55_0_0)] transition-colors">
+      <span onClick={onNavigate} className="block py-3 text-sm tracking-[0.1em] font-body text-sf-text hover:text-sf-accent transition-colors">
         會員登入
       </span>
     </Link>

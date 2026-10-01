@@ -55,6 +55,9 @@ export default defineConfig({
       DOTENV_CONFIG_PATH: ".env.test.local",
       DATABASE_URL: testDatabaseUrl,
       JWT_SECRET: "e2e-local-jwt-secret-min-32-chars",
+      // 全套測試會在幾分鐘內大量登入與下單，放寬限流避免互相擠爆；
+      // server/_core/rateLimit.ts 在 Vercel 上會忽略這個變數
+      E2E_RATE_LIMIT_MULTIPLIER: "50",
       PAYPAL_SANDBOX: "1",
       ECPAY_SANDBOX: "true",
       ECPAY_MERCHANT_ID: "3002607",
@@ -71,8 +74,6 @@ export default defineConfig({
       RESEND_API_KEY: allowResendDelivery ? process.env.RESEND_API_KEY ?? "" : "",
       GEMINI_API_KEY: allowRealChatbot ? process.env.GEMINI_API_KEY ?? "" : "",
       E2E_STORAGE_STUB: "true",
-      VITE_ANALYTICS_ENDPOINT: "__e2e_analytics",
-      VITE_ANALYTICS_WEBSITE_ID: "e2e",
     },
     url: baseURL,
     reuseExistingServer: false,

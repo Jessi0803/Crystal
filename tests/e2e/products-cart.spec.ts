@@ -4,6 +4,9 @@ import { readFileSync } from "node:fs";
 import mysql from "mysql2/promise";
 import { proceedThroughCheckoutGate } from "./helpers";
 
+// 手機版有固定購買列（StickyBuyBar），頁面上會有兩顆「加入購物袋」，
+// 所以一律從商品選項區 #product-options 內點。
+
 async function connectTestDb() {
   const env = dotenv.parse(readFileSync(".env.test.local"));
   const url = new URL(env.DATABASE_URL);
@@ -212,10 +215,10 @@ test("product detail can add seeded product to cart and continue to checkout", a
   await expect(page).toHaveURL(/\/products\/e2e-bracelet-in-stock/);
   await expect(page.getByRole("heading", { name: "E2E 現貨手鍊" })).toBeVisible();
 
-  await page.getByRole("button", { name: /龍蝦扣/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /龍蝦扣/ }).click();
   await expect(page.locator("body")).toContainText(/龍蝦扣\+NT\$200/);
 
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   await expect(page.getByText("購物袋").first()).toBeVisible();
   await expect(page.getByText("E2E 現貨手鍊").last()).toBeVisible();
   await expect(page.locator("body")).toContainText("龍蝦扣");
@@ -307,7 +310,7 @@ test("seeded inventory states are visible", async ({ page }) => {
 
   await page.goto("/products/e2e-bracelet-preorder");
   await expect(page.locator("body")).toContainText(/預購|7-14 天/);
-  await expect(page.getByRole("button", { name: /加入購物袋/ })).toBeEnabled();
+  await expect(page.locator("#product-options").getByRole("button", { name: /加入購物袋/ })).toBeEnabled();
 
   await page.goto("/products/e2e-monthly-sold-out");
   await expect(page.locator(".sold-out-card")).toHaveText("已售完");
@@ -318,9 +321,9 @@ test("seeded inventory states are visible", async ({ page }) => {
 test("bracelet options and cart controls update line price and quantity", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-in-stock");
   await page.getByRole("combobox").selectOption("13.5");
-  await page.getByRole("button", { name: /磁扣/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /磁扣/ }).click();
   await page.getByRole("button", { name: /微鬆/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("手圍 13.5 cm");
@@ -350,16 +353,16 @@ test("moon clear heart wrist size rules update price and cart line", async ({ pa
   await expect(page.locator("body")).toContainText("NT$ 1,680");
 
   await wristSelect.selectOption("14");
-  await page.getByRole("button", { name: /彈力繩/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /彈力繩/ }).click();
   await expect(page.locator("body")).toContainText("NT$ 1,580");
-  await page.getByRole("button", { name: /龍蝦扣/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /龍蝦扣/ }).click();
   await expect(page.locator("body")).toContainText("NT$ 1,780");
-  await page.getByRole("button", { name: /磁扣/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /磁扣/ }).click();
   await expect(page.locator("body")).toContainText("NT$ 1,780");
 
   await wristSelect.selectOption("18");
-  await page.getByRole("button", { name: /彈力繩/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /彈力繩/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("手圍 18 cm");
@@ -384,9 +387,9 @@ test("monthly limited bracelet products keep wrist size and clasp through checko
   await page.goto("/products/e2e-monthly-in-stock");
 
   await page.getByRole("combobox").selectOption("16.5");
-  await page.getByRole("button", { name: /磁扣/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /磁扣/ }).click();
   await page.getByRole("button", { name: /微鬆/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("手圍 16.5 cm");
@@ -407,8 +410,8 @@ test("non-bracelet category products also keep clasp through checkout", async ({
   await page.goto("/products/d003-venus");
 
   await expect(page.getByRole("heading", { name: "維納斯 Venus" })).toBeVisible();
-  await page.getByRole("button", { name: /磁扣/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /磁扣/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("維納斯 Venus");
@@ -433,8 +436,8 @@ test("adjustable bracelets offer only 13 to 19 cm and retain a boundary size in 
   expect(sizes).toEqual(["13", "13.5", "14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18", "18.5", "19"]);
 
   await sizeSelect.selectOption("19");
-  await page.getByRole("button", { name: /彈力繩/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /彈力繩/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("手圍 19 cm");
@@ -446,8 +449,8 @@ test("adjustable bracelets offer only 13 to 19 cm and retain a boundary size in 
 
 test("domestic shipping switches from home fee to convenience-store fee", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-in-stock");
-  await page.getByRole("button", { name: /彈力繩/ }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /彈力繩/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
   await page.getByRole("button", { name: "前往結帳" }).click();
   await proceedThroughCheckoutGate(page);
 
@@ -462,9 +465,9 @@ test("domestic shipping switches from home fee to convenience-store fee", async 
 
 test("two bracelets receive domestic free shipping in checkout summary", async ({ page }) => {
   await page.goto("/products/e2e-bracelet-in-stock");
-  await page.getByRole("button", { name: /彈力繩/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /彈力繩/ }).click();
   await page.getByRole("button", { name: "增加" }).click();
-  await page.getByRole("button", { name: /加入購物袋/ }).click();
+  await page.locator("#product-options").getByRole("button", { name: /加入購物袋/ }).click();
 
   const drawer = page.locator("div.fixed").filter({ hasText: "SHOPPING BAG" });
   await expect(drawer).toContainText("購物袋 (2)");

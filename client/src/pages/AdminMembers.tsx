@@ -35,6 +35,7 @@ import { COUPON_SOURCE_LABELS, MEMBER_COUPON_STATUS_LABELS, type CouponSource } 
 import { COUPON_STATUS_BADGE_CLASS, formatCouponDate, formatCouponMinimum } from "@/lib/coupons";
 import BirthdayFields, { birthdayToDraft, parseBirthdayDraft, type BirthdayDraft } from "@/components/BirthdayFields";
 import { birthdayFromUser, formatBirthday, type Birthday } from "@shared/birthday";
+import BirthdayCouponPanel from "@/components/admin/BirthdayCouponPanel";
 
 const PAGE_SIZE = 50;
 
@@ -470,6 +471,7 @@ export default function AdminMembers() {
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [vipTier, setVipTier] = useState<(typeof VIP_OPTIONS)[number]["value"]>("none");
   const [vipNote, setVipNote] = useState("");
+  const [viewMode, setViewMode] = useState<"members" | "birthdays">("members");
 
   const utils = trpc.useUtils();
   const offset = (page - 1) * PAGE_SIZE;
@@ -667,6 +669,29 @@ export default function AdminMembers() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="flex border-b border-[oklch(0.88_0_0)]">
+          <button
+            type="button"
+            onClick={() => setViewMode("members")}
+            className={`border-b-2 px-4 py-3 text-sm font-body transition-colors ${viewMode === "members" ? "border-[oklch(0.18_0_0)] text-[oklch(0.16_0_0)]" : "border-transparent text-[oklch(0.55_0_0)]"}`}
+          >
+            全部會員
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode("birthdays");
+              setDetailOpen(false);
+            }}
+            className={`border-b-2 px-4 py-3 text-sm font-body transition-colors ${viewMode === "birthdays" ? "border-rose-400 text-[oklch(0.16_0_0)]" : "border-transparent text-[oklch(0.55_0_0)]"}`}
+          >
+            當月壽星
+          </button>
+        </div>
+
+        {viewMode === "birthdays" ? (
+          <BirthdayCouponPanel />
+        ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.45fr)]">
           <section className="bg-white border border-[oklch(0.93_0_0)]">
             <div className="p-5 border-b border-[oklch(0.93_0_0)]">
@@ -985,6 +1010,7 @@ export default function AdminMembers() {
             </div>
           </section>
         </div>
+        )}
       </div>
     </div>
   );
