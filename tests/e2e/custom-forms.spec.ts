@@ -13,6 +13,11 @@ async function expectConsultationNoteInAdmin(page: Page, orderNo: string, expect
   await page.getByText(orderNo).click();
   await expect(page.locator("body")).toContainText("客製化諮詢內容");
   await expect(page.locator("body")).toContainText(expectedText);
+
+  // 客製表單連結：一般連結只能查看，另一顆是放行用的可編輯連結
+  await expect(page.locator("body")).toContainText("客製表單連結");
+  await expect(page.getByRole("button", { name: "複製", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "複製可編輯", exact: true }).first()).toBeVisible();
 }
 
 async function createCustomDepositOrder(

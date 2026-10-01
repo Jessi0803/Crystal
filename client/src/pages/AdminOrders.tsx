@@ -5,28 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import {
-  CheckCircle,
-  XCircle,
-  Package,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  ShoppingBag,
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  CreditCard,
-  Calendar,
-  Truck,
-  Banknote,
-  Trash2,
-  GitMerge,
-  ImageOff,
-  Copy,
-  ExternalLink,
-} from "lucide-react";
+import { Banknote, Calendar, CheckCircle, ChevronDown, ChevronUp, Copy, CreditCard, ExternalLink, GitMerge, ImageOff, Mail, MapPin, Package, Pencil, Phone, RefreshCw, ShoppingBag, Trash2, Truck, User, XCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -165,7 +144,10 @@ type CustomFormLink = {
   productName: string;
   itemIndex: number;
   quantity: number;
+  /** 一般連結：客人填過之後只能查看 */
   url: string;
+  /** 帶 edit=1 的放行連結：允許重新填寫並覆蓋原內容 */
+  editUrl: string;
 };
 
 function getOrderItemConfigurationDisplay(snapshot: unknown) {
@@ -220,12 +202,15 @@ function getAdminCustomFormLinks(detail: any): CustomFormLink[] {
         orderItemId: String(item.id),
         itemIndex: String(itemIndex),
       });
+      const url = `${origin}${formPath}?${params.toString()}`;
       return {
         key: `${item.id}-${itemIndex}`,
         productName: item.productName,
         itemIndex,
         quantity,
-        url: `${origin}${formPath}?${params.toString()}`,
+        url,
+        // 帶 edit=1 才能覆蓋已送出的內容（見 customFormSubmission 的 allowRewrite）
+        editUrl: `${url}&edit=1`,
       };
     });
   });
@@ -333,10 +318,10 @@ function OrderRowCard({
 
   const customFormLinks = getAdminCustomFormLinks(detail);
 
-  const copyCustomFormLink = async (url: string) => {
+  const copyCustomFormLink = async (url: string, label = "客製表單連結") => {
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("客製表單連結已複製");
+      toast.success(`${label}已複製`);
     } catch {
       toast.error("複製失敗，請手動選取連結");
     }
@@ -500,6 +485,16 @@ function OrderRowCard({
                           >
                             <Copy className="h-3.5 w-3.5" />
                             複製
+                          </button>
+                          {/* 客人填過之後一般連結只能查看；這顆帶 edit=1，放行時才給 */}
+                          <button
+                            type="button"
+                            onClick={() => copyCustomFormLink(link.editUrl, "可編輯連結")}
+                            title="允許客人重新填寫並覆蓋原本的內容"
+                            className="inline-flex items-center gap-1.5 border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 hover:bg-amber-100"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            複製可編輯
                           </button>
                           <a
                             href={link.url}
