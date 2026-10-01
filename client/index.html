@@ -19,9 +19,11 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!--
+      原本這裡有 umami 分析的 script，但它的環境變數從未設定，建置後會留下未替換的
+      字面值；該路徑會被 vercel.json 的 SPA 規則導回 index.html，等於每次頁面載入
+      都白下載一份 HTML，分析本身也不會運作。之後要接分析，請先設定好服務與環境
+      變數再加回來（注意：註解內也不要寫出變數的替換語法，Vite 一樣會處理它）。
+    -->
   </body>
 </html>

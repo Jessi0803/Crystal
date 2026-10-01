@@ -74,8 +74,6 @@ export default defineConfig({
       RESEND_API_KEY: allowResendDelivery ? process.env.RESEND_API_KEY ?? "" : "",
       GEMINI_API_KEY: allowRealChatbot ? process.env.GEMINI_API_KEY ?? "" : "",
       E2E_STORAGE_STUB: "true",
-      VITE_ANALYTICS_ENDPOINT: "__e2e_analytics",
-      VITE_ANALYTICS_WEBSITE_ID: "e2e",
     },
     url: baseURL,
     reuseExistingServer: false,
