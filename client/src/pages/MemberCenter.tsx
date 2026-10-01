@@ -135,7 +135,7 @@ function CustomFormEntries({ order }: { order: any }) {
                   : "bg-sf-accent text-white hover:bg-sf-accent-hover"
               }`}
             >
-              {isSubmitted ? "查看 / 修改" : "填寫客製需求"}
+              {isSubmitted ? "查看內容" : "填寫客製需求"}
             </button>
           </div>
         );

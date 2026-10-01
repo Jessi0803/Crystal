@@ -106,13 +106,13 @@ test("關掉客製提醒彈窗後，訂單頁仍找得回表單入口", async ({
   await expect(page.locator('input[type="number"]').first()).toBeVisible({ timeout: 30_000 });
 });
 
-test("已填寫的表單先顯示唯讀內容，要按修改才會進表單", async ({ page }) => {
+test("已填寫的表單只能查看，客人沒有修改入口", async ({ page }) => {
   const orderNo = await createCustomDepositOrder(page, customProducts[0], "e2e-custom-reentry");
   await fillPureCustomOrderForm(page, orderNo, { focusChoices: ["感情"] });
 
   await page.goto(`/order/${orderNo}`);
   await expect(page.getByText("已送出", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "查看 / 修改", exact: true }).click();
+  await page.getByRole("button", { name: "查看內容", exact: true }).click();
 
   // 唯讀畫面：看得到自己填過什麼，而不是一張空白表單
   await expect(page.getByRole("heading", { name: "你已經填寫過這份表單" })).toBeVisible({ timeout: 30_000 });
@@ -120,10 +120,28 @@ test("已填寫的表單先顯示唯讀內容，要按修改才會進表單", as
   await expect(page.locator("body")).toContainText("這次最想為自己調整的是：感情");
   await expect(page.locator('input[type="number"]')).toHaveCount(0);
 
-  // 按「修改內容」才進表單，且要明確警告會覆蓋
-  await page.getByRole("button", { name: "修改內容", exact: true }).click();
-  await expect(page.locator("body")).toContainText("完全取代");
-  await expect(page.locator('input[type="number"]').first()).toBeVisible();
+  // 沒有任何修改入口，並且告訴客人要找官方 LINE
+  await expect(page.getByRole("button", { name: "修改內容" })).toHaveCount(0);
+  await expect(page.locator("body")).toContainText("送出後無法自行修改");
+});
+
+test("店家放行（網址帶 edit=1）時才能重新填寫覆蓋", async ({ page }) => {
+  const orderNo = await createCustomDepositOrder(page, customProducts[0], "e2e-custom-rewrite");
+  await fillPureCustomOrderForm(page, orderNo, { focusChoices: ["感情"] });
+
+  // 從訂單頁取得這一件的表單網址，再加上店家放行的參數
+  await page.goto(`/order/${orderNo}`);
+  const viewButton = page.getByRole("button", { name: "查看內容", exact: true });
+  await expect(viewButton).toBeVisible({ timeout: 30_000 });
+  await viewButton.click();
+
+  // 先等唯讀畫面出現，確認已經在表單頁再取網址
+  await expect(page.getByRole("heading", { name: "你已經填寫過這份表單" })).toBeVisible({ timeout: 30_000 });
+  const formUrl = page.url();
+
+  await page.goto(`${formUrl}&edit=1`);
+  await expect(page.locator("body")).toContainText("完全取代", { timeout: 30_000 });
+  await expect(page.locator('input[type="number"]').first()).toBeVisible({ timeout: 30_000 });
 });
 
 test("一筆訂單多件客製：分別送出後兩份需求都保留", async ({ page }) => {
