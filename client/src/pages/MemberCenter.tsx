@@ -3,6 +3,7 @@ import { IconBadge } from "@/components/LineIcon";
 import { ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import OrderItemReviews from "@/components/OrderItemReviews";
 import { toast } from "sonner";
 import { lineLinkUrl, MemberCouponList } from "@/components/MemberCoupons";
 import { canFillCustomForm, getCustomFormEntries } from "@/lib/customFormEntries";
@@ -354,33 +355,8 @@ export default function MemberCenter() {
                     {/* 展開的訂單詳情 */}
                     {expandedOrder === order.id && (
                       <div className="border-t border-sf-line px-5 py-4 bg-sf-cream">
-                        {/* 商品明細 */}
-                        <div className="space-y-2 mb-4">
-                          {order.items.map((item) => (
-                            <div key={item.id} className="flex justify-between items-center">
-                              <div className="flex items-center gap-3">
-                                {item.productImage && (
-                                  <img
-                                    src={item.productImage}
-                                    alt={item.productName}
-                                    className="w-10 h-10 object-cover"
-                                  />
-                                )}
-                                <div>
-                                  <p className="text-xs font-body text-sf-text">
-                                    {item.productName}
-                                  </p>
-                                  <p className="text-[0.65rem] text-sf-muted font-body">
-                                    × {item.quantity}
-                                  </p>
-                                </div>
-                              </div>
-                              <p className="text-xs font-body text-sf-text">
-                                NT$ {item.subtotal.toLocaleString()}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
+                        {/* 商品明細 + 每個品項的評價入口 */}
+                        <OrderItemReviews order={order} />
 
                         {/* 客製表單入口：填到一半離開的人要在這裡找得回來 */}
                         <CustomFormEntries order={order} />

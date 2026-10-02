@@ -8,6 +8,7 @@ import {
   ClipboardList,
   ExternalLink,
   Menu,
+  MessageSquareQuote,
   Settings,
   ShieldCheck,
   TicketPercent,
@@ -26,6 +27,7 @@ type AdminNavItem = {
 const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin/orders", label: "訂單管理", icon: ClipboardList },
   { href: "/admin/products", label: "商品與庫存", icon: Boxes, aliases: ["/admin/inventory"] },
+  { href: "/admin/reviews", label: "商品回饋", icon: MessageSquareQuote },
   { href: "/admin/revenue", label: "營收報表", icon: BarChart3 },
   { href: "/admin/members", label: "會員管理", icon: Users },
   { href: "/admin/coupons", label: "優惠券管理", icon: TicketPercent },

@@ -7,6 +7,7 @@ import { chatbotRouter } from "./routers/chatbot";
 import { inventoryRouter } from "./routers/inventory";
 import { memberRouter } from "./routers/member";
 import { productRouter } from "./routers/products";
+import { reviewRouter } from "./routers/reviews";
 import { adminMembersRouter } from "./routers/adminMembers";
 import { siteSettingsRouter } from "./routers/siteSettings";
 import { auditRouter } from "./routers/audit";
@@ -29,6 +30,7 @@ export const appRouter = router({
   inventory: inventoryRouter,
   member: memberRouter,
   product: productRouter,
+  reviews: reviewRouter,
   adminMembers: adminMembersRouter,
   siteSettings: siteSettingsRouter,
   audit: auditRouter,

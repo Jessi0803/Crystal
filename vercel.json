@@ -34,7 +34,7 @@
       {
         "protocol": "https",
         "hostname": "hpjrd3k3iz79xk5k.public.blob.vercel-storage.com",
-        "pathname": "^/(products|product-benefits)/.*$"
+        "pathname": "^/(products|product-benefits|product-reviews)/.*$"
       }
     ]
   },

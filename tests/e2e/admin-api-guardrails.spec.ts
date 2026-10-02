@@ -42,6 +42,35 @@ test("unauthenticated requests cannot call admin tRPC procedures", async ({ requ
   await expectAdminProcedureForbidden(request, "order.getStats");
   await expectAdminProcedureForbidden(request, "product.adminList");
   await expectAdminProcedureForbidden(request, "chatbot.listLogs", { page: 1, pageSize: 10 });
+  await expectAdminProcedureForbidden(request, "reviews.adminList", {});
+  await expectAdminProcedureForbidden(request, "reviews.adminGet", { id: 1 });
+  await expectAdminProcedureForbidden(request, "reviews.adminCreate", {
+    productId: "e2e-bracelet-in-stock",
+    displayName: "E2E 守門",
+    rating: 5,
+    content: "不應該被建立",
+    images: [],
+    status: "published",
+    isFeatured: false,
+    sortOrder: 0,
+  }, "mutation");
+  await expectAdminProcedureForbidden(request, "reviews.adminUpdate", {
+    id: 1,
+    productId: "e2e-bracelet-in-stock",
+    displayName: "E2E 守門",
+    rating: 5,
+    content: "不應該被修改",
+    images: [],
+    status: "published",
+    isFeatured: false,
+    sortOrder: 0,
+  }, "mutation");
+  await expectAdminProcedureForbidden(request, "reviews.adminSetStatus", { id: 1, status: "hidden" }, "mutation");
+  await expectAdminProcedureForbidden(request, "reviews.adminRemove", { id: 1 }, "mutation");
+  await expectAdminProcedureForbidden(request, "reviews.uploadImage", {
+    contentType: "image/jpeg",
+    dataBase64: "AAAA",
+  }, "mutation");
   await expectAdminProcedureForbidden(request, "inventory.setInventory", {
     productId: "e2e-bracelet-in-stock",
     productName: "E2E 現貨手鍊",
@@ -57,6 +86,35 @@ test("regular member sessions cannot call admin tRPC procedures", async ({ brows
     await expectAdminProcedureForbidden(request, "order.getStats");
     await expectAdminProcedureForbidden(request, "product.adminList");
     await expectAdminProcedureForbidden(request, "chatbot.listLogs", { page: 1, pageSize: 10 });
+    await expectAdminProcedureForbidden(request, "reviews.adminList", {});
+    await expectAdminProcedureForbidden(request, "reviews.adminGet", { id: 1 });
+    await expectAdminProcedureForbidden(request, "reviews.adminCreate", {
+      productId: "e2e-bracelet-in-stock",
+      displayName: "E2E 守門",
+      rating: 5,
+      content: "不應該被建立",
+      images: [],
+      status: "published",
+      isFeatured: false,
+      sortOrder: 0,
+    }, "mutation");
+    await expectAdminProcedureForbidden(request, "reviews.adminUpdate", {
+      id: 1,
+      productId: "e2e-bracelet-in-stock",
+      displayName: "E2E 守門",
+      rating: 5,
+      content: "不應該被修改",
+      images: [],
+      status: "published",
+      isFeatured: false,
+      sortOrder: 0,
+    }, "mutation");
+    await expectAdminProcedureForbidden(request, "reviews.adminSetStatus", { id: 1, status: "hidden" }, "mutation");
+    await expectAdminProcedureForbidden(request, "reviews.adminRemove", { id: 1 }, "mutation");
+    await expectAdminProcedureForbidden(request, "reviews.uploadImage", {
+      contentType: "image/jpeg",
+      dataBase64: "AAAA",
+    }, "mutation");
     await expectAdminProcedureForbidden(request, "inventory.setInventory", {
       productId: "e2e-bracelet-in-stock",
       productName: "E2E 現貨手鍊",

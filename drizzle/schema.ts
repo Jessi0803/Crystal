@@ -551,3 +551,44 @@ export const lineFriendRewards = mysqlTable("lineFriendRewards", {
 });
 
 export type LineFriendReward = typeof lineFriendRewards.$inferSelect;
+
+// ─── 商品顧客回饋 ─────────────────────────────────────────────────────────────
+// 第一階段只有後台人工建立（source=admin）；第二階段顧客投稿沿用同一張表，
+// 以 source=customer + userId + orderItemId 區分，並走 pending → 審核 → published。
+//
+// productName 是建立／改綁商品時寫入的快照（同 orderItems.productName 的做法）：
+// 商品之後被刪除，後台仍看得出這則回饋原本屬於哪個商品。
+export const productReviews = mysqlTable("productReviews", {
+  id: int("id").autoincrement().primaryKey(),
+  // 對應 products.id（varchar）；本專案不建 FK，商品是否存在由 API 驗證
+  productId: varchar("productId", { length: 64 }).notNull(),
+  productName: varchar("productName", { length: 200 }).notNull(),
+  // admin：後台人工建立；customer：第二階段顧客投稿
+  source: mysqlEnum("source", ["admin", "customer"]).notNull().default("admin"),
+  // 以下兩欄第一階段恆為 null，保留給第二階段的已購買驗證
+  userId: int("userId"),
+  orderItemId: int("orderItemId"),
+  displayName: varchar("displayName", { length: 50 }).notNull(),
+  rating: tinyint("rating").notNull(),
+  content: text("content").notNull(),
+  // 回饋圖片網址（Vercel Blob），最多 3 張，陣列順序即顯示順序
+  images: json("images").$type<string[]>(),
+  // pending：待審核（第二階段用）；published：商品頁顯示；hidden：隱藏
+  status: mysqlEnum("status", ["pending", "published", "hidden"]).notNull().default("published"),
+  // 首頁「暖心回饋」精選；第一階段只存欄位，首頁尚未串接
+  isFeatured: boolean("isFeatured").notNull().default(false),
+  sortOrder: int("sortOrder").notNull().default(0),
+  // 第一次切到 published 的時間；之後隱藏再上架不覆寫
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("product_reviews_product_status_idx").on(table.productId, table.status),
+  index("product_reviews_featured_idx").on(table.isFeatured, table.status),
+  // 一個 orderItem 只能留一則顧客評價。MySQL／TiDB 的 UNIQUE 允許多筆 NULL，
+  // 後台建立的回饋 orderItemId 為 null，不受影響（已在 TiDB 8.5.3 實測）。
+  uniqueIndex("product_reviews_order_item_unique").on(table.orderItemId),
+]);
+
+export type ProductReview = typeof productReviews.$inferSelect;
+export type InsertProductReview = typeof productReviews.$inferInsert;

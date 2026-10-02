@@ -12,7 +12,7 @@ function isOptimizable(src: string) {
   if (src.startsWith("/") && !src.startsWith("//")) return /^\/(images|reviews)\/|^\/hero-cover\.jpg$/.test(src);
   try {
     const url = new URL(src);
-    return url.protocol === "https:" && url.hostname === BLOB_HOST && /^\/(products|product-benefits)\//.test(url.pathname);
+    return url.protocol === "https:" && url.hostname === BLOB_HOST && /^\/(products|product-benefits|product-reviews)\//.test(url.pathname);
   } catch {
     return false;
   }
