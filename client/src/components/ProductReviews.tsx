@@ -3,14 +3,17 @@
  *
  * - 只顯示 published 的回饋（由 reviews.listByProduct 決定，前端不做狀態過濾）
  * - 沒有回饋時整個 section 不渲染，不顯示「目前尚無評論」
+ * - 單列橫向捲動，捲到接近尾端才去撈下一批，不一次把全部回饋載進來
  * - 只有顧客投稿（source=customer 且綁得到 orderItem）才標示「已購買」；
  *   後台人工建立的回饋沒有系統購買驗證，不掛這個標示
  */
+import { useEffect, useRef } from "react";
 import { Star } from "lucide-react";
 import ResponsiveImage from "@/components/ResponsiveImage";
 import { trpc } from "@/lib/trpc";
 
 const SERIF = { fontFamily: "'Noto Serif TC', 'Noto Sans TC', serif" } as const;
+const PAGE_SIZE = 8;
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -29,9 +32,35 @@ function StarRating({ rating }: { rating: number }) {
 
 export default function ProductReviews({ productId }: { productId: string }) {
   const enabled = productId.length > 0;
-  const { data } = trpc.reviews.listByProduct.useQuery({ productId }, { enabled });
   const { data: summary } = trpc.reviews.summaryByProduct.useQuery({ productId }, { enabled });
-  const reviews = data ?? [];
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    trpc.reviews.listByProduct.useInfiniteQuery(
+      { productId, limit: PAGE_SIZE },
+      { enabled, initialCursor: 0, getNextPageParam: (lastPage) => lastPage.nextCursor }
+    );
+
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const reviews = data?.pages.flatMap((page) => page.items) ?? [];
+
+  // 尾端的哨兵捲進可視範圍就撈下一批；root 設成捲動容器，橫向捲動才偵測得到
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const sentinel = sentinelRef.current;
+    if (!scroller || !sentinel || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      // 提前一點開始載，滑到底時通常已經接上了
+      { root: scroller, rootMargin: "0px 240px 0px 0px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, reviews.length]);
 
   // 載入中與沒有回饋都不佔版面，避免商品頁出現空區塊
   if (reviews.length === 0) return null;
@@ -53,6 +82,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
 
         {/* 橫向捲動，只排一列；桌機放不下時一樣用捲的，不另外換行 */}
         <div
+          ref={scrollerRef}
           role="region"
           aria-label="顧客回饋"
           tabIndex={0}
@@ -100,13 +130,21 @@ export default function ProductReviews({ productId }: { productId: string }) {
 
               <p className="mt-5 text-[0.7rem] font-body tracking-[0.18em] text-sf-muted">
                 — {review.displayName}
-                {/* 只有系統驗證過購買紀錄的顧客投稿才掛這個標示 */}
-                {review.verifiedPurchase && (
-                  <span className="ml-2 text-sf-accent">· 已購買</span>
-                )}
+                {review.verifiedPurchase && <span className="ml-2 text-sf-accent">· 已購買</span>}
               </p>
             </article>
           ))}
+
+          {/* 捲到這裡就載下一批；沒有下一批時不佔寬度 */}
+          <div
+            ref={sentinelRef}
+            aria-hidden="true"
+            className={hasNextPage ? "flex w-24 shrink-0 items-center justify-center" : "w-0"}
+          >
+            {isFetchingNextPage && (
+              <span className="h-5 w-5 animate-spin rounded-full border border-sf-line-strong border-t-transparent" />
+            )}
+          </div>
         </div>
       </div>
     </section>

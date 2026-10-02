@@ -18,6 +18,7 @@ import {
   REVIEW_CONTENT_MAX_LENGTH,
   REVIEW_DISPLAY_NAME_MAX_LENGTH,
   REVIEW_MAX_IMAGES,
+  REVIEW_PAGE_SIZE,
   REVIEW_STATUSES,
   ReviewError,
   createReview,
@@ -135,10 +136,21 @@ async function uploadReviewImage(input: z.infer<typeof imageUploadInputSchema>) 
 }
 
 export const reviewRouter = router({
-  /** 商品頁：只回已上架的回饋，查詢失敗時回空陣列（錯誤已在 reviewDb 記錄） */
+  /**
+   * 商品頁：只回已上架的回饋，分批取（捲到底才撈下一批）。
+   * 查詢失敗時回空陣列（錯誤已在 reviewDb 記錄）。
+   */
   listByProduct: publicProcedure
-    .input(z.object({ productId: z.string().trim().min(1).max(64) }))
-    .query(({ input }) => listPublishedReviews(input.productId)),
+    .input(
+      z.object({
+        productId: z.string().trim().min(1).max(64),
+        limit: z.number().int().min(1).max(24).default(REVIEW_PAGE_SIZE),
+        cursor: z.number().int().min(0).nullish(),
+      })
+    )
+    .query(({ input }) =>
+      listPublishedReviews(input.productId, { limit: input.limit, cursor: input.cursor ?? 0 })
+    ),
 
   adminList: adminProcedure
     .input(z.object({ productId: z.string().trim().max(64).optional() }).default({}))

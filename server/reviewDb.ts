@@ -10,7 +10,7 @@
  * - 商品已不存在的回饋可以查看、編輯、隱藏、刪除，但不能 published、不能設為首頁精選；
  *   要重新上架必須先改綁到目前存在的商品。
  */
-import { and, avg, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, avg, count, desc, eq, inArray } from "drizzle-orm";
 import { dbProducts, orderItems, orders, productReviews, type ProductReview } from "../drizzle/schema";
 import { getDb } from "./db";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
@@ -136,24 +136,50 @@ async function findProduct(db: Awaited<ReturnType<typeof requireDb>>, productId:
   return rows[0] ?? null;
 }
 
+/** 商品頁預設一次拿幾則 */
+export const REVIEW_PAGE_SIZE = 8;
+
+export type PublicReviewPage = {
+  items: PublicReview[];
+  /** 還有下一批時是下一個 offset，沒有就是 null */
+  nextCursor: number | null;
+};
+
 /**
- * 商品頁用：只回 published。
+ * 商品頁用：只回 published，分批取。
+ *
+ * 排序寫在 SQL 而不是取回來再排，否則沒辦法分頁（會每次都把全部撈回來）。
+ * 規則與 compareReviews 一致，另外用 id 當決勝鍵讓每一頁的邊界穩定。
  *
  * 查詢失敗時回空陣列讓商品頁照常顯示，但一定要留下 log —— 這是防護，
  * 不是「application 可以早於 migration 部署」的理由。
  */
-export async function listPublishedReviews(productId: string): Promise<PublicReview[]> {
+export async function listPublishedReviews(
+  productId: string,
+  options: { limit?: number; cursor?: number } = {}
+): Promise<PublicReviewPage> {
+  const limit = options.limit ?? REVIEW_PAGE_SIZE;
+  const cursor = options.cursor ?? 0;
   try {
     const db = await getDb();
-    if (!db) return [];
+    if (!db) return { items: [], nextCursor: null };
+    // 多撈一筆來判斷還有沒有下一批，不用另外 count
     const rows = await db
       .select()
       .from(productReviews)
-      .where(and(eq(productReviews.productId, productId), eq(productReviews.status, "published")));
-    return rows.sort(compareReviews).map(toPublicReview);
+      .where(and(eq(productReviews.productId, productId), eq(productReviews.status, "published")))
+      .orderBy(asc(productReviews.sortOrder), desc(productReviews.createdAt), desc(productReviews.id))
+      .limit(limit + 1)
+      .offset(cursor);
+
+    const hasMore = rows.length > limit;
+    return {
+      items: (hasMore ? rows.slice(0, limit) : rows).map(toPublicReview),
+      nextCursor: hasMore ? cursor + limit : null,
+    };
   } catch (error) {
     console.error("[reviews.listByProduct]", error);
-    return [];
+    return { items: [], nextCursor: null };
   }
 }
 

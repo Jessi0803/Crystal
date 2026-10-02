@@ -17,6 +17,21 @@ function uniqueName(prefix: string) {
   return `${prefix}-${Date.now()}`;
 }
 
+/** 橫向捲軸是捲到底才撈下一批，要先全部載完才能驗排序 */
+async function loadAllReviews(page: Page) {
+  const scroller = page.locator('[aria-label="顧客回饋"]');
+  await expect(scroller).toBeVisible({ timeout: 30_000 });
+  let previous = -1;
+  for (let round = 0; round < 12; round += 1) {
+    const current = await page.locator("article").count();
+    if (current === previous) break;
+    previous = current;
+    await scroller.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+    await page.waitForTimeout(600);
+  }
+  return page.locator("article").count();
+}
+
 /** 後台列表在手機是 <li> 卡片、桌機是 <tr>，兩種版型只有一種看得見 */
 function reviewRow(page: Page, displayName: string) {
   return page.locator("li:visible, tr:visible").filter({ hasText: displayName }).first();
@@ -197,6 +212,7 @@ test("排序數字小的回饋顯示在前面", async ({ page }) => {
     await expect(dialog).toBeHidden({ timeout: 30_000 });
 
     await page.goto(`/products/${IN_STOCK.id}`);
+    await loadAllReviews(page);
     await expect(page.getByText(`— ${first}`)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(`— ${second}`)).toBeVisible();
 
@@ -244,5 +260,54 @@ test("手機版的顧客回饋區塊版面正常", async ({ page }) => {
     expect(overflow).toBeLessThanOrEqual(1);
   } finally {
     await cleanUpReviews(page, displayName);
+  }
+});
+
+
+test("捲到底會自動載入下一批，不需要按任何按鈕", async ({ page }) => {
+  const prefix = uniqueName("E2E分批");
+  const names: string[] = [];
+
+  await openAdminReviews(page);
+  // 一批 8 則，建 10 則才看得到第二批
+  for (let index = 0; index < 10; index += 1) {
+    const displayName = `${prefix}-${index}`;
+    names.push(displayName);
+    await createReview(page, {
+      productName: IN_STOCK.name,
+      displayName,
+      rating: 5,
+      content: `${displayName} 的測試回饋內容。`,
+    });
+  }
+
+  try {
+    await page.goto(`/products/${IN_STOCK.id}`);
+    await expect(page.getByRole("heading", { name: "顧客回饋" })).toBeVisible({ timeout: 30_000 });
+
+    // 沒有「查看全部」這種按鈕
+    await expect(page.getByRole("button", { name: /查看全部/ })).toHaveCount(0);
+
+    // 一開始只載第一批
+    const firstPage = await page.locator("article").count();
+    expect(firstPage).toBe(8);
+
+    // 捲到底之後應該自己載更多
+    const scroller = page.locator('[aria-label="顧客回饋"]');
+    await scroller.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+    await expect.poll(() => page.locator("article").count(), { timeout: 30_000 }).toBeGreaterThan(firstPage);
+
+    // 全部載完後仍然只有一排，而且不會讓整頁橫向捲動
+    await loadAllReviews(page);
+    const rows = await page.evaluate(
+      () => new Set(Array.from(document.querySelectorAll("article")).map((el) => Math.round(el.getBoundingClientRect().top))).size
+    );
+    expect(rows).toBe(1);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  } finally {
+    for (const displayName of names) await cleanUpReviews(page, displayName);
   }
 });
