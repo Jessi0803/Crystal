@@ -72,6 +72,8 @@ export default function CustomerReviewDialog({
     setError(null);
   }, [item]);
 
+  // 只有彈窗打開時才查，讓顧客看到「不勾匿名會顯示成什麼」
+  const { data: nameInfo } = trpc.reviews.customerDisplayName.useQuery(undefined, { enabled: Boolean(item) });
   const uploadImage = trpc.reviews.customerUploadImage.useMutation();
   const createReview = trpc.reviews.customerCreate.useMutation({
     onSuccess: async () => {
@@ -161,14 +163,25 @@ export default function CustomerReviewDialog({
               />
             </div>
 
-            <label className="flex items-center gap-3 border border-sf-line bg-white px-4 py-3">
+            <label className="flex items-start gap-3 border border-sf-line bg-white px-4 py-3">
               <input
                 type="checkbox"
                 checked={anonymous}
                 onChange={(event) => setAnonymous(event.target.checked)}
-                className="h-4 w-4 shrink-0"
+                className="mt-0.5 h-4 w-4 shrink-0"
               />
-              <span className="text-sm font-body text-sf-text">匿名發表（顯示為「匿名顧客」）</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-body text-sf-text">匿名發表</span>
+                {/* 直接給實際會顯示的名字，不描述規則：
+                    中文姓名會被遮成「葉**」，英文名與暱稱則是完整顯示，寫通則會變成錯誤承諾 */}
+                <span className="mt-0.5 block text-xs font-body leading-relaxed text-sf-muted">
+                  這則回饋會顯示為「
+                  <span className="text-sf-text">
+                    {anonymous ? nameInfo?.anonymousName ?? "匿名顧客" : nameInfo?.displayName ?? "…"}
+                  </span>
+                  」
+                </span>
+              </span>
             </label>
 
             {error && <p className="text-sm font-body text-red-600">{error}</p>}

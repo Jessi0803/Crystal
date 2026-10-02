@@ -5,10 +5,12 @@
  *
  * 取用順序：
  * 1. anonymous → 「匿名顧客」
- * 2. lineDisplayName → 直接使用。這是 LINE 的公開暱稱，本來就是拿來給人看的，
- *    不是真實姓名，所以不做遮罩（硬套姓名規則反而會把「小兔子🐰」變成「小○子」）。
- * 3. users.name → 這是註冊時填的姓名，要遮罩
- * 4. 都沒有 → 「會員」
+ * 2. lineDisplayName → name → 「會員」
+ *
+ * 遮罩不看名稱來自哪個欄位，只看「這串字像不像中文姓名」：
+ * LINE 暱稱裡其實有不少是真實姓名（正式站 46 個暱稱中有 19 個是 2～4 個純中文字），
+ * 把整欄當暱稱放行會直接露出全名；反過來把暱稱套姓名規則，
+ * 又會讓「小兔子🐰」變成奇怪的遮罩。所以改成依內容判斷。
  */
 
 export const ANONYMOUS_DISPLAY_NAME = "匿名顧客";
@@ -16,18 +18,21 @@ export const FALLBACK_DISPLAY_NAME = "會員";
 /** 對齊 productReviews.displayName 的欄位長度 */
 export const DISPLAY_NAME_MAX_LENGTH = 50;
 
-const CJK = /^[㐀-䶿一-鿿豈-﫿]+$/;
+/** 2～4 個純中文字：視為真實姓名，需要遮罩 */
+const CJK_PERSONAL_NAME = /^[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]{2,4}$/;
 
 function tidy(value: string | null | undefined) {
   return value?.replace(/\s+/g, " ").trim() ?? "";
 }
 
 /**
- * 姓名遮罩：
- * - 中文 2 字：王大 → 王○
- * - 中文 3 字以上：王小明 → 王○明、歐陽小明 → 歐○○明
- * - 其他（英文、混合、暱稱）：只留第一段，John Smith → John、Yuki → Yuki
- * - 看起來像 Email：只留第一個字，alice@x.com → a***
+ * 像中文姓名就只留姓氏，其餘以 * 取代：
+ * - 葉小明 → 葉**
+ * - 葉大   → 葉*
+ * - 歐陽小明 → 歐***（複姓會多遮一字，寧可保守）
+ *
+ * 其他一律完整顯示：英文姓名、暱稱、含 emoji 的名稱本來就是拿來給人看的。
+ * 誤填成 Email 時只留第一個字，避免把信箱公開到商品頁。
  */
 export function maskPersonalName(rawName: string | null | undefined) {
   const name = tidy(rawName);
@@ -38,16 +43,12 @@ export function maskPersonalName(rawName: string | null | undefined) {
     return local ? `${Array.from(local)[0]}***` : "";
   }
 
-  if (CJK.test(name)) {
+  if (CJK_PERSONAL_NAME.test(name)) {
     const chars = Array.from(name);
-    if (chars.length === 1) return chars[0];
-    if (chars.length === 2) return `${chars[0]}○`;
-    return `${chars[0]}${"○".repeat(chars.length - 2)}${chars[chars.length - 1]}`;
+    return `${chars[0]}${"*".repeat(chars.length - 1)}`;
   }
 
-  // 英文或混合：第一段通常是名字或暱稱，姓氏不顯示
-  const first = name.split(" ")[0];
-  return first || name;
+  return name;
 }
 
 export function resolveReviewDisplayName(
@@ -56,10 +57,8 @@ export function resolveReviewDisplayName(
 ) {
   if (options.anonymous) return ANONYMOUS_DISPLAY_NAME;
 
-  const lineName = tidy(user.lineDisplayName);
-  if (lineName) return lineName.slice(0, DISPLAY_NAME_MAX_LENGTH);
-
-  const masked = maskPersonalName(user.name);
+  const source = tidy(user.lineDisplayName) || tidy(user.name);
+  const masked = maskPersonalName(source);
   if (masked) return masked.slice(0, DISPLAY_NAME_MAX_LENGTH);
 
   return FALLBACK_DISPLAY_NAME;

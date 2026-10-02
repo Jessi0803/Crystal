@@ -33,6 +33,7 @@ import {
 } from "../reviewDb";
 import { resolveMemberIdentity } from "../memberOrderAccess";
 import { getUserByOpenId } from "../db";
+import { ANONYMOUS_DISPLAY_NAME, resolveReviewDisplayName } from "../reviewDisplayName";
 import { isSafeImageSrc } from "@shared/richText";
 
 export const reviewInputSchema = z.object({
@@ -180,6 +181,21 @@ export const reviewRouter = router({
         return getOrderItemReviewStates(input.orderId, identity);
       })
     ),
+
+  /**
+   * 會員端：告訴顧客「不勾匿名時會顯示成什麼」。
+   * 遮罩規則只有伺服器有一份，前端不重做，避免兩邊走偏。
+   */
+  customerDisplayName: protectedProcedure.query(async ({ ctx }) => {
+    const profile = await getUserByOpenId(ctx.user.openId);
+    return {
+      displayName: resolveReviewDisplayName(
+        { name: profile?.name ?? ctx.user.name ?? null, lineDisplayName: profile?.lineDisplayName ?? null },
+        { anonymous: false }
+      ),
+      anonymousName: ANONYMOUS_DISPLAY_NAME,
+    };
+  }),
 
   /**
    * 會員端：留下商品評價。

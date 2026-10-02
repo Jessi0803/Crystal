@@ -144,7 +144,12 @@ test("匿名發表顯示為匿名顧客", async ({ page }) => {
     await page.getByRole("button", { name: reviewButtonName }).click();
     const dialog = page.getByRole("dialog");
     await dialog.locator("textarea").fill(content);
+
+    // 送出前就要讓顧客看到實際會顯示的名字；E2E User 不是中文姓名，完整顯示
+    await expect(dialog.getByText("這則回饋會顯示為「E2E User」")).toBeVisible({ timeout: 30_000 });
     await dialog.getByRole("checkbox").check();
+    await expect(dialog.getByText("這則回饋會顯示為「匿名顧客」")).toBeVisible();
+
     await dialog.getByRole("button", { name: "送出評價" }).click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
 
@@ -304,4 +309,7 @@ test("未登入不能呼叫顧客評價 API", async ({ request }) => {
 
   const status = await trpcQuery(request, "reviews.statusByOrder", { orderId: 1 });
   expect([401, 403]).toContain(status.status());
+
+  const name = await trpcQuery(request, "reviews.customerDisplayName", undefined);
+  expect([401, 403]).toContain(name.status());
 });
