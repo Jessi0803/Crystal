@@ -28,11 +28,14 @@ const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，�
 
 你的角色：
 - 以溫柔、專業、有親和力的口吻回答問題
-- 根據提供的知識庫內容回答，不要編造不在知識庫中的資訊
-- 當顧客描述能量需求（如招桃花、提升人緣、改善健康、化解小人等），若知識庫中沒有完全符合的現貨商品，可推薦客製化手鍊服務，說明可以依功效需求量身設計，並附上連結 https://goodaytarot.com/custom
-- 當顧客指定想找的水晶種類，但知識庫或現貨清單沒有該晶石時，必須誠實說「目前現貨沒有這款晶石」；可以提供功效相近或能量方向相近的現貨替代款。不可說客製化方案一定會有、一定能做、可指定取得該晶石；若提到客製化，只能說可與店家討論需求與可用材料
-- 如果知識庫中沒有相關資訊且不屬於能量需求類問題，誠實告知並建議聯繫 LINE 客服：https://line.me/R/ti/p/@011tymeh
-- 當顧客描述需求（如想提升自信、財運、愛情等），或指定想找的水晶種類（如粉晶、草莓晶、月光石等），根據知識庫推薦適合的現貨款式並附上商品連結
+- 只根據提供的參考資料回答，不要編造資料裡沒有的資訊
+- 絕對不要對顧客提到「知識庫」「資料庫」「系統」「我的資料」等內部用語，顧客不需要知道這些；也不要解釋你為什麼答不出來
+- 當顧客描述能量需求（如招桃花、提升人緣、改善健康、化解小人等），若參考資料中沒有完全符合的現貨商品，可推薦客製化手鍊服務，說明可以依功效需求量身設計，並附上連結 https://goodaytarot.com/custom
+- 當顧客指定想找的水晶種類，但參考資料或現貨清單沒有該晶石時，必須誠實說「目前現貨沒有這款晶石」；可以提供功效相近或能量方向相近的現貨替代款。不可說客製化方案一定會有、一定能做、可指定取得該晶石；若提到客製化，只能說可與店家討論需求與可用材料
+- 只要【可推薦的相關商品】清單裡有款式，就一定要先推薦清單上的款式並附連結。顧客問的是分類（例如「有吊飾嗎」「有項鍊嗎」）時也一樣，先把清單上的款式介紹給他，不可以跳過推薦直接把人導到 LINE
+- 只有在清單是空的、參考資料也答不出來時（例如商品規格數字、匯款帳號、折扣政策這類營運細節），才把顧客導到官方 LINE：https://line.me/R/ti/p/@011tymeh
+- 導向 LINE 時：不要說明自己查不到或沒有資料，語氣像在幫忙轉接而不是推託；每次的說法要自然變化，不要每則都用同一句開場
+- 當顧客描述需求（如想提升自信、財運、愛情等），或指定想找的水晶種類（如粉晶、草莓晶、月光石等），根據參考資料推薦適合的現貨款式並附上商品連結
 - 使用繁體中文回答
 - 字數：整則回答請控制在 200 字以內；以讀者看到的字元為準，每一行完整貼上的 https 商品連結不計入 200 字，其餘說明、品名、標點、換行皆須計入
 - 語意完整：每句話須寫到自然結尾（句號、驚嘆號或問號皆可），禁止停在半句、破折、或未寫完的詞（例如「椛小」）
@@ -44,7 +47,7 @@ const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，�
 - 當語境中出現【可推薦的相關商品】且註明與下方商品卡一致時，推薦現貨僅能使用該清單上的款式；款數、品名、連結須與清單完全一致，須逐款寫出並附上清單中的完整 https 連結，不可只介紹其中幾款，也不可新增清單外的現貨品名；說明適合原因時仍可依顧客問題自由發揮
 - 若須介紹【可推薦的相關商品】清單，請先逐款寫出「品名＋該款的完整 https 商品連結」（可每款一行），再寫簡短適合原因，避免因篇幅或截斷停在「推薦」「如下」等未接品名、未貼連結的半句
 - 若已有【可推薦的相關商品】清單，勿寫「沒有推薦商品」「沒有現貨可推薦」「沒有符合的現貨」等概括否定（彷彿店內完全無現貨可參考）。若顧客點名的主石或款式不在該清單內，請先用一兩句說明落差（例如現貨無該主石為主的款式）；若你接著要介紹清單上的款式作為替代參考，須依清單逐款寫出品名與清單內的完整 https 連結，與上文說明銜接自然即可。不可補充「客製化就會有該指定晶石」
-- 若有列出連結，必須逐字複製該完整 https 網址到回答中，不可省略、改寫，也不可使用「請插入連結」「知識庫未提供」等占位文字
+- 若有列出連結，必須逐字複製該完整 https 網址到回答中，不可省略、改寫，也不可使用「請插入連結」「資料未提供」等占位文字
 - 使用適當的換行讓回答易讀
 - 不使用 markdown 格式，不使用 **粗體**、*斜體*、# 標題等符號`;
 
@@ -89,11 +92,37 @@ export function trimIncompleteTail(reply: string): string {
   return lines.join("\n").trim();
 }
 
-/** RAG 注入時截斷過長答案，降低輸入過長造成輸出被截斷或語意異常的機率 */
-function clipKnowledgeAnswer(text: string, maxChars = 240): string {
+/** 注入 RAG 時每條知識最多帶這麼多字，控制輸入長度與成本 */
+const KNOWLEDGE_CLIP_CHARS = 400;
+
+/**
+ * 商品知識的結尾是「價格 …，商品連結：https://…」，但功效說明動輒五、六百字，
+ * 單純砍尾巴會連價格和連結一起砍掉（實測 38 個商品條目有 33 個中招），
+ * 模型因此看不到連結，只好回「知識庫中沒有商品連結」。
+ *
+ * 所以改成砍中間：前面留重點，結尾的價格與連結一定帶上。
+ */
+export function extractPriceAndLinkTail(text: string): string {
+  const linkAt = text.lastIndexOf("https://");
+  if (linkAt < 0) return "";
+  // 讓連結帶著它所屬的那一句（價格）或那一行一起保留
+  const priceAt = text.lastIndexOf("價格", linkAt);
+  const newlineAt = text.lastIndexOf("\n", linkAt);
+  const start = Math.max(priceAt, newlineAt + 1);
+  return text.slice(start > 0 ? start : linkAt).trim();
+}
+
+/** RAG 注入時截斷過長答案，但一定保住結尾的價格與商品連結 */
+export function clipKnowledgeAnswer(text: string, maxChars = KNOWLEDGE_CLIP_CHARS): string {
   const t = text.trim();
   if (t.length <= maxChars) return t;
-  return `${t.slice(0, maxChars)}…（後略）`;
+
+  const tail = extractPriceAndLinkTail(t);
+  if (!tail || tail.length >= maxChars) return `${t.slice(0, maxChars)}…（後略）`;
+
+  // 從額度裡先扣掉結尾要用的長度，總長仍維持在 maxChars 以內
+  const head = t.slice(0, Math.max(0, maxChars - tail.length - 6)).trim();
+  return `${head}…（中略）${tail}`;
 }
 
 /** 對話中可能寫全名或省略「手鍊」後綴，皆視為有引用該品 */
@@ -223,6 +252,26 @@ type RelatedProductForChat = {
 
 function uniqueProductIdsFromChunks(chunks: ScoredChunk[]): string[] {
   return Array.from(new Set(chunks.flatMap((chunk) => chunk.relatedProductIds ?? [])));
+}
+
+/**
+ * 顧客問的是不是「某款沒現貨的晶石」。
+ *
+ * 原本只要任何一條 -unavailable 命中 0.55 就成立，但中文裡「有綠幽靈嗎」和
+ * 「有吊飾嗎」這種同為「有沒有某類商品」的問句相似度本來就高（實測 0.614），
+ * 結果問吊飾會被當成問缺貨晶石，三款吊飾全被清掉，模型只好回「店內主要是手鍊」。
+ *
+ * 改成要求 -unavailable 必須是分數最高的那一條：顧客真的在問那款晶石時它會居首，
+ * 問別的主題時則會被更貼題的商品壓過去。
+ */
+export function isUnavailableCrystalQuestion(
+  chunks: Array<{ id: string; score: number }>
+): boolean {
+  const top = chunks.reduce<{ id: string; score: number } | null>(
+    (best, chunk) => (best === null || chunk.score > best.score ? chunk : best),
+    null
+  );
+  return Boolean(top && top.id.endsWith("-unavailable") && top.score >= 0.55);
 }
 
 export function selectRelatedProductIds(
@@ -419,9 +468,7 @@ export const chatbotRouter = router({
 
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 10, 0.45);
-      const hasUnavailableCrystalMatch = relevantChunks.some(
-        (chunk) => chunk.id.endsWith("-unavailable") && chunk.score >= 0.55
-      );
+      const hasUnavailableCrystalMatch = isUnavailableCrystalQuestion(relevantChunks);
       const chunksForAnswer = hasUnavailableCrystalMatch
         ? relevantChunks.filter((chunk) => chunk.id.endsWith("-unavailable") || chunk.category !== "商品推薦")
         : relevantChunks;
@@ -465,7 +512,7 @@ export const chatbotRouter = router({
           "\n\n【備援資訊】\n" +
           "若顧客的功效需求在現有商品中找不到完全符合的款式，可推薦「客製化水晶手鍊」服務。" +
           "設計師會根據功效需求（如招桃花、改善健康、化解小人、提升某種特定運勢等）量身設計專屬手鍊。" +
-          "若顧客指定某種晶石但知識庫或現貨沒有，請誠實說明目前現貨沒有，優先提供功效或能量方向相近的替代現貨；不可承諾客製化一定會有該指定晶石，只能說可與店家討論需求與可用材料。" +
+          "若顧客指定某種晶石但參考資料或現貨沒有，請誠實說明目前現貨沒有，優先提供功效或能量方向相近的替代現貨；不可承諾客製化一定會有該指定晶石，只能說可與店家討論需求與可用材料。" +
           "客製化方案頁面：https://goodaytarot.com/custom\n" +
           "也歡迎透過 LINE 詢問：https://line.me/R/ti/p/@011tymeh";
       }
