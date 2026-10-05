@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { adminProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { searchKnowledge, type ScoredChunk } from "../crystalKnowledge";
@@ -73,6 +73,67 @@ const CHATBOT_TEMPERATURE = 0.3;
  * 這是上限不是預扣，只為實際產生的 token 付費，放寬不會多花錢。
  */
 const CHATBOT_MAX_OUTPUT_TOKENS = 8192;
+
+export type ChatbotAnswerStatus = "complete" | "low_confidence" | "knowledge_gap" | "handoff";
+
+const SMALL_TALK_PATTERN = /^(你好|嗨|哈囉|hello|hi|謝謝|感謝|掰掰|再見)[！!。,.，\s]*$/i;
+const HUMAN_HANDOFF_PATTERN = /(官方\s*line|聯繫.{0,8}客服|私訊.{0,8}line|洽詢.{0,8}line|透過.{0,8}line)/i;
+const EXPLICIT_GAP_PATTERN = /(沒有(?:提供|相關).{0,12}(?:資訊|資料)|無法(?:確認|回答)|不確定|需要.{0,10}(?:客服|店家).{0,8}確認)/i;
+const SPECIFIC_FACT_PATTERN = /(珠徑|水晶.{0,6}(?:大小|尺寸)|幾\s*(?:mm|公厘)|最大顆|匯款帳號|優惠碼|折扣碼|庫存數量|到貨日期)/i;
+const STRONG_MATCH_SCORE = 0.65;
+
+export function classifyChatbotAnswer(input: {
+  question: string;
+  reply: string;
+  chunks: Array<Pick<ScoredChunk, "id" | "question" | "category" | "score">>;
+  usedFallback: boolean;
+}): { status: ChatbotAnswerStatus; reason: string; topScore: number | null } {
+  const topScore = input.chunks[0]?.score ?? null;
+  if (SMALL_TALK_PATTERN.test(input.question.trim())) {
+    return { status: "complete", reason: "一般寒暄，不需使用知識庫回答", topScore };
+  }
+
+  if (HUMAN_HANDOFF_PATTERN.test(input.reply)) {
+    return {
+      status: "handoff",
+      reason: SPECIFIC_FACT_PATTERN.test(input.question)
+        ? "詢問特定規格或營運資料，回答已轉介人工客服"
+        : "回答包含明確的 LINE／人工客服轉介",
+      topScore,
+    };
+  }
+
+  if (EXPLICIT_GAP_PATTERN.test(input.reply) || input.usedFallback || topScore === null) {
+    return {
+      status: "knowledge_gap",
+      reason: EXPLICIT_GAP_PATTERN.test(input.reply)
+        ? "回答明確表示缺少可確認的資料"
+        : "沒有達到可直接回答的知識命中分數",
+      topScore,
+    };
+  }
+
+  const hasStrongFaqMatch = input.chunks.some(
+    (chunk) => !chunk.id.startsWith("product-") && chunk.score >= STRONG_MATCH_SCORE
+  );
+  if (SPECIFIC_FACT_PATTERN.test(input.question) && !hasStrongFaqMatch) {
+    return {
+      status: "low_confidence",
+      reason: "特定規格問題只命中泛用或商品知識，建議人工確認",
+      topScore,
+    };
+  }
+
+  if (topScore < STRONG_MATCH_SCORE) {
+    return {
+      status: "low_confidence",
+      reason: `最高知識命中分數低於 ${STRONG_MATCH_SCORE}`,
+      topScore,
+    };
+  }
+
+  return { status: "complete", reason: "有較高分知識命中，且未使用備援或人工轉介", topScore };
+}
 
 /**
  * 回覆被模型截斷時，砍掉結尾未寫完的那一段，寧可少一句也不要留半句。
@@ -374,6 +435,11 @@ async function saveChatbotLog(params: {
   botReply: string;
   relatedProducts: ChatbotRelatedProduct[];
   retrievedQuestions: string[];
+  retrievedKnowledge: Array<{ id: string; question: string; category: string; score: number }>;
+  answerStatus: ChatbotAnswerStatus;
+  answerStatusReason: string;
+  topKnowledgeScore: number | null;
+  usedFallback: boolean;
   pagePath?: string | null;
 }) {
   const db = await getDb();
@@ -389,6 +455,11 @@ async function saveChatbotLog(params: {
       botReply: params.botReply,
       relatedProducts: params.relatedProducts,
       retrievedQuestions: params.retrievedQuestions,
+      retrievedKnowledge: params.retrievedKnowledge,
+      answerStatus: params.answerStatus,
+      answerStatusReason: params.answerStatusReason.slice(0, 255),
+      topKnowledgeScore: params.topKnowledgeScore,
+      usedFallback: params.usedFallback,
       pagePath: params.pagePath?.slice(0, 255) ?? null,
     });
   } catch (error) {
@@ -506,7 +577,7 @@ export const chatbotRouter = router({
       }
 
       // 當沒有撈到任何相關結果時，補入客製化服務資訊作為備援
-      const hasGoodMatch = relevantChunks.some((c) => c.score >= 0.5);
+      const hasGoodMatch = chunksForAnswer.some((c) => c.score >= 0.5);
       if (!hasGoodMatch) {
         ragContext +=
           "\n\n【備援資訊】\n" +
@@ -541,12 +612,31 @@ export const chatbotRouter = router({
         href: `/products/${p.id}`,
       }));
       const retrievedQuestions = chunksForAnswer.map((c) => c.question);
+      const retrievedKnowledge = chunksForAnswer.map((chunk) => ({
+        id: chunk.id,
+        question: chunk.question,
+        category: chunk.category,
+        score: Number(chunk.score.toFixed(4)),
+      }));
+      const answerAssessment = classifyChatbotAnswer({
+        question: input.message,
+        reply,
+        chunks: chunksForAnswer,
+        usedFallback: !hasGoodMatch,
+      });
 
       await saveChatbotLog({
         ...baseLog,
         botReply: reply,
         relatedProducts: responseProducts,
         retrievedQuestions,
+        retrievedKnowledge,
+        answerStatus: answerAssessment.status,
+        answerStatusReason: answerAssessment.reason,
+        topKnowledgeScore: answerAssessment.topScore === null
+          ? null
+          : Number(answerAssessment.topScore.toFixed(4)),
+        usedFallback: !hasGoodMatch,
       });
 
       return {
@@ -568,6 +658,7 @@ export const chatbotRouter = router({
         limit: z.number().int().min(1).max(100).default(20),
         offset: z.number().int().min(0).default(0),
         search: z.string().max(100).optional(),
+        answerStatus: z.enum(["complete", "low_confidence", "knowledge_gap", "handoff", "unclassified"]).optional(),
       })
     )
     .query(async ({ input }) => {
@@ -590,6 +681,11 @@ export const chatbotRouter = router({
             sql`CAST(${chatbotLogs.retrievedQuestions} AS CHAR) LIKE ${term}`
           )
         );
+      }
+      if (input.answerStatus === "unclassified") {
+        conditions.push(isNull(chatbotLogs.answerStatus));
+      } else if (input.answerStatus) {
+        conditions.push(eq(chatbotLogs.answerStatus, input.answerStatus));
       }
 
       const where = conditions.length > 0 ? and(...conditions) : undefined;

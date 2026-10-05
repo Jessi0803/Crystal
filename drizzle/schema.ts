@@ -402,12 +402,23 @@ export const chatbotLogs = mysqlTable("chatbotLogs", {
   botReply: text("botReply").notNull(),
   relatedProducts: json("relatedProducts"),
   retrievedQuestions: json("retrievedQuestions"),
+  retrievedKnowledge: json("retrievedKnowledge").$type<Array<{
+    id: string;
+    question: string;
+    category: string;
+    score: number;
+  }>>(),
+  answerStatus: mysqlEnum("answerStatus", ["complete", "low_confidence", "knowledge_gap", "handoff"]),
+  answerStatusReason: varchar("answerStatusReason", { length: 255 }),
+  topKnowledgeScore: decimal("topKnowledgeScore", { precision: 5, scale: 4, mode: "number" }),
+  usedFallback: boolean("usedFallback"),
   pagePath: varchar("pagePath", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   index("chatbot_logs_created_at_idx").on(table.createdAt),
   index("chatbot_logs_session_created_at_idx").on(table.sessionId, table.createdAt),
   index("chatbot_logs_user_created_at_idx").on(table.userId, table.createdAt),
+  index("chatbot_logs_answer_status_created_at_idx").on(table.answerStatus, table.createdAt),
 ]);
 
 export type ChatbotLog = typeof chatbotLogs.$inferSelect;

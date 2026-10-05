@@ -20,6 +20,11 @@ test("admin chatbot log UI paginates and exposes recommendation metadata", async
           botReply: "第二頁回覆",
           relatedProducts: [{ name: "E2E 現貨手鍊" }],
           retrievedQuestions: ["測試知識庫問題"],
+          retrievedKnowledge: [{ id: "faq-e2e", question: "測試知識庫問題", category: "商品", score: 0.82 }],
+          answerStatus: "complete",
+          answerStatusReason: "有較高分知識命中，且未使用備援或人工轉介",
+          topKnowledgeScore: 0.82,
+          usedFallback: false,
           pagePath: "/products/e2e-bracelet-in-stock",
         }
       : {
@@ -31,6 +36,11 @@ test("admin chatbot log UI paginates and exposes recommendation metadata", async
           botReply: "第一頁回覆",
           relatedProducts: [],
           retrievedQuestions: [],
+          retrievedKnowledge: [],
+          answerStatus: "low_confidence",
+          answerStatusReason: "最高知識命中分數低於 0.65",
+          topKnowledgeScore: 0.61,
+          usedFallback: false,
           pagePath: "/",
         };
     await route.fulfill({
@@ -42,6 +52,8 @@ test("admin chatbot log UI paginates and exposes recommendation metadata", async
   await page.goto("/admin/chatbot");
   await expect(page.locator("body")).toContainText("目前顯示第 1 / 2 頁，共 21 筆");
   await expect(page.locator("body")).toContainText("第一頁的推薦問題");
+  await expect(page.locator("body")).toContainText("低信心");
+  await expect(page.locator("body")).toContainText("最高命中 61%");
   await page.getByRole("button", { name: "下一頁" }).click();
   await expect(page.locator("body")).toContainText("目前顯示第 2 / 2 頁，共 21 筆");
 
@@ -49,4 +61,13 @@ test("admin chatbot log UI paginates and exposes recommendation metadata", async
   await expect(page.locator("body")).toContainText("來源頁面：/products/e2e-bracelet-in-stock");
   await expect(page.locator("body")).toContainText("E2E 現貨手鍊");
   await expect(page.locator("body")).toContainText("測試知識庫問題");
+  await expect(page.locator("body")).toContainText("測試知識庫問題（82%）");
+  await expect(page.locator("body")).toContainText("有較高分知識命中，且未使用備援或人工轉介");
+
+  const filteredRequest = page.waitForRequest((request) =>
+    request.url().includes("chatbot.listLogs") && decodeURIComponent(request.url()).includes('"answerStatus":"low_confidence"')
+  );
+  await page.getByLabel("回答狀態").selectOption("low_confidence");
+  await filteredRequest;
+  await expect(page.locator("body")).toContainText("第一頁的推薦問題");
 });

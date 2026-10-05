@@ -20,6 +20,15 @@ function initialTab(): ChatbotTab {
 
 const PAGE_SIZE = 20;
 
+const ANSWER_STATUS_META = {
+  complete: { label: "回答完整", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  low_confidence: { label: "低信心", className: "border-amber-200 bg-amber-50 text-amber-700" },
+  knowledge_gap: { label: "知識缺口", className: "border-red-200 bg-red-50 text-red-700" },
+  handoff: { label: "轉人工", className: "border-blue-200 bg-blue-50 text-blue-700" },
+} as const;
+
+type AnswerStatusFilter = keyof typeof ANSWER_STATUS_META | "unclassified" | "all";
+
 function formatDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
   return date.toLocaleString("zh-TW", {
@@ -58,6 +67,16 @@ function normalizeJsonArray(value: unknown): string[] {
     : [];
 }
 
+function normalizeKnowledgeMatches(value: unknown): Array<{ question: string; score: number }> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const question = "question" in item ? String(item.question ?? "").trim() : "";
+    const score = "score" in item ? Number(item.score) : Number.NaN;
+    return question && Number.isFinite(score) ? [{ question, score }] : [];
+  });
+}
+
 export default function AdminChatbot() {
   const [, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
@@ -65,6 +84,7 @@ export default function AdminChatbot() {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [answerStatus, setAnswerStatus] = useState<AnswerStatusFilter>("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
 
@@ -77,7 +97,12 @@ export default function AdminChatbot() {
     error,
     refetch,
   } = trpc.chatbot.listLogs.useQuery(
-    { limit: PAGE_SIZE, offset, search: search || undefined },
+    {
+      limit: PAGE_SIZE,
+      offset,
+      search: search || undefined,
+      answerStatus: answerStatus === "all" ? undefined : answerStatus,
+    },
     { enabled: user?.role === "admin" }
   );
 
@@ -257,6 +282,24 @@ export default function AdminChatbot() {
                   className="w-full border border-[oklch(0.88_0_0)] bg-white pl-9 pr-3 py-3 text-sm font-body focus:outline-none focus:border-[oklch(0.35_0_0)]"
                 />
               </div>
+              <select
+                value={answerStatus}
+                onChange={(event) => {
+                  setAnswerStatus(event.target.value as AnswerStatusFilter);
+                  setPage(1);
+                  setExpandedId(null);
+                  setSelectedIds(new Set());
+                }}
+                aria-label="回答狀態"
+                className="border border-[oklch(0.88_0_0)] bg-white px-3 py-3 text-sm font-body text-[oklch(0.35_0_0)] focus:outline-none focus:border-[oklch(0.35_0_0)]"
+              >
+                <option value="all">全部狀態</option>
+                <option value="complete">回答完整</option>
+                <option value="low_confidence">低信心</option>
+                <option value="knowledge_gap">知識缺口</option>
+                <option value="handoff">轉人工</option>
+                <option value="unclassified">未分類（舊紀錄）</option>
+              </select>
               <button className="btn-primary px-6 py-3 text-sm" type="submit">搜尋</button>
               {search && (
                 <button
@@ -352,6 +395,8 @@ export default function AdminChatbot() {
                     const isSelected = selectedIds.has(item.id);
                     const products = normalizeJsonArray(item.relatedProducts);
                     const retrievedQuestions = normalizeJsonArray(item.retrievedQuestions);
+                    const knowledgeMatches = normalizeKnowledgeMatches(item.retrievedKnowledge);
+                    const statusMeta = item.answerStatus ? ANSWER_STATUS_META[item.answerStatus] : null;
                     return (
                       <div key={item.id} className="bg-white border border-[oklch(0.93_0_0)]">
                         <div className="flex items-start gap-3 p-5 transition-colors hover:bg-[oklch(0.985_0_0)]">
@@ -383,9 +428,19 @@ export default function AdminChatbot() {
                               <p className="text-sm font-body text-[oklch(0.12_0_0)] line-clamp-2 whitespace-pre-wrap">
                                 {item.customerQuestion}
                               </p>
-                              <p className="text-xs font-body text-[oklch(0.55_0_0)] mt-2">
-                                來源頁面：{item.pagePath || "-"} · 推薦商品：{products.length > 0 ? products.join("、") : "無"}
-                              </p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span className={`border px-2 py-0.5 text-[11px] font-body ${statusMeta?.className ?? "border-[oklch(0.88_0_0)] bg-[oklch(0.97_0_0)] text-[oklch(0.5_0_0)]"}`}>
+                                  {statusMeta?.label ?? "未分類"}
+                                </span>
+                                {item.topKnowledgeScore != null && (
+                                  <span className="text-[11px] font-body text-[oklch(0.55_0_0)]">
+                                    最高命中 {Math.round(Number(item.topKnowledgeScore) * 100)}%
+                                  </span>
+                                )}
+                                <span className="text-xs font-body text-[oklch(0.55_0_0)]">
+                                  來源頁面：{item.pagePath || "-"} · 推薦商品：{products.length > 0 ? products.join("、") : "無"}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           </button>
@@ -406,13 +461,30 @@ export default function AdminChatbot() {
                               </p>
                             </div>
                             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-body text-[oklch(0.45_0_0)]">
+                              <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4 md:col-span-2">
+                                <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">系統判定</p>
+                                <p>{item.answerStatusReason || "舊紀錄尚未分類"}</p>
+                                {item.usedFallback != null && (
+                                  <p className="mt-1 text-[oklch(0.55_0_0)]">使用備援資訊：{item.usedFallback ? "是" : "否"}</p>
+                                )}
+                              </div>
                               <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4">
                                 <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">推薦商品</p>
                                 <p>{products.length > 0 ? products.join("、") : "無"}</p>
                               </div>
                               <div className="bg-[oklch(0.985_0_0)] border border-[oklch(0.93_0_0)] p-4">
                                 <p className="tracking-widest text-[oklch(0.55_0_0)] mb-2">命中的知識庫問題</p>
-                                <p>{retrievedQuestions.length > 0 ? retrievedQuestions.join("、") : "無"}</p>
+                                {knowledgeMatches.length > 0 ? (
+                                  <div className="space-y-1.5">
+                                    {knowledgeMatches.map((match, index) => (
+                                      <p key={`${match.question}-${index}`}>
+                                        {match.question}（{Math.round(match.score * 100)}%）
+                                      </p>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p>{retrievedQuestions.length > 0 ? retrievedQuestions.join("、") : "無"}</p>
+                                )}
                               </div>
                             </div>
                           </div>
