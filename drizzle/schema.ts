@@ -337,6 +337,35 @@ export const logisticsOrders = mysqlTable("logisticsOrders", {
 export type LogisticsOrder = typeof logisticsOrders.$inferSelect;
 export type InsertLogisticsOrder = typeof logisticsOrders.$inferInsert;
 
+// ─── 物流事件歷史 ────────────────────────────────────────────────────────────
+// logisticsOrders 保存「目前狀態」；此表保存每次有效回呼，供顧客時間軸與後台反查。
+export const logisticsEvents = mysqlTable("logisticsEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  logisticsOrderId: int("logisticsOrderId").notNull(),
+  orderId: int("orderId").notNull(),
+  eventKey: varchar("eventKey", { length: 64 }).notNull().unique(),
+  eventKind: mysqlEnum("eventKind", ["status", "record_only", "synthetic"]).notNull(),
+  normalizedStatus: mysqlEnum("normalizedStatus", [
+    "created",
+    "in_transit",
+    "arrived",
+    "picked_up",
+    "returned",
+    "failed",
+  ]),
+  rawCode: varchar("rawCode", { length: 20 }),
+  message: varchar("message", { length: 255 }),
+  occurredAt: timestamp("occurredAt").notNull(),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  rawData: json("rawData"),
+}, (table) => [
+  index("logistics_events_logistics_occurred_idx").on(table.logisticsOrderId, table.occurredAt),
+  index("logistics_events_order_occurred_idx").on(table.orderId, table.occurredAt),
+]);
+
+export type LogisticsEvent = typeof logisticsEvents.$inferSelect;
+export type InsertLogisticsEvent = typeof logisticsEvents.$inferInsert;
+
 // ─── 金流監控與管理員操作稽核 ────────────────────────────────────────────────
 // 不設外鍵，讓訂單或會員日後刪除時仍保留事件軌跡。
 export const operationAuditEvents = mysqlTable("operationAuditEvents", {

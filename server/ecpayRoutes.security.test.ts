@@ -31,6 +31,7 @@ vi.mock("./orderDb", () => ({
   updateBalancePaymentStatus: vi.fn(),
   updateBalancePaymentAttemptStatus: vi.fn(),
   updateLogisticsStatus: vi.fn(),
+  recordLogisticsEvent: vi.fn(),
 }));
 
 vi.mock("./inventoryDb", () => ({

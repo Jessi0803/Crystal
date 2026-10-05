@@ -1,7 +1,7 @@
 /**
  * 訂單資料庫查詢函式
  */
-import { eq, desc, and, gte, sql, inArray, SQL, or } from "drizzle-orm";
+import { eq, desc, asc, and, gte, sql, inArray, SQL, or } from "drizzle-orm";
 import crypto from "node:crypto";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
 import { upsertCustomConsultationNote } from "../shared/customFormNote";
@@ -10,6 +10,7 @@ import {
   orders,
   orderItems,
   logisticsOrders,
+  logisticsEvents,
   orderBalancePayments,
   orderBalancePaymentAttempts,
   orderMergeGroups,
@@ -19,6 +20,7 @@ import {
   InsertOrderItem,
   InsertOrderBalancePayment,
   InsertLogisticsOrder,
+  InsertLogisticsEvent,
 } from "../drizzle/schema";
 import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "../shared/const";
 import { calcCheckoutFees } from "../shared/checkoutFees";
@@ -28,6 +30,7 @@ type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type OrderRow = typeof orders.$inferSelect;
 type OrderItemRow = typeof orderItems.$inferSelect;
 type LogisticsRow = typeof logisticsOrders.$inferSelect;
+type LogisticsEventRow = typeof logisticsEvents.$inferSelect;
 type BalancePaymentRow = typeof orderBalancePayments.$inferSelect;
 type BalancePaymentAttemptRow = typeof orderBalancePaymentAttempts.$inferSelect;
 export type BalancePaymentAttemptCheckoutData = {
@@ -106,15 +109,35 @@ export type OrderMergeDetail = OrderMergeInfo & {
   }[];
 };
 
+export type PublicLogisticsEvent = Pick<
+  LogisticsEventRow,
+  "id" | "eventKind" | "normalizedStatus" | "rawCode" | "message" | "occurredAt" | "receivedAt"
+>;
+
+type PublicLogisticsRow = Omit<LogisticsRow, "ecpayLogisticsData">;
+export type LogisticsWithEvents = PublicLogisticsRow & { events: PublicLogisticsEvent[] };
+
+function toPublicLogistics(
+  logistics: LogisticsRow,
+  events: PublicLogisticsEvent[]
+): LogisticsWithEvents {
+  const { ecpayLogisticsData: _privateCallbackData, ...publicLogistics } = logistics;
+  return { ...publicLogistics, events };
+}
+
 export type OrderWithItemsAndLogistics = OrderRow & {
   items: OrderItemRow[];
-  logistics: LogisticsRow | null;
+  logistics: LogisticsWithEvents | null;
   balancePayment?: BalancePaymentRow | null;
   balancePaymentAttempts?: Pick<BalancePaymentAttemptRow,
     "merchantTradeNo" | "totalAmount" | "paymentStatus" | "tradeNo" |
     "ecpayNotifyData" | "paidAt" | "createdAt"
   >[];
   mergeInfo?: OrderMergeDetail | null;
+};
+
+export type AdminOrderWithItemsAndLogistics = Omit<OrderWithItemsAndLogistics, "logistics"> & {
+  logistics: (LogisticsRow & { events: PublicLogisticsEvent[] }) | null;
 };
 
 async function orderHasDomesticFreeShipping(db: DbInstance, orderId: number) {
@@ -376,6 +399,23 @@ async function attachItemsAndLogisticsForOrders(
   ]));
   const allItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, allItemOrderIds));
   const allLogistics = await db.select().from(logisticsOrders).where(inArray(logisticsOrders.orderId, visibleOrderIds));
+  const logisticsIds = allLogistics.map((row) => row.id);
+  const allLogisticsEvents = logisticsIds.length > 0
+    ? await db
+        .select({
+          id: logisticsEvents.id,
+          logisticsOrderId: logisticsEvents.logisticsOrderId,
+          eventKind: logisticsEvents.eventKind,
+          normalizedStatus: logisticsEvents.normalizedStatus,
+          rawCode: logisticsEvents.rawCode,
+          message: logisticsEvents.message,
+          occurredAt: logisticsEvents.occurredAt,
+          receivedAt: logisticsEvents.receivedAt,
+        })
+        .from(logisticsEvents)
+        .where(inArray(logisticsEvents.logisticsOrderId, logisticsIds))
+        .orderBy(asc(logisticsEvents.occurredAt), asc(logisticsEvents.id))
+    : [];
 
   const itemsByOrder = new Map<number, OrderItemRow[]>();
   for (const item of allItems) {
@@ -384,9 +424,20 @@ async function attachItemsAndLogisticsForOrders(
     itemsByOrder.set(item.orderId, arr);
   }
 
-  const logisticsByOrder = new Map<number, LogisticsRow>();
+  const eventsByLogisticsId = new Map<number, PublicLogisticsEvent[]>();
+  for (const event of allLogisticsEvents) {
+    const arr = eventsByLogisticsId.get(event.logisticsOrderId) ?? [];
+    const { logisticsOrderId: _logisticsOrderId, ...publicEvent } = event;
+    arr.push(publicEvent);
+    eventsByLogisticsId.set(event.logisticsOrderId, arr);
+  }
+
+  const logisticsByOrder = new Map<number, LogisticsWithEvents>();
   for (const log of allLogistics) {
-    logisticsByOrder.set(log.orderId, log);
+    logisticsByOrder.set(
+      log.orderId,
+      toPublicLogistics(log, eventsByLogisticsId.get(log.id) ?? [])
+    );
   }
 
   return visibleOrderRows.map((order) => {
@@ -490,13 +541,34 @@ export async function getOrderWithItems(merchantTradeNo: string) {
     .where(eq(logisticsOrders.orderId, order.id))
     .limit(1);
 
+  const logisticsEventRows = logistics
+    ? await db
+        .select({
+          id: logisticsEvents.id,
+          eventKind: logisticsEvents.eventKind,
+          normalizedStatus: logisticsEvents.normalizedStatus,
+          rawCode: logisticsEvents.rawCode,
+          message: logisticsEvents.message,
+          occurredAt: logisticsEvents.occurredAt,
+          receivedAt: logisticsEvents.receivedAt,
+        })
+        .from(logisticsEvents)
+        .where(eq(logisticsEvents.logisticsOrderId, logistics.id))
+        .orderBy(asc(logisticsEvents.occurredAt), asc(logisticsEvents.id))
+    : [];
+
   const [balancePayment] = await db
     .select(balancePaymentLegacySelect)
     .from(orderBalancePayments)
     .where(eq(orderBalancePayments.orderId, order.id))
     .limit(1);
 
-  return { ...order, items, logistics: logistics ?? null, balancePayment: hydrateBalancePayment(balancePayment) };
+  return {
+    ...order,
+    items,
+    logistics: logistics ? toPublicLogistics(logistics, logisticsEventRows) : null,
+    balancePayment: hydrateBalancePayment(balancePayment),
+  };
 }
 
 /** PayPal Capture 成功後標記已付款 */
@@ -831,7 +903,7 @@ export async function getAdminOrderSummaries(
   };
 }
 
-export async function getAdminOrderDetail(orderId: number): Promise<OrderWithItemsAndLogistics | null> {
+export async function getAdminOrderDetail(orderId: number): Promise<AdminOrderWithItemsAndLogistics | null> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
@@ -890,6 +962,22 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
         .limit(10)
     : [];
 
+  const adminLogisticsEvents = logistics[0]
+    ? await db
+        .select({
+          id: logisticsEvents.id,
+          eventKind: logisticsEvents.eventKind,
+          normalizedStatus: logisticsEvents.normalizedStatus,
+          rawCode: logisticsEvents.rawCode,
+          message: logisticsEvents.message,
+          occurredAt: logisticsEvents.occurredAt,
+          receivedAt: logisticsEvents.receivedAt,
+        })
+        .from(logisticsEvents)
+        .where(eq(logisticsEvents.logisticsOrderId, logistics[0].id))
+        .orderBy(asc(logisticsEvents.occurredAt), asc(logisticsEvents.id))
+    : [];
+
   return {
     ...order,
     totalAmount: displayTotalAmount,
@@ -897,7 +985,7 @@ export async function getAdminOrderDetail(orderId: number): Promise<OrderWithIte
       ...item,
       productImage: item.productImage ? normalizeProductImageUrl(item.productImage) : item.productImage,
     })),
-    logistics: logistics[0] ?? null,
+    logistics: logistics[0] ? { ...logistics[0], events: adminLogisticsEvents } : null,
     balancePayment: hydrateBalancePayment(balancePayment[0]),
     balancePaymentAttempts: balanceAttempts,
     mergeInfo,
@@ -1041,15 +1129,95 @@ export async function createLogisticsOrder(data: InsertLogisticsOrder) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.insert(logisticsOrders).values(data);
+  return db.transaction(async (tx) => {
+    await tx.insert(logisticsOrders).values(data);
 
-  const [created] = await db
-    .select()
-    .from(logisticsOrders)
-    .where(eq(logisticsOrders.logisticsMerchantTradeNo, data.logisticsMerchantTradeNo))
-    .limit(1);
+    const [created] = await tx
+      .select()
+      .from(logisticsOrders)
+      .where(eq(logisticsOrders.logisticsMerchantTradeNo, data.logisticsMerchantTradeNo))
+      .limit(1);
 
-  return created;
+    if (!created) throw new Error("Failed to create logistics order");
+
+    const occurredAt = created.createdAt ?? new Date();
+    await tx.insert(logisticsEvents).values({
+      logisticsOrderId: created.id,
+      orderId: created.orderId,
+      eventKey: createLogisticsEventKey({
+        logisticsMerchantTradeNo: created.logisticsMerchantTradeNo,
+        eventKind: "synthetic",
+        statusOrCode: "created",
+        occurredAt,
+      }),
+      eventKind: "synthetic",
+      normalizedStatus: "created",
+      rawCode: null,
+      message: "物流單已建立",
+      occurredAt,
+      rawData: null,
+    });
+
+    return created;
+  });
+}
+
+function createLogisticsEventKey(input: {
+  logisticsMerchantTradeNo: string;
+  eventKind: InsertLogisticsEvent["eventKind"];
+  statusOrCode: string;
+  occurredAt: Date;
+}) {
+  return crypto
+    .createHash("sha256")
+    .update([
+      input.logisticsMerchantTradeNo,
+      input.eventKind,
+      input.statusOrCode,
+      input.occurredAt.toISOString(),
+    ].join("|"))
+    .digest("hex");
+}
+
+/**
+ * 保存每一筆綠界物流事件。eventKey 唯一，因此綠界重送相同回呼時不會重複新增。
+ * 最新物流狀態仍由 updateLogisticsStatus 的單向條件獨立控制。
+ */
+export async function recordLogisticsEvent(input: {
+  logisticsOrderId: number;
+  orderId: number;
+  logisticsMerchantTradeNo: string;
+  eventKind: InsertLogisticsEvent["eventKind"];
+  normalizedStatus: InsertLogisticsEvent["normalizedStatus"];
+  rawCode?: string | null;
+  message?: string | null;
+  occurredAt: Date;
+  rawData?: unknown;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const eventKey = createLogisticsEventKey({
+    logisticsMerchantTradeNo: input.logisticsMerchantTradeNo,
+    eventKind: input.eventKind,
+    statusOrCode: input.rawCode || input.normalizedStatus || "unknown",
+    occurredAt: input.occurredAt,
+  });
+
+  await db
+    .insert(logisticsEvents)
+    .values({
+      logisticsOrderId: input.logisticsOrderId,
+      orderId: input.orderId,
+      eventKey,
+      eventKind: input.eventKind,
+      normalizedStatus: input.normalizedStatus,
+      rawCode: input.rawCode ?? null,
+      message: input.message ?? null,
+      occurredAt: input.occurredAt,
+      rawData: input.rawData ?? null,
+    })
+    .onDuplicateKeyUpdate({ set: { eventKey } });
 }
 
 /**

@@ -18,6 +18,7 @@ describe("classifyECPayLogisticsStatus", () => {
     expect(statusOf({ LogisticsSubType: "UNIMARTC2C", RtnCode: "2098" })).toBe("arrived");
     expect(statusOf({ LogisticsSubType: "UNIMARTC2C", RtnCode: "2067" })).toBe("picked_up");
     expect(statusOf({ LogisticsSubType: "UNIMARTC2C", RtnCode: "2074" })).toBe("returned");
+    expect(statusOf({ LogisticsSubType: "UNIMARTC2C", RtnCode: "2099" })).toBe("returned");
   });
 
   it("maps FamilyMart C2C logistics status codes", () => {

@@ -16,6 +16,7 @@ import {
   updateOrderPaymentStatus,
   getOrderByMerchantTradeNo,
   updateLogisticsStatus,
+  recordLogisticsEvent,
   getBalancePaymentByMerchantTradeNo,
   getBalancePaymentAttemptByMerchantTradeNo,
   updateBalancePaymentStatus,
@@ -231,6 +232,7 @@ export async function handleECPayLogisticsNotify(data: Record<string, string>) {
   if (!db) throw new Error("Database not available");
   const [logistics] = await db
     .select({
+      id: logisticsOrders.id,
       orderId: logisticsOrders.orderId,
       logisticsType: logisticsOrders.logisticsType,
       logisticsSubType: logisticsOrders.logisticsSubType,
@@ -257,6 +259,19 @@ export async function handleECPayLogisticsNotify(data: Record<string, string>) {
     LogisticsType: data.LogisticsType || logistics.logisticsType,
   });
 
+  const statusDate = parseECPayStatusDate(data.UpdateStatusDate) ?? new Date();
+  await recordLogisticsEvent({
+    logisticsOrderId: logistics.id,
+    orderId: logistics.orderId,
+    logisticsMerchantTradeNo,
+    eventKind: classification.kind === "record_only" ? "record_only" : "status",
+    normalizedStatus: classification.kind === "status" ? classification.status : null,
+    rawCode: data.RtnCode ?? null,
+    message: data.RtnMsg ?? null,
+    occurredAt: statusDate,
+    rawData: data,
+  });
+
   if (classification.kind === "record_only") {
     await recordAuditEventSafely({
       source: "logistics", category: "logistics", action: "ecpay.logistics.callback",
@@ -268,7 +283,6 @@ export async function handleECPayLogisticsNotify(data: Record<string, string>) {
   }
 
   const newStatus = classification.status;
-  const statusDate = parseECPayStatusDate(data.UpdateStatusDate) ?? new Date();
   const logisticsUpdated = await updateLogisticsStatus(
     logisticsMerchantTradeNo,
     newStatus,

@@ -10,6 +10,7 @@ import { rememberOrderAccess } from "@/lib/orderAccess";
 import BirthdayFields, { EMPTY_BIRTHDAY_DRAFT, parseBirthdayDraft, type BirthdayDraft } from "@/components/BirthdayFields";
 import { CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
 import { birthdayFromUser, formatBirthday } from "@shared/birthday";
+import MemberLogisticsTimeline from "@/components/MemberLogisticsTimeline";
 
 type MemberTab = "orders" | "coupons" | "profile";
 
@@ -384,6 +385,8 @@ export default function MemberCenter() {
 
                         {/* 客製表單入口：填到一半離開的人要在這裡找得回來 */}
                         <CustomFormEntries order={order} />
+
+                        <MemberLogisticsTimeline order={order} />
 
                         {/* 訂單資訊 */}
                         <div className="border-t border-sf-line pt-3 space-y-1.5">

@@ -176,9 +176,9 @@ _（尚未設定。等實際遇到問題、確認過程度後再放入。）_
 - **Notes:** 本專案相關：ECPay 回調驗簽、重送處理、非同步付款結果與訂單狀態的一致性
 
 #### Order State Design
-- **Level:** Unassessed
-- **Last reviewed:** —
-- **Evidence:** —
+- **Level:** L2 Developing
+- **Last reviewed:** 2026-10-05
+- **Evidence:** 2026-10-05 能主動區分「物流事件歷史」與「目前物流進度」：延遲抵達的舊事件應保留以便問題反查，但不可讓目前訂單進度倒退。
 - **Notes:** 本專案相關：`orderStatus` × `paymentStatus` 雙軸、訂金／尾款、狀態轉移的合法性
 
 #### Inventory Consistency
@@ -221,6 +221,15 @@ _（尚未設定。等實際遇到問題、確認過程度後再放入。）_
 
 > 只記錄**有實質學習價值**的事件。一般的功能開發、bug 修正不用寫。
 > 一則記錄大約對應一次完整的 Learning Flow。
+
+### 2026-10-05 — 物流回呼歷史與目前狀態
+
+- **Problem:** 確認前台能否像電商平台顯示物流進度，以及綠界延遲／重複回呼應如何保存。
+- **My initial reasoning:** 希望以前台簡化的 4～5 階段進度條呈現，並新增物流紀錄保存回呼歷史。
+- **What I missed:** 還需要事件去重、依事件發生時間排序，以及將異常／退回和正常進度分開呈現。
+- **Final understanding:** 延遲收到的舊物流事件可以保留供後續問題反查，但目前物流進度必須維持單向前進，不能被舊事件倒退。
+- **Evidence of understanding:** 能用自己的話說明保留歷史紀錄的目的，是讓後續問題有資料可以反查。
+- **Level change:** `Order State Design` Unassessed → L2 Developing
 
 ### 格式
 

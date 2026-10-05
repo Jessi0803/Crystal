@@ -18,6 +18,7 @@ const TCAT_REVERSALS = new Set(["3016", "3017"]);
 
 const CVS_EXPIRED = new Set(["7013"]);
 const UNIMART_ARRIVED = new Set(["2063", "2073", "2098"]);
+const UNIMART_RETURNED = new Set(["2074", "2099"]);
 const FAMI_ARRIVED = new Set(["3018"]);
 
 function status(value: LogisticsStatus, needsAttention = false): LogisticsStatusResult {
@@ -54,7 +55,7 @@ export function classifyECPayLogisticsStatus(data: {
   if (logisticsType.includes("UNIMART")) {
     if (UNIMART_ARRIVED.has(rtnCode)) return status("arrived");
     if (rtnCode === "2067") return status("picked_up");
-    if (rtnCode === "2074") return status("returned");
+    if (UNIMART_RETURNED.has(rtnCode)) return status("returned");
     return status("in_transit");
   }
 
@@ -68,7 +69,7 @@ export function classifyECPayLogisticsStatus(data: {
   // 未帶物流商時沿用既有的超商代碼判斷
   if (rtnCode === "3018" || rtnCode === "2073" || rtnCode === "2063") return status("arrived");
   if (rtnCode === "3022" || rtnCode === "2067") return status("picked_up");
-  if (rtnCode === "3020" || rtnCode === "2074" || rtnCode === "3028") return status("returned");
+  if (rtnCode === "3020" || rtnCode === "2074" || rtnCode === "2099" || rtnCode === "3028") return status("returned");
   return status("in_transit");
 }
 

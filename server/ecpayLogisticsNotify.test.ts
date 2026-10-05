@@ -15,6 +15,7 @@ vi.mock("./orderDb", () => ({
   updateBalancePaymentStatus: vi.fn(),
   updateBalancePaymentAttemptStatus: vi.fn(),
   updateLogisticsStatus: vi.fn(),
+  recordLogisticsEvent: vi.fn(),
 }));
 vi.mock("./inventoryDb", () => ({
   deductInventoryAfterPayment: vi.fn(),
@@ -27,17 +28,19 @@ vi.mock("./auditDb", () => ({ recordAuditEventSafely: vi.fn() }));
 
 import { handleECPayLogisticsNotify } from "./ecpayRoutes";
 import { verifyLogisticsCheckMacValue } from "./ecpayLogistics";
-import { updateLogisticsStatus } from "./orderDb";
+import { recordLogisticsEvent, updateLogisticsStatus } from "./orderDb";
 import { getDb } from "./db";
 import { recordAuditEventSafely } from "./auditDb";
 
 const dialect = new MySqlDialect();
 const verifyMock = vi.mocked(verifyLogisticsCheckMacValue);
 const updateLogisticsStatusMock = vi.mocked(updateLogisticsStatus);
+const recordLogisticsEventMock = vi.mocked(recordLogisticsEvent);
 const getDbMock = vi.mocked(getDb);
 const auditMock = vi.mocked(recordAuditEventSafely);
 
 type Logistics = {
+  id: number;
   orderId: number;
   logisticsType: "CVS" | "HOME";
   logisticsSubType: string | null;
@@ -69,7 +72,7 @@ function setupDb(logistics: Logistics | null, orderAffectedRows = 1) {
   return orderUpdates;
 }
 
-const tcat: Logistics = { orderId: 501, logisticsType: "HOME", logisticsSubType: "TCAT", logisticsStatus: "in_transit" };
+const tcat: Logistics = { id: 91, orderId: 501, logisticsType: "HOME", logisticsSubType: "TCAT", logisticsStatus: "in_transit" };
 
 function payload(overrides: Record<string, string> = {}) {
   return {
@@ -91,6 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   verifyMock.mockReturnValue(true);
   updateLogisticsStatusMock.mockResolvedValue(true);
+  recordLogisticsEventMock.mockResolvedValue(undefined);
 });
 
 describe("handleECPayLogisticsNotify", () => {
@@ -105,6 +109,14 @@ describe("handleECPayLogisticsNotify", () => {
       expect.arrayContaining(["in_transit", "arrived"]),
       expect.objectContaining({ pickedUpAt: new Date("2026-09-17T06:05:33.000Z") })
     );
+    expect(recordLogisticsEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      logisticsOrderId: 91,
+      orderId: 501,
+      eventKind: "status",
+      normalizedStatus: "picked_up",
+      rawCode: "3003",
+      occurredAt: new Date("2026-09-17T06:05:33.000Z"),
+    }));
     expect(orderUpdates).toHaveLength(1);
     expect(orderUpdates[0].values).toEqual({ orderStatus: "picked_up" });
     expect(orderUpdates[0].params).toEqual([501, "paid", "processing", "shipped", "arrived"]);
@@ -137,6 +149,11 @@ describe("handleECPayLogisticsNotify", () => {
     await expect(handleECPayLogisticsNotify(payload({ RtnCode: "3006", RtnMsg: "配送中" }))).resolves.toBe("1|OK");
 
     expect(orderUpdates).toHaveLength(0);
+    expect(recordLogisticsEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      eventKind: "status",
+      normalizedStatus: "in_transit",
+      rawCode: "3006",
+    }));
     expect(lastAudit()).toMatchObject({ outcome: "duplicate" });
   });
 
@@ -174,12 +191,17 @@ describe("handleECPayLogisticsNotify", () => {
     await handleECPayLogisticsNotify(payload({ RtnCode: "3016", RtnMsg: "配完狀態刪除" }));
 
     expect(updateLogisticsStatusMock).not.toHaveBeenCalled();
+    expect(recordLogisticsEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      eventKind: "record_only",
+      normalizedStatus: null,
+      rawCode: "3016",
+    }));
     expect(orderUpdates).toHaveLength(0);
     expect(lastAudit()).toMatchObject({ severity: "warning", orderId: 501 });
   });
 
   it("keeps syncing 7-ELEVEN arrivals", async () => {
-    const orderUpdates = setupDb({ orderId: 502, logisticsType: "CVS", logisticsSubType: "UNIMARTC2C", logisticsStatus: "in_transit" });
+    const orderUpdates = setupDb({ id: 92, orderId: 502, logisticsType: "CVS", logisticsSubType: "UNIMARTC2C", logisticsStatus: "in_transit" });
 
     await handleECPayLogisticsNotify(
       payload({ RtnCode: "2073", RtnMsg: "包裹配達取件門市", LogisticsType: "CVS", LogisticsSubType: "UNIMARTC2C" })
@@ -203,6 +225,7 @@ describe("handleECPayLogisticsNotify", () => {
 
     expect(getDbMock).not.toHaveBeenCalled();
     expect(updateLogisticsStatusMock).not.toHaveBeenCalled();
+    expect(recordLogisticsEventMock).not.toHaveBeenCalled();
     expect(orderUpdates).toHaveLength(0);
   });
 
@@ -212,6 +235,7 @@ describe("handleECPayLogisticsNotify", () => {
     await expect(handleECPayLogisticsNotify(payload())).resolves.toBe("1|OK");
 
     expect(updateLogisticsStatusMock).not.toHaveBeenCalled();
+    expect(recordLogisticsEventMock).not.toHaveBeenCalled();
     expect(lastAudit()).toMatchObject({ outcome: "rejected" });
   });
 });
