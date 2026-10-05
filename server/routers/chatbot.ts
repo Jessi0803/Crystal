@@ -51,6 +51,44 @@ const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，�
 const PUBLIC_SITE = "https://goodaytarot.com";
 export const CHATBOT_MAX_MESSAGE_LENGTH = 500;
 
+/**
+ * 固定版本，不用 gemini-flash-latest 那類浮動別名：
+ * 別名換底層模型時不會通知，正式站的行為會無預警改變。
+ * 註：gemini-2.5-flash 已不開放新的 Google Cloud 專案使用。
+ */
+const CHATBOT_MODEL = "gemini-3.8-flash";
+/** 偏低的溫度換取回答長度與用字穩定，客服場景不需要發散 */
+const CHATBOT_TEMPERATURE = 0.3;
+/**
+ * 思考（thinking）與回答共用這個額度，所以要留得比「回答本身需要的長度」寬得多。
+ *
+ * 2.5-flash 時期設 2048，思考偶爾跑到 1962，只剩 80～90 token 給回答，
+ * 約 6.5% 的回覆因此停在半句。換成 3.8-flash 後實測思考落在 1176～3247，
+ * 胃口比 2.5 更大，單純換模型而不放寬額度一樣會被截斷。
+ *
+ * 實測單次 output（思考＋回答）最多 2287，留 8192 約有 3.5 倍餘裕。
+ * 這是上限不是預扣，只為實際產生的 token 付費，放寬不會多花錢。
+ */
+const CHATBOT_MAX_OUTPUT_TOKENS = 8192;
+
+/**
+ * 回覆被模型截斷時，砍掉結尾未寫完的那一段，寧可少一句也不要留半句。
+ * 完整網址結尾視為正常（回答格式本來就允許以商品連結收尾）。
+ */
+export function trimIncompleteTail(reply: string): string {
+  const text = reply.trim();
+  if (!text) return "";
+  if (/[。！？!?～~：)」】]$/.test(text) || /https?:\/\/\S+$/.test(text)) return text;
+
+  const lines = text.split("\n");
+  while (lines.length > 0) {
+    const last = lines[lines.length - 1].trim();
+    if (last && (/[。！？!?～~：)」】]$/.test(last) || /https?:\/\/\S+$/.test(last))) break;
+    lines.pop();
+  }
+  return lines.join("\n").trim();
+}
+
 /** RAG 注入時截斷過長答案，降低輸入過長造成輸出被截斷或語意異常的機率 */
 function clipKnowledgeAnswer(text: string, maxChars = 240): string {
   const t = text.trim();
@@ -91,7 +129,7 @@ async function generateAnswer(
   systemPrompt: string,
   history: Array<{ role: "user" | "assistant"; content: string }>,
   userMessage: string,
-  maxTokens = 2048
+  maxTokens = CHATBOT_MAX_OUTPUT_TOKENS
 ): Promise<string> {
   const contents = [
     ...history.map((h) => ({
@@ -102,14 +140,19 @@ async function generateAnswer(
   ];
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${ENV.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${CHATBOT_MODEL}:generateContent?key=${ENV.geminiApiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
-        generationConfig: { maxOutputTokens: maxTokens },
+        generationConfig: {
+          // 思考與回答共用這個額度，放寬的理由見 CHATBOT_MAX_OUTPUT_TOKENS
+          maxOutputTokens: maxTokens,
+          // 不設的話用模型預設值，客服場景不需要發散
+          temperature: CHATBOT_TEMPERATURE,
+        },
       }),
     }
   );
@@ -139,6 +182,8 @@ async function generateAnswer(
       .join("") ?? "";
   if (candidate.finishReason === "MAX_TOKENS" && text.length > 0) {
     console.warn("[chatbot] reply hit maxOutputTokens (truncated):", text.length, "chars");
+    // 最後一道保險：即使模型被截斷，也不要把半句話丟給顧客
+    return trimIncompleteTail(text) || "抱歉，我現在無法回答，請稍後再試。";
   }
   return text.trim() || "抱歉，我現在無法回答，請稍後再試。";
 }
@@ -429,8 +474,7 @@ export const chatbotRouter = router({
       const reply = await generateAnswer(
         SYSTEM_PROMPT + ragContext,
         input.history.slice(-10),
-        input.message,
-        2048
+        input.message
       );
 
       const productsForClient = filterRelatedProductsCitedInReply(reply, relatedProducts);
