@@ -301,6 +301,7 @@ export default function CustomForm() {
         canFillForm={formSubmission.canFillForm}
         hasExistingNote={formSubmission.hasExistingNote}
         existingNote={formSubmission.existingNote}
+        allowRewrite={formSubmission.allowRewrite}
       >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">

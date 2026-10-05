@@ -4,6 +4,7 @@
 import { eq, desc, asc, and, gte, sql, inArray, SQL, or } from "drizzle-orm";
 import crypto from "node:crypto";
 import { normalizeOrderEmail } from "./_core/emailNormalize";
+import { memberVisibleOrdersWhere } from "./memberOrderAccess";
 import { upsertCustomConsultationNote } from "../shared/customFormNote";
 import { getDb } from "./db";
 import {
@@ -1800,20 +1801,11 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
   const db = await getDb();
   if (!db) return [];
 
-  const conditions: SQL[] = [];
+  // 規則放在 memberOrderAccess，與顧客評價資格共用同一份定義
+  const ownershipWhere = memberVisibleOrdersWhere(opts);
+  if (!ownershipWhere) return [];
 
-  if (opts.userId != null) {
-    conditions.push(eq(orders.userId, opts.userId));
-  }
-
-  if (opts.email) {
-    const key = normalizeOrderEmail(opts.email);
-    conditions.push(sql`LOWER(TRIM(${orders.buyerEmail})) = ${key}`);
-  }
-
-  if (conditions.length === 0) return [];
-
-  const whereClause = visibleOrdersOnlyWhere(conditions.length === 1 ? conditions[0] : or(...conditions)!);
+  const whereClause = visibleOrdersOnlyWhere(ownershipWhere);
 
   try {
     const memberOrders = await db

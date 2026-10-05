@@ -15,6 +15,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { protectedProcedure, rateLimitedProtectedProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
+import { resolveMemberIdentity } from "../memberOrderAccess";
 import { sdk } from "../_core/sdk";
 import * as crypto from "crypto";
 import * as db from "../db";
@@ -301,11 +302,9 @@ export const memberRouter = router({
 
   /** 查詢自己的訂單 */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
-    const currentUser = (await db.getUserByOpenId(ctx.user.openId)) ?? ctx.user;
-    // 未驗證的 Email 不可用來比對訪客訂單，避免冒用他人 Email 註冊後看到對方訂單
-    return getOrdersForMember({
-      userId: currentUser.id,
-      email: currentUser.emailVerified ? currentUser.email : null,
-    });
+    // 未驗證的 Email 不可用來比對訪客訂單，避免冒用他人 Email 註冊後看到對方訂單；
+    // 規則與顧客評價資格共用 memberOrderAccess
+    const identity = await resolveMemberIdentity(ctx.user);
+    return getOrdersForMember({ userId: identity.userId, email: identity.verifiedEmail });
   }),
 });

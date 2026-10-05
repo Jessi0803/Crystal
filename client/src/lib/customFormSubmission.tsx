@@ -1,9 +1,9 @@
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { AlertTriangle, CheckCircle, LockKeyhole, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import type { CustomDepositProductId } from "@/lib/customOrderingContent";
+import { CUSTOM_LINE_URL, type CustomDepositProductId } from "@/lib/customOrderingContent";
 import { getSavedOrderAccess } from "@/lib/orderAccess";
 import { extractCustomConsultationNote } from "@shared/customFormNote";
 
@@ -37,6 +37,8 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
   const itemIndex = Number(params.get("itemIndex") ?? "");
   const hasItemInstance = Number.isInteger(orderItemId) && orderItemId > 0 && Number.isInteger(itemIndex) && itemIndex > 0;
   const orderAccess = getSavedOrderAccess(merchantTradeNo);
+  // 送出後預設不開放客人自行修改；店家同意時，給一條帶 ?edit=1 的連結即可重新填寫
+  const allowRewrite = params.get("edit") === "1";
 
   const orderQuery = trpc.order.getOrder.useQuery(
     { merchantTradeNo, ...orderAccess },
@@ -99,6 +101,7 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     // 已送出的內容：用來讓客人先看到自己填過什麼，而不是直接看到一張空白表單
     existingNote,
     hasExistingNote: Boolean(existingNote),
+    allowRewrite,
     submitCustomNote,
     isSubmitting: submitMutation.isPending,
   };
@@ -111,6 +114,7 @@ export function CustomFormAccessGate({
   canFillForm,
   hasExistingNote,
   existingNote,
+  allowRewrite = false,
   children,
 }: {
   merchantTradeNo: string;
@@ -118,11 +122,12 @@ export function CustomFormAccessGate({
   isError: boolean;
   canFillForm: boolean;
   hasExistingNote: boolean;
-  /** 已送出的需求內容；有值時先顯示唯讀版本，避免客人看到空白表單而誤送覆蓋 */
+  /** 已送出的需求內容；有值時只顯示唯讀版本 */
   existingNote?: string | null;
+  /** 店家放行時才為 true（網址帶 ?edit=1），允許重新填寫覆蓋 */
+  allowRewrite?: boolean;
   children: ReactNode;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   if (!merchantTradeNo) {
     return (
       <CustomFormGateMessage
@@ -155,7 +160,7 @@ export function CustomFormAccessGate({
 
   // 已填寫過：先給唯讀畫面。表單無法從純文字還原成欄位，
   // 直接顯示空白表單會讓客人一送出就把先前的內容覆蓋掉。
-  if (existingNote && !isEditing) {
+  if (existingNote && !allowRewrite) {
     return (
       <div className="min-h-[60vh] bg-sf-cream px-4 py-12">
         <div className="mx-auto max-w-2xl">
@@ -170,30 +175,30 @@ export function CustomFormAccessGate({
               </h1>
             </div>
             <p className="mb-5 text-sm font-body leading-relaxed text-sf-muted">
-              以下是你送出的內容，設計師已經收到。如果需要調整，請點下方的「修改內容」。
+              以下是你送出的內容，設計師已經收到。送出後無法自行修改，如需調整請透過
+              <a
+                href={CUSTOM_LINE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mx-1 underline decoration-brand-peach underline-offset-2 hover:text-sf-accent"
+              >
+                官方 LINE
+              </a>
+              與我們聯繫。
             </p>
 
             <div className="mb-6 whitespace-pre-wrap rounded-md border border-sf-line bg-sf-cream px-4 py-4 text-sm font-body leading-relaxed text-sf-text">
               {existingNote}
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="btn-primary w-full justify-center sm:w-auto"
-              >
-                修改內容
+            <Link
+              href={`/order/${encodeURIComponent(merchantTradeNo)}`}
+              className="block w-full sm:w-auto"
+            >
+              <button type="button" className="btn-primary w-full justify-center sm:w-auto">
+                返回訂單
               </button>
-              <Link
-                href={`/order/${encodeURIComponent(merchantTradeNo)}`}
-                className="block w-full sm:w-auto"
-              >
-                <button type="button" className="btn-ghost w-full justify-center sm:w-auto">
-                  返回訂單
-                </button>
-              </Link>
-            </div>
+            </Link>
           </div>
         </div>
       </div>

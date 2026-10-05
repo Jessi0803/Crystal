@@ -2,6 +2,7 @@
 // Design: Vacanza-inspired — large image + clean product info
 import { useState, useEffect, useMemo, useRef } from "react";
 import ResponsiveImage from "@/components/ResponsiveImage";
+import ProductReviews from "@/components/ProductReviews";
 import ProductCardTags from "@/components/ProductCardTags";
 import { useParams, Link } from "wouter";
 import { CircleAlert, Minus, Plus, ShoppingBag } from "lucide-react";
@@ -1106,6 +1107,9 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* 顧客回饋：沒有已上架的回饋時整個區塊不會渲染 */}
+      <ProductReviews productId={product.id} />
 
       {/* Related Products */}
       {related.length > 0 && (
