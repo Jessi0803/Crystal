@@ -16,7 +16,7 @@ import {
   updateOrderPaymentStatus,
   getOrderByMerchantTradeNo,
   updateLogisticsStatus,
-  recordLogisticsEvent,
+  recordLogisticsEventSafely,
   getBalancePaymentByMerchantTradeNo,
   getBalancePaymentAttemptByMerchantTradeNo,
   updateBalancePaymentStatus,
@@ -260,7 +260,8 @@ export async function handleECPayLogisticsNotify(data: Record<string, string>) {
   });
 
   const statusDate = parseECPayStatusDate(data.UpdateStatusDate) ?? new Date();
-  await recordLogisticsEvent({
+  // 歷史紀錄失敗不可以擋住下面的狀態更新
+  await recordLogisticsEventSafely({
     logisticsOrderId: logistics.id,
     orderId: logistics.orderId,
     logisticsMerchantTradeNo,

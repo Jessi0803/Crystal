@@ -1180,6 +1180,17 @@ function createLogisticsEventKey(input: {
     .digest("hex");
 }
 
+/** 對齊 drizzle/0044_logistics_events.sql 的欄位長度 */
+const LOGISTICS_EVENT_RAW_CODE_MAX = 20;
+const LOGISTICS_EVENT_MESSAGE_MAX = 255;
+
+/** 超過欄位長度就截斷，不要讓一段過長的訊息把整筆寫入打掉 */
+function clipForColumn(value: string | null | undefined, maxLength: number): string | null {
+  if (value == null) return null;
+  const text = String(value);
+  return text.length <= maxLength ? text : text.slice(0, maxLength);
+}
+
 /**
  * 保存每一筆綠界物流事件。eventKey 唯一，因此綠界重送相同回呼時不會重複新增。
  * 最新物流狀態仍由 updateLogisticsStatus 的單向條件獨立控制。
@@ -1211,14 +1222,40 @@ export async function recordLogisticsEvent(input: {
       logisticsOrderId: input.logisticsOrderId,
       orderId: input.orderId,
       eventKey,
+      // rawCode / message 是綠界自由填的欄位，長度沒有保證；
+      // TiDB 是 strict mode，超過欄位長度會直接報錯而不是截斷
       eventKind: input.eventKind,
       normalizedStatus: input.normalizedStatus,
-      rawCode: input.rawCode ?? null,
-      message: input.message ?? null,
+      rawCode: clipForColumn(input.rawCode, LOGISTICS_EVENT_RAW_CODE_MAX),
+      message: clipForColumn(input.message, LOGISTICS_EVENT_MESSAGE_MAX),
       occurredAt: input.occurredAt,
       rawData: input.rawData ?? null,
     })
     .onDuplicateKeyUpdate({ set: { eventKey } });
+}
+
+/**
+ * 寫入物流事件，失敗時只記錄不往外丟。
+ *
+ * 事件歷史是附加功能，綠界回呼真正要做的是更新訂單與物流狀態。
+ * 如果這裡的例外往上冒，會讓後面的狀態更新整段不執行 ——
+ * 等於「記不了歷史」升級成「訂單狀態卡住」，因小失大。
+ * 完整的回呼內容本來就會進 audit log，這裡失敗不會遺失資訊。
+ */
+export async function recordLogisticsEventSafely(
+  input: Parameters<typeof recordLogisticsEvent>[0]
+): Promise<boolean> {
+  try {
+    await recordLogisticsEvent(input);
+    return true;
+  } catch (error) {
+    console.error(
+      "[logistics] 寫入物流事件失敗（不影響狀態更新）:",
+      input.logisticsMerchantTradeNo,
+      error
+    );
+    return false;
+  }
 }
 
 /**

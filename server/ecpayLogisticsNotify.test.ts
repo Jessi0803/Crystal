@@ -15,7 +15,7 @@ vi.mock("./orderDb", () => ({
   updateBalancePaymentStatus: vi.fn(),
   updateBalancePaymentAttemptStatus: vi.fn(),
   updateLogisticsStatus: vi.fn(),
-  recordLogisticsEvent: vi.fn(),
+  recordLogisticsEventSafely: vi.fn(),
 }));
 vi.mock("./inventoryDb", () => ({
   deductInventoryAfterPayment: vi.fn(),
@@ -28,14 +28,14 @@ vi.mock("./auditDb", () => ({ recordAuditEventSafely: vi.fn() }));
 
 import { handleECPayLogisticsNotify } from "./ecpayRoutes";
 import { verifyLogisticsCheckMacValue } from "./ecpayLogistics";
-import { recordLogisticsEvent, updateLogisticsStatus } from "./orderDb";
+import { recordLogisticsEventSafely, updateLogisticsStatus } from "./orderDb";
 import { getDb } from "./db";
 import { recordAuditEventSafely } from "./auditDb";
 
 const dialect = new MySqlDialect();
 const verifyMock = vi.mocked(verifyLogisticsCheckMacValue);
 const updateLogisticsStatusMock = vi.mocked(updateLogisticsStatus);
-const recordLogisticsEventMock = vi.mocked(recordLogisticsEvent);
+const recordLogisticsEventMock = vi.mocked(recordLogisticsEventSafely);
 const getDbMock = vi.mocked(getDb);
 const auditMock = vi.mocked(recordAuditEventSafely);
 
@@ -94,10 +94,28 @@ beforeEach(() => {
   vi.clearAllMocks();
   verifyMock.mockReturnValue(true);
   updateLogisticsStatusMock.mockResolvedValue(true);
-  recordLogisticsEventMock.mockResolvedValue(undefined);
+  recordLogisticsEventMock.mockResolvedValue(true);
 });
 
 describe("handleECPayLogisticsNotify", () => {
+  it("寫入物流事件失敗時，訂單與物流狀態仍然照常更新", async () => {
+    // 事件歷史是附加功能；它失敗不可以讓核心的狀態更新整段不執行
+    const orderUpdates = setupDb(tcat);
+    recordLogisticsEventMock.mockResolvedValue(false);
+
+    await expect(handleECPayLogisticsNotify(payload())).resolves.toBe("1|OK");
+
+    expect(recordLogisticsEventMock).toHaveBeenCalled();
+    expect(updateLogisticsStatusMock).toHaveBeenCalledWith(
+      "L1789600000000",
+      "picked_up",
+      expect.anything(),
+      expect.anything()
+    );
+    expect(orderUpdates).toHaveLength(1);
+    expect(orderUpdates[0].values).toEqual({ orderStatus: "picked_up" });
+  });
+
   it("marks a delivered black-cat parcel as picked up with ECPay's status time", async () => {
     const orderUpdates = setupDb(tcat);
 
