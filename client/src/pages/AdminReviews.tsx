@@ -629,7 +629,7 @@ export default function AdminReviews() {
   return (
     <div className="min-h-screen bg-[oklch(0.97_0_0)]">
       <div className="bg-white border-b border-[oklch(0.93_0_0)] sticky top-14 lg:top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0_0)]">
               REVIEWS
@@ -652,15 +652,17 @@ export default function AdminReviews() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
           <span className="text-[11px] tracking-widest text-[oklch(0.5_0_0)] font-body">
             篩選商品
           </span>
           <select
             value={productFilter}
             onChange={e => setProductFilter(e.target.value)}
-            className="border border-[oklch(0.86_0_0)] bg-white px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)]"
+            // select 的寬度會被最長的 option 撐開（商品一多就會超出手機螢幕），
+            // 所以明確限制寬度並讓文字截斷
+            className="w-full min-w-0 max-w-full truncate border border-[oklch(0.86_0_0)] bg-white px-3 py-2 text-sm font-body outline-none focus:border-[oklch(0.2_0_0)] sm:w-64"
           >
             <option value="">全部商品</option>
             {products.map(product => (
@@ -713,7 +715,7 @@ export default function AdminReviews() {
           ) : (
             <>
               {/* 手機：卡片 */}
-              <ul className="divide-y divide-[oklch(0.93_0_0)] md:hidden">
+              <ul className="divide-y divide-[oklch(0.93_0_0)] xl:hidden">
                 {visibleReviews.map(review => (
                   <li key={review.id} className="space-y-3 p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -806,18 +808,14 @@ export default function AdminReviews() {
               </ul>
 
               {/* 桌機：表格 */}
-              <div className="hidden md:block">
+              <div className="hidden xl:block">
                 <table className="w-full text-left text-sm font-body">
                   <thead className="border-b border-[oklch(0.93_0_0)] text-[11px] tracking-widest text-[oklch(0.5_0_0)]">
-                    <tr>
+                    <tr className="whitespace-nowrap">
                       <th className="px-4 py-3 font-normal">商品</th>
-                      <th className="px-4 py-3 font-normal">評分</th>
-                      <th className="px-4 py-3 font-normal">顯示名稱</th>
-                      <th className="px-4 py-3 font-normal">來源</th>
+                      <th className="px-4 py-3 font-normal">顧客</th>
                       <th className="px-4 py-3 font-normal">回饋內容</th>
-                      <th className="px-4 py-3 font-normal">圖片</th>
                       <th className="px-4 py-3 font-normal">狀態</th>
-                      <th className="px-4 py-3 font-normal">精選</th>
                       <th className="px-4 py-3 font-normal text-right">排序</th>
                       <th className="px-4 py-3 font-normal">建立</th>
                       <th className="px-4 py-3 font-normal text-right">操作</th>
@@ -838,31 +836,25 @@ export default function AdminReviews() {
                         </td>
                         <td className="px-4 py-3">
                           <StarDisplay rating={review.rating} />
+                          <p className="mt-1 truncate text-xs text-[oklch(0.4_0_0)]">
+                            {review.displayName}
+                          </p>
+                          <div className="mt-1.5">
+                            <SourceBadge source={review.source} />
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-[oklch(0.4_0_0)]">
-                          {review.displayName}
-                        </td>
-                        <td className="px-4 py-3">
-                          <SourceBadge source={review.source} />
-                        </td>
-                        <td className="max-w-[16rem] px-4 py-3">
-                          <p className="line-clamp-2 text-xs text-[oklch(0.4_0_0)]">
+                        <td className="max-w-[22rem] px-4 py-3">
+                          <p className="line-clamp-2 text-xs leading-relaxed text-[oklch(0.4_0_0)]">
                             {review.content}
                           </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          {review.images.length === 0 ? (
-                            <span className="text-xs text-[oklch(0.6_0_0)]">
-                              —
-                            </span>
-                          ) : (
-                            <div className="flex gap-1">
+                          {review.images.length > 0 && (
+                            <div className="mt-2 flex gap-1">
                               {review.images.map(src => (
                                 <img
                                   key={src}
                                   src={src}
                                   alt=""
-                                  className="h-9 w-9 border border-[oklch(0.9_0_0)] object-cover"
+                                  className="h-8 w-8 border border-[oklch(0.9_0_0)] object-cover"
                                 />
                               ))}
                             </div>
@@ -870,9 +862,11 @@ export default function AdminReviews() {
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={review.status} />
-                        </td>
-                        <td className="px-4 py-3 text-xs text-[oklch(0.4_0_0)]">
-                          {review.isFeatured ? "是" : "—"}
+                          {review.isFeatured && (
+                            <p className="mt-1.5 whitespace-nowrap text-[11px] text-[oklch(0.45_0_0)]">
+                              首頁精選
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right">
                           {review.sortOrder}
