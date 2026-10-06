@@ -32,8 +32,40 @@ pnpm run test:e2e      # playwright
 - **Migration 手寫**：新增 `drizzle/00NN_描述.sql`，部署前先手動套用到正式資料庫。**禁止在 runtime 執行 `ALTER TABLE`**。
 - **`pnpm run check:vercel`**：只要動到 server 端套件就要跑。Vercel 的 function loader 不能 `require()` 純 ESM 套件（`ERR_REQUIRE_ESM`），本機 Node 允許所以測不出來，曾讓全站 API 回 500。
 - **本機 dev server 連的是正式資料庫**（port 3000）。任何寫入操作先問過再做。
+  要在本機點流程又不想碰正式資料，用 `node scripts/dev-test-db.mjs`（port 3200）。
+- **分辨正式／測試資料庫，只能看使用者前綴**（見下方）。
 - **Branch**：目前工作提交到 `feature/storefront-refresh`，**沒有明確指示就不要 merge 回 `main`**。
 - **前台樣式**：全站樣式集中在 `client/src/index.css`，前台靠 `html.storefront` scope，後台維持原本風格。不要為了前台改動而影響後台。
+
+### 怎麼分辨連到的是正式還是測試資料庫
+
+TiDB Cloud 上有兩個叢集：`crystal`（正式）與 `crystal-test`（測試）。
+
+**以下兩個特徵都分辨不出來，不要拿它們判斷：**
+
+| 看起來像線索，其實不是 | 為什麼 |
+|---|---|
+| `SELECT DATABASE()` 回 `test` | **兩個叢集的 database 都叫 `test`** |
+| host 含 `prod`（`gateway01.ap-northeast-1.prod.aws.tidbcloud.com`） | `prod` 是 TiDB 給所有 serverless 叢集的 gateway 網域的一部分，**兩邊的 host 完全相同** |
+
+**唯一可靠的依據是連線使用者的專案前綴：**
+
+| 叢集 | 使用者前綴 | 用在哪 |
+|---|---|---|
+| 正式 `crystal` | `2NtQ6iWnaDtLLkT` | `.env`、`.env.local` |
+| 測試 `crystal-test` | `3DeLUzaGBUJsiKt` | `.env.test.local` |
+
+```sql
+SELECT CURRENT_USER();   -- 取 '.' 前面那段比對
+```
+
+程式裡已經有兩道守門，要寫新腳本就沿用，不要自己重寫判斷：
+
+- [`scripts/dev-test-db.mjs`](scripts/dev-test-db.mjs) — 連到正式就拒絕啟動
+- [`scripts/test-db-helpers.mjs`](scripts/test-db-helpers.mjs) 的 `assertTestDatabaseTarget()` — 檢查前綴、`NODE_ENV=test`，寫入還要額外開關
+
+**臨時查正式資料前，先印出 `CURRENT_USER()` 並講清楚連到哪個叢集，再跑查詢。**
+唯讀 SELECT 不需要事先批准，任何寫入都要。
 
 ---
 
