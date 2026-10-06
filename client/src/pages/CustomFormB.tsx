@@ -29,7 +29,11 @@ import {
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
 import { getTarotTopicByOptionId } from "@shared/tarotPricing";
-import { TAROT_TOPIC_GROUPS, type TarotGroup } from "@shared/tarotRequirements";
+import {
+  TAROT_TOPIC_GROUPS,
+  getTarotGroupFields,
+  type TarotGroup,
+} from "@shared/tarotRequirements";
 
 const LINE_URL = "https://line.me/R/ti/p/@011tymeh";
 
@@ -298,45 +302,8 @@ function buildNote(tarot: TarotData, bracelet: BraceletData): string {
     `占卜主題：${tarot.topic}`,
   ];
 
-  const g = tarot.group;
-  if (g === "couple" || g === "friendship" || g === "past_life_2") {
-    tarotLines.push(`自己姓名：${tarot.selfName}`);
-    tarotLines.push(`自己西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`對方姓名：${tarot.partnerName}`);
-    tarotLines.push(`對方西元生日：${tarot.partnerBirthday}`);
-    if (g === "couple") tarotLines.push(`感情概況：${tarot.situation}`);
-    if (g === "friendship") tarotLines.push(`友情概況：${tarot.situation}`);
-    if (g === "past_life_2") tarotLines.push(`今生關係：${tarot.relationship}`);
-  } else if (g === "love_solo") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`感情概況：${tarot.situation}`);
-  } else if (g === "basic") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-  } else if (g === "startup") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`想創業的項目：${tarot.startupItem}`);
-  } else if (g === "career") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`工作概況：${tarot.situation}`);
-  } else if (g === "interview") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`面試公司及職位：${tarot.interviewTarget}`);
-  } else if (g === "dual_path") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`A 是：${tarot.optionA}`);
-    tarotLines.push(`B 是：${tarot.optionB}`);
-    tarotLines.push(`目前情況：${tarot.currentStatus}`);
-    tarotLines.push(`想占卜的原因：${tarot.reason}`);
-  } else if (g === "healing") {
-    tarotLines.push(`姓名：${tarot.selfName}`);
-    tarotLines.push(`西元生日：${tarot.selfBirthday}`);
-    tarotLines.push(`想療癒的內容：${tarot.healingContent}`);
+  for (const field of getTarotGroupFields(tarot.group)) {
+    tarotLines.push(`${field.noteLabel ?? field.label}：${tarot[field.key]}`);
   }
 
   const braceletLines = [
@@ -388,230 +355,38 @@ export default function CustomFormB() {
   // ── 塔羅資料欄位（依主題動態產生）────────────────────────────────────────
 
   function tarotDataFields() {
-    const g = tarot.group as TarotGroup;
-    const needsPartner =
-      g === "couple" || g === "friendship" || g === "past_life_2";
+    const fields = getTarotGroupFields(tarot.group as TarotGroup);
+    const inputClass =
+      "w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50";
+    const textareaClass =
+      "w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none";
 
     return (
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-body text-sf-muted mb-1.5">
-            {needsPartner ? "自己的姓名" : "姓名"}
-          </label>
-          <input
-            type="text"
-            value={tarot.selfName}
-            onChange={e => setTarot({ ...tarot, selfName: e.target.value })}
-            placeholder="請填寫真實姓名"
-            className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-body text-sf-muted mb-1.5">
-            {needsPartner ? "自己的西元生日" : "西元生日"}
-          </label>
-          <input
-            type="text"
-            value={tarot.selfBirthday}
-            onChange={e => setTarot({ ...tarot, selfBirthday: e.target.value })}
-            placeholder="例如：1995/08/22"
-            className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-          />
-        </div>
-
-        {needsPartner && (
-          <>
-            <div>
-              <label className="block text-xs font-body text-sf-muted mb-1.5">
-                對方的姓名
-              </label>
-              <input
-                type="text"
-                value={tarot.partnerName}
-                onChange={e =>
-                  setTarot({ ...tarot, partnerName: e.target.value })
-                }
-                placeholder="請填寫對方真實姓名"
-                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-body text-sf-muted mb-1.5">
-                對方的西元生日
-              </label>
-              <input
-                type="text"
-                value={tarot.partnerBirthday}
-                onChange={e =>
-                  setTarot({ ...tarot, partnerBirthday: e.target.value })
-                }
-                placeholder="例如：1993/03/15"
-                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-              />
-            </div>
-          </>
-        )}
-
-        {(g === "couple" || g === "love_solo") && (
-          <div>
+        {fields.map(field => (
+          <div key={field.key}>
             <label className="block text-xs font-body text-sf-muted mb-1.5">
-              感情概況
+              {field.label}
             </label>
-            <textarea
-              value={tarot.situation}
-              onChange={e => setTarot({ ...tarot, situation: e.target.value })}
-              placeholder="例如：目前的相處狀況、發生什麼事、為什麼想占卜……"
-              rows={4}
-              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
-            />
-          </div>
-        )}
-        {g === "friendship" && (
-          <div>
-            <label className="block text-xs font-body text-sf-muted mb-1.5">
-              友情概況
-            </label>
-            <textarea
-              value={tarot.situation}
-              onChange={e => setTarot({ ...tarot, situation: e.target.value })}
-              placeholder="例如：目前的相處狀況、發生什麼事、為什麼想占卜……"
-              rows={4}
-              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
-            />
-          </div>
-        )}
-        {g === "startup" && (
-          <div>
-            <label className="block text-xs font-body text-sf-muted mb-1.5">
-              想創業的項目
-            </label>
-            <input
-              type="text"
-              value={tarot.startupItem}
-              onChange={e =>
-                setTarot({ ...tarot, startupItem: e.target.value })
-              }
-              placeholder="例如：手作飾品、餐飲業……"
-              className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-            />
-          </div>
-        )}
-        {g === "career" && (
-          <div>
-            <label className="block text-xs font-body text-sf-muted mb-1.5">
-              工作概況
-            </label>
-            <textarea
-              value={tarot.situation}
-              onChange={e => setTarot({ ...tarot, situation: e.target.value })}
-              placeholder="例如：目前從事什麼工作、工作上有沒有發生什麼事、為什麼想占卜……"
-              rows={4}
-              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
-            />
-          </div>
-        )}
-        {g === "interview" && (
-          <div>
-            <label className="block text-xs font-body text-sf-muted mb-1.5">
-              面試的公司及職位
-            </label>
-            <input
-              type="text"
-              value={tarot.interviewTarget}
-              onChange={e =>
-                setTarot({ ...tarot, interviewTarget: e.target.value })
-              }
-              placeholder="例如：XX 公司，行銷專員"
-              className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-            />
-          </div>
-        )}
-        {g === "dual_path" && (
-          <>
-            <div>
-              <label className="block text-xs font-body text-sf-muted mb-1.5">
-                A 是什麼？
-              </label>
-              <input
-                type="text"
-                value={tarot.optionA}
-                onChange={e => setTarot({ ...tarot, optionA: e.target.value })}
-                placeholder="例如：繼續現在的工作"
-                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-body text-sf-muted mb-1.5">
-                B 是什麼？
-              </label>
-              <input
-                type="text"
-                value={tarot.optionB}
-                onChange={e => setTarot({ ...tarot, optionB: e.target.value })}
-                placeholder="例如：轉職到新公司"
-                className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-body text-sf-muted mb-1.5">
-                目前情況
-              </label>
+            {field.rows ? (
               <textarea
-                value={tarot.currentStatus}
-                onChange={e =>
-                  setTarot({ ...tarot, currentStatus: e.target.value })
-                }
-                placeholder="描述目前的狀況"
-                rows={3}
-                className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
+                value={tarot[field.key]}
+                onChange={e => setTarot({ ...tarot, [field.key]: e.target.value })}
+                placeholder={field.placeholder}
+                rows={field.rows}
+                className={textareaClass}
               />
-            </div>
-            <div>
-              <label className="block text-xs font-body text-sf-muted mb-1.5">
-                為什麼想占卜？
-              </label>
-              <textarea
-                value={tarot.reason}
-                onChange={e => setTarot({ ...tarot, reason: e.target.value })}
-                placeholder="說說您的想法"
-                rows={3}
-                className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
+            ) : (
+              <input
+                type="text"
+                value={tarot[field.key]}
+                onChange={e => setTarot({ ...tarot, [field.key]: e.target.value })}
+                placeholder={field.placeholder}
+                className={inputClass}
               />
-            </div>
-          </>
-        )}
-        {g === "healing" && (
-          <div>
-            <label className="block text-xs font-body text-sf-muted mb-1.5">
-              內心想療癒的內容
-            </label>
-            <textarea
-              value={tarot.healingContent}
-              onChange={e =>
-                setTarot({ ...tarot, healingContent: e.target.value })
-              }
-              placeholder="說說您想療癒的事情……"
-              rows={4}
-              className="w-full border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50 resize-none"
-            />
+            )}
           </div>
-        )}
-        {g === "past_life_2" && (
-          <div>
-            <label className="block text-xs font-body text-sf-muted mb-1.5">
-              今生關係
-            </label>
-            <input
-              type="text"
-              value={tarot.relationship}
-              onChange={e =>
-                setTarot({ ...tarot, relationship: e.target.value })
-              }
-              placeholder="例如：戀人、朋友、同事……"
-              className="w-full border border-sf-line-strong px-4 py-2.5 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-            />
-          </div>
-        )}
+        ))}
       </div>
     );
   }
@@ -777,61 +552,10 @@ export default function CustomFormB() {
   // ── 驗證 ──────────────────────────────────────────────────────────────────
 
   function validateTarotData(): boolean {
-    const g = tarot.group as TarotGroup;
-    if (!tarot.selfName.trim()) {
-      toast.error("請填寫姓名");
-      return false;
-    }
-    if (!tarot.selfBirthday.trim()) {
-      toast.error("請填寫西元生日");
-      return false;
-    }
-    const needsPartner =
-      g === "couple" || g === "friendship" || g === "past_life_2";
-    if (needsPartner) {
-      if (!tarot.partnerName.trim()) {
-        toast.error("請填寫對方姓名");
-        return false;
-      }
-      if (!tarot.partnerBirthday.trim()) {
-        toast.error("請填寫對方西元生日");
-        return false;
-      }
-    }
-    if (
-      (g === "couple" ||
-        g === "love_solo" ||
-        g === "friendship" ||
-        g === "career") &&
-      !tarot.situation.trim()
-    ) {
-      toast.error("請填寫概況說明");
-      return false;
-    }
-    if (g === "startup" && !tarot.startupItem.trim()) {
-      toast.error("請填寫想創業的項目");
-      return false;
-    }
-    if (g === "interview" && !tarot.interviewTarget.trim()) {
-      toast.error("請填寫面試公司及職位");
-      return false;
-    }
-    if (g === "dual_path") {
-      if (!tarot.optionA.trim() || !tarot.optionB.trim()) {
-        toast.error("請填寫 A 和 B 的選項");
-        return false;
-      }
-      if (!tarot.currentStatus.trim()) {
-        toast.error("請填寫目前情況");
-        return false;
-      }
-    }
-    if (g === "healing" && !tarot.healingContent.trim()) {
-      toast.error("請填寫想療癒的內容");
-      return false;
-    }
-    if (g === "past_life_2" && !tarot.relationship.trim()) {
-      toast.error("請填寫今生關係");
+    for (const field of getTarotGroupFields(tarot.group as TarotGroup)) {
+      if (!field.errorMessage) continue;
+      if (tarot[field.key].trim()) continue;
+      toast.error(field.errorMessage);
       return false;
     }
     return true;

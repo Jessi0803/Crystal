@@ -157,6 +157,19 @@ export async function createAtmHomeDeliveryOrder(page: Page, email: string) {
   return page.url().split("/order/")[1]?.split("?")[0] ?? "";
 }
 
+/**
+ * 商品頁價目表的分類分頁。要選的主題不在預設分頁時得先切換。
+ * key 去掉空白，因為商品頁寫「前世今生 2」、表單寫「前世今生2」。
+ */
+const TAROT_TOPIC_TAB: Record<string, string> = {
+  戀愛指南: "感情關係", 感情復合: "感情關係", 緣來暗戀: "感情關係",
+  旺桃花運: "感情關係", 友情可貴: "感情關係", 雙向之路: "感情關係",
+  財富密碼: "財富職涯", 創業衝衝: "財富職涯", 職涯探索: "財富職涯", 面試勝經: "財富職涯",
+  進化人生: "人生療癒", 心靈療癒: "人生療癒", 守護神: "人生療癒",
+  前世今生3: "前世流年", 前世今生2: "前世流年", 前世今生1: "前世流年",
+  流年運勢3: "前世流年", 流年運勢1: "前世流年", 流年運勢2: "前世流年",
+};
+
 export async function addCustomDepositToCart(
   page: Page,
   productId: string,
@@ -167,8 +180,11 @@ export async function addCustomDepositToCart(
   await page.goto(`/products/${productId}`);
   await expect(page.getByRole("heading", { name: productName })).toBeVisible({ timeout: 30_000 });
   if (options.tarotTopic) {
-    if (options.tarotTopic === "財富密碼") {
-      await page.getByRole("button", { name: "財富職涯", exact: true }).click();
+    const tab = TAROT_TOPIC_TAB[options.tarotTopic.replace(/\s+/g, "")];
+    if (!tab) throw new Error(`未知的塔羅主題：${options.tarotTopic}`);
+    // 第一個分類是預設開啟的，不用點
+    if (tab !== "感情關係") {
+      await page.getByRole("button", { name: tab, exact: true }).click();
     }
     await page.getByRole("button", { name: new RegExp(options.tarotTopic) }).click();
   }

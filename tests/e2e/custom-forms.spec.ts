@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addCustomDepositToCart, addPureCustomDepositToCart, fillProfileCustomOrderForm, fillPureCustomOrderForm, fillTarotCustomOrderForm, loginAsAdminByCookie, proceedToCheckoutFromCart, submitAtmCustomDepositCheckout } from "./helpers";
+import { addCustomDepositToCart, addPureCustomDepositToCart, fillProfileCustomOrderForm, fillPureCustomOrderForm, fillTarotCustomOrderForm, loginAsAdminByCookie, openPendingCustomOrderForm, proceedToCheckoutFromCart, submitAtmCustomDepositCheckout } from "./helpers";
+import { TAROT_GROUP_SPEC, type TarotGroup } from "../../shared/tarotRequirements";
 
 const customProducts = [
   { path: "/custom/form", id: "custom-deposit-product", name: "客製化商品" },
@@ -47,6 +48,46 @@ test("pure custom flow pays first, submits the form, and exposes it to admin", a
   await expect(page.locator("body")).toContainText("這次最想為自己調整的是：感情、工作");
   await expect(page.locator("body")).toContainText("Instagram 帳號 / LINE ID：e2e_line_id");
 });
+
+// 每個欄位組合挑一個代表主題；名稱用商品頁價目表的寫法（「前世今生 2」有空格）。
+// single_q（單題制）不在價目表裡、也不開放透過表單下單，所以沒有代表主題。
+const TAROT_GROUP_SAMPLES: { group: TarotGroup; topic: string }[] = [
+  { group: "couple", topic: "戀愛指南" },
+  { group: "love_solo", topic: "旺桃花運" },
+  { group: "basic", topic: "財富密碼" },
+  { group: "startup", topic: "創業衝衝" },
+  { group: "career", topic: "職涯探索" },
+  { group: "interview", topic: "面試勝經" },
+  { group: "dual_path", topic: "雙向之路" },
+  { group: "friendship", topic: "友情可貴" },
+  { group: "healing", topic: "心靈療癒" },
+  { group: "past_life_2", topic: "前世今生 2" },
+];
+
+test("每個欄位組合都有代表主題可以測（single_q 除外）", () => {
+  const covered = new Set(TAROT_GROUP_SAMPLES.map((sample) => sample.group));
+  const missing = Object.keys(TAROT_GROUP_SPEC).filter(
+    (group) => group !== "single_q" && !covered.has(group as TarotGroup)
+  );
+  expect(missing, "新增欄位組合時請一併補上代表主題").toEqual([]);
+});
+
+for (const { group, topic } of TAROT_GROUP_SAMPLES) {
+  test(`塔羅表單欄位：${topic}（${group}）與 TAROT_GROUP_SPEC 一致`, async ({ page }) => {
+    const fields = TAROT_GROUP_SPEC[group].fields;
+    const orderNo = await createCustomDepositOrder(page, customProducts[1], `e2e-${group}`, topic);
+    await openPendingCustomOrderForm(page, orderNo, customProducts[1].name);
+
+    const section = page.locator("section").filter({ hasText: "占卜所需資料" });
+    // 順序也要對：欄位是照 spec 的陣列順序渲染的
+    await expect(section.locator("label")).toHaveText(fields.map((field) => field.label));
+    // rows 有值的渲染成 textarea，其餘是單行 input
+    await expect(section.locator("textarea")).toHaveCount(fields.filter((field) => field.rows).length);
+    await expect(section.locator('input[type="text"]')).toHaveCount(
+      fields.filter((field) => !field.rows).length
+    );
+  });
+}
 
 test("paid custom form still rejects a wrist size below 13 cm", async ({ page }) => {
   const orderNo = await createCustomDepositOrder(page, customProducts[0], "e2e-invalid-wrist");
