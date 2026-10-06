@@ -34,7 +34,8 @@ pnpm run test:e2e      # playwright
 - **本機 dev server 連的是正式資料庫**（port 3000）。任何寫入操作先問過再做。
   要在本機點流程又不想碰正式資料，用 `node scripts/dev-test-db.mjs`（port 3200）。
 - **分辨正式／測試資料庫，只能看使用者前綴**（見下方）。
-- **Branch**：目前工作提交到 `feature/storefront-refresh`，**沒有明確指示就不要 merge 回 `main`**。
+- **Branch**：目前直接在 `main` 開發。**push 到 `main` 會觸發 Vercel 正式部署，每次都要先確認。**
+  `feature/storefront-refresh` 已於 2026-10 全數合併，不再使用。
 - **前台樣式**：全站樣式集中在 `client/src/index.css`，前台靠 `html.storefront` scope，後台維持原本風格。不要為了前台改動而影響後台。
 
 ### 怎麼分辨連到的是正式還是測試資料庫
