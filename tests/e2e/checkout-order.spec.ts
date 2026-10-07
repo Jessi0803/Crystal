@@ -12,6 +12,23 @@ async function updateExpandedAdminOrderStatus(page: Page, status: string, expect
   await expect(page.locator("body")).toContainText(expectedText);
 }
 
+test("登入會員時購買人姓名不自動帶入，Email 仍帶入", async ({ page }) => {
+  // buyerName 會成為綠界的 ReceiverName，超商取貨要核對證件。
+  // 自動帶入會員名稱（常是暱稱或 LINE 顯示名稱）會讓顧客直接送出而領不到貨。
+  await loginAsUserByCookie(page);
+  await goToCheckoutWithSeededBracelet(page);
+
+  const nameInput = page.locator('input[placeholder="請輸入真實姓名"]');
+  await expect(nameInput).toBeVisible({ timeout: 30_000 });
+  await expect(nameInput).toHaveValue("");
+  // Email 的自動帶入要保留：會員中心的訂單比對靠 userId 與 buyerEmail
+  await expect(page.locator('input[type="email"]').first()).toHaveValue("e2e-user@example.com");
+  await expect(page.getByText("姓名（請填寫證件上的姓名）")).toBeVisible();
+  await expect(
+    page.getByText("此姓名會作為收件人；為避免影響取件，請填寫與取件證件相符的姓名。")
+  ).toBeVisible();
+});
+
 test("checkout validates required domestic home delivery fields", async ({ page }) => {
   await goToCheckoutWithSeededBracelet(page);
 

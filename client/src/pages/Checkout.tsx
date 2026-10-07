@@ -207,19 +207,20 @@ export default function Checkout() {
     }
   }, [selectedCouponId, appliedCoupon, myCoupons.length]);
 
-  // 已登入時帶入帳號 Email／姓名，避免與會員中心訂單比對不一致
+  // 已登入時帶入帳號 Email，避免與會員中心訂單比對不一致
+  //
+  // 姓名刻意不帶入：buyerName 會成為綠界的 ReceiverName（見 server/routers/order.ts
+  // 的 normalizeReceiverName），超商取貨要核對證件。會員名稱常是暱稱或 LINE 顯示名稱，
+  // 自動帶入會讓顧客直接送出而領不到貨。會員中心的訂單比對只看 userId 與 buyerEmail
+  // （server/memberOrderAccess.ts），不看姓名，所以不帶入不影響比對。
   useEffect(() => {
     const email = sessionUser?.email;
     if (!email) return;
     setForm(f => ({
       ...f,
       buyerEmail: f.buyerEmail.trim() === "" ? email : f.buyerEmail,
-      buyerName:
-        f.buyerName.trim() === "" && sessionUser?.name?.trim()
-          ? sessionUser.name.trim()
-          : f.buyerName,
     }));
-  }, [sessionUser?.email, sessionUser?.name]);
+  }, [sessionUser?.email]);
 
   // 套用綠界回傳的門市資訊
   const cvsWindowRef = useRef<Window | null>(null);
@@ -735,9 +736,12 @@ export default function Checkout() {
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs tracking-widest font-body text-sf-text mb-2">
-                    姓名 <span className="text-red-400">*</span>
+                  <label className="block text-xs tracking-widest font-body text-sf-text mb-1">
+                    姓名（請填寫證件上的姓名） <span className="text-red-400">*</span>
                   </label>
+                  <p className="text-xs font-body text-sf-muted mb-2 leading-relaxed">
+                    此姓名會作為收件人；為避免影響取件，請填寫與取件證件相符的姓名。
+                  </p>
                   <input
                     type="text"
                     placeholder="請輸入真實姓名"
