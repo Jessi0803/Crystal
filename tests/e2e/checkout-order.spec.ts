@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createAtmHomeDeliveryOrder, fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet, loginAsAdminByCookie, loginAsUserByCookie, uploadTransferReceipt } from "./helpers";
+import { createAtmHomeDeliveryOrder, fillDomesticHomeCheckout, goToCheckoutWithSeededBracelet, login, loginAsAdminByCookie, loginAsUserByCookie, uploadTransferReceipt } from "./helpers";
 
 async function openAdminOrder(page: Page, merchantTradeNo: string) {
   await page.goto("/admin/orders");
