@@ -477,7 +477,7 @@ export default function CustomFormB() {
     }] : []),
     {
       title: "配件與佩戴偏好",
-      subtitle: `請選擇${spec.preferenceFields.length > 2 ? "鬆緊、金銀飾、銀管珠框、扣具與吊飾" : "配件"}偏好`,
+      subtitle: spec.preferenceStepSubtitle,
       required: true,
       field: (
         <CustomFormBraceletPreferenceFields
@@ -671,6 +671,7 @@ export default function CustomFormB() {
           <div className="space-y-5 mb-8">
             <CustomFormOrderingIntro
               itemLabel={spec.label}
+            fixedNotes={spec.fixedNotes}
               formStepDescription={spec.formStepDescription}
               showClaspRules={asksClasp}
             />

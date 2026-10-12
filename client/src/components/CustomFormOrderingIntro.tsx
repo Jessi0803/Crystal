@@ -9,6 +9,8 @@ import { CircleAlert } from "lucide-react";
  */
 interface CustomFormOrderingIntroProps {
   itemLabel?: string;
+  /** 這個規格的固定條件（例如項鍊的 45 公分、僅金飾），商品頁與表單都要顯示 */
+  fixedNotes?: string[];
   /** 訂購流程第 2 步要客人提供什麼 */
   formStepDescription?: string;
   showClaspRules?: boolean;
@@ -16,6 +18,7 @@ interface CustomFormOrderingIntroProps {
 
 export default function CustomFormOrderingIntro({
   itemLabel = "手鍊",
+  fixedNotes = [],
   formStepDescription = "提供手圍、喜歡金飾或銀飾，並確認設計需求",
   showClaspRules = true,
 }: CustomFormOrderingIntroProps) {
@@ -30,6 +33,19 @@ export default function CustomFormOrderingIntro({
       >
         訂購流程與{itemLabel}注意事項
       </h2>
+
+      {fixedNotes.length > 0 && (
+        <div className="border-b border-sf-line pb-6 mb-6">
+          <p className="text-[0.7rem] tracking-[0.14em] font-body text-sf-text mb-3 font-medium">
+            本款的固定規格
+          </p>
+          <ul className="space-y-1.5 text-sm font-body font-light text-sf-text leading-relaxed">
+            {fixedNotes.map(note => (
+              <li key={note}>・{note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="border-b border-sf-line pb-6 mb-6">
         <p className="text-[0.7rem] tracking-[0.14em] font-body text-sf-text mb-3 font-medium">

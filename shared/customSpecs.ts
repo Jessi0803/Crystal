@@ -45,6 +45,8 @@ export type CustomSpec = {
   selectorNote: string;
   /** 客製表單開頭「訂購流程」第 2 步要客人提供什麼 */
   formStepDescription: string;
+  /** 客製表單「配件與佩戴偏好」那一步的副標 */
+  preferenceStepSubtitle: string;
 };
 
 export const CUSTOM_SPECS: Record<CustomSpecCode, CustomSpec> = {
@@ -64,6 +66,7 @@ export const CUSTOM_SPECS: Record<CustomSpecCode, CustomSpec> = {
     asksWristSize: true,
     selectorNote: "可選鬆緊、扣具與配件",
     formStepDescription: "提供手圍、喜歡金飾或銀飾，並確認設計需求",
+    preferenceStepSubtitle: "請選擇鬆緊、金銀飾、銀管珠框、扣具與吊飾偏好",
   },
   necklace: {
     code: "necklace",
@@ -74,6 +77,7 @@ export const CUSTOM_SPECS: Record<CustomSpecCode, CustomSpec> = {
     asksWristSize: false,
     selectorNote: "長度 45 公分・金飾款",
     formStepDescription: "確認水晶顏色、功效與配件需求",
+    preferenceStepSubtitle: "請選擇銀管與吊飾偏好",
   },
   pendant: {
     code: "pendant",
@@ -84,6 +88,7 @@ export const CUSTOM_SPECS: Record<CustomSpecCode, CustomSpec> = {
     asksWristSize: false,
     selectorNote: "可選金飾或銀飾",
     formStepDescription: "選擇金飾或銀飾，並確認水晶顏色與功效需求",
+    preferenceStepSubtitle: "請選擇金銀飾與中間主墜偏好",
   },
 };
 
