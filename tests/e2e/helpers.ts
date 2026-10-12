@@ -358,7 +358,7 @@ export async function fillProfileCustomOrderForm(
 }
 
 export async function fillTarotCustomOrderForm(page: Page, orderNo: string) {
-  await openPendingCustomOrderForm(page, orderNo, "塔羅 × 水晶手鍊客製化商品");
+  await openPendingCustomOrderForm(page, orderNo, "塔羅 × 水晶客製化商品");
   await page.locator('input[placeholder="請填寫真實姓名"]').fill("E2E 塔羅客戶");
   await page.locator('input[placeholder="例如：1995/08/22"]').fill("1993/03/15");
   await selectCustomFormChoice(page

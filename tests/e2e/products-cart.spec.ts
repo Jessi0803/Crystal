@@ -53,7 +53,7 @@ async function ensureCustomDepositProducts() {
     },
     {
       id: "tarot-crystal-deposit-product",
-      name: "塔羅 × 水晶手鍊客製化商品",
+      name: "塔羅 × 水晶客製化商品",
       subtitle: "塔羅 × 水晶手鍊客製化服務訂金下單專用",
       price: 1399,
       priceRange: "手鍊 NT$1,500 ± NT$300｜塔羅依價目表 9 折",
@@ -65,7 +65,7 @@ async function ensureCustomDepositProducts() {
     },
     {
       id: "chakra-crystal-deposit-product",
-      name: "脈輪檢測 × 水晶手鍊客製化商品",
+      name: "脈輪檢測 × 水晶客製化商品",
       subtitle: "脈輪檢測 × 水晶手鍊客製化服務訂金下單專用",
       price: 1000,
       priceRange: "手鍊 NT$1,500 ± NT$300｜脈輪檢測 NT$500",
@@ -77,7 +77,7 @@ async function ensureCustomDepositProducts() {
     },
     {
       id: "numerology-crystal-deposit-product",
-      name: "生命靈數 × 水晶手鍊客製化商品",
+      name: "生命靈數 × 水晶客製化商品",
       subtitle: "生命靈數 × 水晶手鍊客製化服務訂金下單專用",
       price: 1000,
       priceRange: "手鍊 NT$1,500 ± NT$300｜生命靈數解析 NT$500",
@@ -277,9 +277,9 @@ test("product grid quick action sends custom deposits to detail before cart", as
   await ensureCustomDepositProducts();
   const customProducts = [
     { id: "custom-deposit-product", name: "客製化商品" },
-    { id: "tarot-crystal-deposit-product", name: "塔羅 × 水晶手鍊客製化商品" },
-    { id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶手鍊客製化商品" },
-    { id: "numerology-crystal-deposit-product", name: "生命靈數 × 水晶手鍊客製化商品" },
+    { id: "tarot-crystal-deposit-product", name: "塔羅 × 水晶客製化商品" },
+    { id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶客製化商品" },
+    { id: "numerology-crystal-deposit-product", name: "生命靈數 × 水晶客製化商品" },
   ];
 
   for (const product of customProducts) {

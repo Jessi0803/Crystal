@@ -4,9 +4,9 @@ import { TAROT_GROUP_SPEC, type TarotGroup } from "../../shared/tarotRequirement
 
 const customProducts = [
   { path: "/custom/form", id: "custom-deposit-product", name: "客製化商品" },
-  { path: "/custom/form-b", id: "tarot-crystal-deposit-product", name: "塔羅 × 水晶手鍊客製化商品" },
-  { path: "/custom/form-c", id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶手鍊客製化商品" },
-  { path: "/custom/form-d", id: "numerology-crystal-deposit-product", name: "生命靈數 × 水晶手鍊客製化商品" },
+  { path: "/custom/form-b", id: "tarot-crystal-deposit-product", name: "塔羅 × 水晶客製化商品" },
+  { path: "/custom/form-c", id: "chakra-crystal-deposit-product", name: "脈輪檢測 × 水晶客製化商品" },
+  { path: "/custom/form-d", id: "numerology-crystal-deposit-product", name: "生命靈數 × 水晶客製化商品" },
 ] as const;
 
 async function expectConsultationNoteInAdmin(page: Page, orderNo: string, expectedText: string) {
@@ -44,7 +44,7 @@ test("pure custom flow pays first, submits the form, and exposes it to admin", a
   await expect(page.getByRole("heading", { name: "接下來，告訴我們你的故事。" })).toBeVisible();
 
   await fillPureCustomOrderForm(page, orderNo, { focusChoices: ["感情", "工作"] });
-  await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶飾品諮詢表單】");
   await expect(page.locator("body")).toContainText("這次最想為自己調整的是：感情、工作");
   await expect(page.locator("body")).toContainText("Instagram 帳號 / LINE ID：e2e_line_id");
 });
@@ -128,7 +128,7 @@ test("chakra custom flow submits its post-payment form", async ({ page }) => {
   const orderNo = await createCustomDepositOrder(page, customProducts[2], "e2e-chakra");
   await fillProfileCustomOrderForm(page, orderNo, customProducts[2].name, "E2E 脈輪客戶", "19");
 
-  await expectConsultationNoteInAdmin(page, orderNo, "【脈輪檢測 × 水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(page, orderNo, "【脈輪檢測 × 水晶飾品諮詢表單】");
   await expect(page.locator("body")).toContainText("E2E 脈輪客戶");
 });
 
@@ -136,7 +136,7 @@ test("numerology custom flow submits its post-payment form", async ({ page }) =>
   const orderNo = await createCustomDepositOrder(page, customProducts[3], "e2e-numerology");
   await fillProfileCustomOrderForm(page, orderNo, customProducts[3].name, "E2E 靈數客戶", "13");
 
-  await expectConsultationNoteInAdmin(page, orderNo, "【生命靈數 × 水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(page, orderNo, "【生命靈數 × 水晶飾品諮詢表單】");
   await expect(page.locator("body")).toContainText("E2E 靈數客戶");
 });
 
@@ -149,8 +149,8 @@ test("multiple custom products in one order require and retain one form per item
   await fillPureCustomOrderForm(page, orderNo);
   await fillProfileCustomOrderForm(page, orderNo, customProducts[3].name, "E2E 多客製靈數客戶", "14");
 
-  await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶手鍊諮詢表單】");
-  await expect(page.locator("body")).toContainText("【生命靈數 × 水晶手鍊諮詢表單】");
+  await expectConsultationNoteInAdmin(page, orderNo, "【純客製水晶飾品諮詢表單】");
+  await expect(page.locator("body")).toContainText("【生命靈數 × 水晶飾品諮詢表單】");
   await expect(page.locator("body")).toContainText("E2E 多客製靈數客戶");
 });
 

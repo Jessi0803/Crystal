@@ -1,4 +1,4 @@
-// 椛˙Crystal — 塔羅 × 水晶手鍊報名表單
+// 椛˙Crystal — 塔羅 × 水晶飾品報名表單
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
@@ -649,7 +649,7 @@ export default function CustomFormB() {
           </Link>
           <div>
             <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase">
-              塔羅 × 水晶手鍊
+              塔羅 × 水晶{spec.label}
             </p>
             <p className="text-sm font-body font-medium text-sf-ink">
               報名表單
@@ -821,7 +821,7 @@ export default function CustomFormB() {
                   className="bg-white border border-sf-line rounded-md p-6 sm:p-8"
                 >
                   <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase mb-2">
-                    水晶手鍊偏好
+                    水晶{spec.label}偏好
                   </p>
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <h2

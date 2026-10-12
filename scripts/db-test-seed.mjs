@@ -147,7 +147,7 @@ const products = [
   },
   {
     id: "tarot-crystal-deposit-product",
-    name: "塔羅 × 水晶手鍊客製化商品",
+    name: "塔羅 × 水晶客製化商品",
     subtitle: "塔羅 × 水晶手鍊客製化服務訂金下單專用",
     category: "custom",
     categoryLabel: "客製化",
@@ -176,7 +176,7 @@ const products = [
   },
   {
     id: "chakra-crystal-deposit-product",
-    name: "脈輪檢測 × 水晶手鍊客製化商品",
+    name: "脈輪檢測 × 水晶客製化商品",
     subtitle: "脈輪檢測 × 水晶手鍊客製化服務訂金下單專用",
     category: "custom",
     categoryLabel: "客製化",
@@ -205,7 +205,7 @@ const products = [
   },
   {
     id: "numerology-crystal-deposit-product",
-    name: "生命靈數 × 水晶手鍊客製化商品",
+    name: "生命靈數 × 水晶客製化商品",
     subtitle: "生命靈數 × 水晶手鍊客製化服務訂金下單專用",
     category: "custom",
     categoryLabel: "客製化",

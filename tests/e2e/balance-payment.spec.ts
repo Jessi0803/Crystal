@@ -267,7 +267,7 @@ test("custom deposit order can receive a balance payment link and submit ATM bal
 
   await page.goto("/admin/orders");
   await page.locator("button").filter({ hasText: depositOrderNo }).click();
-  await expect(page.locator("body")).toContainText("【純客製水晶手鍊諮詢表單】");
+  await expect(page.locator("body")).toContainText("【純客製水晶飾品諮詢表單】");
 
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("請輸入商品尾款金額");

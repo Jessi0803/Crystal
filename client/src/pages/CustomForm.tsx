@@ -1,4 +1,4 @@
-// 椛˙Crystal — 純客製水晶手鍊報名表單頁面
+// 椛˙Crystal — 純客製水晶飾品報名表單頁面
 import { useState } from "react";
 import { Check, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
@@ -64,7 +64,7 @@ const EMPTY_FORM: FormData = {
 
 function buildNote(form: FormData, spec: CustomSpec): string {
   return [
-    "【純客製水晶手鍊諮詢表單】",
+    "【純客製水晶飾品諮詢表單】",
     `規格：${spec.label}`,
     "",
     `這次最想為自己調整的是：${formatCustomFocusNote(form.focus, form.focusStory)}`,
@@ -306,7 +306,7 @@ export default function CustomForm() {
           </Link>
           <div>
             <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase">
-              純客製水晶手鍊
+              純客製水晶{spec.label}
             </p>
             <p className="text-sm font-body font-medium text-sf-ink">
               報名表單

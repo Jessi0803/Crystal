@@ -544,8 +544,8 @@ export default function ProductDetail() {
             <p className="text-sm font-body font-light text-sf-text mb-6 leading-relaxed">
               {product.category === "custom"
                 ? ({
-                    "custom-deposit-product": "依您的功效需求，量身打造專屬能量水晶手鍊",
-                    "tarot-crystal-deposit-product": "透過塔羅解析能量缺口，為您設計最契合當下的水晶手鍊",
+                    "custom-deposit-product": "依您的功效需求，量身打造專屬能量水晶飾品",
+                    "tarot-crystal-deposit-product": "透過塔羅解析能量缺口，為您設計最契合當下的水晶飾品",
                     "chakra-crystal-deposit-product": "以靈擺與塔羅測出七脈輪狀態，用水晶補足能量缺口",
                     "numerology-crystal-deposit-product": "從出生年月日找出缺數，以水晶能量精準補足天賦",
                   } as Record<string, string>)[product.id]

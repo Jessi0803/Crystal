@@ -17,10 +17,10 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
-  CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
   type CustomDepositProductId,
 } from "@/lib/customOrderingContent";
+import { CUSTOM_SPEC_PRICE_SUMMARY } from "@shared/customSpecs";
 import { useCart } from "@/contexts/CartContext";
 import { products } from "@/lib/data";
 import { toast } from "sonner";
@@ -30,8 +30,8 @@ const LINE_URL = CUSTOM_LINE_URL;
 const plans = [
   {
     id: "A",
-    title: "純客製水晶手鍊",
-    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`],
+    title: "純客製水晶飾品",
+    priceLines: [CUSTOM_SPEC_PRICE_SUMMARY],
     icon: <Gem className="w-5 h-5" />,
     features: [
       "可提供想要的功效、色系、款式",
@@ -45,8 +45,8 @@ const plans = [
   },
   {
     id: "B",
-    title: "塔羅 × 水晶手鍊",
-    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`, "塔羅價格：依價目表 9 折"],
+    title: "塔羅 × 水晶飾品",
+    priceLines: [CUSTOM_SPEC_PRICE_SUMMARY, "塔羅價格：依價目表 9 折"],
     priceNote: "各塔羅方案價格在表單內說明",
     icon: <Sparkles className="w-5 h-5" />,
     features: [
@@ -62,8 +62,8 @@ const plans = [
   },
   {
     id: "C",
-    title: "脈輪檢測 × 水晶手鍊",
-    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`, "脈輪檢測價格：NT$500"],
+    title: "脈輪檢測 × 水晶飾品",
+    priceLines: [CUSTOM_SPEC_PRICE_SUMMARY, "脈輪檢測價格：NT$500"],
     icon: <Zap className="w-5 h-5" />,
     features: [
       "使用塔羅、靈擺，連結你的能量與高我對談，逐一分析七大脈輪個別能量。店家會提供一份文字訊息報告，並透過此檢測分析出缺失的脈輪能量進行水晶搭配。",
@@ -77,8 +77,8 @@ const plans = [
   },
   {
     id: "D",
-    title: "生命靈數 × 水晶手鍊",
-    priceLines: [`手鍊價格：${CUSTOM_BRACELET_PRICE_DISPLAY}`, "生命靈數解析價格：NT$500"],
+    title: "生命靈數 × 水晶飾品",
+    priceLines: [CUSTOM_SPEC_PRICE_SUMMARY, "生命靈數解析價格：NT$500"],
     icon: <Fingerprint className="w-5 h-5" />,
     features: [
       "透過你的生命數、天賦數、星座數、先天數，去找到你的空缺數，並透過你的生命靈數與空缺數去搭配水晶，增強優勢，改善缺點",

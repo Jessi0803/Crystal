@@ -1,4 +1,4 @@
-// 椛˙Crystal — 生命靈數 × 水晶手鍊報名表單
+// 椛˙Crystal — 生命靈數 × 水晶飾品報名表單
 import { useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { Link } from "wouter";
@@ -68,7 +68,7 @@ const EMPTY_FORM: FormData = {
 
 function buildNote(form: FormData, spec: CustomSpec): string {
   return [
-    "【生命靈數 × 水晶手鍊諮詢表單】",
+    "【生命靈數 × 水晶飾品諮詢表單】",
     `規格：${spec.label}`,
     "",
     `姓名：${form.name || "（未填）"}`,
@@ -356,7 +356,7 @@ export default function CustomFormD() {
           </Link>
           <div>
             <p className="text-[0.6rem] tracking-[0.2em] text-sf-muted uppercase">
-              生命靈數 × 水晶手鍊
+              生命靈數 × 水晶{spec.label}
             </p>
             <p className="text-sm font-body font-medium text-sf-ink">
               報名表單

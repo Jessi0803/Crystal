@@ -108,3 +108,6 @@ export const PENDANT_CENTERPIECE_COPY = {
   note: "中間主墜",
   choiceLabel: "中間主墜",
 } as const;
+
+/** /custom 方案卡與商品小卡用的價格摘要；實際價格在商品頁選規格時才顯示 */
+export const CUSTOM_SPEC_PRICE_SUMMARY = "手鍊／項鍊／吊飾三種規格可選";
