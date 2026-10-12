@@ -29,6 +29,38 @@ test("登入會員時購買人姓名不自動帶入，Email 仍帶入", async ({
   ).toBeVisible();
 });
 
+test("訪客沒有存取憑證時，訂單頁只打一次 getOrder 就顯示 Email 驗證表單", async ({ page }) => {
+  // 回歸：getOrder 回 401 時若沿用 React Query 預設的 retry 與固定輪詢，
+  // 一次開頁會連打 4 次以上，正式站的 order-access 額度（8 次 / 15 分鐘）
+  // 幾秒內就被打爆變成 429，畫面也一直卡在「查詢訂單中…」。
+  //
+  // 注意：playwright.config.ts 設了 E2E_RATE_LIMIT_MULTIPLIER=50，
+  // 所以 e2e 重現不了 429，這裡改成直接數請求次數——那才是修正真正改掉的行為。
+  const email = `e2e-guest-verify-${Date.now()}@example.com`;
+  const orderNo = await createAtmHomeDeliveryOrder(page, email);
+
+  // 模擬換一台裝置／清過快取：結帳時存下的 accessToken 不在了
+  await page.evaluate(() => localStorage.clear());
+
+  let getOrderCalls = 0;
+  page.on("request", req => {
+    if (req.url().includes("order.getOrder")) getOrderCalls += 1;
+  });
+
+  await page.goto(`/order/${orderNo}`);
+  await expect(page.getByText("驗證訪客訂單", { exact: true })).toBeVisible({ timeout: 15_000 });
+
+  // 停在驗證畫面不該繼續輪詢
+  await page.waitForTimeout(12_000);
+  expect(getOrderCalls, "未授權時不應重試或輪詢").toBeLessThanOrEqual(2);
+
+  // 輸入正確 Email 後要看得到訂單
+  await page.getByPlaceholder("訂購 Email").fill(email);
+  await page.getByRole("button", { name: "驗證並查看訂單" }).click();
+  await expect(page.locator("body")).toContainText(orderNo);
+  await expect(page.locator("body")).toContainText("訂單資訊");
+});
+
 test("checkout validates required domestic home delivery fields", async ({ page }) => {
   await goToCheckoutWithSeededBracelet(page);
 

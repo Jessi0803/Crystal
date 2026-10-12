@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  ShieldCheck,
   ArrowRight,
   Package,
   Banknote,
@@ -71,7 +72,15 @@ export default function OrderResult() {
     },
     {
       enabled: !!merchantTradeNo,
-      refetchInterval: 5000,
+      // 訪客在新裝置開訂單連結時 localStorage 沒有 accessToken，getOrder 會回 401。
+      // 若沿用 React Query 的預設 retry: 3 加上固定輪詢，查詢永遠不會結束，
+      // isLoading 就一直是 true，畫面卡在「查詢訂單中…」而走不到下面的 Email
+      // 驗證表單；每次重試還會吃掉 order-access 的失敗額度（8 次 / 15 分鐘），
+      // 幾秒內就被 429 擋住。所以未授權時不重試、也不再輪詢。
+      retry: (failureCount, err) =>
+        err.data?.code !== "UNAUTHORIZED" && failureCount < 2,
+      // 輪詢是為了等金流回調更新狀態，只對已經看得到訂單的人有意義
+      refetchInterval: query => (query.state.error ? false : 5000),
     }
   );
 
@@ -284,7 +293,12 @@ export default function OrderResult() {
     const requiresVerification = error?.data?.code === "UNAUTHORIZED";
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-        <XCircle className="w-12 h-12 text-red-400 mb-4" />
+        {/* 需要驗證不是錯誤，用紅色叉叉會讓客人誤以為訂單不存在 */}
+        {requiresVerification ? (
+          <ShieldCheck className="w-12 h-12 text-sf-accent mb-4" />
+        ) : (
+          <XCircle className="w-12 h-12 text-red-400 mb-4" />
+        )}
         <p
           className="text-xl mb-2"
           style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 300 }}
