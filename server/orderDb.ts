@@ -517,6 +517,22 @@ export async function getOrderByMerchantTradeNo(merchantTradeNo: string) {
   return order ?? null;
 }
 
+/**
+ * 訂單裡只給店家看的欄位，不能跟著顧客端的回應送出去。
+ *
+ * - adminNote：後台內部備註（正式站目前有 5 筆訂單存了內容）
+ * - customFormToken：整個專案沒有任何地方讀它，是遺留欄位
+ *
+ * 顧客端有兩個出口都要套：order.getOrder 與 member.myOrders。
+ * 後台走 order.getOrderDetail（adminProcedure），不受影響。
+ */
+export function toCustomerFacingOrder<T extends { adminNote?: unknown; customFormToken?: unknown }>(
+  order: T
+): Omit<T, "adminNote" | "customFormToken"> {
+  const { adminNote: _adminNote, customFormToken: _customFormToken, ...rest } = order;
+  return rest;
+}
+
 export async function getOrderWithItems(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1882,7 +1898,6 @@ export async function getOrdersForMember(opts: { userId?: number | null; email?:
         shippingAddress: orders.shippingAddress,
         transferLastFive: orders.transferLastFive,
         transferReceiptUrl: orders.transferReceiptUrl,
-        adminNote: orders.adminNote,
         ecpayNotifyData: orders.ecpayNotifyData,
         paidAt: orders.paidAt,
         confirmedAt: orders.confirmedAt,

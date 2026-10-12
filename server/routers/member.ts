@@ -19,7 +19,7 @@ import { resolveMemberIdentity } from "../memberOrderAccess";
 import { sdk } from "../_core/sdk";
 import * as crypto from "crypto";
 import * as db from "../db";
-import { getOrdersForMember } from "../orderDb";
+import { getOrdersForMember, toCustomerFacingOrder } from "../orderDb";
 import { birthdayFromUser, validateBirthday } from "@shared/birthday";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
 
@@ -305,6 +305,10 @@ export const memberRouter = router({
     // 未驗證的 Email 不可用來比對訪客訂單，避免冒用他人 Email 註冊後看到對方訂單；
     // 規則與顧客評價資格共用 memberOrderAccess
     const identity = await resolveMemberIdentity(ctx.user);
-    return getOrdersForMember({ userId: identity.userId, email: identity.verifiedEmail });
+    const memberOrders = await getOrdersForMember({
+      userId: identity.userId,
+      email: identity.verifiedEmail,
+    });
+    return memberOrders.map(toCustomerFacingOrder);
   }),
 });

@@ -12,6 +12,8 @@ vi.mock("./db", () => ({
 
 vi.mock("./orderDb", () => ({
   getOrdersForMember: vi.fn(),
+  // 真實實作只是剝掉 adminNote / customFormToken，mock 直接原樣回傳即可
+  toCustomerFacingOrder: (order: unknown) => order,
 }));
 
 vi.mock("./email", () => ({

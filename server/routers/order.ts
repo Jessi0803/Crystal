@@ -17,6 +17,7 @@ import {
 import {
   createOrder,
   getOrderWithItems,
+  toCustomerFacingOrder,
   getAdminOrderDetail,
   getAdminOrderSummaries,
   updateOrderTransferLastFive,
@@ -1237,7 +1238,7 @@ export const orderRouter = router({
       }
       assertOrderAccess(order, ctx, input);
       return {
-        ...order,
+        ...toCustomerFacingOrder(order),
         paymentSandbox: usePaymentSandbox,
       };
     }),

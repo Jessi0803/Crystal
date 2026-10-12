@@ -61,6 +61,49 @@ test("訪客沒有存取憑證時，訂單頁只打一次 getOrder 就顯示 Ema
   await expect(page.locator("body")).toContainText("訂單資訊");
 });
 
+test("getOrder 不把後台內部欄位送給顧客", async ({ page, request }) => {
+  // adminNote 是店家自己的備註，連通過驗證的本人都不該看到；
+  // customFormToken 則是整個專案都沒讀過的遺留欄位。
+  const email = `e2e-no-admin-note-${Date.now()}@example.com`;
+  const orderNo = await createAtmHomeDeliveryOrder(page, email);
+
+  const input = encodeURIComponent(
+    JSON.stringify({ 0: { json: { merchantTradeNo: orderNo, buyerEmail: email } } })
+  );
+  const res = await request.get(`/api/trpc/order.getOrder?batch=1&input=${input}`);
+  expect(res.status()).toBe(200);
+  const order = (await res.json())[0].result.data.json;
+
+  // 先確認真的拿到這筆訂單，否則下面的斷言會因為查不到而假性通過
+  expect(order.merchantTradeNo).toBe(orderNo);
+  expect(order.buyerEmail).toBe(email);
+
+  expect(Object.keys(order), "adminNote 不可以出現在顧客端回應").not.toContain("adminNote");
+  expect(Object.keys(order), "customFormToken 不可以出現在顧客端回應").not.toContain("customFormToken");
+});
+
+test("會員中心的訂單列表也不帶後台內部欄位", async ({ page, request }) => {
+  // getOrder 與 member.myOrders 是顧客端的兩個出口，兩邊都要剝乾淨
+  const email = `e2e-member-no-admin-note-${Date.now()}@example.com`;
+  await createAtmHomeDeliveryOrder(page, email);
+  await loginAsUserByCookie(page);
+
+  const cookies = await page.context().cookies();
+  const res = await request.get(
+    `/api/trpc/member.myOrders?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: { json: null, meta: { values: ["undefined"] } } }))}`,
+    { headers: { cookie: cookies.map(c => `${c.name}=${c.value}`).join("; ") } }
+  );
+  expect(res.status()).toBe(200);
+  const orders = (await res.json())[0].result.data.json;
+  expect(Array.isArray(orders), "應該拿到訂單陣列").toBe(true);
+  expect(orders.length, "測試會員要有訂單，否則下面的斷言會假性通過").toBeGreaterThan(0);
+
+  for (const order of orders) {
+    expect(Object.keys(order)).not.toContain("adminNote");
+    expect(Object.keys(order)).not.toContain("customFormToken");
+  }
+});
+
 test("checkout validates required domestic home delivery fields", async ({ page }) => {
   await goToCheckoutWithSeededBracelet(page);
 
