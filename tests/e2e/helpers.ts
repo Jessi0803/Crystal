@@ -174,11 +174,15 @@ export async function addCustomDepositToCart(
   page: Page,
   productId: string,
   productName: string,
-  options: { proceedToCheckout?: boolean; tarotTopic?: string } = {},
+  options: { proceedToCheckout?: boolean; tarotTopic?: string; spec?: "手鍊" | "項鍊" | "吊飾" } = {},
 ) {
   const { proceedToCheckout = true } = options;
   await page.goto(`/products/${productId}`);
   await expect(page.getByRole("heading", { name: productName })).toBeVisible({ timeout: 30_000 });
+  if (options.spec) {
+    // 規格按鈕的可及名稱是「品項 + 價格區間」，所以用開頭比對
+    await page.getByRole("button", { name: new RegExp(`^${options.spec}`) }).click();
+  }
   if (options.tarotTopic) {
     const tab = TAROT_TOPIC_TAB[options.tarotTopic.replace(/\s+/g, "")];
     if (!tab) throw new Error(`未知的塔羅主題：${options.tarotTopic}`);
@@ -200,16 +204,30 @@ export async function addPureCustomDepositToCart(page: Page, options: { proceedT
   await addCustomDepositToCart(page, "custom-deposit-product", "客製化商品", options);
 }
 
-export async function openPendingCustomOrderForm(page: Page, orderNo: string, productName: string) {
+export async function openPendingCustomOrderForm(
+  page: Page,
+  orderNo: string,
+  productName: string,
+  // 項鍊與吊飾規格沒有手圍欄位，改用第一個步驟標題確認表單已經開啟
+  options: { hasWristSize?: boolean } = {},
+) {
+  const { hasWristSize = true } = options;
   await page.goto(`/order/${orderNo}`);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible({ timeout: 30_000 });
   await dialog.getByRole("button").filter({ hasText: productName }).first().click();
-  const wristInput = page.locator('input[type="number"]').first();
-  await expect(wristInput).toBeVisible({ timeout: 30_000 });
-  await expect(wristInput).toHaveAttribute("min", "13");
-  await expect(wristInput).toHaveAttribute("max", "19");
-  await expect(wristInput).toHaveAttribute("step", "0.5");
+  if (hasWristSize) {
+    const wristInput = page.locator('input[type="number"]').first();
+    await expect(wristInput).toBeVisible({ timeout: 30_000 });
+    await expect(wristInput).toHaveAttribute("min", "13");
+    await expect(wristInput).toHaveAttribute("max", "19");
+    await expect(wristInput).toHaveAttribute("step", "0.5");
+  } else {
+    await expect(
+      page.getByRole("heading", { name: /這次最想為自己調整的是？/ })
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('input[type="number"]')).toHaveCount(0);
+  }
   await expect(page.locator("body")).not.toContainText("想一併選擇其他客製化嗎？");
 }
 
@@ -255,6 +273,38 @@ export async function fillPureCustomOrderForm(
     await expect(page).toHaveURL(/\/custom\/form\?/);
     return;
   }
+  await submitCustomOrderForm(page, orderNo);
+}
+
+/** 項鍊規格：沒有手圍／鬆緊／扣具／金銀飾，只問銀管與吊飾 */
+export async function fillNecklaceSpecCustomOrderForm(
+  page: Page,
+  orderNo: string,
+  productName: string,
+  customerName = "E2E 項鍊客戶",
+) {
+  await openPendingCustomOrderForm(page, orderNo, productName, { hasWristSize: false });
+  await expect(page.getByRole("heading", { name: "訂購流程與項鍊注意事項" })).toBeVisible();
+  // 項鍊沒有扣具可換，開頭說明不該出現手鍊才有的加價規則
+  await expect(page.locator("body")).not.toContainText("龍蝦扣款");
+
+  // 脈輪／生命靈數方案還是要姓名與生日
+  const nameInput = page.locator('input[placeholder="請填寫真實姓名"]');
+  if (await nameInput.count()) {
+    await nameInput.fill(customerName);
+    await page.locator('input[placeholder="例如：1995/08/22"]').fill("1994/06/18");
+  }
+  await selectCustomFormChoice(page
+    .locator("section").filter({ hasText: "這次最想為自己調整的是？" })
+    .getByRole("button", { name: "沒有想法，交給設計師", exact: true }));
+  await selectCustomFormChoice(page
+    .locator("section").filter({ hasText: "希望整體設計？" })
+    .getByRole("button", { name: "沒有想法，交給設計師", exact: true }));
+  await selectCustomFormChoice(
+    page.getByText("銀管", { exact: true }).locator("..").getByRole("button", { name: "要", exact: true })
+  );
+  await selectCustomFormChoice(page.getByRole("button", { name: "不要吊飾", exact: true }));
+  await page.getByLabel("Instagram 帳號 / LINE ID").fill("e2e_spec_necklace");
   await submitCustomOrderForm(page, orderNo);
 }
 

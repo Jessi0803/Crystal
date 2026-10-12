@@ -10,10 +10,10 @@ import { products as staticProducts } from "@/lib/data";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { CUSTOM_SPEC_LIST, CUSTOM_SPECS, DEFAULT_CUSTOM_SPEC_CODE, type CustomSpecCode } from "@shared/customSpecs";
 import ClaspDurabilityNotice from "@/components/ClaspDurabilityNotice";
 import {
   CUSTOM_BRACELET_DEPOSIT,
-  CUSTOM_BRACELET_PRICE_DISPLAY,
   CUSTOM_LINE_URL,
   isCustomDepositProduct,
 } from "@/lib/customOrderingContent";
@@ -175,6 +175,8 @@ export default function ProductDetail() {
   const [selectedWristSize, setSelectedWristSize] = useState("14");
   const [selectedClaspType, setSelectedClaspType] = useState<"elastic" | "lobster" | "magnetic">("elastic");
   const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState("");
+  // 客製方案的規格（手鍊／項鍊／吊飾）。預設手鍊，與改版前的唯一選項一致。
+  const [selectedSpecCode, setSelectedSpecCode] = useState<CustomSpecCode>(DEFAULT_CUSTOM_SPEC_CODE);
   const [selectedWristSizeSelections, setSelectedWristSizeSelections] = useState<Record<string, string>>({});
   const [hasSelectedClasp, setHasSelectedClasp] = useState(false);
   const [showWristMeasureGuide, setShowWristMeasureGuide] = useState(false);
@@ -335,6 +337,11 @@ export default function ProductDetail() {
   const originalCurrentPrice = originalBasePrice + claspExtra;
   const hasCurrentPriceSale = currentPrice < originalCurrentPrice;
   const shouldShowCurrentPrice = hasTieredBraceletPricing || hasSelectedOptionWristSizePricing;
+  const isCustomDeposit = product.category === "custom";
+  const selectedSpec = CUSTOM_SPECS[selectedSpecCode];
+  // 訂金不隨規格改變（一律 500 或 500＋解析費），只有本體價格區間會變
+  const customItemPriceDisplay = selectedSpec.priceDisplay;
+  const customItemLabel = selectedSpec.label;
   const isBasicCustomDepositProduct = product.id === "custom-deposit-product";
   const isChakraDepositProduct = product.id === "chakra-crystal-deposit-product";
   const isNumerologyDepositProduct = product.id === "numerology-crystal-deposit-product";
@@ -410,6 +417,7 @@ export default function ProductDetail() {
               unitPrice: currentPrice,
               purchaseOptionId: selectedPurchaseOption?.id,
               purchaseOptionLabel: selectedPurchaseOption?.label,
+              specCode: isCustomDeposit ? selectedSpecCode : undefined,
               wristSize: isComboPurchaseOption ? undefined : selectedWristSize,
               wristSizeSelections,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
@@ -424,6 +432,7 @@ export default function ProductDetail() {
               purchaseOptionLabel: isTarotDepositProduct
                 ? selectedTarotTopic?.label
                 : selectedPurchaseOption?.label,
+              specCode: isCustomDeposit ? selectedSpecCode : undefined,
               claspType: hasClaspOption ? effectiveSelectedClaspType : undefined,
               fitPreference: hasFitPreferenceOption ? selectedFitPreference : undefined,
               isPreorder: isPreorderItem,
@@ -543,6 +552,47 @@ export default function ProductDetail() {
                 : product.subtitle}
             </p>
 
+            {/* 客製方案的規格：同一個方案可以做成手鍊／項鍊／吊飾，訂金相同、本體價格不同 */}
+            {isCustomDeposit && (
+              <div className="mb-6">
+                <p className="text-[0.7rem] tracking-[0.12em] font-body text-sf-text mb-2">
+                  選擇規格
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {CUSTOM_SPEC_LIST.map(spec => {
+                    const isActive = spec.code === selectedSpecCode;
+                    return (
+                      <button
+                        type="button"
+                        key={spec.code}
+                        onClick={() => setSelectedSpecCode(spec.code)}
+                        aria-pressed={isActive}
+                        className={`rounded-md px-3 py-3 text-xs font-body border transition-colors text-left ${
+                          isActive
+                            ? "border-sf-accent bg-sf-selected text-sf-ink"
+                            : "border-sf-line-strong text-sf-muted hover:border-sf-accent/50"
+                        }`}
+                      >
+                        <span className="block text-sm font-medium mb-0.5">{spec.label}</span>
+                        <span className="block text-[0.68rem] leading-snug opacity-80">
+                          {spec.priceDisplay}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedSpec.fixedNotes.length > 0 && (
+                  <ul className="mt-3 space-y-1">
+                    {selectedSpec.fixedNotes.map(note => (
+                      <li key={note} className="text-xs font-body text-sf-muted leading-relaxed">
+                        ・{note}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
             {/* Price */}
             <div className="flex flex-col gap-1.5 mb-8 pb-8 border-b border-sf-line">
               {shouldShowCurrentPrice ? (
@@ -566,13 +616,13 @@ export default function ProductDetail() {
                   {isTarotDepositProduct ? (
                     <div className="space-y-5">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
+                        <CustomPriceTile label={`${customItemLabel}價格`} value={customItemPriceDisplay} />
                         <CustomPriceTile label="塔羅價格" value="價目表 9 折" note="各塔羅方案可於下方切換查看" />
                       </div>
                       <CustomPriceTile
                         label="本次付款金額"
                         value={selectedTarotTopic ? `NT$${currentPrice.toLocaleString()}` : "請先選擇占卜主題"}
-                        note="此金額包含手鍊訂金與所選塔羅方案；付款後主題不可更換"
+                        note={`此金額包含${customItemLabel}訂金與所選塔羅方案；付款後主題不可更換`}
                       />
                       <div className="bg-sf-cream border border-sf-line px-4 py-4 sm:px-5 sm:py-5">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-3">
@@ -720,13 +770,13 @@ export default function ProductDetail() {
                     </div>
                   ) : isBasicCustomDepositProduct ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
+                      <CustomPriceTile label={`${customItemLabel}價格`} value={customItemPriceDisplay} />
                       <CustomPriceTile label="訂金" value="NT$500" note="尾款由店家確認後另行通知" />
                     </div>
                   ) : splitCustomFeeLabel ? (
                     <div className="space-y-3">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <CustomPriceTile label="手鍊價格" value={CUSTOM_BRACELET_PRICE_DISPLAY} />
+                        <CustomPriceTile label={`${customItemLabel}價格`} value={customItemPriceDisplay} />
                         <CustomPriceTile
                           label={splitCustomFeeLabel}
                           value={`NT$${splitCustomReadingFee.toLocaleString()}`}
@@ -736,7 +786,7 @@ export default function ProductDetail() {
                       <CustomPriceTile
                         label="訂金"
                         value={`NT$${product.price.toLocaleString()}`}
-                        note={`${splitCustomFeeName} NT$${splitCustomReadingFee.toLocaleString()} ＋ 客製手鍊訂金 NT$${CUSTOM_BRACELET_DEPOSIT.toLocaleString()}；尾款由店家確認後另行通知`}
+                        note={`${splitCustomFeeName} NT$${splitCustomReadingFee.toLocaleString()} ＋ 客製${customItemLabel}訂金 NT$${CUSTOM_BRACELET_DEPOSIT.toLocaleString()}；尾款由店家確認後另行通知`}
                       />
                     </div>
                   ) : (

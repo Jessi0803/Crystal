@@ -28,6 +28,7 @@ import {
   CustomFormAccessGate,
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
+import { PENDANT_CENTERPIECE_COPY, type CustomSpec } from "@shared/customSpecs";
 import { getTarotTopicByOptionId } from "@shared/tarotPricing";
 import {
   TAROT_TOPIC_GROUPS,
@@ -294,9 +295,10 @@ const EMPTY_BRACELET: BraceletData = {
   igHandle: "",
 };
 
-function buildNote(tarot: TarotData, bracelet: BraceletData): string {
+function buildNote(tarot: TarotData, bracelet: BraceletData, spec: CustomSpec): string {
   const tarotLines = [
-    "【塔羅 × 水晶手鍊諮詢表單】",
+    "【塔羅 × 水晶客製化諮詢表單】",
+    `規格：${spec.label}`,
     "",
     "── 塔羅占卜資料 ──",
     `占卜主題：${tarot.topic}`,
@@ -308,12 +310,17 @@ function buildNote(tarot: TarotData, bracelet: BraceletData): string {
 
   const braceletLines = [
     "",
-    "── 水晶手鍊偏好 ──",
+    `── 水晶${spec.label}偏好 ──`,
     `這次最想為自己調整的是：${formatCustomFocusNote(bracelet.focus, bracelet.focusStory)}`,
     `喜歡 / 不喜歡的顏色：${bracelet.colorPreference || "無特別指定"}`,
     `希望整體設計：${formatCustomDesignStyleNote(bracelet.designStyle)}`,
-    `手圍：${bracelet.wristSize ? `${bracelet.wristSize} cm` : "（未填）"}`,
-    ...formatCustomBraceletPreferenceLines(bracelet),
+    ...(spec.asksWristSize
+      ? [`手圍：${bracelet.wristSize ? `${bracelet.wristSize} cm` : "（未填）"}`]
+      : spec.fixedNotes.map(note => `規格說明：${note}`)),
+    ...formatCustomBraceletPreferenceLines(bracelet, {
+      fields: spec.preferenceFields,
+      copy: spec.code === "pendant" ? { pendantCharm: PENDANT_CENTERPIECE_COPY } : undefined,
+    }),
     `最後想告訴設計師的內容：${bracelet.specialRequests || "無"}`,
     `Instagram 帳號 / LINE ID：${bracelet.igHandle || "（未填）"}`,
   ];
@@ -329,6 +336,8 @@ export default function CustomFormB() {
   const formSubmission = useCustomFormSubmission(
     "tarot-crystal-deposit-product"
   );
+  const spec = formSubmission.spec;
+  const asksClasp = spec.preferenceFields.includes("claspType");
   const paidTopic = getTarotTopicByOptionId(
     formSubmission.matchingOrderItem?.purchaseOptionId
   );
@@ -438,7 +447,8 @@ export default function CustomFormB() {
         />
       ),
     },
-    {
+    // 只有手鍊要問手圍；項鍊是固定長度、吊飾沒有尺寸
+    ...(spec.asksWristSize ? [{
       title: "手圍",
       subtitle: "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減",
       required: true,
@@ -464,15 +474,17 @@ export default function CustomFormB() {
           </p>
         </div>
       ),
-    },
+    }] : []),
     {
       title: "配件與佩戴偏好",
-      subtitle: "請選擇鬆緊、金銀飾、銀管珠框、扣具與吊飾偏好",
+      subtitle: `請選擇${spec.preferenceFields.length > 2 ? "鬆緊、金銀飾、銀管珠框、扣具與吊飾" : "配件"}偏好`,
       required: true,
       field: (
         <CustomFormBraceletPreferenceFields
           value={bracelet}
           onChange={updates => setBracelet({ ...bracelet, ...updates })}
+          fields={spec.preferenceFields}
+          copy={spec.code === "pendant" ? { pendantCharm: PENDANT_CENTERPIECE_COPY } : undefined}
         />
       ),
     },
@@ -575,15 +587,20 @@ export default function CustomFormB() {
       toast.error("請選擇希望整體設計");
       return false;
     }
-    if (!bracelet.wristSize) {
-      toast.error("請填寫手圍尺寸");
-      return false;
+    if (spec.asksWristSize) {
+      if (!bracelet.wristSize) {
+        toast.error("請填寫手圍尺寸");
+        return false;
+      }
+      if (!isValidCustomWristSize(bracelet.wristSize)) {
+        toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
+        return false;
+      }
     }
-    if (!isValidCustomWristSize(bracelet.wristSize)) {
-      toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
-      return false;
-    }
-    const preferenceError = validateCustomBraceletPreferences(bracelet);
+    const preferenceError = validateCustomBraceletPreferences(bracelet, {
+      fields: spec.preferenceFields,
+      copy: spec.code === "pendant" ? { pendantCharm: PENDANT_CENTERPIECE_COPY } : undefined,
+    });
     if (preferenceError) {
       toast.error(preferenceError);
       return false;
@@ -605,7 +622,7 @@ export default function CustomFormB() {
     if (tarot.group === "single_q") return;
     if (!validateTarotData()) return;
     if (!validateBraceletData()) return;
-    const customConsultationNote = buildNote(tarot, bracelet);
+    const customConsultationNote = buildNote(tarot, bracelet, spec);
     try {
       await formSubmission.submitCustomNote(customConsultationNote);
     } catch (err) {
@@ -652,7 +669,11 @@ export default function CustomFormB() {
       >
         <div className="max-w-2xl mx-auto px-4 py-8">
           <div className="space-y-5 mb-8">
-            <CustomFormOrderingIntro />
+            <CustomFormOrderingIntro
+              itemLabel={spec.label}
+              formStepDescription={spec.formStepDescription}
+              showClaspRules={asksClasp}
+            />
             <section className="bg-white border border-sf-line rounded-md p-6 sm:p-8">
               <h2
                 className="text-xl font-medium text-sf-ink mb-3"

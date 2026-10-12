@@ -84,10 +84,12 @@ import {
 } from "@shared/overseasAddress";
 import { calcCheckoutFees } from "@shared/checkoutFees";
 import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID, CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { CUSTOM_SPEC_CODES, resolveCustomSpec } from "@shared/customSpecs";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 import {
   getTarotDepositPrice,
   getTarotTopicByOptionId,
+  tarotTopicOptionId,
   TAROT_DEPOSIT_PRODUCT_ID,
 } from "@shared/tarotPricing";
 import { createOrderAccessToken, verifyOrderAccessToken } from "../orderAccess";
@@ -296,6 +298,8 @@ const CartItemSchema = z.object({
   baseProductId: z.string().optional(),
   purchaseOptionId: z.string().optional(),
   purchaseOptionLabel: z.string().optional(),
+  // 客製方案的規格。不走 purchaseOptionId，理由見 shared/customSpecs。
+  specCode: z.enum(CUSTOM_SPEC_CODES).optional(),
   wristSize: z.string().optional(),
   wristSizeSelections: z.array(z.object({
     id: z.string(),
@@ -413,6 +417,8 @@ function formatOrderItemWristSize(wristSize: number) {
 
 function buildOrderItemName(input: {
   productName: string;
+  /** 客製規格排在最前面，後台一眼看到要做什麼品項 */
+  specLabel?: string | null;
   purchaseOptionLabel?: string | null;
   wristSize?: number | null;
   wristSizeSelections?: { label: string; wristSize: number }[];
@@ -420,6 +426,7 @@ function buildOrderItemName(input: {
   fitPreference?: CheckoutItem["fitPreference"];
 }) {
   const details = [
+    input.specLabel,
     input.purchaseOptionLabel,
     input.wristSize == null ? null : `手圍 ${formatOrderItemWristSize(input.wristSize)}cm`,
     ...(input.wristSizeSelections ?? []).map(
@@ -434,6 +441,7 @@ function buildOrderItemName(input: {
 
 function buildOrderItemConfigurationSnapshot(input: {
   productName: string;
+  spec?: { code: string; label: string } | null;
   purchaseOption?: { id: string; label: string } | null;
   wristSizes?: { key: string; label: string; value: number }[];
   claspType?: CheckoutItem["claspType"];
@@ -454,6 +462,7 @@ function buildOrderItemConfigurationSnapshot(input: {
   return {
     version: 1,
     baseProductName: input.productName,
+    spec: input.spec ?? null,
     purchaseOption: input.purchaseOption ?? null,
     wristSizes: (input.wristSizes ?? []).map((wristSize) => ({
       ...wristSize,
@@ -520,6 +529,10 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]): Promise<Norm
   return items.map((item) => {
     const productId = item.baseProductId ?? item.id;
     const product = productById.get(productId);
+    // 客製方案的規格由伺服器用共用定義收斂，不信任前端傳來的值；
+    // 舊訂單與非客製商品沒有規格，resolveCustomSpec 會退回手鍊。
+    const customSpec = product?.category === "custom" ? resolveCustomSpec(item.specCode) : null;
+    const specDetail = customSpec ? { code: customSpec.code, label: customSpec.label } : null;
     if (productId === TAROT_DEPOSIT_PRODUCT_ID) {
       const topic = getTarotTopicByOptionId(item.purchaseOptionId);
       if (!product || product.active === false || !topic) {
@@ -532,13 +545,21 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]): Promise<Norm
         ...item,
         name: buildOrderItemName({
           productName: product.name,
+          specLabel: specDetail?.label,
           purchaseOptionLabel: topic.label,
         }),
         price: getTarotDepositPrice(product.price, topic),
         image: item.image || product.image,
         purchaseOptionLabel: topic.label,
         purchaseOptionUsesOwnStock: false,
-        configurationSnapshot: null,
+        // 規格放 snapshot，塔羅主題仍佔著 purchaseOptionId，兩者不衝突
+        configurationSnapshot: buildOrderItemConfigurationSnapshot({
+          productName: product.name,
+          spec: specDetail,
+          purchaseOption: { id: tarotTopicOptionId(topic.id), label: topic.label },
+          basePrice: getTarotDepositPrice(product.price, topic),
+          claspSurcharge: 0,
+        }),
       };
     }
     if (!product || product.active === false) {
@@ -567,6 +588,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]): Promise<Norm
         baseProductId: product.id,
         name: buildOrderItemName({
           productName: product.name,
+          specLabel: specDetail?.label,
           wristSize,
           claspType: item.claspType,
           fitPreference,
@@ -575,6 +597,7 @@ async function normalizePurchaseOptionItems(items: CheckoutItem[]): Promise<Norm
         image: product.image || item.image,
         configurationSnapshot: buildOrderItemConfigurationSnapshot({
           productName: product.name,
+          spec: specDetail,
           wristSizes: wristSize == null ? [] : [{ key: "wrist", label: "手圍", value: wristSize }],
           claspType: item.claspType,
           fitPreference,

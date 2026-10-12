@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addCustomDepositToCart, addPureCustomDepositToCart, fillProfileCustomOrderForm, fillPureCustomOrderForm, fillTarotCustomOrderForm, loginAsAdminByCookie, openPendingCustomOrderForm, proceedToCheckoutFromCart, submitAtmCustomDepositCheckout } from "./helpers";
+import { addCustomDepositToCart, fillNecklaceSpecCustomOrderForm, addPureCustomDepositToCart, fillProfileCustomOrderForm, fillPureCustomOrderForm, fillTarotCustomOrderForm, loginAsAdminByCookie, openPendingCustomOrderForm, proceedToCheckoutFromCart, submitAtmCustomDepositCheckout } from "./helpers";
 import { TAROT_GROUP_SPEC, type TarotGroup } from "../../shared/tarotRequirements";
 
 const customProducts = [
@@ -88,6 +88,25 @@ for (const { group, topic } of TAROT_GROUP_SAMPLES) {
     );
   });
 }
+
+test("選項鍊規格：訂單品名帶規格、表單不問手圍與扣具", async ({ page }) => {
+  // 同一個客製方案可以做手鍊／項鍊／吊飾，規格存在 configurationSnapshot，
+  // 不佔 purchaseOptionId（塔羅主題還在用那個欄位）。
+  await addCustomDepositToCart(page, customProducts[2].id, customProducts[2].name, { spec: "項鍊" });
+  const orderNo = await submitAtmCustomDepositCheckout(page, `e2e-spec-necklace-${Date.now()}@example.com`);
+
+  await fillNecklaceSpecCustomOrderForm(page, orderNo, customProducts[2].name);
+
+  await expectConsultationNoteInAdmin(page, orderNo, "規格：項鍊");
+  const body = page.locator("body");
+  await expect(body).toContainText("規格說明：長度固定 45 公分");
+  await expect(body).toContainText("加銀管：要");
+  // 訂單品名要帶規格，後台才知道要做什麼品項
+  await expect(body).toContainText("（項鍊）");
+  // 手鍊才有的欄位不可以出現
+  await expect(body).not.toContainText("鬆緊偏好");
+  await expect(body).not.toContainText("扣具");
+});
 
 test("paid custom form still rejects a wrist size below 13 cm", async ({ page }) => {
   const orderNo = await createCustomDepositOrder(page, customProducts[0], "e2e-invalid-wrist");

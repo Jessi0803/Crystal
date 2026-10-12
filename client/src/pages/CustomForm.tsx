@@ -28,6 +28,7 @@ import {
   CustomFormAccessGate,
   useCustomFormSubmission,
 } from "@/lib/customFormSubmission";
+import { PENDANT_CENTERPIECE_COPY, type CustomSpec } from "@shared/customSpecs";
 
 interface FormData {
   focus: CustomFocusChoice;
@@ -61,15 +62,21 @@ const EMPTY_FORM: FormData = {
   igHandle: "",
 };
 
-function buildNote(form: FormData): string {
+function buildNote(form: FormData, spec: CustomSpec): string {
   return [
     "【純客製水晶手鍊諮詢表單】",
+    `規格：${spec.label}`,
     "",
     `這次最想為自己調整的是：${formatCustomFocusNote(form.focus, form.focusStory)}`,
     `喜歡 / 不喜歡的顏色：${form.colorPreference || "無特別指定"}`,
     `希望整體設計：${formatCustomDesignStyleNote(form.designStyle)}`,
-    `手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`,
-    ...formatCustomBraceletPreferenceLines(form),
+    ...(spec.asksWristSize
+      ? [`手圍：${form.wristSize ? `${form.wristSize} cm` : "（未填）"}`]
+      : spec.fixedNotes.map(note => `規格說明：${note}`)),
+    ...formatCustomBraceletPreferenceLines(form, {
+      fields: spec.preferenceFields,
+      copy: spec.code === "pendant" ? { pendantCharm: PENDANT_CENTERPIECE_COPY } : undefined,
+    }),
     `最後想告訴設計師的內容：${form.specialRequests || "無"}`,
     `Instagram 帳號 / LINE ID：${form.igHandle || "（未填）"}`,
   ].join("\n");
@@ -78,6 +85,8 @@ function buildNote(form: FormData): string {
 export default function CustomForm() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const formSubmission = useCustomFormSubmission("custom-deposit-product");
+  const spec = formSubmission.spec;
+  const asksClasp = spec.preferenceFields.includes("claspType");
 
   const steps = [
     {
@@ -119,32 +128,37 @@ export default function CustomForm() {
         />
       ),
     },
-    {
-      title: "手圍",
-      subtitle:
-        "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減，我們會幫您調整鬆緊",
-      required: true,
-      field: (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              value={form.wristSize}
-              onChange={e => setForm({ ...form, wristSize: e.target.value })}
-              placeholder="例如：15.5"
-              step={CUSTOM_WRIST_SIZE_STEP}
-              min={CUSTOM_WRIST_SIZE_MIN}
-              max={CUSTOM_WRIST_SIZE_MAX}
-              className="w-48 border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50"
-            />
-            <span className="text-sm font-body text-sf-muted">cm</span>
-          </div>
-          <p className="text-xs font-body text-sf-muted leading-relaxed">
-            不知道怎麼量？拿皮尺平貼在想戴的位置，繞一圈的長度就是淨手圍。
-          </p>
-        </div>
-      ),
-    },
+    // 只有手鍊要問手圍；項鍊是固定長度、吊飾沒有尺寸
+    ...(spec.asksWristSize
+      ? [
+        {
+          title: "手圍",
+          subtitle:
+            "請用皮尺量淨手圍（cm），可選 13–19 cm，不需要自行加減，我們會幫您調整鬆緊",
+          required: true,
+          field: (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={form.wristSize}
+                  onChange={e => setForm({ ...form, wristSize: e.target.value })}
+                  placeholder="例如：15.5"
+                  step={CUSTOM_WRIST_SIZE_STEP}
+                  min={CUSTOM_WRIST_SIZE_MIN}
+                  max={CUSTOM_WRIST_SIZE_MAX}
+                  className="w-48 border border-sf-line-strong px-4 py-3 text-sm font-body focus:outline-none focus:border-sf-accent/50"
+                />
+                <span className="text-sm font-body text-sf-muted">cm</span>
+              </div>
+              <p className="text-xs font-body text-sf-muted leading-relaxed">
+                不知道怎麼量？拿皮尺平貼在想戴的位置，繞一圈的長度就是淨手圍。
+              </p>
+            </div>
+          ),
+        },
+        ]
+      : []),
     {
       title: "配件與佩戴偏好",
       subtitle: "請選擇鬆緊、金銀飾、銀管珠框、扣具與吊飾偏好",
@@ -153,6 +167,8 @@ export default function CustomForm() {
         <CustomFormBraceletPreferenceFields
           value={form}
           onChange={updates => setForm({ ...form, ...updates })}
+          fields={spec.preferenceFields}
+          copy={spec.code === "pendant" ? { pendantCharm: PENDANT_CENTERPIECE_COPY } : undefined}
         />
       ),
     },
@@ -242,15 +258,20 @@ export default function CustomForm() {
       toast.error("請選擇希望整體設計");
       return false;
     }
-    if (!form.wristSize) {
-      toast.error("請填寫手圍尺寸");
-      return false;
+    if (spec.asksWristSize) {
+      if (!form.wristSize) {
+        toast.error("請填寫手圍尺寸");
+        return false;
+      }
+      if (!isValidCustomWristSize(form.wristSize)) {
+        toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
+        return false;
+      }
     }
-    if (!isValidCustomWristSize(form.wristSize)) {
-      toast.error("手圍尺寸請輸入 13 至 19 cm（以 0.5 cm 為單位）");
-      return false;
-    }
-    const preferenceError = validateCustomBraceletPreferences(form);
+    const preferenceError = validateCustomBraceletPreferences(form, {
+      fields: spec.preferenceFields,
+      copy: spec.code === "pendant" ? { pendantCharm: PENDANT_CENTERPIECE_COPY } : undefined,
+    });
     if (preferenceError) {
       toast.error(preferenceError);
       return false;
@@ -264,7 +285,7 @@ export default function CustomForm() {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    const customConsultationNote = buildNote(form);
+    const customConsultationNote = buildNote(form, spec);
     try {
       await formSubmission.submitCustomNote(customConsultationNote);
     } catch (err) {
@@ -305,7 +326,11 @@ export default function CustomForm() {
       >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="space-y-5 mb-8">
-          <CustomFormOrderingIntro />
+          <CustomFormOrderingIntro
+            itemLabel={spec.label}
+            formStepDescription={spec.formStepDescription}
+            showClaspRules={asksClasp}
+          />
           {steps.map((item, index) => (
             <section
               key={item.title}

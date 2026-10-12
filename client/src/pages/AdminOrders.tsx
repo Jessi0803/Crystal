@@ -155,6 +155,7 @@ function getOrderItemConfigurationDisplay(snapshot: unknown) {
   const value = snapshot as {
     version?: unknown;
     baseProductName?: unknown;
+    spec?: { label?: unknown } | null;
     purchaseOption?: { label?: unknown } | null;
     wristSizes?: { label?: unknown; value?: unknown; unit?: unknown }[];
     clasp?: { label?: unknown } | null;
@@ -163,6 +164,10 @@ function getOrderItemConfigurationDisplay(snapshot: unknown) {
   if (value.version !== 1 || typeof value.baseProductName !== "string") return null;
 
   const details: string[] = [];
+  // 規格排最前面，店家一眼看到要做手鍊、項鍊還是吊飾
+  if (value.spec && typeof value.spec.label === "string") {
+    details.push(`規格：${value.spec.label}`);
+  }
   if (value.purchaseOption && typeof value.purchaseOption.label === "string") {
     details.push(`方案：${value.purchaseOption.label}`);
   }

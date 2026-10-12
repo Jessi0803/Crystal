@@ -193,6 +193,11 @@ export type OrderItemConfigurationSnapshot = {
   version: 1;
   baseProductName: string;
   purchaseOption: { id: string; label: string } | null;
+  /**
+   * 客製方案的規格（手鍊／項鍊／吊飾）。非客製商品與這之前的舊訂單為 null，
+   * 讀取端一律視為手鍊，見 shared/customSpecs 的 DEFAULT_CUSTOM_SPEC_CODE。
+   */
+  spec?: { code: string; label: string } | null;
   wristSizes: {
     key: string;
     label: string;

@@ -1,5 +1,6 @@
 // Crystal Aura — 購物車狀態管理
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import type { CustomSpecCode } from "@shared/customSpecs";
 import { Product } from "@/lib/data";
 
 // 購物車存進 sessionStorage：讓使用者在「同分頁跳轉去綠界選店」再回來時，
@@ -26,6 +27,8 @@ export interface CartItem {
   unitPrice: number;
   purchaseOptionId?: string;
   purchaseOptionLabel?: string;
+  /** 客製方案的規格（手鍊／項鍊／吊飾）；非客製商品為 undefined */
+  specCode?: CustomSpecCode;
   wristSize?: string;
   wristSizeSelections?: { id: string; label: string; value: string }[];
   claspType?: "elastic" | "lobster" | "magnetic";
@@ -38,6 +41,7 @@ type AddToCartOptions = {
   unitPrice?: number;
   purchaseOptionId?: string;
   purchaseOptionLabel?: string;
+  specCode?: CustomSpecCode;
   wristSize?: string;
   wristSizeSelections?: { id: string; label: string; value: string }[];
   claspType?: "elastic" | "lobster" | "magnetic";
@@ -82,7 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ? (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
       : "default";
     const wristSelectionKey = options?.wristSizeSelections?.map((selection) => `${selection.id}:${selection.value}`).join("|") ?? "default";
-    const itemId = `${product.id}-${options?.purchaseOptionId ?? "default"}-${options?.wristSize ?? "default"}-${wristSelectionKey}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
+    const itemId = `${product.id}-${options?.purchaseOptionId ?? "default"}-${options?.specCode ?? "default"}-${options?.wristSize ?? "default"}-${wristSelectionKey}-${options?.claspType ?? "default"}-${options?.fitPreference ?? "default"}-${unitPrice}-${consultationKey}`;
     setItems(prev => {
       const existing = prev.find(item => item.id === itemId);
       if (existing) {
@@ -101,6 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           unitPrice,
           purchaseOptionId: options?.purchaseOptionId,
           purchaseOptionLabel: options?.purchaseOptionLabel,
+          specCode: options?.specCode,
           wristSize: options?.wristSize,
           wristSizeSelections: options?.wristSizeSelections,
           claspType: options?.claspType,

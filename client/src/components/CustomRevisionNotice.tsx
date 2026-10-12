@@ -7,8 +7,21 @@ import { CUSTOM_REVISION_NOTICE } from "@/lib/customOrderingContent";
  * 商品詳細頁的「注意事項」分欄不走這裡——那邊顯示的是後台各商品自填的
  * product.disclaimer。
  */
-export default function CustomRevisionNotice() {
+interface CustomRevisionNoticeProps {
+  /** 項鍊與吊飾沒有扣具可換，要把「彈力繩改龍蝦扣／磁扣」那兩條與對應警語拿掉 */
+  showClaspRules?: boolean;
+}
+
+export default function CustomRevisionNotice({
+  showClaspRules = true,
+}: CustomRevisionNoticeProps) {
   const { title, lead, leadNote, groups, warning, footer } = CUSTOM_REVISION_NOTICE;
+  const visibleGroups = showClaspRules
+    ? groups
+    : groups.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !item.includes("彈力繩")),
+      }));
 
   return (
     <div className="space-y-4 text-[0.8125rem] font-body font-light leading-[1.8] tracking-wide text-sf-text">
@@ -19,7 +32,7 @@ export default function CustomRevisionNotice() {
         <p className="mt-1">{leadNote}</p>
       </div>
 
-      {groups.map((group) => (
+      {visibleGroups.map((group) => (
         <div key={group.heading}>
           <p className="mb-1 font-medium text-sf-text">{group.heading}</p>
           <ul className="ml-0.5 list-outside space-y-1 pl-4">
@@ -32,7 +45,9 @@ export default function CustomRevisionNotice() {
         </div>
       ))}
 
-      <p className="border-l-2 border-brand-peach pl-3 text-xs leading-relaxed">{warning}</p>
+      {showClaspRules && (
+        <p className="border-l-2 border-brand-peach pl-3 text-xs leading-relaxed">{warning}</p>
+      )}
 
       <p>{footer}</p>
     </div>

@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { CUSTOM_LINE_URL, type CustomDepositProductId } from "@/lib/customOrderingContent";
 import { getSavedOrderAccess } from "@/lib/orderAccess";
 import { extractCustomConsultationNote } from "@shared/customFormNote";
+import { resolveCustomSpec } from "@shared/customSpecs";
 
 export const RECENT_CUSTOM_FORM_SUBMISSION_TTL_MS = 2 * 60 * 1000;
 
@@ -91,10 +92,18 @@ export function useCustomFormSubmission(productId: CustomDepositProductId) {
     setLocation(`/order/${merchantTradeNo}`);
   };
 
+  // 規格決定這份表單要問哪些欄位。舊訂單的 snapshot 沒有 spec，
+  // resolveCustomSpec 會退回手鍊，與改版前的行為一致。
+  const spec = resolveCustomSpec(
+    (matchingOrderItem as { configurationSnapshot?: { spec?: { code?: string } | null } } | undefined)
+      ?.configurationSnapshot?.spec?.code
+  );
+
   return {
     merchantTradeNo,
     order,
     matchingOrderItem,
+    spec,
     isLoading: orderQuery.isLoading,
     isError: orderQuery.isError,
     canFillForm,

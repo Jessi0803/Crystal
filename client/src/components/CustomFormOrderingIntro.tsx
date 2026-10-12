@@ -3,9 +3,22 @@ import CustomRevisionNotice from "@/components/CustomRevisionNotice";
 import { CircleAlert } from "lucide-react";
 
 /**
- * 客製報名表單頂部：訂購流程 + 手鍊注意事項（與官網 /custom、商品詳情文案一致）
+ * 客製報名表單頂部：訂購流程 + 品項注意事項（與官網 /custom、商品詳情文案一致）
+ *
+ * 文案預設是手鍊；項鍊與吊飾沒有手圍與扣具，要用 itemLabel 與 formStepDescription 覆寫。
  */
-export default function CustomFormOrderingIntro() {
+interface CustomFormOrderingIntroProps {
+  itemLabel?: string;
+  /** 訂購流程第 2 步要客人提供什麼 */
+  formStepDescription?: string;
+  showClaspRules?: boolean;
+}
+
+export default function CustomFormOrderingIntro({
+  itemLabel = "手鍊",
+  formStepDescription = "提供手圍、喜歡金飾或銀飾，並確認設計需求",
+  showClaspRules = true,
+}: CustomFormOrderingIntroProps) {
   return (
     <section className="bg-gradient-to-b from-sf-cream to-white border border-sf-line rounded-md p-6 sm:p-8 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]">
       <p className="text-[0.62rem] tracking-[0.22em] font-body text-brand-blush uppercase mb-1">
@@ -15,7 +28,7 @@ export default function CustomFormOrderingIntro() {
         className="text-lg sm:text-xl font-medium text-sf-ink mb-6 leading-snug"
         style={{ fontFamily: "'Noto Sans TC', sans-serif" }}
       >
-        訂購流程與手鍊注意事項
+        訂購流程與{itemLabel}注意事項
       </h2>
 
       <div className="border-b border-sf-line pb-6 mb-6">
@@ -24,7 +37,7 @@ export default function CustomFormOrderingIntro() {
         </p>
         <ol className="ml-0.5 list-outside list-decimal space-y-2.5 pl-5 text-sm font-body font-light text-sf-text leading-[1.75] marker:font-medium marker:text-brand-blush">
           <li>支付訂金。</li>
-          <li>填寫報名表單，提供手圍、喜歡金飾或銀飾，並確認設計需求。</li>
+          <li>填寫報名表單，{formStepDescription}。</li>
           <li>
             加入
             <a
@@ -37,7 +50,7 @@ export default function CustomFormOrderingIntro() {
             </a>
             ，等待設計師傳送水晶搭配圖。
           </li>
-          <li>手鍊與設計確認完成後，將提供尾款報價。</li>
+          <li>{itemLabel}與設計確認完成後，將提供尾款報價。</li>
           <li>尾款支付完畢，準備出貨。</li>
         </ol>
         <p className="mt-4 border-l-2 border-brand-peach pl-3 text-xs font-body leading-relaxed text-sf-text">
@@ -48,9 +61,9 @@ export default function CustomFormOrderingIntro() {
       <div className="rounded-md border border-sf-line bg-sf-cream px-4 py-4 sm:px-5 sm:py-5">
         <p className="text-sm font-body text-sf-text mb-3 flex items-center gap-2 tracking-wide font-medium">
           <CircleAlert className="h-4 w-4 text-brand-blush" strokeWidth={1.6} aria-hidden="true" />
-          手鍊注意事項
+          {itemLabel}注意事項
         </p>
-        <CustomRevisionNotice />
+        <CustomRevisionNotice showClaspRules={showClaspRules} />
       </div>
     </section>
   );

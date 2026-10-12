@@ -39,6 +39,7 @@ import {
 } from "@shared/overseasShipping";
 import { calcCheckoutFees, OVERSEAS_SHIPPING_FEES } from "@shared/checkoutFees";
 import { CUSTOM_PRODUCT_IDS } from "@shared/const";
+import { CUSTOM_SPECS } from "@shared/customSpecs";
 import { STORE_BANK_INFO } from "@shared/bankAccount";
 import { getPurchaseOptionImage } from "@/lib/purchaseOptions";
 
@@ -468,11 +469,12 @@ export default function Checkout() {
           baseProductId: i.product.id,
           purchaseOptionId: i.purchaseOptionId,
           purchaseOptionLabel: i.purchaseOptionLabel,
+          specCode: i.specCode,
           wristSize: i.wristSize,
           wristSizeSelections: i.wristSizeSelections,
           claspType: i.claspType,
           fitPreference: i.fitPreference,
-          name: `${i.product.name}${i.purchaseOptionLabel ? `（${i.purchaseOptionLabel}）` : ""}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.wristSizeSelections?.map(selection => `（${selection.label} ${selection.value}cm）`).join("") ?? ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}${i.fitPreference === "just-right" ? "（剛好）" : i.fitPreference === "loose" ? "（微鬆）" : ""}`,
+          name: `${i.product.name}${i.specCode ? `（${CUSTOM_SPECS[i.specCode].label}）` : ""}${i.purchaseOptionLabel ? `（${i.purchaseOptionLabel}）` : ""}${i.wristSize ? `（手圍 ${i.wristSize}cm）` : ""}${i.wristSizeSelections?.map(selection => `（${selection.label} ${selection.value}cm）`).join("") ?? ""}${i.claspType === "lobster" ? "（龍蝦扣）" : i.claspType === "magnetic" ? "（磁扣）" : ""}${i.fitPreference === "just-right" ? "（剛好）" : i.fitPreference === "loose" ? "（微鬆）" : ""}`,
           price: i.unitPrice,
           quantity: i.quantity,
           image: getPurchaseOptionImage(i.product, i.purchaseOptionId),

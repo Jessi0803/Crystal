@@ -507,6 +507,7 @@ describe("order.createAndPay security regression coverage", () => {
           configurationSnapshot: {
             version: 1,
             baseProductName: "通知測試手鍊",
+            spec: null,
             purchaseOption: null,
             wristSizes: [{ key: "wrist", label: "手圍", value: 13, unit: "cm" }],
             clasp: { code: "elastic", label: "彈力繩", surcharge: 0 },
