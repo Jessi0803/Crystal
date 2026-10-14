@@ -9,6 +9,16 @@ import { formatCustomConsultationNoteForDisplay } from "../shared/customConsulta
 const FROM_ADDRESS = "service@goodaytarot.com";
 const BRAND_NAME = "椛 · Crystal";
 const ADMIN_ORDER_NOTIFICATION_EMAIL = process.env.ADMIN_ORDER_NOTIFICATION_EMAIL ?? "goodaytarot@gmail.com";
+/**
+ * 維運類告警（例如網域憑證快到期）的收件人。
+ *
+ * 跟訂單通知分開，因為收件對象不同：訂單是給顧客服務用的商家信箱，
+ * 維運告警要寄給實際會去處理的人。沒設就退回商家信箱，至少不會沒人收到。
+ *
+ * 刻意不把信箱寫死在原始碼：這個 repo 是公開的。請在 Vercel 設
+ * CERT_ALERT_EMAIL 環境變數。
+ */
+const OPS_ALERT_EMAIL = process.env.CERT_ALERT_EMAIL?.trim() || ADMIN_ORDER_NOTIFICATION_EMAIL;
 
 function getSiteUrl() {
   return process.env.SITE_URL?.trim().replace(/\/$/, "") || "https://goodaytarot.com";
@@ -323,7 +333,7 @@ export async function sendCertificateExpiryAlertEmail(payload: {
 
   return resend.emails.send({
     from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
-    to: ADMIN_ORDER_NOTIFICATION_EMAIL,
+    to: OPS_ALERT_EMAIL,
     subject: `【${BRAND_NAME}】網域憑證告警（${payload.lines.length} 項）`,
     html,
   });
