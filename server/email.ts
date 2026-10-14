@@ -289,6 +289,46 @@ export function renderEmailItemRows(items: OrderItem[], borderColor = "#f0ece7")
     .join("");
 }
 
+/**
+ * 網域憑證快到期／已過期的告警信。只有偵測到問題時才會寄，沒事不打擾。
+ */
+export async function sendCertificateExpiryAlertEmail(payload: {
+  lines: string[];
+  warningDays: number;
+}) {
+  const resend = getResend();
+  const rows = payload.lines
+    .map(
+      (line) =>
+        `<tr><td style="font-size:13px;color:#1a1a1a;padding:6px 0;border-bottom:1px solid #eee;">${escapeHtml(line)}</td></tr>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:24px;background:#faf8f6;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #eee;">
+    <tr><td style="padding:24px;">
+      <p style="margin:0 0 4px;font-size:12px;letter-spacing:2px;color:#b08968;">CERTIFICATE ALERT</p>
+      <h1 style="margin:0 0 16px;font-size:18px;color:#1a1a1a;font-weight:500;">網域憑證需要處理</h1>
+      <table role="presentation" width="100%">${rows}</table>
+      <p style="margin:16px 0 0;font-size:12px;color:#666;line-height:1.7;">
+        憑證由 Vercel 自動續期。若出現過期或無法連線，通常是該網域沒有綁在
+        Vercel 專案底下，請到專案的 Settings → Domains 確認。
+      </p>
+      <p style="margin:8px 0 0;font-size:12px;color:#999;">剩餘天數低於 ${payload.warningDays} 天就會收到這封信。</p>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  return resend.emails.send({
+    from: `${BRAND_NAME} <${FROM_ADDRESS}>`,
+    to: ADMIN_ORDER_NOTIFICATION_EMAIL,
+    subject: `【${BRAND_NAME}】網域憑證告警（${payload.lines.length} 項）`,
+    html,
+  });
+}
+
 export async function sendAdminOrderNotificationEmail(payload: AdminOrderNotificationPayload) {
   const resend = getResend();
   const {

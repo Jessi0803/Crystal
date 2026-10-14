@@ -44,12 +44,19 @@
     },
     "api/cron/custom-form-reminders.js": {
       "maxDuration": 60
+    },
+    "api/cron/certificate-monitor.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cron/custom-form-reminders",
       "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/certificate-monitor",
+      "schedule": "0 1 * * *"
     }
   ],
   "rewrites": [

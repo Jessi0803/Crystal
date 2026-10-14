@@ -19,6 +19,7 @@ const entries = [
   "server/_entry/trpcHandler.ts",
   "server/_entry/ecpayHandler.ts",
   "server/_entry/customFormRemindersCronHandler.ts",
+  "server/_entry/certificateMonitorCronHandler.ts",
 ];
 
 // 放在專案內，打包後的外部套件才能從專案的 node_modules 解析
