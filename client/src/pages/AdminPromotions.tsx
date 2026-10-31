@@ -211,7 +211,7 @@ export default function AdminPromotions() {
                     onChange={e => setForm({ ...form, name: e.target.value })}
                   />
                 </label>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   {(["startsAt", "endsAt"] as const).map(key => (
                     <label key={key} className="min-w-0 block">
                       <span className={labelClass}>
@@ -221,7 +221,7 @@ export default function AdminPromotions() {
                       <input
                         required
                         type="datetime-local"
-                        className={inputClass}
+                        className={`${inputClass} block box-border max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:min-w-0`}
                         value={form[key]}
                         onChange={e =>
                           setForm({ ...form, [key]: e.target.value })
