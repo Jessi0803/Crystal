@@ -30,6 +30,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin/reviews", label: "商品回饋", icon: MessageSquareQuote },
   { href: "/admin/revenue", label: "營收報表", icon: BarChart3 },
   { href: "/admin/members", label: "會員管理", icon: Users },
+  { href: "/admin/promotions", label: "活動管理", icon: TicketPercent },
   { href: "/admin/coupons", label: "優惠券管理", icon: TicketPercent },
   { href: "/admin/chatbot", label: "AI 客服", icon: Bot },
   { href: "/admin/monitoring", label: "操作監控", icon: ShieldCheck },

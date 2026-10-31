@@ -1,3 +1,7 @@
+import { usesPromotionFlow } from "@shared/promotions";
+import OrderPromotionSummary from "@/components/OrderPromotionSummary";
+import { balancePromotionTotal } from "@shared/promotions";
+import { balanceCouponDiscount } from "@shared/balanceCoupons";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { CircleCheck } from "lucide-react";
 import { useParams, useLocation } from "wouter";
@@ -85,6 +89,8 @@ function compressTransferReceipt(
 export default function BalancePayment() {
   const { merchantTradeNo } = useParams<{ merchantTradeNo: string }>();
   const [, setLocation] = useLocation();
+  const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
+  const { data: sessionUser } = trpc.auth.me.useQuery();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit");
   const [checkoutRegion, setCheckoutRegion] =
     useState<CheckoutRegion>("domestic");
@@ -128,6 +134,8 @@ export default function BalancePayment() {
     { merchantTradeNo: merchantTradeNo ?? "" },
     { enabled: !!merchantTradeNo, refetchInterval: 5000 }
   );
+
+  const { data: myCoupons = [] } = trpc.coupons.mine.useQuery(undefined, { enabled: Boolean(sessionUser && data && usesPromotionFlow(data.order)) });
 
   useEffect(() => {
     const buyerPhone = data?.order.buyerPhone?.trim();
@@ -401,7 +409,13 @@ export default function BalancePayment() {
     ),
     chargeShippingWhenSubtotalZero: data.amount === 0,
   });
-  const payableAmount = feeSummary.total;
+  const activitySummary = balancePromotionTotal(data.amount, feeSummary.shippingFee, includeClearQuartzChips && hasLiveClearQuartzChipsProduct ? clearQuartzChipsProduct.price : 0, data.quote);
+  const couponAmounts = { productAmountAfterPromotion: data.quote ? Math.max(0, data.quote.finalPrice - data.quote.discount) : data.order.totalAmount, remainingProductAmount: Math.max(0, data.amount - (data.quote?.discount ?? 0)) };
+  const couponOptions = myCoupons.filter(coupon => usesPromotionFlow(data.order) && coupon.displayStatus === "available").map(coupon => ({ coupon, preview: balanceCouponDiscount({ ...couponAmounts, coupon }) }));
+  const selectedCoupon = usesPromotionFlow(data.order) ? data.coupon ?? couponOptions.find(option => option.coupon.id === selectedCouponId && option.preview.ok)?.coupon : null;
+  const couponPreview = selectedCoupon ? balanceCouponDiscount({ ...couponAmounts, coupon: selectedCoupon }) : null;
+  const couponDiscount = couponPreview?.ok ? couponPreview.discount : 0;
+  const payableAmount = Math.max(0, activitySummary.total - couponDiscount);
 
   const inputClass = (field: string) =>
     `w-full border px-4 py-3 text-sm font-body focus:outline-none transition-colors ${
@@ -505,6 +519,7 @@ export default function BalancePayment() {
     startCheckout.mutate({
       merchantTradeNo: data.merchantTradeNo,
       paymentMethod,
+      ...(usesPromotionFlow(data.order) ? { memberCouponId: selectedCoupon?.id, expectedTotal: payableAmount } : {}),
       includeClearQuartzChips:
         includeClearQuartzChips && hasLiveClearQuartzChipsProduct,
       checkoutRegion,
@@ -606,6 +621,12 @@ export default function BalancePayment() {
                 NT$ {data.amount.toLocaleString()}
               </span>
             </div>
+            {data.promotionOrders.length > 0 ? data.promotionOrders.map(member => <div key={member.merchantTradeNo}><p className="text-xs">{member.merchantTradeNo}</p><OrderPromotionSummary promotion={member.promotion} quote={member.customQuote} custom/></div>) : <OrderPromotionSummary promotion={data.order.promotion} quote={data.quote} custom/>}
+            {!showPaymentChoice && data.couponItem && <p className="text-sm">{data.couponItem.productName}：−NT$ {Math.abs(data.couponItem.subtotal).toLocaleString()}</p>}
+            {showPaymentChoice && !data.coupon && sessionUser?.id === data.order.userId && couponOptions.length > 0 && <label className="block text-sm font-body">優惠券（低消依完整商品的活動後金額判斷）
+              <select className="w-full border p-2 mt-2" value={selectedCouponId ?? ''} onChange={event => setSelectedCouponId(event.target.value ? Number(event.target.value) : null)}><option value="">不使用優惠券</option>{couponOptions.map(({ coupon, preview }) => <option key={coupon.id} value={coupon.id} disabled={!preview.ok}>{coupon.name} · {preview.ok ? `折 NT$ ${preview.discount}` : preview.reason}</option>)}</select>
+              <p className="text-xs mt-1">每筆訂單限用一張；送出付款後保留該券，重試沿用原券，取消訂單依原規則退回。</p>
+            </label>}
             {showPaymentChoice && (
               <div className="border-t border-sf-line pt-3">
                 <ClearQuartzAddonOption
@@ -638,6 +659,8 @@ export default function BalancePayment() {
                     </span>
                   </div>
                 )}
+                {activitySummary.discount > 0 && <div className="flex justify-between text-sm"><span>活動折抵</span><span>−NT$ {activitySummary.discount.toLocaleString()}</span></div>}
+                {couponDiscount > 0 && <div className="flex justify-between text-sm"><span>優惠券 · {selectedCoupon?.name}</span><span>−NT$ {couponDiscount.toLocaleString()}</span></div>}
                 <div className="flex justify-between gap-4 text-sm font-body">
                   <span className="text-sf-muted">運費</span>
                   <span className="text-sf-ink">

@@ -1,3 +1,4 @@
+import type { OrderPromotion, PromotionQuote } from "../shared/promotions";
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, index, uniqueIndex, longtext, decimal, smallint, tinyint } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -120,6 +121,10 @@ export const orders = mysqlTable("orders", {
   isCustomOrder: boolean("isCustomOrder").default(false).notNull(),
   // 單筆訂單免運覆寫（例如合併訂單後由後台處理免運）
   freeShippingOverride: boolean("freeShippingOverride").default(false).notNull(),
+  // 僅新訂單明確設定版本；舊訂單維持 NULL，禁止回填升級。
+  promotionFlowVersion: tinyint("promotionFlowVersion"),
+  promotion: json("promotion").$type<OrderPromotion | null>(),
+  customQuote: json("customQuote").$type<PromotionQuote | null>(),
   // 訂單金額
   totalAmount: int("totalAmount").notNull(),
   // 購買人資訊
@@ -637,3 +642,17 @@ export const productReviews = mysqlTable("productReviews", {
 
 export type ProductReview = typeof productReviews.$inferSelect;
 export type InsertProductReview = typeof productReviews.$inferInsert;
+
+// 全館自動滿額折抵；資格與規則另保存於訂單，不受之後編輯影響。
+export const promotions = mysqlTable("promotions", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  threshold: int("threshold").notNull(),
+  discountAmount: int("discountAmount").notNull(),
+  maxDiscount: int("maxDiscount"),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt").notNull(),
+  isActive: boolean("isActive").notNull().default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});

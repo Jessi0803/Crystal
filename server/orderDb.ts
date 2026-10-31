@@ -1,3 +1,5 @@
+import { usesPromotionFlow } from "../shared/promotions";
+import { quoteCustomPromotion, PROMOTION_DISCOUNT_PRODUCT_ID, type PromotionQuote } from "../shared/promotions";
 /**
  * 訂單資料庫查詢函式
  */
@@ -9,6 +11,7 @@ import { upsertCustomConsultationNote } from "../shared/customFormNote";
 import { getDb } from "./db";
 import {
   orders,
+  memberCoupons,
   orderItems,
   logisticsOrders,
   logisticsEvents,
@@ -35,6 +38,9 @@ type LogisticsEventRow = typeof logisticsEvents.$inferSelect;
 type BalancePaymentRow = typeof orderBalancePayments.$inferSelect;
 type BalancePaymentAttemptRow = typeof orderBalancePaymentAttempts.$inferSelect;
 export type BalancePaymentAttemptCheckoutData = {
+  coupon?: { id: number; name: string; discount: number } | null;
+  promotionDiscount?: number;
+  promotionFlowVersion?: number;
   orderUpdate: {
     buyerPhone: string;
     deliveryRegion: "domestic" | "overseas";
@@ -107,6 +113,9 @@ export type OrderMergeDetail = OrderMergeInfo & {
     orderStatus: OrderRow["orderStatus"];
     totalAmount: number;
     customerNote: string | null;
+    promotionFlowVersion?: number | null;
+    promotion?: OrderRow["promotion"];
+    customQuote?: OrderRow["customQuote"];
   }[];
 };
 
@@ -338,6 +347,9 @@ async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<
       orderStatus: orders.orderStatus,
       totalAmount: orders.totalAmount,
       customerNote: orders.customerNote,
+      promotionFlowVersion: orders.promotionFlowVersion,
+      promotion: orders.promotion,
+      customQuote: orders.customQuote,
     })
     .from(orderMergeMembers)
     .leftJoin(orders, eq(orderMergeMembers.orderId, orders.id))
@@ -355,6 +367,9 @@ async function getMergeDetailForOrder(db: DbInstance, orderId: number): Promise<
         orderStatus: row.orderStatus,
         totalAmount: row.totalAmount,
         customerNote: row.customerNote,
+        promotionFlowVersion: row.promotionFlowVersion,
+        promotion: row.promotion,
+        customQuote: row.customQuote,
       })),
   };
 }
@@ -1121,7 +1136,7 @@ export async function getProductSalesTotals() {
   const productMap = new Map<string, { productId: string; productName: string; totalQty: number; totalRevenue: number }>();
 
   for (const item of allItems) {
-    if (item.productId === COUPON_DISCOUNT_PRODUCT_ID) continue;
+    if (NON_PRODUCT_ORDER_ITEM_IDS.includes(item.productId)) continue;
     const existing = productMap.get(item.productId);
     if (existing) {
       existing.totalQty += item.quantity;
@@ -1316,7 +1331,154 @@ export function generateBalanceMerchantTradeNo() {
   return `CB${crypto.randomBytes(9).toString("hex").toUpperCase()}`;
 }
 
-export async function createOrReplaceBalancePayment(opts: {
+/** 合併單逐單報價，所有訂金從原始商品列取得，不從已含尾款的 totalAmount 推算。 */
+export async function getCustomQuoteSummary(
+  db: Pick<DbInstance, "select">,
+  orderId: number
+) {
+  const [membership] = await db
+    .select()
+    .from(orderMergeMembers)
+    .where(eq(orderMergeMembers.orderId, orderId))
+    .limit(1);
+  const members = membership
+    ? await db
+        .select()
+        .from(orderMergeMembers)
+        .where(eq(orderMergeMembers.groupId, membership.groupId))
+    : [];
+  const ids = members.length
+    ? members.map(member => member.orderId)
+    : [orderId];
+  const rows = await db.select().from(orders).where(inArray(orders.id, ids));
+  const customRows = rows.filter(row => row.isCustomOrder);
+  if (!customRows.some(usesPromotionFlow)) return null;
+  if (customRows.some(row => !usesPromotionFlow(row)))
+    throw new Error("新舊流程訂單不可合併報價");
+  if (customRows.some(row => !row.customQuote))
+    throw new Error("請先逐單設定所有客製訂單的最終總價，再產生合併尾款");
+  return customRows.reduce<PromotionQuote>(
+    (sum, row) => ({
+      finalPrice: sum.finalPrice + row.customQuote!.finalPrice,
+      depositPaid: sum.depositPaid + row.customQuote!.depositPaid,
+      discount: sum.discount + row.customQuote!.discount,
+    }),
+    { finalPrice: 0, depositPaid: 0, discount: 0 }
+  );
+}
+
+export async function setCustomFinalPrice(orderId: number, finalPrice: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [targetOrder] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!targetOrder || !usesPromotionFlow(targetOrder)) throw new Error("舊訂單請沿用原本的商品尾款輸入流程");
+  const context = await getMergeDetailForOrder(db, orderId);
+  const mainOrderId = context?.mainOrderId ?? orderId;
+  return db.transaction(async tx => {
+    // 與尾款報價／付款嘗試共用鎖，避免報價與付款金額交錯。
+    await tx.execute(
+      sql`SELECT \`id\` FROM \`orders\` WHERE \`id\` = ${mainOrderId} FOR UPDATE`
+    );
+    const [balance] = await tx
+      .select()
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.orderId, mainOrderId))
+      .limit(1);
+    if (balance) {
+      await tx.execute(
+        sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balance.id} FOR UPDATE`
+      );
+      const attempts = await tx
+        .select()
+        .from(orderBalancePaymentAttempts)
+        .where(eq(orderBalancePaymentAttempts.balancePaymentId, balance.id));
+      if (
+        ["paid", "transfer_pending"].includes(balance.paymentStatus) ||
+        (balance.ecpayNotifyData as { source?: string } | null)?.source ===
+          "balance_atm_checkout" ||
+        attempts.some(attempt =>
+          ["pending", "superseded", "paid"].includes(attempt.paymentStatus)
+        )
+      )
+        throw new Error("尾款已進入付款流程，請勿修改報價");
+      // 先取消舊連結，逐單報價完成後重新啟用，避免尚未完成的合併報價被付款。
+      await tx
+        .update(orderBalancePayments)
+        .set({ paymentStatus: "cancelled" })
+        .where(eq(orderBalancePayments.id, balance.id));
+    }
+    const [reservedCoupon] = await tx
+      .select()
+      .from(memberCoupons)
+      .where(
+        and(
+          eq(memberCoupons.orderId, mainOrderId),
+          eq(memberCoupons.status, "reserved")
+        )
+      )
+      .limit(1);
+    if (reservedCoupon) throw new Error("尾款已保留優惠券，請勿修改報價");
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+    if (!order || !usesPromotionFlow(order))
+      throw new Error("舊訂單請沿用原本的商品尾款輸入流程");
+    if (!order.isCustomOrder || order.orderStatus !== "deposit_paid")
+      throw new Error("僅能設定已付訂金的客製訂單總價");
+    const items = await tx
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
+    const depositPaid = items
+      .filter(item => CUSTOM_PRODUCT_IDS.includes(item.productId))
+      .reduce((sum, item) => sum + item.subtotal, 0);
+    if (finalPrice < depositPaid)
+      throw new Error("最終總價不可低於已付訂金；如需退款請另行處理");
+    const quote = quoteCustomPromotion(
+      finalPrice,
+      depositPaid,
+      order.promotion?.rule
+    );
+    await tx
+      .update(orders)
+      .set({
+        customQuote: quote,
+        ...(order.promotion
+          ? {
+              promotion: {
+                ...order.promotion,
+                discount: quote.discount,
+                quote,
+              },
+            }
+          : {}),
+      })
+      .where(eq(orders.id, orderId));
+    await tx
+      .delete(orderItems)
+      .where(
+        and(
+          eq(orderItems.orderId, orderId),
+          eq(orderItems.productId, PROMOTION_DISCOUNT_PRODUCT_ID)
+        )
+      );
+    if (quote.discount > 0)
+      await tx.insert(orderItems).values({
+        orderId,
+        productId: PROMOTION_DISCOUNT_PRODUCT_ID,
+        productName: `活動折抵（尾款）- ${order.promotion!.rule.name}`,
+        quantity: 1,
+        unitPrice: -quote.discount,
+        subtotal: -quote.discount,
+        isPreorder: false,
+      });
+    return quote;
+  });
+}
+
+async function legacyCreateOrReplaceBalancePayment(opts: {
   orderId: number;
   amount: number;
 }) {
@@ -1387,6 +1549,113 @@ export async function createOrReplaceBalancePayment(opts: {
   return hydrateBalancePayment(created)!;
 }
 
+export async function createOrReplaceBalancePayment(opts: {
+  orderId: number;
+  amount?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [targetOrder] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, opts.orderId))
+    .limit(1);
+  if (!targetOrder) throw new Error("Order not found");
+  if (!usesPromotionFlow(targetOrder)) {
+    if (opts.amount == null) throw new Error("舊訂單請輸入商品尾款金額");
+    return legacyCreateOrReplaceBalancePayment({
+      orderId: opts.orderId,
+      amount: opts.amount,
+    });
+  }
+  await ensureBalancePaymentColumns(db);
+  await ensureBalancePaymentAttemptTable(db);
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT \`id\` FROM \`orders\` WHERE \`id\` = ${opts.orderId} FOR UPDATE`
+    );
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, opts.orderId))
+      .limit(1);
+    if (!order?.isCustomOrder || order.orderStatus !== "deposit_paid")
+      throw new Error("僅能為已付訂金的客製訂單產生尾款");
+    const [reservedCoupon] = await tx
+      .select()
+      .from(memberCoupons)
+      .where(
+        and(
+          eq(memberCoupons.orderId, opts.orderId),
+          eq(memberCoupons.status, "reserved")
+        )
+      )
+      .limit(1);
+    if (reservedCoupon) throw new Error("尾款已保留優惠券，請沿用既有付款連結");
+    const quote = await getCustomQuoteSummary(tx, opts.orderId);
+    if (!quote && opts.amount == null) throw new Error("請先設定最終總價");
+    const amount = quote ? quote.finalPrice - quote.depositPaid : opts.amount!;
+    const totalAmount = Math.max(0, amount - (quote?.discount ?? 0));
+    const [existing] = await tx
+      .select(balancePaymentLegacySelect)
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.orderId, opts.orderId))
+      .limit(1);
+    if (existing) {
+      await tx.execute(
+        sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${existing.id} FOR UPDATE`
+      );
+      const attempts = await tx
+        .select()
+        .from(orderBalancePaymentAttempts)
+        .where(eq(orderBalancePaymentAttempts.balancePaymentId, existing.id));
+      if (
+        ["paid", "transfer_pending"].includes(existing.paymentStatus) ||
+        (existing.ecpayNotifyData as { source?: string } | null)?.source ===
+          "balance_atm_checkout" ||
+        attempts.some(attempt =>
+          ["pending", "superseded", "paid"].includes(attempt.paymentStatus)
+        )
+      )
+        throw new Error("尾款已進入付款流程，不可重設金額");
+    }
+    const merchantTradeNo =
+      existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
+    const values = {
+      amount,
+      shippingFee: 0,
+      paymentFee: 0,
+      totalAmount,
+      paymentStatus: "pending" as const,
+      tradeNo: null,
+      ecpayNotifyData: null,
+      paidAt: null,
+    };
+    if (existing)
+      await tx
+        .update(orderBalancePayments)
+        .set(values)
+        .where(eq(orderBalancePayments.id, existing.id));
+    else
+      await tx
+        .insert(orderBalancePayments)
+        .values({ orderId: opts.orderId, merchantTradeNo, ...values });
+    await tx
+      .update(orders)
+      .set({
+        totalAmount:
+          order.totalAmount - (existing?.totalAmount ?? 0) + totalAmount,
+      })
+      .where(eq(orders.id, opts.orderId));
+    const [result] = await tx
+      .select(balancePaymentLegacySelect)
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+      .limit(1);
+    return hydrateBalancePayment(result)!;
+  });
+}
+
 export async function getBalancePaymentByMerchantTradeNo(merchantTradeNo: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1407,31 +1676,75 @@ export async function createBalancePaymentAttempt(opts: {
   paymentFee: number;
   totalAmount: number;
   checkoutData: BalancePaymentAttemptCheckoutData;
+  expectedQuote?: PromotionQuote | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentAttemptTable(db);
 
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${opts.balancePaymentId} FOR UPDATE`);
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${opts.balancePaymentId} FOR UPDATE`
+    );
     const [balance] = await tx
       .select(balancePaymentLegacySelect)
       .from(orderBalancePayments)
       .where(eq(orderBalancePayments.id, opts.balancePaymentId))
       .limit(1);
     if (!balance) throw new Error("Balance payment not found");
-    if (balance.paymentStatus === "paid" || balance.paymentStatus === "cancelled" || balance.paymentStatus === "transfer_pending") {
+    if (
+      balance.paymentStatus === "paid" ||
+      balance.paymentStatus === "cancelled" ||
+      balance.paymentStatus === "transfer_pending"
+    ) {
       throw new Error("Inactive balance payment cannot be retried");
+    }
+
+    if (opts.checkoutData.promotionFlowVersion === 1) {
+      if (balance.amount !== opts.amount)
+        throw new Error("尾款報價已更新，請重新整理");
+      const [reservedCoupon] = await tx
+        .select()
+        .from(memberCoupons)
+        .where(
+          and(
+            eq(memberCoupons.orderId, balance.orderId),
+            eq(memberCoupons.status, "reserved")
+          )
+        )
+        .limit(1);
+      if (
+        (reservedCoupon?.id ?? null) !== (opts.checkoutData.coupon?.id ?? null)
+      )
+        throw new Error("優惠券已更新，請重新整理尾款頁");
+      const [parent] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, balance.orderId))
+        .limit(1);
+      if (!parent || parent.orderStatus === "cancelled")
+        throw new Error("訂單已取消");
+      if (
+        opts.expectedQuote !== undefined &&
+        JSON.stringify(await getCustomQuoteSummary(tx, balance.orderId)) !==
+          JSON.stringify(opts.expectedQuote)
+      )
+        throw new Error("尾款報價已更新，請重新整理");
     }
 
     // 讓舊的尚未完成嘗試停止出現在「進行中」；若其延遲回傳成功，回呼仍會安全處理。
     await tx
       .update(orderBalancePaymentAttempts)
       .set({ paymentStatus: "superseded" })
-      .where(and(
-        eq(orderBalancePaymentAttempts.balancePaymentId, opts.balancePaymentId),
-        eq(orderBalancePaymentAttempts.paymentStatus, "pending"),
-      ));
+      .where(
+        and(
+          eq(
+            orderBalancePaymentAttempts.balancePaymentId,
+            opts.balancePaymentId
+          ),
+          eq(orderBalancePaymentAttempts.paymentStatus, "pending")
+        )
+      );
 
     const merchantTradeNo = generateBalanceMerchantTradeNo();
     await tx.insert(orderBalancePaymentAttempts).values({
@@ -1450,11 +1763,18 @@ export async function createBalancePaymentAttempt(opts: {
     if (balance.paymentStatus === "failed") {
       await tx
         .update(orderBalancePayments)
-        .set({ paymentStatus: "pending", tradeNo: null, ecpayNotifyData: null, paidAt: null })
-        .where(and(
-          eq(orderBalancePayments.id, balance.id),
-          eq(orderBalancePayments.paymentStatus, "failed"),
-        ));
+        .set({
+          paymentStatus: "pending",
+          tradeNo: null,
+          ecpayNotifyData: null,
+          paidAt: null,
+        })
+        .where(
+          and(
+            eq(orderBalancePayments.id, balance.id),
+            eq(orderBalancePayments.paymentStatus, "failed")
+          )
+        );
     }
 
     return { merchantTradeNo };
@@ -1492,7 +1812,7 @@ export async function updateBalancePaymentAttemptStatus(
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentAttemptTable(db);
 
-  return db.transaction(async (tx) => {
+  return db.transaction(async tx => {
     const [attempt] = await tx
       .select()
       .from(orderBalancePaymentAttempts)
@@ -1504,17 +1824,21 @@ export async function updateBalancePaymentAttemptStatus(
       const result = await tx
         .update(orderBalancePaymentAttempts)
         .set({ paymentStatus: "failed", tradeNo, ecpayNotifyData: notifyData })
-        .where(and(
-          eq(orderBalancePaymentAttempts.id, attempt.id),
-          sql`${orderBalancePaymentAttempts.paymentStatus} IN ('pending', 'superseded')`,
-        ));
+        .where(
+          and(
+            eq(orderBalancePaymentAttempts.id, attempt.id),
+            sql`${orderBalancePaymentAttempts.paymentStatus} IN ('pending', 'superseded')`
+          )
+        );
       if (getAffectedRows(result) === 0) return null;
       const [balance] = await tx
         .select(balancePaymentLegacySelect)
         .from(orderBalancePayments)
         .where(eq(orderBalancePayments.id, attempt.balancePaymentId))
         .limit(1);
-      return balance ? { ...attempt, balancePayment: hydrateBalancePayment(balance)! } : null;
+      return balance
+        ? { ...attempt, balancePayment: hydrateBalancePayment(balance)! }
+        : null;
     }
 
     const [balance] = await tx
@@ -1524,6 +1848,68 @@ export async function updateBalancePaymentAttemptStatus(
       .limit(1);
     if (!balance || balance.paymentStatus !== "pending") return null;
 
+    const isPromotionAttempt =
+      (attempt.checkoutData as BalancePaymentAttemptCheckoutData | null)
+        ?.promotionFlowVersion === 1;
+    if (isPromotionAttempt) {
+      await tx.execute(
+        sql`SELECT \`id\` FROM \`orders\` WHERE \`id\` = ${balance.orderId} FOR UPDATE`
+      );
+      await tx.execute(
+        sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balance.id} FOR UPDATE`
+      );
+      const [lockedBalance] = await tx
+        .select()
+        .from(orderBalancePayments)
+        .where(eq(orderBalancePayments.id, balance.id))
+        .limit(1)
+        .for("update");
+      if (!lockedBalance || lockedBalance.paymentStatus !== "pending")
+        return null;
+      const checkoutDataForCoupon =
+        attempt.checkoutData as BalancePaymentAttemptCheckoutData | null;
+      const [parentOrder] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, balance.orderId))
+        .limit(1)
+        .for("update");
+      if (!parentOrder || parentOrder.orderStatus === "cancelled") return null;
+      if (checkoutDataForCoupon?.coupon) {
+        const coupon = checkoutDataForCoupon.coupon;
+        const result = await tx
+          .update(memberCoupons)
+          .set({ status: "used", usedAt: new Date() })
+          .where(
+            and(
+              eq(memberCoupons.id, coupon.id),
+              eq(memberCoupons.orderId, balance.orderId),
+              eq(memberCoupons.status, "reserved")
+            )
+          );
+        if (getAffectedRows(result) === 0)
+          throw new Error("尾款優惠券保留已失效，請人工確認付款");
+        await tx
+          .delete(orderItems)
+          .where(
+            and(
+              eq(orderItems.orderId, balance.orderId),
+              eq(orderItems.productId, COUPON_DISCOUNT_PRODUCT_ID)
+            )
+          );
+        await tx
+          .insert(orderItems)
+          .values({
+            orderId: balance.orderId,
+            productId: COUPON_DISCOUNT_PRODUCT_ID,
+            productName: `優惠券折抵 - ${coupon.name}`,
+            quantity: 1,
+            unitPrice: -coupon.discount,
+            subtotal: -coupon.discount,
+            isPreorder: false,
+          });
+      }
+    }
     const now = new Date();
     // 先搶尾款主記錄，確保不同付款嘗試的併發成功回呼也只能完成一次。
     const balanceResult = await tx
@@ -1538,14 +1924,24 @@ export async function updateBalancePaymentAttemptStatus(
         ecpayNotifyData: notifyData,
         paidAt: now,
       })
-      .where(and(
-        eq(orderBalancePayments.id, balance.id),
-        eq(orderBalancePayments.paymentStatus, "pending"),
-      ));
-    if (getAffectedRows(balanceResult) === 0) return null;
+      .where(
+        and(
+          eq(orderBalancePayments.id, balance.id),
+          eq(orderBalancePayments.paymentStatus, "pending")
+        )
+      );
+    if (getAffectedRows(balanceResult) === 0) {
+      if (isPromotionAttempt) throw new Error("尾款狀態已更新，請重試回呼");
+      return null;
+    }
 
-    const checkoutData = attempt.checkoutData as BalancePaymentAttemptCheckoutData | null;
-    const [order] = await tx.select().from(orders).where(eq(orders.id, balance.orderId)).limit(1);
+    const checkoutData =
+      attempt.checkoutData as BalancePaymentAttemptCheckoutData | null;
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, balance.orderId))
+      .limit(1);
     if (!order) throw new Error("Balance payment parent order not found");
 
     if (checkoutData?.clearQuartzChipsAddOn) {
@@ -1553,16 +1949,29 @@ export async function updateBalancePaymentAttemptStatus(
       const [existingItem] = await tx
         .select({ id: orderItems.id })
         .from(orderItems)
-        .where(and(eq(orderItems.orderId, order.id), eq(orderItems.productId, addOn.productId)))
+        .where(
+          and(
+            eq(orderItems.orderId, order.id),
+            eq(orderItems.productId, addOn.productId)
+          )
+        )
         .limit(1);
       if (existingItem) {
-        await tx.update(orderItems).set(addOn).where(eq(orderItems.id, existingItem.id));
+        await tx
+          .update(orderItems)
+          .set(addOn)
+          .where(eq(orderItems.id, existingItem.id));
       } else {
-        await tx.insert(orderItems).values({ orderId: order.id, ...addOn, isPreorder: false });
+        await tx
+          .insert(orderItems)
+          .values({ orderId: order.id, ...addOn, isPreorder: false });
       }
     }
 
-    const nextOrderTotal = Math.max(1, order.totalAmount - balance.totalAmount + attempt.totalAmount);
+    const nextOrderTotal = Math.max(
+      1,
+      order.totalAmount - balance.totalAmount + attempt.totalAmount
+    );
     await tx
       .update(orders)
       .set({
@@ -1571,13 +1980,20 @@ export async function updateBalancePaymentAttemptStatus(
         orderStatus: "paid",
         paymentStatus: "paid",
         paidAt: now,
-        ...(checkoutData?.clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}),
+        ...(checkoutData?.clearQuartzChipsAddOn
+          ? { inventoryDeducted: false }
+          : {}),
       })
       .where(eq(orders.id, balance.orderId));
 
     await tx
       .update(orderBalancePaymentAttempts)
-      .set({ paymentStatus: "paid", tradeNo, ecpayNotifyData: notifyData, paidAt: now })
+      .set({
+        paymentStatus: "paid",
+        tradeNo,
+        ecpayNotifyData: notifyData,
+        paidAt: now,
+      })
       .where(eq(orderBalancePaymentAttempts.id, attempt.id));
 
     return { ...attempt, balancePayment: hydrateBalancePayment(balance)! };
@@ -1605,6 +2021,7 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     .limit(1);
   if (!order) return null;
   const orderMergeInfo = await getMergeDetailForOrder(db, order.id);
+  if (usesPromotionFlow(order) && orderMergeInfo?.role === "member") return null;
 
   const [clearQuartzChipsItem] = await db
     .select()
@@ -1615,6 +2032,7 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
     ))
     .limit(1);
 
+  const [couponItem] = usesPromotionFlow(order) ? await db.select().from(orderItems).where(and(eq(orderItems.orderId, row.orderId), eq(orderItems.productId, COUPON_DISCOUNT_PRODUCT_ID))).limit(1) : [];
   const originalDomesticFreeShipping = await orderHasDomesticFreeShipping(db, order.id);
   const [latestAttempt] = await db
     .select({
@@ -1628,9 +2046,12 @@ export async function getBalancePaymentDetail(merchantTradeNo: string) {
 
   return {
     ...balancePayment,
+    quote: usesPromotionFlow(order) ? await getCustomQuoteSummary(db, order.id) : null,
     order,
     orderMergeInfo,
+    promotionOrders: usesPromotionFlow(order) ? orderMergeInfo?.members.filter(member => member.isCustomOrder).map(member => ({ merchantTradeNo: member.merchantTradeNo, promotion: member.promotion, customQuote: member.customQuote })) ?? [] : [],
     clearQuartzChipsItem: clearQuartzChipsItem ?? null,
+    couponItem: couponItem ?? null,
     originalDomesticFreeShipping,
     latestAttempt: latestAttempt ?? null,
   };
@@ -1714,7 +2135,7 @@ export async function updateBalancePaymentTransferCode(
   }
 }
 
-export async function confirmBalanceTransfer(
+async function legacyConfirmBalanceTransfer(
   merchantTradeNo: string,
   audit?: { adminUserId: number; note?: string }
 ) {
@@ -1753,6 +2174,76 @@ export async function confirmBalanceTransfer(
     .update(orders)
     .set({ orderStatus: "paid", paymentStatus: "confirmed", confirmedAt: now })
     .where(eq(orders.id, balance.orderId));
+}
+
+export async function confirmBalanceTransfer(
+  merchantTradeNo: string,
+  audit?: { adminUserId: number; note?: string }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await ensureBalancePaymentColumns(db);
+  const [reference] = await db
+    .select({
+      orderId: orderBalancePayments.orderId,
+      id: orderBalancePayments.id,
+    })
+    .from(orderBalancePayments)
+    .where(eq(orderBalancePayments.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (!reference) throw new Error("Balance payment not found");
+  const [targetOrder] = await db.select().from(orders).where(eq(orders.id, reference.orderId)).limit(1);
+  if (!targetOrder || !usesPromotionFlow(targetOrder)) return legacyConfirmBalanceTransfer(merchantTradeNo, audit);
+  return db.transaction(async tx => {
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, reference.orderId))
+      .limit(1)
+      .for("update");
+    const [balance] = await tx
+      .select()
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.id, reference.id))
+      .limit(1)
+      .for("update");
+    if (!order || order.orderStatus === "cancelled")
+      throw new Error("訂單已取消，不可確認收款");
+    if (!balance) throw new Error("Balance payment not found");
+    if (balance.paymentStatus === "paid") return;
+    if (!["pending", "transfer_pending"].includes(balance.paymentStatus))
+      throw new Error("Inactive balance payment cannot be confirmed");
+    const now = new Date();
+    const manualAudit = audit
+      ? {
+          source: "admin_manual_balance_confirmation",
+          adminUserId: audit.adminUserId,
+          note: audit.note?.trim() || null,
+          confirmedAt: now.toISOString(),
+        }
+      : balance.ecpayNotifyData;
+    await tx
+      .update(orderBalancePayments)
+      .set({ paymentStatus: "paid", paidAt: now, ecpayNotifyData: manualAudit })
+      .where(eq(orderBalancePayments.id, balance.id));
+    await tx
+      .update(orders)
+      .set({
+        orderStatus: "paid",
+        paymentStatus: "confirmed",
+        confirmedAt: now,
+      })
+      .where(eq(orders.id, balance.orderId));
+    await tx
+      .update(memberCoupons)
+      .set({ status: "used", usedAt: now })
+      .where(
+        and(
+          eq(memberCoupons.orderId, order.id),
+          eq(memberCoupons.status, "reserved")
+        )
+      );
+  });
 }
 
 export async function settleZeroBalancePayment(

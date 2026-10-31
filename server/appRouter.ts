@@ -1,3 +1,4 @@
+import { promotionRouter } from "./routers/promotions";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -35,6 +36,7 @@ export const appRouter = router({
   siteSettings: siteSettingsRouter,
   audit: auditRouter,
   coupons: couponRouter,
+  promotions: promotionRouter,
 });
 
 export type AppRouter = typeof appRouter;

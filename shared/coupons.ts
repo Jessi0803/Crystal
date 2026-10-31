@@ -2,7 +2,7 @@
 export const COUPON_DISCOUNT_PRODUCT_ID = "coupon-discount";
 
 /** 非商品的訂單明細列：計算庫存、免運件數、銷售排行時要排除 */
-export const NON_PRODUCT_ORDER_ITEM_IDS = ["shipping", "shipping-fee", "payment-fee", COUPON_DISCOUNT_PRODUCT_ID];
+export const NON_PRODUCT_ORDER_ITEM_IDS = ["shipping", "shipping-fee", "payment-fee", COUPON_DISCOUNT_PRODUCT_ID, "promotion-discount"];
 
 /** 待付款訂單保留優惠券的時間；超過後若訂單仍未付款，會員可把券用在新訂單 */
 export const COUPON_RESERVATION_TTL_MS = 30 * 60_000;

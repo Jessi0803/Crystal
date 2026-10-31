@@ -11,6 +11,7 @@
     "check:vercel": "node scripts/check-vercel-bundles.mjs",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:promotions": "vitest run server/promotions.test.ts",
     "test:notifications": "tsx scripts/test-notifications.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

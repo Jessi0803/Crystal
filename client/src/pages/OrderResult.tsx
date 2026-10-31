@@ -1,3 +1,4 @@
+import OrderPromotionSummary from "@/components/OrderPromotionSummary";
 /**
  * 訂單結果頁面
  * 路由：/order/:merchantTradeNo
@@ -631,6 +632,7 @@ export default function OrderResult() {
             <h2 className="text-xs tracking-[0.2em] font-body mb-4 pb-3 border-b border-sf-line">
               商品明細
             </h2>
+            <OrderPromotionSummary promotion={order.promotion} quote={order.customQuote} custom={order.isCustomOrder}/>
             <div className="space-y-3">
               {order.items.map((item: any) => (
                 <div

@@ -1,3 +1,4 @@
+import { balanceCouponDiscount } from "../shared/balanceCoupons";
 /**
  * 會員專屬優惠券
  *
@@ -15,6 +16,8 @@ import {
   lineFriendRewards,
   memberCoupons,
   orderItems,
+  orderBalancePayments,
+  orderBalancePaymentAttempts,
   orders,
   siteSettings,
   users,
@@ -758,4 +761,137 @@ export async function grantLineFriendReward(opts: { userId: number; lineUserId: 
     if (error instanceof CouponError) return { status: "unavailable", message: error.message };
     throw error;
   }
+}
+
+/** 尾款優惠券固定綁定該訂單，重試沿用同一張；與訂金共用每單一張限制。 */
+export async function claimBalanceCoupon(
+  orderId: number,
+  balanceId: number,
+  userId: number | null,
+  amounts: {
+    productAmountAfterPromotion: number;
+    remainingProductAmount: number;
+  },
+  couponId?: number
+) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT \`id\` FROM \`orders\` WHERE \`id\` = ${orderId} FOR UPDATE`
+    );
+    await tx.execute(
+      sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balanceId} FOR UPDATE`
+    );
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+    const [balance] = await tx
+      .select()
+      .from(orderBalancePayments)
+      .where(eq(orderBalancePayments.id, balanceId))
+      .limit(1);
+    if (
+      !order ||
+      order.orderStatus === "cancelled" ||
+      !balance ||
+      !["pending", "failed"].includes(balance.paymentStatus)
+    )
+      throw new Error("訂單或尾款狀態已更新，請重新整理");
+    const [attached] = await tx
+      .select()
+      .from(memberCoupons)
+      .where(
+        and(
+          eq(memberCoupons.orderId, orderId),
+          inArray(memberCoupons.status, ["reserved", "used"])
+        )
+      )
+      .limit(1);
+    if (attached?.status === "used") {
+      if (couponId) throw new Error("此訂單已使用一張優惠券，不可重複使用");
+      return null;
+    }
+    if (attached) {
+      if (couponId != null && couponId !== attached.id)
+        throw new Error("尾款已保留優惠券，請沿用原券完成付款");
+      const preview = balanceCouponDiscount({ ...amounts, coupon: attached });
+      if (!preview.ok) throw new Error(preview.reason);
+      return { ...attached, discount: preview.discount };
+    }
+    if (!couponId) return null;
+    const attempts = await tx
+      .select()
+      .from(orderBalancePaymentAttempts)
+      .where(
+        and(
+          eq(orderBalancePaymentAttempts.balancePaymentId, balanceId),
+          inArray(orderBalancePaymentAttempts.paymentStatus, [
+            "pending",
+            "superseded",
+          ])
+        )
+      );
+    if (attempts.length)
+      throw new Error(
+        "已有信用卡付款進行中，請勿新增優惠券，以免付款金額不一致"
+      );
+    if (userId == null || order.userId !== userId)
+      throw new Error("請登入原訂購會員帳號才能使用優惠券");
+    const [coupon] = await tx
+      .select()
+      .from(memberCoupons)
+      .where(eq(memberCoupons.id, couponId))
+      .limit(1);
+    if (!coupon || coupon.userId !== userId || coupon.expiresAt <= new Date())
+      throw new Error("優惠券不存在或已過期");
+    const preview = balanceCouponDiscount({ ...amounts, coupon });
+    if (!preview.ok) throw new Error(preview.reason);
+    const result = await tx
+      .update(memberCoupons)
+      .set({
+        status: "reserved",
+        orderId,
+        reservedAt: nowInSeconds(),
+        usedAt: null,
+      })
+      .where(
+        and(
+          eq(memberCoupons.id, couponId),
+          eq(memberCoupons.userId, userId),
+          eq(memberCoupons.status, "available"),
+          gt(memberCoupons.expiresAt, new Date())
+        )
+      );
+    if (getAffectedRows(result) === 0)
+      throw new Error("優惠券已被使用或保留，請重新選擇");
+    return {
+      ...coupon,
+      status: "reserved" as const,
+      orderId,
+      discount: preview.discount,
+    };
+  });
+}
+
+export async function getBalanceCoupon(orderId: number) {
+  const db = await requireDb();
+  const [coupon] = await db
+    .select({
+      id: memberCoupons.id,
+      name: memberCoupons.name,
+      discountAmount: memberCoupons.discountAmount,
+      minOrderAmount: memberCoupons.minOrderAmount,
+      status: memberCoupons.status,
+    })
+    .from(memberCoupons)
+    .where(
+      and(
+        eq(memberCoupons.orderId, orderId),
+        eq(memberCoupons.status, "reserved")
+      )
+    )
+    .limit(1);
+  return coupon ?? null;
 }

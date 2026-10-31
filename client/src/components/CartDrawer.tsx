@@ -1,3 +1,6 @@
+import PromotionNotice from "./PromotionNotice";
+import { promotionDiscount } from "@shared/promotions";
+import { CUSTOM_PRODUCT_IDS } from "@shared/const";
 // 日日好日 — Cart Drawer
 // Design: Vacanza-inspired minimal slide-in cart
 import { X, Minus, Plus, ShoppingBag } from "lucide-react";
@@ -14,6 +17,8 @@ import {
 
 export default function CartDrawer() {
   const { items, isOpen, setIsOpen, addToCart, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
+  const { data: activePromotion } = trpc.promotions.active.useQuery(undefined, { enabled: isOpen, refetchInterval: isOpen ? 30_000 : false });
+  const custom = items.some(item => CUSTOM_PRODUCT_IDS.includes(item.product.id));
   const { data: liveProducts = [] } = trpc.product.list.useQuery(undefined, { enabled: isOpen && items.length > 0 });
   const {
     product: clearQuartzChipsProduct,
@@ -171,6 +176,7 @@ export default function CartDrawer() {
                 NT$ {totalPrice.toLocaleString()}
               </p>
             </div>
+            {activePromotion && <PromotionNotice rule={activePromotion} subtotal={totalPrice} discount={custom ? 0 : promotionDiscount(totalPrice, activePromotion)} custom={custom}/>}
             {showFreeShippingHint && (
               <p className="text-[0.65rem] font-body rounded-md text-sf-text bg-sf-cream border border-sf-line px-3 py-2 mb-5 tracking-wide">
                 任選 2 件即免運（國內），目前還差 1 件

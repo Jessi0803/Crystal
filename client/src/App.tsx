@@ -33,6 +33,7 @@ import AdminProducts from "./pages/AdminProducts";
 import AdminMembers from "./pages/AdminMembers";
 import AdminSettings from "./pages/AdminSettings";
 import AdminCoupons from "./pages/AdminCoupons";
+import AdminPromotions from "./pages/AdminPromotions";
 import AdminReviews from "./pages/AdminReviews";
 import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminLayout from "./components/AdminLayout";
@@ -162,6 +163,7 @@ function Router() {
       <Route path="/admin/products" component={AdminProducts} />
       <Route path="/admin/members" component={AdminMembers} />
       <Route path="/admin/coupons" component={AdminCoupons} />
+      <Route path="/admin/promotions" component={AdminPromotions} />
       <Route path="/admin/reviews" component={AdminReviews} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/monitoring" component={AdminMonitoring} />

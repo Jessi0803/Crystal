@@ -1,3 +1,5 @@
+import PromotionNotice from "@/components/PromotionNotice";
+import { promotionDiscount } from "@shared/promotions";
 /**
  * 結帳頁面
  * 流程：填寫購買人資料 → 選擇配送方式（超商/宅配；客製訂金不需填）→ 選擇付款方式（信用卡/轉帳）→ 送出訂單
@@ -172,7 +174,9 @@ export default function Checkout() {
     buyerEmail: form.buyerEmail,
   });
   const shippingFee = isCustomDepositCheckout ? 0 : feeSummary.shippingFee;
-  const finalTotal = isCustomDepositCheckout ? totalPrice : feeSummary.total;
+  const { data: activePromotion, isLoading: promotionLoading, error: promotionError } = trpc.promotions.active.useQuery(undefined, { refetchInterval: 30_000, refetchOnWindowFocus: true });
+  const activityDiscount = isCustomDepositCheckout ? 0 : promotionDiscount(totalPrice, activePromotion);
+  const finalTotal = (isCustomDepositCheckout ? totalPrice : feeSummary.total) - activityDiscount;
   // 超商選店資訊（由綠界地圖回傳）
   const [cvsStore, setCvsStore] = useState<{
     storeId: string;
@@ -191,10 +195,10 @@ export default function Checkout() {
     enabled: Boolean(sessionUser),
   });
   const couponOptions = myCoupons
-    .filter(coupon => coupon.displayStatus === "available")
+    .filter(coupon => !isCustomDepositCheckout && coupon.displayStatus === "available")
     .map(coupon => ({
       coupon,
-      preview: calcCouponDiscount({ subtotal: totalPrice, shippingFee, coupon }),
+      preview: calcCouponDiscount({ subtotal: totalPrice - activityDiscount, shippingFee, coupon }),
     }));
   const selectedCoupon = couponOptions.find(option => option.coupon.id === selectedCouponId);
   const appliedCoupon = selectedCoupon?.preview.ok ? selectedCoupon : null;
@@ -389,6 +393,7 @@ export default function Checkout() {
     if (!validate()) return;
 
     try {
+      if (promotionLoading || promotionError) { toast.error("請等待活動資訊載入，或重新整理後再結帳"); return; }
       const result = await createAndPay.mutateAsync({
         checkoutRegion: isCustomDepositCheckout ? "domestic" : checkoutRegion,
         buyerName: form.buyerName,
@@ -487,6 +492,7 @@ export default function Checkout() {
         origin: window.location.origin,
         customerNote: hasCustomDepositItem ? customConsultationNote : undefined,
         memberCouponId: appliedCoupon?.coupon.id,
+        expectedPromotion: { id: activePromotion?.id ?? null, discount: activityDiscount, subtotal: totalPrice },
       });
 
       saveOrderAccess(
@@ -1590,6 +1596,8 @@ export default function Checkout() {
                   </div>
                 ))}
               </div>
+              {activePromotion && <PromotionNotice rule={activePromotion} subtotal={totalPrice} discount={activityDiscount} custom={isCustomDepositCheckout}/>}
+              {promotionError && <p role="alert" className="text-red-600 text-sm">無法確認活動，請重新整理後再結帳。</p>}
               {couponOptions.length > 0 && (
                 <div className="border-t border-sf-line py-4">
                   <p className="flex items-center gap-1.5 text-xs tracking-[0.1em] text-sf-text font-body mb-3">
@@ -1653,7 +1661,7 @@ export default function Checkout() {
                       </label>
                     ))}
                   </div>
-                  <p className="mt-2 text-[0.65rem] text-sf-muted font-body">每筆訂單限用一張，折抵商品金額（不含運費）。</p>
+                  <p className="mt-2 text-[0.65rem] text-sf-muted font-body">每筆訂單限用一張，低消與折抵以活動後商品金額計算（不含運費）。</p>
                 </div>
               )}
               <div className="border-t border-sf-line pt-4 space-y-2">
@@ -1661,6 +1669,7 @@ export default function Checkout() {
                   <span className="text-sf-muted">商品小計</span>
                   <span>NT$ {totalPrice.toLocaleString()}</span>
                 </div>
+                {activityDiscount > 0 && <div className="flex justify-between text-sm font-body"><span>{activePromotion?.name}</span><span className="text-rose-700">-NT$ {activityDiscount.toLocaleString()}</span></div>}
                 {couponDiscount > 0 && (
                   <div className="flex justify-between text-sm font-body">
                     <span className="text-sf-muted">優惠券</span>

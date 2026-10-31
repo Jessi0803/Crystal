@@ -1,3 +1,4 @@
+import OrderPromotionSummary from "@/components/OrderPromotionSummary";
 import { useEffect, useState } from "react";
 import { IconBadge } from "@/components/LineIcon";
 import { ShoppingBag } from "lucide-react";
@@ -360,7 +361,7 @@ export default function MemberCenter() {
                         <OrderItemReviews order={order} />
 
                         {/* 客製表單入口：填到一半離開的人要在這裡找得回來 */}
-                        <CustomFormEntries order={order} />
+                        <OrderPromotionSummary promotion={order.promotion} quote={order.customQuote} custom={order.isCustomOrder}/><CustomFormEntries order={order} />
 
                         <MemberLogisticsTimeline order={order} />
 

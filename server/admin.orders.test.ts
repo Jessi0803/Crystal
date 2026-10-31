@@ -4,7 +4,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TRPCError } from "@trpc/server";
 
+vi.mock("./promotionDb", () => ({ getActivePromotion: vi.fn().mockResolvedValue(null) }));
+
 vi.mock("./orderDb", () => ({
+  setCustomFinalPrice: vi.fn(),
+  getCustomQuoteSummary: vi.fn().mockResolvedValue(null),
   markOrderPaidPayPal: vi.fn(),
   // 真實實作只是剝掉 adminNote / customFormToken，mock 直接原樣回傳即可
   toCustomerFacingOrder: (order: unknown) => order,
@@ -96,6 +100,8 @@ vi.mock("./couponDb", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./couponDb")>();
   return {
     ...actual,
+    claimBalanceCoupon: vi.fn().mockResolvedValue(null),
+    getBalanceCoupon: vi.fn().mockResolvedValue(null),
     getCouponForCheckout: vi.fn(),
     reserveCoupon: vi.fn(),
     attachReservedCouponToOrder: vi.fn(),
@@ -1142,6 +1148,7 @@ describe("order.getBalancePaymentCheckout", () => {
       paymentFee: 0,
       totalAmount: 0,
       paymentStatus: "pending",
+      quote: null,
       clearQuartzChipsItem: null,
       orderMergeInfo: null,
       order: {
@@ -1185,6 +1192,7 @@ describe("order.getBalancePaymentCheckout", () => {
       paymentFee: 0,
       totalAmount: 0,
       paymentStatus: "pending",
+      quote: null,
       clearQuartzChipsItem: null,
       orderMergeInfo: null,
       order: {
@@ -1240,6 +1248,7 @@ describe("order.getBalancePaymentCheckout", () => {
       paidAt: null,
       createdAt: new Date("2026-08-01T00:00:00Z"),
       updatedAt: new Date("2026-08-01T00:00:00Z"),
+      quote: null,
       clearQuartzChipsItem: null,
       orderMergeInfo: null,
       order: {

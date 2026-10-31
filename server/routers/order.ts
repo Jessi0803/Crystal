@@ -1,3 +1,9 @@
+import { usesPromotionFlow, PROMOTION_FLOW_VERSION } from "../../shared/promotions";
+import { memberCoupons, orderBalancePaymentAttempts } from "../../drizzle/schema";
+import { claimBalanceCoupon, getBalanceCoupon } from "../couponDb";
+import { setCustomFinalPrice, getCustomQuoteSummary } from "../orderDb";
+import { getActivePromotion } from "../promotionDb";
+import { promotionDiscount, balancePromotionTotal, PROMOTION_DISCOUNT_PRODUCT_ID } from "../../shared/promotions";
 /**
  * 訂單 tRPC 路由
  * 處理：建立訂單、產生綠界付款表單參數、查詢訂單狀態、轉帳確認
@@ -754,6 +760,416 @@ async function originalOrderHasDomesticFreeShipping(orderId: number) {
   }).domesticFreeShipping;
 }
 
+const balanceCheckoutInputSchema = z
+  .object({
+    merchantTradeNo: z.string().min(1),
+    paymentMethod: z.enum(["credit", "atm"]),
+    memberCouponId: z.number().int().positive().optional(),
+    expectedTotal: z.number().int().min(0).optional(),
+    includeClearQuartzChips: z.boolean().optional(),
+    checkoutRegion: z.enum(["domestic", "overseas"]),
+    receiverPhone: z.string().min(1).max(32),
+    shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
+    cvsStoreId: z.string().optional(),
+    cvsStoreName: z.string().optional(),
+    cvsType: z.string().optional(),
+    shippingAddress: z.string().optional(),
+    receiverZipCode: z.string().optional(),
+    intlCountry: z.string().optional(),
+    intlAddrLine1: z.string().optional(),
+    intlAddrLine2: z.string().optional(),
+    intlCity: z.string().optional(),
+    intlState: z.string().optional(),
+    intlPostalCode: z.string().optional(),
+    origin: z.string().url(),
+  })
+  .superRefine((data, ctx) => {
+    const receiverPhone = data.receiverPhone.trim();
+    if (data.checkoutRegion === "domestic") {
+      if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
+        ctx.addIssue({
+          code: "custom",
+          message: "請輸入台灣手機格式（09 開頭共 10 碼）",
+          path: ["receiverPhone"],
+        });
+      }
+      if (
+        data.shippingMethod === "cvs_711" ||
+        data.shippingMethod === "cvs_family"
+      ) {
+        if (!data.cvsStoreId?.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            message: "請選擇超商門市",
+            path: ["cvsStoreId"],
+          });
+        }
+      }
+      if (data.shippingMethod === "home") {
+        if (!data.shippingAddress?.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            message: "請填寫收件地址",
+            path: ["shippingAddress"],
+          });
+        }
+        const zip = data.receiverZipCode?.trim() ?? "";
+        if (!/^\d{3,6}$/.test(zip)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "請填寫郵遞區號",
+            path: ["receiverZipCode"],
+          });
+        }
+      }
+    } else {
+      if (receiverPhone.length < 8) {
+        ctx.addIssue({
+          code: "custom",
+          message: "請填寫聯絡電話",
+          path: ["receiverPhone"],
+        });
+      }
+      const payload = {
+        intlCountry: data.intlCountry ?? "",
+        intlAddrLine1: data.intlAddrLine1 ?? "",
+        intlAddrLine2: data.intlAddrLine2 ?? "",
+        intlCity: data.intlCity ?? "",
+        intlState: data.intlState ?? "",
+        intlPostalCode: data.intlPostalCode ?? "",
+      };
+      for (const it of validateOverseasAddress(payload)) {
+        ctx.addIssue({
+          code: "custom",
+          message: it.message,
+          path: [it.path as string],
+        });
+      }
+    }
+  });
+
+/** 舊訂單專用：保留上線前的尾款計算、付款與配送操作。 */
+async function legacyBalancePaymentCheckout(
+  input: z.infer<typeof balanceCheckoutInputSchema>,
+  ctx: TrpcContext,
+  balancePayment: NonNullable<
+    Awaited<ReturnType<typeof getBalancePaymentDetail>>
+  >
+) {
+  if (!balancePayment) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "找不到尾款資料" });
+  }
+  if (balancePayment.paymentStatus === "paid") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
+  }
+  if (
+    balancePayment.paymentStatus !== "pending" &&
+    balancePayment.paymentStatus !== "failed"
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "此尾款連結目前不可付款",
+    });
+  }
+
+  const db = await getDb();
+  if (!db)
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Database not available",
+    });
+
+  const isOverseas = input.checkoutRegion === "overseas";
+  const shippingMethod = isOverseas ? ("home" as const) : input.shippingMethod;
+  let shippingAddress = input.shippingAddress;
+  let receiverZipCode = input.receiverZipCode;
+  let cvsStoreId = input.cvsStoreId;
+  let cvsStoreName = input.cvsStoreName;
+  let cvsType = input.cvsType;
+  let overseasCountry: OverseasShipCountryCode | null = null;
+
+  if (isOverseas) {
+    cvsStoreId = undefined;
+    cvsStoreName = undefined;
+    cvsType = undefined;
+    const countryCode = input.intlCountry!.trim();
+    if (!isOverseasShipCountryCode(countryCode)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "不支援的海外配送地區",
+      });
+    }
+    overseasCountry = countryCode;
+    const formatted = formatOverseasShippingAddress({
+      countryCode,
+      line1: input.intlAddrLine1!.trim(),
+      line2: input.intlAddrLine2 ?? "",
+      city: input.intlCity!.trim(),
+      state: input.intlState ?? "",
+      postal: input.intlPostalCode ?? "",
+    });
+    shippingAddress = formatted.shippingAddress;
+    receiverZipCode = formatted.receiverZipCode;
+  }
+
+  const balanceItems: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    twoItemFreeShippingEligible?: boolean;
+  }> = [
+    {
+      id: "custom-balance-payment",
+      name: "客製化商品尾款",
+      price: balancePayment.amount,
+      quantity: 1,
+      twoItemFreeShippingEligible: false,
+    },
+  ];
+  const clearQuartzChipsAddOn = input.includeClearQuartzChips
+    ? await getClearQuartzChipsAddOn(db)
+    : null;
+
+  if (clearQuartzChipsAddOn) {
+    balanceItems.push({
+      id: clearQuartzChipsAddOn.id,
+      name: clearQuartzChipsAddOn.name,
+      price: clearQuartzChipsAddOn.price,
+      quantity: 1,
+      twoItemFreeShippingEligible:
+        clearQuartzChipsAddOn.twoItemFreeShippingEligible,
+    });
+  }
+
+  const originalDomesticFreeShipping =
+    input.checkoutRegion === "domestic"
+      ? await originalOrderHasDomesticFreeShipping(balancePayment.orderId)
+      : false;
+  const forceBalanceFreeShipping =
+    balancePayment.order.freeShippingOverride || originalDomesticFreeShipping;
+
+  const feeSummary = calcCheckoutFees({
+    items: balanceItems,
+    checkoutRegion: input.checkoutRegion,
+    shippingMethod,
+    paymentMethod: input.paymentMethod,
+    overseasCountry,
+    buyerEmail: balancePayment.order.buyerEmail,
+    forceFreeShipping: forceBalanceFreeShipping,
+    forcePaidShipping: Boolean(
+      balancePayment.orderMergeInfo && !forceBalanceFreeShipping
+    ),
+    chargeShippingWhenSubtotalZero: balancePayment.amount === 0,
+  });
+  const totalAmount = feeSummary.total;
+
+  const orderUpdate = {
+    buyerPhone: input.receiverPhone.trim(),
+    deliveryRegion: isOverseas ? ("overseas" as const) : ("domestic" as const),
+    shippingMethod,
+    cvsStoreId: cvsStoreId ?? null,
+    cvsStoreName: cvsStoreName ?? null,
+    cvsType: cvsType ?? null,
+    shippingAddress: shippingAddress ?? null,
+    receiverZipCode: receiverZipCode ?? null,
+  };
+
+  // 商品尾款與運費皆為 0 時，不建立金流交易；只確認配送資料並完成尾款。
+  // 舊的已付款零尾款記錄會在上方被擋下，不會被這段回溯修改。
+  if (totalAmount === 0) {
+    const now = new Date();
+    const completed = await db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balancePayment.id} FOR UPDATE`
+      );
+      const [currentBalance] = await tx
+        .select({ paymentStatus: orderBalancePayments.paymentStatus })
+        .from(orderBalancePayments)
+        .where(eq(orderBalancePayments.id, balancePayment.id))
+        .limit(1);
+      if (
+        !currentBalance ||
+        !["pending", "failed"].includes(currentBalance.paymentStatus)
+      )
+        return false;
+
+      await tx
+        .update(orderBalancePayments)
+        .set({
+          paymentMethod: input.paymentMethod,
+          shippingFee: 0,
+          paymentFee: 0,
+          totalAmount: 0,
+          paymentStatus: "paid",
+          tradeNo: "NO_PAYMENT_REQUIRED",
+          ecpayNotifyData: {
+            source: "zero_balance_shipping_confirmation",
+            confirmedAt: now.toISOString(),
+          },
+          paidAt: now,
+        })
+        .where(eq(orderBalancePayments.id, balancePayment.id));
+
+      await tx
+        .update(orders)
+        .set({
+          ...orderUpdate,
+          orderStatus: "paid",
+          paymentStatus: "confirmed",
+          confirmedAt: now,
+          paidAt: now,
+          totalAmount: Math.max(
+            1,
+            balancePayment.order.totalAmount -
+              (balancePayment.totalAmount ?? balancePayment.amount)
+          ),
+        })
+        .where(eq(orders.id, balancePayment.orderId));
+      return true;
+    });
+    if (!completed) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "尾款狀態已更新，請重新整理頁面",
+      });
+    }
+    return {
+      kind: "no_payment" as const,
+      amount: 0,
+      shippingFee: 0,
+      paymentFee: 0,
+    };
+  }
+
+  if (input.paymentMethod === "credit") {
+    let attempt;
+    try {
+      attempt = await createBalancePaymentAttempt({
+        balancePaymentId: balancePayment.id,
+        amount: balancePayment.amount,
+        shippingFee: feeSummary.shippingFee,
+        paymentFee: feeSummary.paymentFee,
+        totalAmount,
+        checkoutData: {
+          orderUpdate,
+          clearQuartzChipsAddOn: clearQuartzChipsAddOn
+            ? {
+                productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+                productName: clearQuartzChipsAddOn.name,
+                productImage: clearQuartzChipsAddOn.image,
+                quantity: 1,
+                unitPrice: clearQuartzChipsAddOn.price,
+                subtotal: clearQuartzChipsAddOn.price,
+              }
+            : null,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "Inactive balance payment cannot be retried"
+      ) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "尾款狀態已更新，請重新整理頁面",
+        });
+      }
+      throw error;
+    }
+
+    const origin = siteBaseUrl(ctx.req);
+    const paymentParams = buildCreditPaymentParams({
+      merchantTradeNo: attempt.merchantTradeNo,
+      tradeDesc: "椛Crystal客製化尾款",
+      itemName: balanceItems
+        .map(item => `${item.name} x${item.quantity}`)
+        .join("#"),
+      totalAmount,
+      returnURL: `${origin}/api/ecpay/notify`,
+      orderResultURL: `${origin}/api/ecpay/balance-result`,
+      clientBackURL: `${origin}/balance/${encodeURIComponent(balancePayment.merchantTradeNo)}`,
+    });
+
+    return {
+      kind: "credit" as const,
+      paymentURL: ECPAY_CONFIG.PaymentURL,
+      paymentParams,
+      amount: totalAmount,
+      shippingFee: feeSummary.shippingFee,
+      paymentFee: feeSummary.paymentFee,
+    };
+  }
+
+  await db
+    .update(orderBalancePayments)
+    .set({
+      paymentMethod: input.paymentMethod,
+      shippingFee: feeSummary.shippingFee,
+      paymentFee: feeSummary.paymentFee,
+      totalAmount,
+      paymentStatus: "pending",
+      tradeNo: null,
+      ecpayNotifyData: null,
+      paidAt: null,
+    })
+    .where(eq(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
+
+  const [existingClearQuartzItem] = await db
+    .select()
+    .from(orderItems)
+    .where(
+      and(
+        eq(orderItems.orderId, balancePayment.orderId),
+        eq(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)
+      )
+    )
+    .limit(1);
+
+  if (clearQuartzChipsAddOn) {
+    const itemValues = {
+      productName: clearQuartzChipsAddOn.name,
+      productImage: clearQuartzChipsAddOn.image,
+      quantity: 1,
+      unitPrice: clearQuartzChipsAddOn.price,
+      subtotal: clearQuartzChipsAddOn.price,
+      isPreorder: false,
+    };
+    if (existingClearQuartzItem) {
+      await db
+        .update(orderItems)
+        .set(itemValues)
+        .where(eq(orderItems.id, existingClearQuartzItem.id));
+    } else {
+      await db.insert(orderItems).values({
+        orderId: balancePayment.orderId,
+        productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
+        ...itemValues,
+      });
+    }
+  }
+
+  await db
+    .update(orders)
+    .set({
+      ...orderUpdate,
+      totalAmount:
+        balancePayment.order.totalAmount -
+        (balancePayment.totalAmount ?? balancePayment.amount) +
+        totalAmount,
+      ...(clearQuartzChipsAddOn ? { inventoryDeducted: false } : {}),
+    })
+    .where(eq(orders.id, balancePayment.orderId));
+
+  return {
+    kind: "atm" as const,
+    amount: totalAmount,
+    shippingFee: feeSummary.shippingFee,
+    paymentFee: feeSummary.paymentFee,
+    bankInfo: STORE_BANK_INFO,
+  };
+}
+
 export const orderRouter = router({
   /**
    * 建立訂單並取得付款資訊
@@ -791,6 +1207,7 @@ export const orderRouter = router({
           customerNote: z.string().max(10000).optional(),
           // 只接受會員持有的優惠券 ID；折抵金額一律由伺服器重新計算
           memberCouponId: z.number().int().positive().optional(),
+          expectedPromotion: z.object({ id: z.number().nullable(), discount: z.number().int().min(0), subtotal: z.number().int().min(0).optional() }).optional(),
         })
         .superRefine((data, ctx) => {
           const isCustomDepositCheckout = data.items
@@ -890,6 +1307,14 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "購物車沒有可結帳商品" });
       }
       const isCustomOrder = isCustomDepositProduct(submittedItems);
+      const qualifiedAt = new Date();
+      const activePromotion = await getActivePromotion(qualifiedAt);
+      const productSubtotal = submittedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const activityDiscount = isCustomOrder ? 0 : promotionDiscount(productSubtotal, activePromotion);
+      if (input.expectedPromotion && (input.expectedPromotion.id !== (activePromotion?.id ?? null) || input.expectedPromotion.discount !== activityDiscount || (input.expectedPromotion.subtotal != null && input.expectedPromotion.subtotal !== productSubtotal))) {
+        throw new TRPCError({ code: "CONFLICT", message: "活動或商品金額已更新，請重新整理結帳頁確認金額" });
+      }
+      if (isCustomOrder && input.memberCouponId != null) throw new TRPCError({ code: "BAD_REQUEST", message: "客製優惠券請於最終報價後在尾款使用" });
       const checkoutRegion = isCustomOrder ? ("domestic" as const) : input.checkoutRegion;
       const isOverseas = checkoutRegion === "overseas";
       const shippingMethod = isCustomOrder ? ("home" as const) : isOverseas ? ("home" as const) : input.shippingMethod;
@@ -974,7 +1399,8 @@ export const orderRouter = router({
           configurationSnapshot: null,
         });
       }
-      let totalAmount = feeSummary.total;
+      if (activityDiscount > 0) feeItems.push({ id: PROMOTION_DISCOUNT_PRODUCT_ID, baseProductId: PROMOTION_DISCOUNT_PRODUCT_ID, name: `活動折抵 - ${activePromotion!.name}`, price: -activityDiscount, quantity: 1, image: "", configurationSnapshot: null });
+      let totalAmount = feeSummary.total - activityDiscount;
       const couponUserId = ctx.user?.id ?? null;
       let couponToReserve: { id: number } | null = null;
       if (input.memberCouponId != null) {
@@ -990,7 +1416,7 @@ export const orderRouter = router({
         }
         const productSubtotal = submittedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const discount = calcCouponDiscount({
-          subtotal: productSubtotal,
+          subtotal: productSubtotal - activityDiscount,
           shippingFee: feeSummary.shippingFee,
           coupon,
         });
@@ -1040,6 +1466,9 @@ export const orderRouter = router({
         isPreorder,
         isCustomOrder,
         totalAmount,
+        createdAt: qualifiedAt,
+        promotionFlowVersion: PROMOTION_FLOW_VERSION,
+        promotion: activePromotion ? { rule: activePromotion, qualifiedAt: qualifiedAt.toISOString(), discount: activityDiscount } : null,
         buyerName: input.buyerName,
         buyerEmail,
         buyerPhone: input.buyerPhone,
@@ -1579,6 +2008,12 @@ export const orderRouter = router({
       if (!mainOrder) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "找不到可作為主訂單的訂單" });
       }
+      const promotionOrders = rows.filter(usesPromotionFlow);
+      if (promotionOrders.length > 0 && promotionOrders.length !== rows.length) throw new TRPCError({ code: "BAD_REQUEST", message: "新舊流程訂單暫不支援跨版本合併；請分別處理尾款" });
+      if (promotionOrders.length > 0) {
+        const activeBalances = await db.select().from(orderBalancePayments).where(inArray(orderBalancePayments.orderId, orderIds));
+        if (activeBalances.length) throw new TRPCError({ code: "BAD_REQUEST", message: "請在產生尾款連結前合併訂單，避免既有付款連結金額失效" });
+      }
       const mergeCode = generateOrderMergeCode();
 
       await db.insert(orderMergeGroups).values({
@@ -1668,11 +2103,16 @@ export const orderRouter = router({
       return { success: true, freeShippingOverride: input.freeShippingOverride };
     }),
 
+  setCustomFinalPrice: adminProcedure.input(z.object({ orderId: z.number().int().positive(), finalPrice: z.number().int().min(0).max(10_000_000) })).mutation(async ({ input }) => {
+    try { return await setCustomFinalPrice(input.orderId, input.finalPrice); }
+    catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "設定報價失敗" }); }
+  }),
+
   createBalancePaymentLink: adminProcedure
     .input(
       z.object({
         orderId: z.number(),
-        amount: z.number().int().min(0),
+        amount: z.number().int().min(0).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1690,7 +2130,12 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "被合併訂單不可產生尾款，請從主訂單產生合併尾款" });
       }
 
-      const payment = await createOrReplaceBalancePayment(input);
+      let payment;
+      try {
+        payment = await createOrReplaceBalancePayment(input);
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "產生尾款連結失敗" });
+      }
       const origin = siteBaseUrl(ctx.req);
       return {
         merchantTradeNo: payment.merchantTradeNo,
@@ -1983,84 +2428,19 @@ export const orderRouter = router({
       const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
       if (!balancePayment) {
         enforceRateLimit(ctx.req, ctx.res, "balance-read-miss", 12, 15 * 60_000);
+        return null;
       }
-      return balancePayment;
+      return { ...balancePayment, coupon: usesPromotionFlow(balancePayment.order) ? await getBalanceCoupon(balancePayment.orderId) : null };
     }),
 
   getBalancePaymentCheckout: rateLimitedPublicProcedure({ scope: "balance-write", limit: 20, windowMs: 15 * 60_000 })
-    .input(
-      z
-        .object({
-          merchantTradeNo: z.string().min(1),
-          paymentMethod: z.enum(["credit", "atm"]),
-          includeClearQuartzChips: z.boolean().optional(),
-          checkoutRegion: z.enum(["domestic", "overseas"]),
-          receiverPhone: z.string().min(1).max(32),
-          shippingMethod: z.enum(["cvs_711", "cvs_family", "home"]),
-          cvsStoreId: z.string().optional(),
-          cvsStoreName: z.string().optional(),
-          cvsType: z.string().optional(),
-          shippingAddress: z.string().optional(),
-          receiverZipCode: z.string().optional(),
-          intlCountry: z.string().optional(),
-          intlAddrLine1: z.string().optional(),
-          intlAddrLine2: z.string().optional(),
-          intlCity: z.string().optional(),
-          intlState: z.string().optional(),
-          intlPostalCode: z.string().optional(),
-          origin: z.string().url(),
-        })
-        .superRefine((data, ctx) => {
-          const receiverPhone = data.receiverPhone.trim();
-          if (data.checkoutRegion === "domestic") {
-            if (!/^09\d{8}$/.test(receiverPhone.replace(/\s/g, ""))) {
-              ctx.addIssue({
-                code: "custom",
-                message: "請輸入台灣手機格式（09 開頭共 10 碼）",
-                path: ["receiverPhone"],
-              });
-            }
-            if (data.shippingMethod === "cvs_711" || data.shippingMethod === "cvs_family") {
-              if (!data.cvsStoreId?.trim()) {
-                ctx.addIssue({ code: "custom", message: "請選擇超商門市", path: ["cvsStoreId"] });
-              }
-            }
-            if (data.shippingMethod === "home") {
-              if (!data.shippingAddress?.trim()) {
-                ctx.addIssue({ code: "custom", message: "請填寫收件地址", path: ["shippingAddress"] });
-              }
-              const zip = data.receiverZipCode?.trim() ?? "";
-              if (!/^\d{3,6}$/.test(zip)) {
-                ctx.addIssue({ code: "custom", message: "請填寫郵遞區號", path: ["receiverZipCode"] });
-              }
-            }
-          } else {
-            if (receiverPhone.length < 8) {
-              ctx.addIssue({ code: "custom", message: "請填寫聯絡電話", path: ["receiverPhone"] });
-            }
-            const payload = {
-              intlCountry: data.intlCountry ?? "",
-              intlAddrLine1: data.intlAddrLine1 ?? "",
-              intlAddrLine2: data.intlAddrLine2 ?? "",
-              intlCity: data.intlCity ?? "",
-              intlState: data.intlState ?? "",
-              intlPostalCode: data.intlPostalCode ?? "",
-            };
-            for (const it of validateOverseasAddress(payload)) {
-              ctx.addIssue({
-                code: "custom",
-                message: it.message,
-                path: [it.path as string],
-              });
-            }
-          }
-        })
-    )
+    .input(balanceCheckoutInputSchema)
     .mutation(async ({ input, ctx }) => {
       const balancePayment = await getBalancePaymentDetail(input.merchantTradeNo);
       if (!balancePayment) {
         throw new TRPCError({ code: "NOT_FOUND", message: "找不到尾款資料" });
       }
+      if (!usesPromotionFlow(balancePayment.order)) return legacyBalancePaymentCheckout(input, ctx, balancePayment);
       if (balancePayment.paymentStatus === "paid") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "尾款已付款" });
       }
@@ -2068,6 +2448,7 @@ export const orderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此尾款連結目前不可付款" });
       }
 
+      if ((balancePayment.ecpayNotifyData as { source?: string } | null)?.source === "balance_atm_checkout" && input.paymentMethod !== "atm") throw new TRPCError({ code: "BAD_REQUEST", message: "已產生轉帳金額，請沿用轉帳方式付款" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
@@ -2145,7 +2526,17 @@ export const orderRouter = router({
         forcePaidShipping: Boolean(balancePayment.orderMergeInfo && !forceBalanceFreeShipping),
         chargeShippingWhenSubtotalZero: balancePayment.amount === 0,
       });
-      const totalAmount = feeSummary.total;
+      const activitySummary = balancePromotionTotal(balancePayment.amount, feeSummary.shippingFee, clearQuartzChipsAddOn?.price ?? 0, balancePayment.quote);
+      let totalAmount = activitySummary.total;
+      let balanceCoupon;
+      try {
+        balanceCoupon = await claimBalanceCoupon(balancePayment.orderId, balancePayment.id, ctx.user?.id ?? null, {
+          productAmountAfterPromotion: balancePayment.quote ? Math.max(0, balancePayment.quote.finalPrice - balancePayment.quote.discount) : balancePayment.order.totalAmount,
+          remainingProductAmount: Math.max(0, balancePayment.amount - (balancePayment.quote?.discount ?? 0)),
+        }, input.memberCouponId);
+      } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "優惠券無法使用" }); }
+      totalAmount = Math.max(0, totalAmount - (balanceCoupon?.discount ?? 0));
+      if (input.expectedTotal != null && totalAmount !== input.expectedTotal) throw new TRPCError({ code: "CONFLICT", message: "尾款金額已更新，請重新整理確認後再付款" });
 
       const orderUpdate = {
         buyerPhone: input.receiverPhone.trim(),
@@ -2158,11 +2549,22 @@ export const orderRouter = router({
         receiverZipCode: receiverZipCode ?? null,
       };
 
+      const verifyCurrentBalance = async (tx: Parameters<Parameters<NonNullable<Awaited<ReturnType<typeof getDb>>>["transaction"]>[0]>[0]) => {
+        await tx.execute(sql`SELECT \`id\` FROM \`orders\` WHERE \`id\` = ${balancePayment.orderId} FOR UPDATE`);
+        await tx.execute(sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balancePayment.id} FOR UPDATE`);
+        const [current] = await tx.select().from(orderBalancePayments).where(eq(orderBalancePayments.id, balancePayment.id)).limit(1);
+        const [parent] = await tx.select().from(orders).where(eq(orders.id, balancePayment.orderId)).limit(1);
+        if (!parent || parent.orderStatus === "cancelled" || !current || !["pending", "failed"].includes(current.paymentStatus) || current.amount !== balancePayment.amount || current.totalAmount !== balancePayment.totalAmount || JSON.stringify(await getCustomQuoteSummary(tx, balancePayment.orderId)) !== JSON.stringify(balancePayment.quote)) throw new TRPCError({ code: "CONFLICT", message: "尾款或報價已更新，請重新整理後再付款" });
+        // 既有信用卡表單仍可能付款，不能同時切成轉帳或零元結清。
+        const attempts = await tx.select().from(orderBalancePaymentAttempts).where(and(eq(orderBalancePaymentAttempts.balancePaymentId, balancePayment.id), inArray(orderBalancePaymentAttempts.paymentStatus, ["pending", "superseded"])));
+        if (attempts.length) throw new TRPCError({ code: "CONFLICT", message: "已有信用卡交易進行中，請完成原付款，或付款失敗後重試" });
+      };
       // 商品尾款與運費皆為 0 時，不建立金流交易；只確認配送資料並完成尾款。
       // 舊的已付款零尾款記錄會在上方被擋下，不會被這段回溯修改。
       if (totalAmount === 0) {
         const now = new Date();
         const completed = await db.transaction(async (tx) => {
+          await verifyCurrentBalance(tx);
           await tx.execute(sql`SELECT \`id\` FROM \`orderBalancePayments\` WHERE \`id\` = ${balancePayment.id} FOR UPDATE`);
           const [currentBalance] = await tx
             .select({ paymentStatus: orderBalancePayments.paymentStatus })
@@ -2170,6 +2572,13 @@ export const orderRouter = router({
             .where(eq(orderBalancePayments.id, balancePayment.id))
             .limit(1);
           if (!currentBalance || !["pending", "failed"].includes(currentBalance.paymentStatus)) return false;
+          const [currentOrder] = await tx.select().from(orders).where(eq(orders.id, balancePayment.orderId)).limit(1);
+          if (!currentOrder || currentOrder.orderStatus === "cancelled") return false;
+          if (balanceCoupon) {
+            await tx.update(memberCoupons).set({ status: "used", usedAt: now }).where(and(eq(memberCoupons.id, balanceCoupon.id), eq(memberCoupons.orderId, balancePayment.orderId), eq(memberCoupons.status, "reserved")));
+            await tx.delete(orderItems).where(and(eq(orderItems.orderId, balancePayment.orderId), eq(orderItems.productId, COUPON_DISCOUNT_PRODUCT_ID)));
+            await tx.insert(orderItems).values({ orderId: balancePayment.orderId, productId: COUPON_DISCOUNT_PRODUCT_ID, productName: `優惠券折抵 - ${balanceCoupon.name}`, quantity: 1, unitPrice: -balanceCoupon.discount, subtotal: -balanceCoupon.discount, isPreorder: false });
+          }
 
           await tx
             .update(orderBalancePayments)
@@ -2202,11 +2611,17 @@ export const orderRouter = router({
               ),
             })
             .where(eq(orders.id, balancePayment.orderId));
+          if (clearQuartzChipsAddOn) {
+            await tx.delete(orderItems).where(and(eq(orderItems.orderId, balancePayment.orderId), eq(orderItems.productId, CLEAR_QUARTZ_CHIPS_PRODUCT_ID)));
+            await tx.insert(orderItems).values({ orderId: balancePayment.orderId, productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID, productName: clearQuartzChipsAddOn.name, productImage: clearQuartzChipsAddOn.image, quantity: 1, unitPrice: clearQuartzChipsAddOn.price, subtotal: clearQuartzChipsAddOn.price, isPreorder: false });
+            await tx.update(orders).set({ inventoryDeducted: false }).where(eq(orders.id, balancePayment.orderId));
+          }
           return true;
         });
         if (!completed) {
           throw new TRPCError({ code: "CONFLICT", message: "尾款狀態已更新，請重新整理頁面" });
         }
+        if (clearQuartzChipsAddOn) await deductInventoryAfterBalancePayment(input.merchantTradeNo);
         return {
           kind: "no_payment" as const,
           amount: 0,
@@ -2224,7 +2639,11 @@ export const orderRouter = router({
             shippingFee: feeSummary.shippingFee,
             paymentFee: feeSummary.paymentFee,
             totalAmount,
+            expectedQuote: balancePayment.quote,
             checkoutData: {
+              promotionFlowVersion: PROMOTION_FLOW_VERSION,
+              coupon: balanceCoupon ? { id: balanceCoupon.id, name: balanceCoupon.name, discount: balanceCoupon.discount } : null,
+              promotionDiscount: activitySummary.discount,
               orderUpdate,
               clearQuartzChipsAddOn: clearQuartzChipsAddOn
                 ? {
@@ -2266,7 +2685,9 @@ export const orderRouter = router({
         };
       }
 
-      await db.update(orderBalancePayments)
+      await db.transaction(async tx => {
+        await verifyCurrentBalance(tx);
+      await tx.update(orderBalancePayments)
         .set({
           paymentMethod: input.paymentMethod,
           shippingFee: feeSummary.shippingFee,
@@ -2274,12 +2695,12 @@ export const orderRouter = router({
           totalAmount,
           paymentStatus: "pending",
           tradeNo: null,
-          ecpayNotifyData: null,
+          ecpayNotifyData: { source: "balance_atm_checkout" },
           paidAt: null,
         })
         .where(eq(orderBalancePayments.merchantTradeNo, input.merchantTradeNo));
 
-      const [existingClearQuartzItem] = await db
+      const [existingClearQuartzItem] = await tx
         .select()
         .from(orderItems)
         .where(and(
@@ -2298,11 +2719,11 @@ export const orderRouter = router({
           isPreorder: false,
         };
         if (existingClearQuartzItem) {
-          await db.update(orderItems)
+          await tx.update(orderItems)
             .set(itemValues)
             .where(eq(orderItems.id, existingClearQuartzItem.id));
         } else {
-          await db.insert(orderItems).values({
+          await tx.insert(orderItems).values({
             orderId: balancePayment.orderId,
             productId: CLEAR_QUARTZ_CHIPS_PRODUCT_ID,
             ...itemValues,
@@ -2310,7 +2731,7 @@ export const orderRouter = router({
         }
       }
 
-      await db.update(orders)
+      await tx.update(orders)
         .set({
           ...orderUpdate,
           totalAmount: balancePayment.order.totalAmount - (balancePayment.totalAmount ?? balancePayment.amount) + totalAmount,
@@ -2318,6 +2739,11 @@ export const orderRouter = router({
         })
         .where(eq(orders.id, balancePayment.orderId));
 
+      if (balanceCoupon) {
+        await tx.delete(orderItems).where(and(eq(orderItems.orderId, balancePayment.orderId), eq(orderItems.productId, COUPON_DISCOUNT_PRODUCT_ID)));
+        await tx.insert(orderItems).values({ orderId: balancePayment.orderId, productId: COUPON_DISCOUNT_PRODUCT_ID, productName: `優惠券折抵 - ${balanceCoupon.name}`, quantity: 1, unitPrice: -balanceCoupon.discount, subtotal: -balanceCoupon.discount, isPreorder: false });
+      }
+      });
       return {
         kind: "atm" as const,
         amount: totalAmount,
