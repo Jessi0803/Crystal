@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   usesPromotionFlow,
+  promotionProductSubtotal,
   promotionDiscount,
   promotionNextThreshold,
   quoteCustomPromotion,
@@ -105,5 +106,38 @@ describe("新舊訂單流程分界（不依日期或目前活動推測）", () =
   it("只有建立訂單時明確寫入版本 1 才進入新流程", () => {
     expect(usesPromotionFlow({ promotionFlowVersion: 1 })).toBe(true);
     expect(usesPromotionFlow({ promotionFlowVersion: 0 })).toBe(false);
+  });
+});
+
+describe("同筆客製訂金與一般商品", () => {
+  it("首單一般商品要計入門檻，但尾款本金不重收一般商品", () => {
+    const quote = quoteCustomPromotion(2000, 500, rule, 2500);
+    expect(promotionProductSubtotal(quote)).toBe(4500);
+    expect(quote.discount).toBe(444);
+    const balancePrincipal = quote.finalPrice - quote.depositPaid;
+    expect(balancePrincipal).toBe(1500);
+    expect(balancePromotionTotal(balancePrincipal, 130, 0, quote).total).toBe(
+      1186
+    );
+    expect(
+      balanceCouponDiscount({
+        productAmountAfterPromotion:
+          promotionProductSubtotal(quote) - quote.discount,
+        remainingProductAmount: balancePrincipal - quote.discount,
+        coupon: { discountAmount: 100, minOrderAmount: 4000 },
+      })
+    ).toEqual({ ok: true, discount: 100 });
+  });
+  it("沒有活動時也不重收首單商品，舊格式報價不追溯改價", () => {
+    const quote = quoteCustomPromotion(2000, 500, null, 2500);
+    expect(quote.discount).toBe(0);
+    expect(balancePromotionTotal(1500, 130, 0, quote).total).toBe(1630);
+    expect(
+      promotionProductSubtotal({
+        finalPrice: 2000,
+        depositPaid: 500,
+        discount: 111,
+      })
+    ).toBe(2000);
   });
 });

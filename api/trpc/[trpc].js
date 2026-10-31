@@ -1461,9 +1461,12 @@ function promotionDiscount(subtotal, rule) {
     Math.floor(subtotal / rule.threshold) * rule.discountAmount
   );
 }
-function quoteCustomPromotion(finalPrice, depositPaid, rule) {
-  const discount = promotionDiscount(finalPrice, rule);
-  return { finalPrice, depositPaid, discount };
+function quoteCustomPromotion(finalPrice, depositPaid, rule, paidRegularSubtotal = 0) {
+  const discount = promotionDiscount(finalPrice + paidRegularSubtotal, rule);
+  return { finalPrice, depositPaid, paidRegularSubtotal, discount };
+}
+function promotionProductSubtotal(quote) {
+  return quote.finalPrice + (quote.paidRegularSubtotal ?? 0);
 }
 function balancePromotionTotal(amount, shippingFee, addOn, quote) {
   const discount = quote?.discount ?? 0;
@@ -1483,7 +1486,7 @@ function balanceCouponDiscount(params) {
   if (params.productAmountAfterPromotion < params.coupon.minOrderAmount)
     return {
       ok: false,
-      reason: `\u672A\u9054\u6D3B\u52D5\u5F8C\u6700\u4F4E\u6D88\u8CBB NT$ ${params.coupon.minOrderAmount.toLocaleString()}`
+      reason: `\u672A\u9054\u512A\u60E0\u5238\u4F7F\u7528\u9580\u6ABB NT$ ${params.coupon.minOrderAmount.toLocaleString()}`
     };
   const discount = Math.min(
     params.coupon.discountAmount,
@@ -2024,7 +2027,7 @@ async function claimBalanceCoupon(orderId, balanceId, userId, amounts, couponId)
     }
     if (attached) {
       if (couponId != null && couponId !== attached.id)
-        throw new Error("\u5C3E\u6B3E\u5DF2\u4FDD\u7559\u512A\u60E0\u5238\uFF0C\u8ACB\u6CBF\u7528\u539F\u5238\u5B8C\u6210\u4ED8\u6B3E");
+        throw new Error("\u6B64\u7B46\u5C3E\u6B3E\u5DF2\u5957\u7528\u512A\u60E0\u5238\uFF0C\u8ACB\u4F7F\u7528\u539F\u5238\u5B8C\u6210\u4ED8\u6B3E\u3002");
       const preview2 = balanceCouponDiscount({ ...amounts, coupon: attached });
       if (!preview2.ok) throw new Error(preview2.reason);
       return { ...attached, discount: preview2.discount };
@@ -2041,7 +2044,7 @@ async function claimBalanceCoupon(orderId, balanceId, userId, amounts, couponId)
     );
     if (attempts.length)
       throw new Error(
-        "\u5DF2\u6709\u4FE1\u7528\u5361\u4ED8\u6B3E\u9032\u884C\u4E2D\uFF0C\u8ACB\u52FF\u65B0\u589E\u512A\u60E0\u5238\uFF0C\u4EE5\u514D\u4ED8\u6B3E\u91D1\u984D\u4E0D\u4E00\u81F4"
+        "\u4FE1\u7528\u5361\u4ED8\u6B3E\u5DF2\u958B\u59CB\uFF0C\u76EE\u524D\u7121\u6CD5\u66F4\u63DB\u512A\u60E0\u5238\u3002"
       );
     if (userId == null || order.userId !== userId)
       throw new Error("\u8ACB\u767B\u5165\u539F\u8A02\u8CFC\u6703\u54E1\u5E33\u865F\u624D\u80FD\u4F7F\u7528\u512A\u60E0\u5238");
@@ -2064,7 +2067,7 @@ async function claimBalanceCoupon(orderId, balanceId, userId, amounts, couponId)
       )
     );
     if (getAffectedRows(result) === 0)
-      throw new Error("\u512A\u60E0\u5238\u5DF2\u88AB\u4F7F\u7528\u6216\u4FDD\u7559\uFF0C\u8ACB\u91CD\u65B0\u9078\u64C7");
+      throw new Error("\u9019\u5F35\u512A\u60E0\u5238\u76EE\u524D\u7121\u6CD5\u4F7F\u7528\uFF0C\u8ACB\u91CD\u65B0\u9078\u64C7\u3002");
     return {
       ...coupon,
       status: "reserved",
@@ -2882,12 +2885,15 @@ function createLogisticsEventKey(input) {
 function generateBalanceMerchantTradeNo() {
   return `CB${crypto.randomBytes(9).toString("hex").toUpperCase()}`;
 }
-async function getCustomQuoteSummary(db, orderId) {
+async function getCustomQuoteOrders(db, orderId) {
   const [membership] = await db.select().from(orderMergeMembers).where(eq7(orderMergeMembers.orderId, orderId)).limit(1);
   const members = membership ? await db.select().from(orderMergeMembers).where(eq7(orderMergeMembers.groupId, membership.groupId)) : [];
   const ids = members.length ? members.map((member) => member.orderId) : [orderId];
   const rows = await db.select().from(orders).where(inArray2(orders.id, ids));
-  const customRows = rows.filter((row) => row.isCustomOrder);
+  return rows.filter((row) => row.isCustomOrder);
+}
+async function getCustomQuoteSummary(db, orderId) {
+  const customRows = await getCustomQuoteOrders(db, orderId);
   if (!customRows.some(usesPromotionFlow)) return null;
   if (customRows.some((row) => !usesPromotionFlow(row)))
     throw new Error("\u65B0\u820A\u6D41\u7A0B\u8A02\u55AE\u4E0D\u53EF\u5408\u4F75\u5831\u50F9");
@@ -2897,16 +2903,68 @@ async function getCustomQuoteSummary(db, orderId) {
     (sum, row) => ({
       finalPrice: sum.finalPrice + row.customQuote.finalPrice,
       depositPaid: sum.depositPaid + row.customQuote.depositPaid,
+      paidRegularSubtotal: (sum.paidRegularSubtotal ?? 0) + (row.customQuote.paidRegularSubtotal ?? 0),
       discount: sum.discount + row.customQuote.discount
     }),
-    { finalPrice: 0, depositPaid: 0, discount: 0 }
+    { finalPrice: 0, depositPaid: 0, paidRegularSubtotal: 0, discount: 0 }
   );
+}
+async function saveCustomQuote(tx, orderId, input) {
+  const [order] = await tx.select().from(orders).where(eq7(orders.id, orderId)).limit(1);
+  if (!order || !usesPromotionFlow(order))
+    throw new Error("\u820A\u8A02\u55AE\u8ACB\u6CBF\u7528\u539F\u672C\u7684\u5546\u54C1\u5C3E\u6B3E\u8F38\u5165\u6D41\u7A0B");
+  if (!order.isCustomOrder || order.orderStatus !== "deposit_paid")
+    throw new Error("\u50C5\u80FD\u8A2D\u5B9A\u5DF2\u4ED8\u8A02\u91D1\u7684\u5BA2\u88FD\u8A02\u55AE\u7E3D\u50F9");
+  const items = await tx.select().from(orderItems).where(eq7(orderItems.orderId, orderId));
+  const depositPaid = items.filter((item) => CUSTOM_PRODUCT_IDS.includes(item.productId)).reduce((sum, item) => sum + item.subtotal, 0);
+  const finalPrice = "remainingAmount" in input ? depositPaid + input.remainingAmount : input.finalPrice;
+  if (!Number.isSafeInteger(finalPrice) || finalPrice > 1e7)
+    throw new Error("\u5BA2\u88FD\u5546\u54C1\u91D1\u984D\u904E\u5927");
+  const paidRegularSubtotal = items.filter(
+    (item) => !CUSTOM_PRODUCT_IDS.includes(item.productId) && !NON_PRODUCT_ORDER_ITEM_IDS.includes(item.productId)
+  ).reduce((sum, item) => sum + item.subtotal, 0);
+  if (finalPrice < depositPaid)
+    throw new Error("\u6700\u7D42\u7E3D\u50F9\u4E0D\u53EF\u4F4E\u65BC\u5DF2\u4ED8\u8A02\u91D1\uFF1B\u5982\u9700\u9000\u6B3E\u8ACB\u53E6\u884C\u8655\u7406");
+  const quote = quoteCustomPromotion(
+    finalPrice,
+    depositPaid,
+    order.promotion?.rule,
+    paidRegularSubtotal
+  );
+  await tx.update(orders).set({
+    customQuote: quote,
+    ...order.promotion ? {
+      promotion: {
+        ...order.promotion,
+        discount: quote.discount,
+        quote
+      }
+    } : {}
+  }).where(eq7(orders.id, orderId));
+  await tx.delete(orderItems).where(
+    and5(
+      eq7(orderItems.orderId, orderId),
+      eq7(orderItems.productId, PROMOTION_DISCOUNT_PRODUCT_ID)
+    )
+  );
+  if (quote.discount > 0)
+    await tx.insert(orderItems).values({
+      orderId,
+      productId: PROMOTION_DISCOUNT_PRODUCT_ID,
+      productName: `\u6D3B\u52D5\u6298\u62B5\uFF08\u5C3E\u6B3E\uFF09- ${order.promotion.rule.name}`,
+      quantity: 1,
+      unitPrice: -quote.discount,
+      subtotal: -quote.discount,
+      isPreorder: false
+    });
+  return quote;
 }
 async function setCustomFinalPrice(orderId, finalPrice) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const [targetOrder] = await db.select().from(orders).where(eq7(orders.id, orderId)).limit(1);
-  if (!targetOrder || !usesPromotionFlow(targetOrder)) throw new Error("\u820A\u8A02\u55AE\u8ACB\u6CBF\u7528\u539F\u672C\u7684\u5546\u54C1\u5C3E\u6B3E\u8F38\u5165\u6D41\u7A0B");
+  if (!targetOrder || !usesPromotionFlow(targetOrder))
+    throw new Error("\u820A\u8A02\u55AE\u8ACB\u6CBF\u7528\u539F\u672C\u7684\u5546\u54C1\u5C3E\u6B3E\u8F38\u5165\u6D41\u7A0B");
   const context = await getMergeDetailForOrder(db, orderId);
   const mainOrderId = context?.mainOrderId ?? orderId;
   return db.transaction(async (tx) => {
@@ -2932,47 +2990,7 @@ async function setCustomFinalPrice(orderId, finalPrice) {
       )
     ).limit(1);
     if (reservedCoupon) throw new Error("\u5C3E\u6B3E\u5DF2\u4FDD\u7559\u512A\u60E0\u5238\uFF0C\u8ACB\u52FF\u4FEE\u6539\u5831\u50F9");
-    const [order] = await tx.select().from(orders).where(eq7(orders.id, orderId)).limit(1);
-    if (!order || !usesPromotionFlow(order))
-      throw new Error("\u820A\u8A02\u55AE\u8ACB\u6CBF\u7528\u539F\u672C\u7684\u5546\u54C1\u5C3E\u6B3E\u8F38\u5165\u6D41\u7A0B");
-    if (!order.isCustomOrder || order.orderStatus !== "deposit_paid")
-      throw new Error("\u50C5\u80FD\u8A2D\u5B9A\u5DF2\u4ED8\u8A02\u91D1\u7684\u5BA2\u88FD\u8A02\u55AE\u7E3D\u50F9");
-    const items = await tx.select().from(orderItems).where(eq7(orderItems.orderId, orderId));
-    const depositPaid = items.filter((item) => CUSTOM_PRODUCT_IDS.includes(item.productId)).reduce((sum, item) => sum + item.subtotal, 0);
-    if (finalPrice < depositPaid)
-      throw new Error("\u6700\u7D42\u7E3D\u50F9\u4E0D\u53EF\u4F4E\u65BC\u5DF2\u4ED8\u8A02\u91D1\uFF1B\u5982\u9700\u9000\u6B3E\u8ACB\u53E6\u884C\u8655\u7406");
-    const quote = quoteCustomPromotion(
-      finalPrice,
-      depositPaid,
-      order.promotion?.rule
-    );
-    await tx.update(orders).set({
-      customQuote: quote,
-      ...order.promotion ? {
-        promotion: {
-          ...order.promotion,
-          discount: quote.discount,
-          quote
-        }
-      } : {}
-    }).where(eq7(orders.id, orderId));
-    await tx.delete(orderItems).where(
-      and5(
-        eq7(orderItems.orderId, orderId),
-        eq7(orderItems.productId, PROMOTION_DISCOUNT_PRODUCT_ID)
-      )
-    );
-    if (quote.discount > 0)
-      await tx.insert(orderItems).values({
-        orderId,
-        productId: PROMOTION_DISCOUNT_PRODUCT_ID,
-        productName: `\u6D3B\u52D5\u6298\u62B5\uFF08\u5C3E\u6B3E\uFF09- ${order.promotion.rule.name}`,
-        quantity: 1,
-        unitPrice: -quote.discount,
-        subtotal: -quote.discount,
-        isPreorder: false
-      });
-    return quote;
+    return saveCustomQuote(tx, orderId, { finalPrice });
   });
 }
 async function legacyCreateOrReplaceBalancePayment(opts) {
@@ -2987,7 +3005,10 @@ async function legacyCreateOrReplaceBalancePayment(opts) {
   }
   const linkMerchantTradeNo = existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
   const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
-  const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
+  const nextTotalAmount = Math.max(
+    1,
+    order.totalAmount - previousBalanceTotal + opts.amount
+  );
   await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq7(orders.id, opts.orderId));
   if (existing) {
     await db.update(orderBalancePayments).set({
@@ -3022,6 +3043,7 @@ async function createOrReplaceBalancePayment(opts) {
   const [targetOrder] = await db.select().from(orders).where(eq7(orders.id, opts.orderId)).limit(1);
   if (!targetOrder) throw new Error("Order not found");
   if (!usesPromotionFlow(targetOrder)) {
+    if (opts.balances) throw new Error("\u820A\u8A02\u55AE\u8ACB\u6CBF\u7528\u539F\u672C\u5408\u4F75\u5C3E\u6B3E\u8F38\u5165\u65B9\u5F0F");
     if (opts.amount == null) throw new Error("\u820A\u8A02\u55AE\u8ACB\u8F38\u5165\u5546\u54C1\u5C3E\u6B3E\u91D1\u984D");
     return legacyCreateOrReplaceBalancePayment({
       orderId: opts.orderId,
@@ -3044,10 +3066,6 @@ async function createOrReplaceBalancePayment(opts) {
       )
     ).limit(1);
     if (reservedCoupon) throw new Error("\u5C3E\u6B3E\u5DF2\u4FDD\u7559\u512A\u60E0\u5238\uFF0C\u8ACB\u6CBF\u7528\u65E2\u6709\u4ED8\u6B3E\u9023\u7D50");
-    const quote = await getCustomQuoteSummary(tx, opts.orderId);
-    if (!quote && opts.amount == null) throw new Error("\u8ACB\u5148\u8A2D\u5B9A\u6700\u7D42\u7E3D\u50F9");
-    const amount = quote ? quote.finalPrice - quote.depositPaid : opts.amount;
-    const totalAmount = Math.max(0, amount - (quote?.discount ?? 0));
     const [existing] = await tx.select(balancePaymentLegacySelect).from(orderBalancePayments).where(eq7(orderBalancePayments.orderId, opts.orderId)).limit(1);
     if (existing) {
       await tx.execute(
@@ -3059,6 +3077,28 @@ async function createOrReplaceBalancePayment(opts) {
       ))
         throw new Error("\u5C3E\u6B3E\u5DF2\u9032\u5165\u4ED8\u6B3E\u6D41\u7A0B\uFF0C\u4E0D\u53EF\u91CD\u8A2D\u91D1\u984D");
     }
+    if (opts.amount != null || opts.balances) {
+      if (opts.amount != null && opts.balances)
+        throw new Error("\u8ACB\u9078\u64C7\u55AE\u7B46\u6216\u9010\u55AE\u5C3E\u6B3E\u8F38\u5165\u65B9\u5F0F");
+      const customOrders = await getCustomQuoteOrders(tx, opts.orderId);
+      const entries = opts.balances ?? [
+        { orderId: opts.orderId, amount: opts.amount }
+      ];
+      const expectedIds = new Set(customOrders.map((row) => row.id));
+      if (entries.length !== expectedIds.size || new Set(entries.map((entry) => entry.orderId)).size !== entries.length || entries.some((entry) => !expectedIds.has(entry.orderId)))
+        throw new Error("\u5408\u4F75\u8A02\u55AE\u8ACB\u9010\u55AE\u8F38\u5165\u5C1A\u9700\u88DC\u4ED8\u7684\u5BA2\u88FD\u5C3E\u6B3E");
+      for (const entry of entries) {
+        if (!Number.isSafeInteger(entry.amount) || entry.amount < 0 || entry.amount > 1e7)
+          throw new Error("\u8ACB\u8F38\u5165\u6709\u6548\u7684\u5BA2\u88FD\u5C3E\u6B3E\u91D1\u984D");
+        await saveCustomQuote(tx, entry.orderId, {
+          remainingAmount: entry.amount
+        });
+      }
+    }
+    const quote = await getCustomQuoteSummary(tx, opts.orderId);
+    if (!quote) throw new Error("\u8ACB\u8F38\u5165\u5C1A\u9700\u88DC\u4ED8\u7684\u5BA2\u88FD\u5C3E\u6B3E");
+    const amount = quote.finalPrice - quote.depositPaid;
+    const totalAmount = Math.max(0, amount - quote.discount);
     const merchantTradeNo = existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
     const values = {
       amount,
@@ -6407,7 +6447,8 @@ var orderRouter = router({
   createBalancePaymentLink: adminProcedure.input(
     z3.object({
       orderId: z3.number(),
-      amount: z3.number().int().min(0).optional()
+      amount: z3.number().int().min(0).optional(),
+      balances: z3.array(z3.object({ orderId: z3.number().int().positive(), amount: z3.number().int().min(0).max(1e7) })).min(1).max(20).optional()
     })
   ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
@@ -6428,6 +6469,7 @@ var orderRouter = router({
     return {
       merchantTradeNo: payment.merchantTradeNo,
       amount: payment.amount,
+      payableAmount: payment.totalAmount ?? payment.amount,
       paymentLink: `${origin}/balance/${encodeURIComponent(payment.merchantTradeNo)}`
     };
   }),
@@ -6724,7 +6766,7 @@ var orderRouter = router({
     let balanceCoupon;
     try {
       balanceCoupon = await claimBalanceCoupon(balancePayment.orderId, balancePayment.id, ctx.user?.id ?? null, {
-        productAmountAfterPromotion: balancePayment.quote ? Math.max(0, balancePayment.quote.finalPrice - balancePayment.quote.discount) : balancePayment.order.totalAmount,
+        productAmountAfterPromotion: balancePayment.quote ? Math.max(0, promotionProductSubtotal(balancePayment.quote) - balancePayment.quote.discount) : balancePayment.order.totalAmount,
         remainingProductAmount: Math.max(0, balancePayment.amount - (balancePayment.quote?.discount ?? 0))
       }, input.memberCouponId);
     } catch (error) {

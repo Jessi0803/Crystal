@@ -815,7 +815,7 @@ export async function claimBalanceCoupon(
     }
     if (attached) {
       if (couponId != null && couponId !== attached.id)
-        throw new Error("尾款已保留優惠券，請沿用原券完成付款");
+        throw new Error("此筆尾款已套用優惠券，請使用原券完成付款。");
       const preview = balanceCouponDiscount({ ...amounts, coupon: attached });
       if (!preview.ok) throw new Error(preview.reason);
       return { ...attached, discount: preview.discount };
@@ -835,7 +835,7 @@ export async function claimBalanceCoupon(
       );
     if (attempts.length)
       throw new Error(
-        "已有信用卡付款進行中，請勿新增優惠券，以免付款金額不一致"
+        "信用卡付款已開始，目前無法更換優惠券。"
       );
     if (userId == null || order.userId !== userId)
       throw new Error("請登入原訂購會員帳號才能使用優惠券");
@@ -865,7 +865,7 @@ export async function claimBalanceCoupon(
         )
       );
     if (getAffectedRows(result) === 0)
-      throw new Error("優惠券已被使用或保留，請重新選擇");
+      throw new Error("這張優惠券目前無法使用，請重新選擇。");
     return {
       ...coupon,
       status: "reserved" as const,

@@ -7,7 +7,7 @@ export function balanceCouponDiscount(params: {
   if (params.productAmountAfterPromotion < params.coupon.minOrderAmount)
     return {
       ok: false as const,
-      reason: `未達活動後最低消費 NT$ ${params.coupon.minOrderAmount.toLocaleString()}`,
+      reason: `未達優惠券使用門檻 NT$ ${params.coupon.minOrderAmount.toLocaleString()}`,
     };
   const discount = Math.min(
     params.coupon.discountAmount,

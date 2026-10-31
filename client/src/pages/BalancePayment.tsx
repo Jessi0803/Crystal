@@ -1,4 +1,4 @@
-import { usesPromotionFlow } from "@shared/promotions";
+import { usesPromotionFlow, promotionProductSubtotal } from "@shared/promotions";
 import OrderPromotionSummary from "@/components/OrderPromotionSummary";
 import { balancePromotionTotal } from "@shared/promotions";
 import { balanceCouponDiscount } from "@shared/balanceCoupons";
@@ -410,7 +410,7 @@ export default function BalancePayment() {
     chargeShippingWhenSubtotalZero: data.amount === 0,
   });
   const activitySummary = balancePromotionTotal(data.amount, feeSummary.shippingFee, includeClearQuartzChips && hasLiveClearQuartzChipsProduct ? clearQuartzChipsProduct.price : 0, data.quote);
-  const couponAmounts = { productAmountAfterPromotion: data.quote ? Math.max(0, data.quote.finalPrice - data.quote.discount) : data.order.totalAmount, remainingProductAmount: Math.max(0, data.amount - (data.quote?.discount ?? 0)) };
+  const couponAmounts = { productAmountAfterPromotion: data.quote ? Math.max(0, promotionProductSubtotal(data.quote) - data.quote.discount) : data.order.totalAmount, remainingProductAmount: Math.max(0, data.amount - (data.quote?.discount ?? 0)) };
   const couponOptions = myCoupons.filter(coupon => usesPromotionFlow(data.order) && coupon.displayStatus === "available").map(coupon => ({ coupon, preview: balanceCouponDiscount({ ...couponAmounts, coupon }) }));
   const selectedCoupon = usesPromotionFlow(data.order) ? data.coupon ?? couponOptions.find(option => option.coupon.id === selectedCouponId && option.preview.ok)?.coupon : null;
   const couponPreview = selectedCoupon ? balanceCouponDiscount({ ...couponAmounts, coupon: selectedCoupon }) : null;
@@ -621,11 +621,11 @@ export default function BalancePayment() {
                 NT$ {data.amount.toLocaleString()}
               </span>
             </div>
-            {data.promotionOrders.length > 0 ? data.promotionOrders.map(member => <div key={member.merchantTradeNo}><p className="text-xs">{member.merchantTradeNo}</p><OrderPromotionSummary promotion={member.promotion} quote={member.customQuote} custom/></div>) : <OrderPromotionSummary promotion={data.order.promotion} quote={data.quote} custom/>}
+            {data.promotionOrders.length > 0 ? data.promotionOrders.filter(member => member.promotion && (member.customQuote?.discount ?? 0) > 0).map(member => <div key={member.merchantTradeNo}><p className="text-xs">{member.merchantTradeNo}</p><OrderPromotionSummary promotion={member.promotion} quote={member.customQuote} custom/></div>) : <OrderPromotionSummary promotion={data.order.promotion} quote={data.quote} custom/>}
             {!showPaymentChoice && data.couponItem && <p className="text-sm">{data.couponItem.productName}：−NT$ {Math.abs(data.couponItem.subtotal).toLocaleString()}</p>}
-            {showPaymentChoice && !data.coupon && sessionUser?.id === data.order.userId && couponOptions.length > 0 && <label className="block text-sm font-body">優惠券（低消依完整商品的活動後金額判斷）
+            {showPaymentChoice && !data.coupon && sessionUser?.id === data.order.userId && couponOptions.length > 0 && <label className="block text-sm font-body">優惠券
               <select className="w-full border p-2 mt-2" value={selectedCouponId ?? ''} onChange={event => setSelectedCouponId(event.target.value ? Number(event.target.value) : null)}><option value="">不使用優惠券</option>{couponOptions.map(({ coupon, preview }) => <option key={coupon.id} value={coupon.id} disabled={!preview.ok}>{coupon.name} · {preview.ok ? `折 NT$ ${preview.discount}` : preview.reason}</option>)}</select>
-              <p className="text-xs mt-1">每筆訂單限用一張；送出付款後保留該券，重試沿用原券，取消訂單依原規則退回。</p>
+              <p className="text-xs mt-1">每筆訂單限用一張，限折抵商品金額。</p>
             </label>}
             {showPaymentChoice && (
               <div className="border-t border-sf-line pt-3">

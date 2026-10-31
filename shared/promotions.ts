@@ -9,7 +9,10 @@ export type PromotionRule = {
   endsAt: string;
 };
 export type PromotionQuote = {
+  /** 僅客製商品的完整售價，含訂金，不含首單一般商品與運費。 */
   finalPrice: number;
+  /** 首單已付款的一般商品；舊報價未保存時維持原值 0，需重新報價才更新。 */
+  paidRegularSubtotal?: number;
   depositPaid: number;
   discount: number;
 };
@@ -44,10 +47,15 @@ export function promotionNextThreshold(subtotal: number, rule: PromotionRule) {
 export function quoteCustomPromotion(
   finalPrice: number,
   depositPaid: number,
-  rule?: PromotionRule | null
+  rule?: PromotionRule | null,
+  paidRegularSubtotal = 0
 ) {
-  const discount = promotionDiscount(finalPrice, rule);
-  return { finalPrice, depositPaid, discount };
+  const discount = promotionDiscount(finalPrice + paidRegularSubtotal, rule);
+  return { finalPrice, depositPaid, paidRegularSubtotal, discount };
+}
+/** 門檻包含首單一般商品；應付尾款仍只收客製尚欠本金。 */
+export function promotionProductSubtotal(quote: PromotionQuote) {
+  return quote.finalPrice + (quote.paidRegularSubtotal ?? 0);
 }
 /** 尾款本金尚未折活動；多餘的活動優惠可以繼續折運費，不回抵訂金。 */
 export function balancePromotionTotal(

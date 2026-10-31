@@ -1,4 +1,4 @@
-import { usesPromotionFlow, PROMOTION_FLOW_VERSION } from "../../shared/promotions";
+import { usesPromotionFlow, PROMOTION_FLOW_VERSION, promotionProductSubtotal } from "../../shared/promotions";
 import { memberCoupons, orderBalancePaymentAttempts } from "../../drizzle/schema";
 import { claimBalanceCoupon, getBalanceCoupon } from "../couponDb";
 import { setCustomFinalPrice, getCustomQuoteSummary } from "../orderDb";
@@ -2113,6 +2113,7 @@ export const orderRouter = router({
       z.object({
         orderId: z.number(),
         amount: z.number().int().min(0).optional(),
+        balances: z.array(z.object({ orderId: z.number().int().positive(), amount: z.number().int().min(0).max(10_000_000) })).min(1).max(20).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -2140,6 +2141,7 @@ export const orderRouter = router({
       return {
         merchantTradeNo: payment.merchantTradeNo,
         amount: payment.amount,
+        payableAmount: payment.totalAmount ?? payment.amount,
         paymentLink: `${origin}/balance/${encodeURIComponent(payment.merchantTradeNo)}`,
       };
     }),
@@ -2531,7 +2533,7 @@ export const orderRouter = router({
       let balanceCoupon;
       try {
         balanceCoupon = await claimBalanceCoupon(balancePayment.orderId, balancePayment.id, ctx.user?.id ?? null, {
-          productAmountAfterPromotion: balancePayment.quote ? Math.max(0, balancePayment.quote.finalPrice - balancePayment.quote.discount) : balancePayment.order.totalAmount,
+          productAmountAfterPromotion: balancePayment.quote ? Math.max(0, promotionProductSubtotal(balancePayment.quote) - balancePayment.quote.discount) : balancePayment.order.totalAmount,
           remainingProductAmount: Math.max(0, balancePayment.amount - (balancePayment.quote?.discount ?? 0)),
         }, input.memberCouponId);
       } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "優惠券無法使用" }); }

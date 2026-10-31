@@ -273,10 +273,6 @@ function OrderRowCard({
     }
   );
 
-  const setFinalPrice = trpc.order.setCustomFinalPrice.useMutation({
-    onSuccess: async () => { await utils.order.getOrderDetail.invalidate({ orderId: order.id }); await utils.order.listOrders.invalidate(); toast.success("最終總價已設定，請從主訂單產生尾款連結"); },
-    onError: error => toast.error(error.message),
-  });
   const createBalancePaymentLink = trpc.order.createBalancePaymentLink.useMutation({
     onSuccess: async (data) => {
       await utils.order.getOrderDetail.invalidate({ orderId: order.id });
@@ -284,7 +280,7 @@ function OrderRowCard({
       await utils.order.getStats.invalidate();
       try {
         await navigator.clipboard.writeText(data.paymentLink);
-        toast.success(detail && usesPromotionFlow(detail) ? "尾款／配送連結已產生並複製，活動與運費將於尾款頁列出" : `尾款／配送連結已產生並複製，商品尾款 NT$ ${data.amount.toLocaleString()}`);
+        toast.success(detail && usesPromotionFlow(detail) ? `尾款／配送連結已產生並複製，活動後商品尾款 NT$ ${data.payableAmount.toLocaleString()}（運費另計）` : `尾款／配送連結已產生並複製，商品尾款 NT$ ${data.amount.toLocaleString()}`);
       } catch {
         toast.success(`尾款／配送連結已產生：${data.paymentLink}`);
       }
@@ -566,14 +562,7 @@ function OrderRowCard({
                         {member.isCustomOrder && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">客製化主單</span>}
                         {member.orderId === (detail as any).mergeInfo.mainOrderId && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">主單</span>}
                         <span>NT$ {Number(member.totalAmount ?? 0).toLocaleString()}</span>
-                        {usesPromotionFlow(member) && member.isCustomOrder && member.orderStatus === "deposit_paid" && <button className="underline" disabled={setFinalPrice.isPending} onClick={() => {
-                          const raw = window.prompt(`設定 ${member.merchantTradeNo} 最終總價（包含已付訂金，不含運費）`, member.customQuote?.finalPrice?.toString() ?? "");
-                          if (raw === null || raw.trim() === "") return;
-                          const finalPrice = Number(raw);
-                          if (!Number.isInteger(finalPrice) || finalPrice < 0 || finalPrice > 10_000_000) return toast.error("請輸入有效的整數總價");
-                          setFinalPrice.mutate({ orderId: member.orderId, finalPrice });
-                        }}>設定本單總價</button>}
-                        {usesPromotionFlow(member) && <OrderPromotionSummary promotion={member.promotion} quote={member.customQuote} custom={member.isCustomOrder}/>}
+                        {usesPromotionFlow(member) && <OrderPromotionSummary promotion={member.promotion} quote={member.customQuote} custom={member.isCustomOrder} showDetails/>}
 
                       </div>
                     ))}
@@ -628,26 +617,29 @@ function OrderRowCard({
                   </button>
                 )}
 
-                {usesPromotionFlow(detail) && detail.isCustomOrder && detail.orderStatus === "deposit_paid" && <button className="px-4 py-2 border text-xs" disabled={setFinalPrice.isPending} onClick={() => {
-                  const raw = window.prompt("請輸入本筆客製訂單最終總價（包含已付訂金，不含運費）；系統依下單活動自動計算優惠。合併單請逐單設定。", detail.customQuote?.finalPrice?.toString() ?? "");
-                  if (raw === null || raw.trim() === "") return;
-                  const finalPrice = Number(raw);
-                  if (!Number.isInteger(finalPrice) || finalPrice < 0 || finalPrice > 10_000_000) return toast.error("請輸入有效的整數總價");
-                  setFinalPrice.mutate({ orderId: detail.id, finalPrice });
-                }}>設定最終總價／自動計算優惠</button>}
                 {detail.isCustomOrder && detail.orderStatus === "deposit_paid" &&
                   (!(detail as any).mergeInfo || (detail as any).mergeInfo.role === "main") &&
                   detail.balancePayment?.paymentStatus !== "transfer_pending" &&
                   detail.balancePayment?.paymentStatus !== "paid" && (
                   <button
                     onClick={() => {
-                      if (usesPromotionFlow(detail)) {
-                        createBalancePaymentLink.mutate({ orderId: detail.id });
+                      const customMembers = usesPromotionFlow(detail) ? (detail as any).mergeInfo?.members?.filter((member: any) => member.isCustomOrder) ?? [] : [];
+                      if (customMembers.length > 1) {
+                        const balances: { orderId: number; amount: number }[] = [];
+                        for (const member of customMembers) {
+                          const previous = member.customQuote ? String(member.customQuote.finalPrice - member.customQuote.depositPaid) : "";
+                          const raw = window.prompt(`訂單 ${member.merchantTradeNo}：請輸入尚需補付的客製商品尾款（活動折抵前，不含已付訂金、首單一般商品與運費）`, previous);
+                          if (raw === null || raw.trim() === "") return;
+                          const amount = Number(raw);
+                          if (!Number.isInteger(amount) || amount < 0 || amount > 10_000_000) { toast.error("請輸入 0 或大於 0 的整數尾款"); return; }
+                          balances.push({ orderId: member.orderId, amount });
+                        }
+                        createBalancePaymentLink.mutate({ orderId: detail.id, balances });
                         return;
                       }
                       const defaultAmount = detail.balancePayment?.amount?.toString() ?? "";
                       const raw = window.prompt(
-                        "請輸入商品尾款金額（可輸入 0；客人仍需透過連結填寫配送資料，運費會另外計算）",
+                        usesPromotionFlow(detail) ? "請輸入尚需補付的客製商品尾款（活動折抵前，不含已付訂金、首單一般商品與運費；系統自動計算優惠後產生連結）" : "請輸入商品尾款金額（可輸入 0；客人仍需透過連結填寫配送資料，運費會另外計算）",
                         defaultAmount,
                       );
                       if (raw === null || raw.trim() === "") return;
@@ -825,7 +817,7 @@ function OrderRowCard({
                 </div>
               )}
 
-              {usesPromotionFlow(detail) && <OrderPromotionSummary promotion={detail.promotion} quote={detail.customQuote} custom={detail.isCustomOrder}/>}
+              {usesPromotionFlow(detail) && <OrderPromotionSummary promotion={detail.promotion} quote={detail.customQuote} custom={detail.isCustomOrder} showDetails/>}
               {detail.isCustomOrder && detail.balancePayment && (
                 <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-xs font-body text-rose-700">
                   <p className="font-medium mb-1">尾款資訊</p>

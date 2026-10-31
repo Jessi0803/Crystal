@@ -31,6 +31,7 @@ import { calcCheckoutFees } from "../shared/checkoutFees";
 import { COUPON_DISCOUNT_PRODUCT_ID, NON_PRODUCT_ORDER_ITEM_IDS } from "../shared/coupons";
 
 type DbInstance = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type OrderDbTransaction = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
 type OrderRow = typeof orders.$inferSelect;
 type OrderItemRow = typeof orderItems.$inferSelect;
 type LogisticsRow = typeof logisticsOrders.$inferSelect;
@@ -1332,7 +1333,7 @@ export function generateBalanceMerchantTradeNo() {
 }
 
 /** 合併單逐單報價，所有訂金從原始商品列取得，不從已含尾款的 totalAmount 推算。 */
-export async function getCustomQuoteSummary(
+async function getCustomQuoteOrders(
   db: Pick<DbInstance, "select">,
   orderId: number
 ) {
@@ -1351,7 +1352,14 @@ export async function getCustomQuoteSummary(
     ? members.map(member => member.orderId)
     : [orderId];
   const rows = await db.select().from(orders).where(inArray(orders.id, ids));
-  const customRows = rows.filter(row => row.isCustomOrder);
+  return rows.filter(row => row.isCustomOrder);
+}
+
+export async function getCustomQuoteSummary(
+  db: Pick<DbInstance, "select">,
+  orderId: number
+) {
+  const customRows = await getCustomQuoteOrders(db, orderId);
   if (!customRows.some(usesPromotionFlow)) return null;
   if (customRows.some(row => !usesPromotionFlow(row)))
     throw new Error("新舊流程訂單不可合併報價");
@@ -1361,17 +1369,104 @@ export async function getCustomQuoteSummary(
     (sum, row) => ({
       finalPrice: sum.finalPrice + row.customQuote!.finalPrice,
       depositPaid: sum.depositPaid + row.customQuote!.depositPaid,
+      paidRegularSubtotal:
+        (sum.paidRegularSubtotal ?? 0) +
+        (row.customQuote!.paidRegularSubtotal ?? 0),
       discount: sum.discount + row.customQuote!.discount,
     }),
-    { finalPrice: 0, depositPaid: 0, discount: 0 }
+    { finalPrice: 0, depositPaid: 0, paidRegularSubtotal: 0, discount: 0 }
   );
+}
+
+/** 僅由持有主單鎖且通過付款狀態檢查的 transaction 呼叫。 */
+async function saveCustomQuote(
+  tx: OrderDbTransaction,
+  orderId: number,
+  input: { finalPrice: number } | { remainingAmount: number }
+) {
+  const [order] = await tx
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+  if (!order || !usesPromotionFlow(order))
+    throw new Error("舊訂單請沿用原本的商品尾款輸入流程");
+  if (!order.isCustomOrder || order.orderStatus !== "deposit_paid")
+    throw new Error("僅能設定已付訂金的客製訂單總價");
+  const items = await tx
+    .select()
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+  const depositPaid = items
+    .filter(item => CUSTOM_PRODUCT_IDS.includes(item.productId))
+    .reduce((sum, item) => sum + item.subtotal, 0);
+  const finalPrice =
+    "remainingAmount" in input
+      ? depositPaid + input.remainingAmount
+      : input.finalPrice;
+  if (!Number.isSafeInteger(finalPrice) || finalPrice > 10_000_000)
+    throw new Error("客製商品金額過大");
+  const paidRegularSubtotal = items
+    .filter(
+      item =>
+        !CUSTOM_PRODUCT_IDS.includes(item.productId) &&
+        !NON_PRODUCT_ORDER_ITEM_IDS.includes(item.productId)
+    )
+    .reduce((sum, item) => sum + item.subtotal, 0);
+  if (finalPrice < depositPaid)
+    throw new Error("最終總價不可低於已付訂金；如需退款請另行處理");
+  const quote = quoteCustomPromotion(
+    finalPrice,
+    depositPaid,
+    order.promotion?.rule,
+    paidRegularSubtotal
+  );
+  await tx
+    .update(orders)
+    .set({
+      customQuote: quote,
+      ...(order.promotion
+        ? {
+            promotion: {
+              ...order.promotion,
+              discount: quote.discount,
+              quote,
+            },
+          }
+        : {}),
+    })
+    .where(eq(orders.id, orderId));
+  await tx
+    .delete(orderItems)
+    .where(
+      and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.productId, PROMOTION_DISCOUNT_PRODUCT_ID)
+      )
+    );
+  if (quote.discount > 0)
+    await tx.insert(orderItems).values({
+      orderId,
+      productId: PROMOTION_DISCOUNT_PRODUCT_ID,
+      productName: `活動折抵（尾款）- ${order.promotion!.rule.name}`,
+      quantity: 1,
+      unitPrice: -quote.discount,
+      subtotal: -quote.discount,
+      isPreorder: false,
+    });
+  return quote;
 }
 
 export async function setCustomFinalPrice(orderId: number, finalPrice: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const [targetOrder] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-  if (!targetOrder || !usesPromotionFlow(targetOrder)) throw new Error("舊訂單請沿用原本的商品尾款輸入流程");
+  const [targetOrder] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+  if (!targetOrder || !usesPromotionFlow(targetOrder))
+    throw new Error("舊訂單請沿用原本的商品尾款輸入流程");
   const context = await getMergeDetailForOrder(db, orderId);
   const mainOrderId = context?.mainOrderId ?? orderId;
   return db.transaction(async tx => {
@@ -1418,63 +1513,7 @@ export async function setCustomFinalPrice(orderId: number, finalPrice: number) {
       )
       .limit(1);
     if (reservedCoupon) throw new Error("尾款已保留優惠券，請勿修改報價");
-    const [order] = await tx
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
-    if (!order || !usesPromotionFlow(order))
-      throw new Error("舊訂單請沿用原本的商品尾款輸入流程");
-    if (!order.isCustomOrder || order.orderStatus !== "deposit_paid")
-      throw new Error("僅能設定已付訂金的客製訂單總價");
-    const items = await tx
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, orderId));
-    const depositPaid = items
-      .filter(item => CUSTOM_PRODUCT_IDS.includes(item.productId))
-      .reduce((sum, item) => sum + item.subtotal, 0);
-    if (finalPrice < depositPaid)
-      throw new Error("最終總價不可低於已付訂金；如需退款請另行處理");
-    const quote = quoteCustomPromotion(
-      finalPrice,
-      depositPaid,
-      order.promotion?.rule
-    );
-    await tx
-      .update(orders)
-      .set({
-        customQuote: quote,
-        ...(order.promotion
-          ? {
-              promotion: {
-                ...order.promotion,
-                discount: quote.discount,
-                quote,
-              },
-            }
-          : {}),
-      })
-      .where(eq(orders.id, orderId));
-    await tx
-      .delete(orderItems)
-      .where(
-        and(
-          eq(orderItems.orderId, orderId),
-          eq(orderItems.productId, PROMOTION_DISCOUNT_PRODUCT_ID)
-        )
-      );
-    if (quote.discount > 0)
-      await tx.insert(orderItems).values({
-        orderId,
-        productId: PROMOTION_DISCOUNT_PRODUCT_ID,
-        productName: `活動折抵（尾款）- ${order.promotion!.rule.name}`,
-        quantity: 1,
-        unitPrice: -quote.discount,
-        subtotal: -quote.discount,
-        isPreorder: false,
-      });
-    return quote;
+    return saveCustomQuote(tx, orderId, { finalPrice });
   });
 }
 
@@ -1486,7 +1525,11 @@ async function legacyCreateOrReplaceBalancePayment(opts: {
   if (!db) throw new Error("Database not available");
   await ensureBalancePaymentColumns(db);
 
-  const [order] = await db.select().from(orders).where(eq(orders.id, opts.orderId)).limit(1);
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, opts.orderId))
+    .limit(1);
   if (!order) throw new Error("Order not found");
 
   const [existing] = await db
@@ -1500,11 +1543,18 @@ async function legacyCreateOrReplaceBalancePayment(opts: {
   }
 
   // 已建立的 merchantTradeNo 是客戶持有的固定尾款網址，不得因管理員重設尾款而更換。
-  const linkMerchantTradeNo = existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
+  const linkMerchantTradeNo =
+    existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
   const previousBalanceTotal = existing?.totalAmount ?? existing?.amount ?? 0;
-  const nextTotalAmount = Math.max(1, order.totalAmount - previousBalanceTotal + opts.amount);
+  const nextTotalAmount = Math.max(
+    1,
+    order.totalAmount - previousBalanceTotal + opts.amount
+  );
 
-  await db.update(orders).set({ totalAmount: nextTotalAmount }).where(eq(orders.id, opts.orderId));
+  await db
+    .update(orders)
+    .set({ totalAmount: nextTotalAmount })
+    .where(eq(orders.id, opts.orderId));
 
   if (existing) {
     await db
@@ -1552,6 +1602,7 @@ async function legacyCreateOrReplaceBalancePayment(opts: {
 export async function createOrReplaceBalancePayment(opts: {
   orderId: number;
   amount?: number;
+  balances?: { orderId: number; amount: number }[];
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1562,6 +1613,7 @@ export async function createOrReplaceBalancePayment(opts: {
     .limit(1);
   if (!targetOrder) throw new Error("Order not found");
   if (!usesPromotionFlow(targetOrder)) {
+    if (opts.balances) throw new Error("舊訂單請沿用原本合併尾款輸入方式");
     if (opts.amount == null) throw new Error("舊訂單請輸入商品尾款金額");
     return legacyCreateOrReplaceBalancePayment({
       orderId: opts.orderId,
@@ -1592,10 +1644,6 @@ export async function createOrReplaceBalancePayment(opts: {
       )
       .limit(1);
     if (reservedCoupon) throw new Error("尾款已保留優惠券，請沿用既有付款連結");
-    const quote = await getCustomQuoteSummary(tx, opts.orderId);
-    if (!quote && opts.amount == null) throw new Error("請先設定最終總價");
-    const amount = quote ? quote.finalPrice - quote.depositPaid : opts.amount!;
-    const totalAmount = Math.max(0, amount - (quote?.discount ?? 0));
     const [existing] = await tx
       .select(balancePaymentLegacySelect)
       .from(orderBalancePayments)
@@ -1619,6 +1667,36 @@ export async function createOrReplaceBalancePayment(opts: {
       )
         throw new Error("尾款已進入付款流程，不可重設金額");
     }
+    if (opts.amount != null || opts.balances) {
+      if (opts.amount != null && opts.balances)
+        throw new Error("請選擇單筆或逐單尾款輸入方式");
+      const customOrders = await getCustomQuoteOrders(tx, opts.orderId);
+      const entries = opts.balances ?? [
+        { orderId: opts.orderId, amount: opts.amount! },
+      ];
+      const expectedIds = new Set(customOrders.map(row => row.id));
+      if (
+        entries.length !== expectedIds.size ||
+        new Set(entries.map(entry => entry.orderId)).size !== entries.length ||
+        entries.some(entry => !expectedIds.has(entry.orderId))
+      )
+        throw new Error("合併訂單請逐單輸入尚需補付的客製尾款");
+      for (const entry of entries) {
+        if (
+          !Number.isSafeInteger(entry.amount) ||
+          entry.amount < 0 ||
+          entry.amount > 10_000_000
+        )
+          throw new Error("請輸入有效的客製尾款金額");
+        await saveCustomQuote(tx, entry.orderId, {
+          remainingAmount: entry.amount,
+        });
+      }
+    }
+    const quote = await getCustomQuoteSummary(tx, opts.orderId);
+    if (!quote) throw new Error("請輸入尚需補付的客製尾款");
+    const amount = quote.finalPrice - quote.depositPaid;
+    const totalAmount = Math.max(0, amount - quote.discount);
     const merchantTradeNo =
       existing?.merchantTradeNo ?? generateBalanceMerchantTradeNo();
     const values = {

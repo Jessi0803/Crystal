@@ -491,9 +491,7 @@ test("舊版：既有尾款與合併維持原操作，跨版本禁止", async ()
   const page = await member.newPage();
   await page.goto(`/balance/${oldLink.merchantTradeNo}`);
   await expect(page.getByText("尾款小計", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("優惠券（低消依完整商品的活動後金額判斷）")
-  ).toHaveCount(0);
+  await expect(page.getByText("優惠券", { exact: true })).toHaveCount(0);
   evidence.push({
     case: "舊流程與版本隔離",
     orders: [
@@ -552,5 +550,175 @@ test("優惠超過商品尾款可折運費到零，不建立金流交易", async
     order: zero.merchantTradeNo,
     balance: balance.merchantTradeNo,
     total: 0,
+  });
+});
+
+test("同單客製與一般手鍊：門檻含首單商品，尾款不重收已付款項", async () => {
+  const created = await rpc(member.request, "order.createAndPay", {
+    buyerName: "混合訂單驗收",
+    buyerEmail: `${run}@example.com`,
+    buyerPhone: "0912345678",
+    checkoutRegion: "domestic",
+    paymentMethod: "credit",
+    shippingMethod: "home",
+    shippingAddress: "台北市中正區驗收路 1 號",
+    receiverZipCode: "100",
+    origin: baseURL,
+    items: [
+      {
+        id: customId,
+        name: "客製訂金",
+        price: deposit,
+        quantity: 1,
+        wristSize: "15",
+        claspType: "elastic",
+      },
+      {
+        id: productId,
+        name: "一般手鍊",
+        price: 2500,
+        quantity: 1,
+        claspType: "elastic",
+      },
+    ],
+  });
+  const mixed = await order(created.merchantTradeNo);
+  expect(mixed.totalAmount).toBe(2500 + deposit);
+  await pay(member.request, mixed.merchantTradeNo, 2500 + deposit);
+  const adminPage = await admin.newPage();
+  await adminPage.goto("/admin/orders");
+  await adminPage
+    .locator("button")
+    .filter({ hasText: mixed.merchantTradeNo })
+    .click();
+  await expect(
+    adminPage.getByRole("button", { name: /設定.*總價/ })
+  ).toHaveCount(0);
+  adminPage.once("dialog", async dialog => {
+    expect(dialog.message()).toContain("尚需補付");
+    await dialog.accept(String(2000 - deposit));
+  });
+  const generated = adminPage.waitForResponse(
+    response =>
+      response.url().includes("order.createBalancePaymentLink") &&
+      response.request().method() === "POST"
+  );
+  await adminPage
+    .getByRole("button", { name: "產生尾款／配送連結", exact: true })
+    .click();
+  const response = await generated;
+  expect(response.ok()).toBeTruthy();
+  const payload = await response.json();
+  const balance: any = superjson.deserialize(
+    (Array.isArray(payload) ? payload[0] : payload).result.data
+  );
+  const detail = await rpc(
+    member.request,
+    "order.getBalancePayment",
+    { merchantTradeNo: balance.merchantTradeNo },
+    false
+  );
+  expect(detail.quote).toMatchObject({
+    finalPrice: 2000,
+    depositPaid: deposit,
+    paidRegularSubtotal: 2500,
+    discount: 444,
+  });
+  expect(balance.payableAmount).toBe(2000 - deposit - 444);
+  await adminPage.close();
+  expect(balance.amount).toBe(2000 - deposit);
+  const total = 2000 - deposit - 444 - 100 + 130;
+  const checkout = await rpc(
+    member.request,
+    "order.getBalancePaymentCheckout",
+    {
+      ...shipping,
+      merchantTradeNo: balance.merchantTradeNo,
+      paymentMethod: "credit",
+      memberCouponId: highCouponId,
+      expectedTotal: total,
+    }
+  );
+  expect(checkout.amount).toBe(total);
+  await pay(member.request, checkout.paymentParams.MerchantTradeNo, total);
+  expect((await order(mixed.merchantTradeNo)).totalAmount).toBe(
+    4500 - 444 - 100 + 130
+  );
+  const page = await member.newPage();
+  await page.goto(`/balance/${balance.merchantTradeNo}`);
+  await expect(
+    page.getByText("活動優惠 NT$ 444", { exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByText("資格依下單時間保留", { exact: false })
+  ).toHaveCount(0);
+  await expect(page.getByText("活動適用金額", { exact: false })).toHaveCount(0);
+  evidence.push({
+    case: "混合訂單一般商品納入活動",
+    order: mixed.merchantTradeNo,
+    balance: balance.merchantTradeNo,
+    customPrice: 2000,
+    firstOrderRegular: 2500,
+    discount: 444,
+    total,
+  });
+  await page.close();
+
+  // 無活動也只輸入尚欠尾款；不要求管理員先算總價。
+  await activity(false);
+  const noActivity = await customOrder();
+  const ordinaryBalance = await link(noActivity.id, 1500);
+  expect(ordinaryBalance.amount).toBe(1500);
+  expect(ordinaryBalance.payableAmount).toBe(1500);
+  const ordinaryDetail = await rpc(
+    member.request,
+    "order.getBalancePayment",
+    { merchantTradeNo: ordinaryBalance.merchantTradeNo },
+    false
+  );
+  expect(ordinaryDetail.quote).toMatchObject({
+    finalPrice: 1500 + deposit,
+    depositPaid: deposit,
+    discount: 0,
+  });
+
+  // 合併單仍逐單保存活動規則，但從同一個產生連結動作提交尚欠尾款。
+  await activity(true);
+  const mergeA = await customOrder();
+  await activity(false);
+  const mergeB = await customOrder();
+  await rpc(admin.request, "order.mergeOrders", {
+    orderIds: [mergeA.id, mergeB.id],
+  });
+  const incomplete = await rpc(
+    admin.request,
+    "order.createBalancePaymentLink",
+    {
+      orderId: mergeA.id,
+      balances: [{ orderId: mergeA.id, amount: 1500 - deposit }],
+    },
+    true,
+    true
+  );
+  expect(incomplete.message).toContain("逐單");
+  const unchanged = await rows(
+    "SELECT customQuote FROM orders WHERE id IN (?, ?)",
+    [mergeA.id, mergeB.id]
+  );
+  expect(unchanged.every(row => row.customQuote === null)).toBe(true);
+  const merged = await rpc(admin.request, "order.createBalancePaymentLink", {
+    orderId: mergeA.id,
+    balances: [
+      { orderId: mergeA.id, amount: 1500 - deposit },
+      { orderId: mergeB.id, amount: 2000 - deposit },
+    ],
+  });
+  expect(merged.amount).toBe(3500 - deposit * 2);
+  expect(merged.payableAmount).toBe(3500 - deposit * 2 - 111);
+  evidence.push({
+    case: "直接輸入尾款：無活動與逐單合併",
+    noActivityOrder: noActivity.merchantTradeNo,
+    mergedOrders: [mergeA.merchantTradeNo, mergeB.merchantTradeNo],
+    mergedAmount: merged.payableAmount,
   });
 });

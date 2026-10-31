@@ -1,38 +1,62 @@
-import type { OrderPromotion, PromotionQuote } from "@shared/promotions";
+import {
+  promotionProductSubtotal,
+  type OrderPromotion,
+  type PromotionQuote,
+} from "@shared/promotions";
+
 export default function OrderPromotionSummary({
   promotion,
   quote,
   custom,
+  showDetails = false,
 }: {
   promotion?: OrderPromotion | null;
   quote?: PromotionQuote | null;
   custom?: boolean;
+  showDetails?: boolean;
 }) {
   if (!promotion && !quote) return null;
+  const discount = quote?.discount ?? promotion?.discount ?? 0;
+  if (!showDetails && (!promotion || ((quote || !custom) && discount <= 0)))
+    return null;
+
   return (
     <div className="my-3 rounded border p-3 text-xs font-body space-y-1">
       {promotion && (
-        <>
-          <p>
-            {promotion.rule.name}：每滿 NT${" "}
-            {promotion.rule.threshold.toLocaleString()} 折 NT${" "}
-            {promotion.rule.discountAmount.toLocaleString()}
-          </p>
-          <p>資格依下單時間保留，付款時不重新判斷活動期間。</p>
-        </>
+        <p className="font-medium">
+          {promotion.rule.name}
+          {showDetails && (
+            <>
+              {" "}
+              · 每滿 NT$ {promotion.rule.threshold.toLocaleString()} 折 NT${" "}
+              {promotion.rule.discountAmount.toLocaleString()}
+            </>
+          )}
+        </p>
       )}
-      {quote ? (
+      {showDetails && quote && (
         <>
           <p>
-            最終總價 NT$ {quote.finalPrice.toLocaleString()} · 已付訂金 NT${" "}
+            客製商品金額 NT$ {quote.finalPrice.toLocaleString()} · 已付訂金 NT${" "}
             {quote.depositPaid.toLocaleString()}
           </p>
-          <p>活動優惠 NT$ {quote.discount.toLocaleString()}，於尾款折抵。</p>
+          {(quote.paidRegularSubtotal ?? 0) > 0 && (
+            <>
+              <p>
+                其他已付商品 NT$ {quote.paidRegularSubtotal!.toLocaleString()}
+              </p>
+              <p>
+                活動適用金額 NT${" "}
+                {promotionProductSubtotal(quote).toLocaleString()}
+              </p>
+            </>
+          )}
         </>
-      ) : custom ? (
-        <p>等待最終報價後自動計算優惠，訂金照原額支付。</p>
+      )}
+      {custom && !quote ? (
+        <p>活動優惠將於尾款折抵。</p>
       ) : (
-        promotion && <p>活動折抵 NT$ {promotion.discount.toLocaleString()}</p>
+        discount > 0 && <p>活動優惠 NT$ {discount.toLocaleString()}</p>
       )}
     </div>
   );

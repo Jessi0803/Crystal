@@ -393,7 +393,7 @@ export default function Checkout() {
     if (!validate()) return;
 
     try {
-      if (promotionLoading || promotionError) { toast.error("請等待活動資訊載入，或重新整理後再結帳"); return; }
+      if (promotionLoading || promotionError) { toast.error("優惠資訊載入中，請稍候或重新整理後再結帳"); return; }
       const result = await createAndPay.mutateAsync({
         checkoutRegion: isCustomDepositCheckout ? "domestic" : checkoutRegion,
         buyerName: form.buyerName,
@@ -1597,7 +1597,7 @@ export default function Checkout() {
                 ))}
               </div>
               {activePromotion && <PromotionNotice rule={activePromotion} subtotal={totalPrice} discount={activityDiscount} custom={isCustomDepositCheckout}/>}
-              {promotionError && <p role="alert" className="text-red-600 text-sm">無法確認活動，請重新整理後再結帳。</p>}
+              {promotionError && <p role="alert" className="text-red-600 text-sm">優惠資訊暫時無法載入，請重新整理後再結帳。</p>}
               {couponOptions.length > 0 && (
                 <div className="border-t border-sf-line py-4">
                   <p className="flex items-center gap-1.5 text-xs tracking-[0.1em] text-sf-text font-body mb-3">
@@ -1647,7 +1647,7 @@ export default function Checkout() {
                           </span>
                           {preview.ok && preview.discount < coupon.discountAmount && (
                             <span className="block text-xs text-amber-700">
-                              商品金額低於面額，只折抵 NT$ {preview.discount.toLocaleString()}，差額不退回
+                              本次可折抵 NT$ {preview.discount.toLocaleString()}，差額不退回
                             </span>
                           )}
                           <span className="block text-xs text-sf-muted">
@@ -1661,7 +1661,7 @@ export default function Checkout() {
                       </label>
                     ))}
                   </div>
-                  <p className="mt-2 text-[0.65rem] text-sf-muted font-body">每筆訂單限用一張，低消與折抵以活動後商品金額計算（不含運費）。</p>
+                  <p className="mt-2 text-[0.65rem] text-sf-muted font-body">每筆訂單限用一張，限折抵商品金額。</p>
                 </div>
               )}
               <div className="border-t border-sf-line pt-4 space-y-2">
