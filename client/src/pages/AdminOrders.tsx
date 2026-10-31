@@ -1,4 +1,4 @@
-import { usesPromotionFlow } from "@shared/promotions";
+import { usesPromotionFlow, type PromotionQuote } from "@shared/promotions";
 import OrderPromotionSummary from "@/components/OrderPromotionSummary";
 /**
  * 訂單管理後台
@@ -233,6 +233,37 @@ function openBase64DocumentInNewTab(base64: string, contentType: string) {
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank", "noopener,noreferrer");
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function MergedCustomQuoteSummary({ members }: {
+  members: { isCustomOrder: boolean; customQuote?: PromotionQuote | null }[];
+}) {
+  const customMembers = members.filter(member => member.isCustomOrder);
+  if (!customMembers.length) return null;
+  if (customMembers.some(member => !member.customQuote)) {
+    return <p className="mt-3 border-t border-emerald-100 pt-3">合併尾款尚未完成逐單報價。</p>;
+  }
+  const total = customMembers.reduce((sum, member) => {
+    const quote = member.customQuote!;
+    return {
+      finalPrice: sum.finalPrice + quote.finalPrice,
+      depositPaid: sum.depositPaid + quote.depositPaid,
+      paidRegularSubtotal: sum.paidRegularSubtotal + (quote.paidRegularSubtotal ?? 0),
+      discount: sum.discount + quote.discount,
+    };
+  }, { finalPrice: 0, depositPaid: 0, paidRegularSubtotal: 0, discount: 0 });
+  const remaining = total.finalPrice - total.depositPaid;
+  return (
+    <div className="mt-3 space-y-1 border-t border-emerald-100 pt-3">
+      <p className="font-medium">合併客製尾款合計（{customMembers.length} 筆）</p>
+      <p>客製商品金額 NT$ {total.finalPrice.toLocaleString()} · 已付訂金 NT$ {total.depositPaid.toLocaleString()}</p>
+      {total.paidRegularSubtotal > 0 && <p>其他已付商品 NT$ {total.paidRegularSubtotal.toLocaleString()}（不重複收取）</p>}
+      <p>商品尾款（活動折抵前）NT$ {remaining.toLocaleString()}</p>
+      <p>逐單活動優惠合計 NT$ {total.discount.toLocaleString()}</p>
+      <p className="font-medium">活動折抵後尾款 NT$ {Math.max(0, remaining - total.discount).toLocaleString()}（未計運費、優惠券及加購）</p>
+      {total.discount > remaining && <p>剩餘活動優惠可繼續折抵運費，實際應付以付款頁為準。</p>}
+    </div>
+  );
 }
 
 function OrderRowCard({
@@ -556,17 +587,24 @@ function OrderRowCard({
                   </div>
                   <div className="space-y-1">
                     {(detail as any).mergeInfo.members?.map((member: any) => (
-                      <div key={member.orderId} className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono">{member.merchantTradeNo}</span>
-                        <span>{member.buyerName}</span>
-                        {member.isCustomOrder && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">客製化主單</span>}
-                        {member.orderId === (detail as any).mergeInfo.mainOrderId && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">主單</span>}
-                        <span>NT$ {Number(member.totalAmount ?? 0).toLocaleString()}</span>
+                      <div key={member.orderId} className="border-b border-emerald-100 py-2 last:border-b-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono">{member.merchantTradeNo}</span>
+                          <span>{member.buyerName}</span>
+                          {member.isCustomOrder && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">客製訂單</span>}
+                          {member.orderId === (detail as any).mergeInfo.mainOrderId && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">主單</span>}
+                          {usesPromotionFlow(member) && member.isCustomOrder
+                            ? !member.customQuote && <span>尚未輸入尾款</span>
+                            : <span>訂單紀錄金額 NT$ {Number(member.totalAmount ?? 0).toLocaleString()}</span>}
+                        </div>
                         {usesPromotionFlow(member) && <OrderPromotionSummary promotion={member.promotion} quote={member.customQuote} custom={member.isCustomOrder} showDetails/>}
-
+                        {usesPromotionFlow(member) && member.customQuote && (
+                          <p>此單商品尾款（活動折抵前）NT$ {(member.customQuote.finalPrice - member.customQuote.depositPaid).toLocaleString()}</p>
+                        )}
                       </div>
                     ))}
                   </div>
+                  {usesPromotionFlow(detail) && <MergedCustomQuoteSummary members={(detail as any).mergeInfo.members ?? []}/>}
                   {(detail as any).mergeInfo.role === "main" && (
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-emerald-100 pt-3">
                       <span className="font-medium">合併尾款運費</span>
@@ -817,7 +855,7 @@ function OrderRowCard({
                 </div>
               )}
 
-              {usesPromotionFlow(detail) && <OrderPromotionSummary promotion={detail.promotion} quote={detail.customQuote} custom={detail.isCustomOrder} showDetails/>}
+              {usesPromotionFlow(detail) && !(detail as any).mergeInfo && <OrderPromotionSummary promotion={detail.promotion} quote={detail.customQuote} custom={detail.isCustomOrder} showDetails/>}
               {detail.isCustomOrder && detail.balancePayment && (
                 <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-xs font-body text-rose-700">
                   <p className="font-medium mb-1">尾款資訊</p>
