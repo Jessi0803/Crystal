@@ -10,8 +10,8 @@
  * 升級伺服器端套件後請執行：pnpm run check:vercel
  */
 import { build } from "esbuild";
-import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { spawnSync, execFileSync } from "node:child_process";
+import { mkdirSync, rmSync, existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -21,6 +21,23 @@ const entries = [
   "server/_entry/customFormRemindersCronHandler.ts",
   "server/_entry/certificateMonitorCronHandler.ts",
 ];
+
+// Vercel 在 build 前先驗證 functions／cron；本機殘留的產物不能代表乾淨 checkout 可部署。
+const deployedEntries = [
+  "api/trpc/[trpc].js",
+  "api/ecpay/[...path].js",
+  "api/cron/custom-form-reminders.js",
+  "api/cron/certificate-monitor.js",
+];
+for (const entry of deployedEntries) {
+  try {
+    if (!existsSync(entry)) throw new Error("missing entry");
+    execFileSync("git", ["--literal-pathspecs", "ls-files", "--error-unmatch", "--", entry], { stdio: "pipe" });
+  } catch {
+    console.error(`缺少已版控的部署入口：${entry}。請先執行 pnpm run build 並加入版控。`);
+    process.exit(1);
+  }
+}
 
 // 放在專案內，打包後的外部套件才能從專案的 node_modules 解析
 const outDir = path.resolve("node_modules/.cache/check-vercel-bundles");

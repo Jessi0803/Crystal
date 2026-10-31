@@ -132,10 +132,6 @@ _gitdir/
 # 本機開發時寫入的上傳檔（含客戶轉帳收據等個資），不可進版控
 uploads/
 
-# esbuild 產出的 serverless function。Vercel 部署時由 vercel.json 的
-# buildCommand（pnpm run build）重新產生，committed 的版本從來不會被用到，
-# 留在版控裡只會在每次 build 後產生大量無意義差異。
-# 注意：api/health.ts 是手寫原始碼，不在忽略範圍。
-api/trpc/*.js
-api/ecpay/*.js
-api/cron/*.js
+# Vercel 在 buildCommand 執行前驗證 API 入口與 functions／cron 設定。
+# api/ 下的 esbuild 產物必須版控；修改 server 後以 pnpm run build 更新。
+# 不可忽略或刪除這些入口，否則乾淨 checkout 會在 build 前因 unused_function 失敗。
