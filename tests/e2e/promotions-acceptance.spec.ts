@@ -235,7 +235,7 @@ test.beforeAll(async ({ browser }) => {
   rule = await rpc(member.request, "promotions.active", undefined, false);
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: new RegExp(`活動驗收 ${run}`) })
+    page.getByRole("cell", { name: `活動驗收 ${run}`, exact: true })
   ).toBeVisible();
   await page.close();
   for (const minOrderAmount of [2000, 2400]) {
