@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 // 未連資料庫：沒有任何知識
 vi.mock("./db", () => ({ getDb: vi.fn(async () => null) }));
 import { buildProductKnowledgeChunk, searchKnowledge, type ScoredChunk } from "./crystalKnowledge";
-import { selectRelatedProductIds } from "./routers/chatbot";
+import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID } from "@shared/const";
+import { selectChatbotContext, selectRelatedProductIds } from "./routers/chatbot";
 
 /** 資料庫商品知識的最小形狀（固定問答已不含商品） */
 function productChunk(productId: string) {
@@ -19,6 +20,39 @@ function productChunk(productId: string) {
 }
 
 describe("chatbot product recommendations", () => {
+  it("limits bracelet cleansing instructions to the quartz chips even when bracelets score higher", () => {
+    const faq = {
+      ...productChunk("cleanse"),
+      id: "faq-cleanse",
+      category: "常見問題",
+      relatedProductIds: [],
+      score: 0.88,
+    };
+    const chunks = [
+      faq,
+      { ...productChunk("d001-moon-secret"), score: 0.73 },
+      { ...productChunk("d005-moon-clear-heart"), score: 0.73 },
+    ];
+
+    expect(selectChatbotContext("手鍊怎麼淨化？", chunks)).toEqual({
+      isCleansingCare: true,
+      chunksForAnswer: [faq],
+      productIds: [CLEAR_QUARTZ_CHIPS_PRODUCT_ID],
+    });
+  });
+
+  it.each(["哪款手鍊主打淨化？", "想找主打淨化的手鍊，有推薦哪款嗎？"])(
+    "keeps the original selection for bracelet shopping: %s",
+    (question) => {
+      const chunks = [{ ...productChunk("d001-moon-secret"), score: 0.73 }];
+      expect(selectChatbotContext(question, chunks)).toEqual({
+        isCleansingCare: false,
+        chunksForAnswer: chunks,
+        productIds: ["d001-moon-secret"],
+      });
+    }
+  );
+
   it("merges two relevant recommendation matches without duplicate or excessive cards", () => {
     const chunks = [
       {

@@ -7780,7 +7780,7 @@ var SYSTEM_PROMPT = `\u4F60\u662F\u300C\u691B\u02D9Crystal\u300D\u6C34\u6676\u5E
 - \u7D55\u5C0D\u4E0D\u8981\u5C0D\u9867\u5BA2\u63D0\u5230\u300C\u77E5\u8B58\u5EAB\u300D\u300C\u8CC7\u6599\u5EAB\u300D\u300C\u7CFB\u7D71\u300D\u300C\u6211\u7684\u8CC7\u6599\u300D\u7B49\u5167\u90E8\u7528\u8A9E\uFF0C\u9867\u5BA2\u4E0D\u9700\u8981\u77E5\u9053\u9019\u4E9B\uFF1B\u4E5F\u4E0D\u8981\u89E3\u91CB\u4F60\u70BA\u4EC0\u9EBC\u7B54\u4E0D\u51FA\u4F86
 - \u7576\u9867\u5BA2\u63CF\u8FF0\u80FD\u91CF\u9700\u6C42\uFF08\u5982\u62DB\u6843\u82B1\u3001\u63D0\u5347\u4EBA\u7DE3\u3001\u6539\u5584\u5065\u5EB7\u3001\u5316\u89E3\u5C0F\u4EBA\u7B49\uFF09\uFF0C\u82E5\u53C3\u8003\u8CC7\u6599\u4E2D\u6C92\u6709\u5B8C\u5168\u7B26\u5408\u7684\u73FE\u8CA8\u5546\u54C1\uFF0C\u53EF\u63A8\u85A6\u5BA2\u88FD\u5316\u624B\u934A\u670D\u52D9\uFF0C\u8AAA\u660E\u53EF\u4EE5\u4F9D\u529F\u6548\u9700\u6C42\u91CF\u8EAB\u8A2D\u8A08\uFF0C\u4E26\u9644\u4E0A\u9023\u7D50 https://goodaytarot.com/custom
 - \u7576\u9867\u5BA2\u6307\u5B9A\u60F3\u627E\u7684\u6C34\u6676\u7A2E\u985E\uFF0C\u4F46\u53C3\u8003\u8CC7\u6599\u6216\u73FE\u8CA8\u6E05\u55AE\u6C92\u6709\u8A72\u6676\u77F3\u6642\uFF0C\u5FC5\u9808\u8AA0\u5BE6\u8AAA\u300C\u76EE\u524D\u73FE\u8CA8\u6C92\u6709\u9019\u6B3E\u6676\u77F3\u300D\uFF1B\u53EF\u4EE5\u63D0\u4F9B\u529F\u6548\u76F8\u8FD1\u6216\u80FD\u91CF\u65B9\u5411\u76F8\u8FD1\u7684\u73FE\u8CA8\u66FF\u4EE3\u6B3E\u3002\u4E0D\u53EF\u8AAA\u5BA2\u88FD\u5316\u65B9\u6848\u4E00\u5B9A\u6703\u6709\u3001\u4E00\u5B9A\u80FD\u505A\u3001\u53EF\u6307\u5B9A\u53D6\u5F97\u8A72\u6676\u77F3\uFF1B\u82E5\u63D0\u5230\u5BA2\u88FD\u5316\uFF0C\u53EA\u80FD\u8AAA\u53EF\u8207\u5E97\u5BB6\u8A0E\u8AD6\u9700\u6C42\u8207\u53EF\u7528\u6750\u6599
-- \u53EA\u8981\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u6E05\u55AE\u88E1\u6709\u6B3E\u5F0F\uFF0C\u5C31\u4E00\u5B9A\u8981\u5148\u63A8\u85A6\u6E05\u55AE\u4E0A\u7684\u6B3E\u5F0F\u4E26\u9644\u9023\u7D50\u3002\u9867\u5BA2\u554F\u7684\u662F\u5206\u985E\uFF08\u4F8B\u5982\u300C\u6709\u540A\u98FE\u55CE\u300D\u300C\u6709\u9805\u934A\u55CE\u300D\uFF09\u6642\u4E5F\u4E00\u6A23\uFF0C\u5148\u628A\u6E05\u55AE\u4E0A\u7684\u6B3E\u5F0F\u4ECB\u7D39\u7D66\u4ED6\uFF0C\u4E0D\u53EF\u4EE5\u8DF3\u904E\u63A8\u85A6\u76F4\u63A5\u628A\u4EBA\u5C0E\u5230 LINE
+- \u53EA\u8981\u3010\u53EF\u63A8\u85A6\u7684\u76F8\u95DC\u5546\u54C1\u3011\u6E05\u55AE\u88E1\u6709\u6B3E\u5F0F\uFF0C\u5C31\u4E00\u5B9A\u8981\u63A8\u85A6\u6E05\u55AE\u4E0A\u7684\u6B3E\u5F0F\u4E26\u9644\u9023\u7D50\u3002\u9664\u975E\u672C\u6B21\u6307\u5B9A\u56DE\u7B54\u9806\u5E8F\uFF0C\u8ACB\u5148\u4ECB\u7D39\u5546\u54C1\u3002\u9867\u5BA2\u554F\u7684\u662F\u5206\u985E\uFF08\u4F8B\u5982\u300C\u6709\u540A\u98FE\u55CE\u300D\u300C\u6709\u9805\u934A\u55CE\u300D\uFF09\u6642\u4E5F\u4E00\u6A23\uFF0C\u4E0D\u53EF\u4EE5\u8DF3\u904E\u63A8\u85A6\u76F4\u63A5\u628A\u4EBA\u5C0E\u5230 LINE
 - \u53EA\u6709\u5728\u6E05\u55AE\u662F\u7A7A\u7684\u3001\u53C3\u8003\u8CC7\u6599\u4E5F\u7B54\u4E0D\u51FA\u4F86\u6642\uFF08\u4F8B\u5982\u5546\u54C1\u898F\u683C\u6578\u5B57\u3001\u532F\u6B3E\u5E33\u865F\u3001\u6298\u6263\u653F\u7B56\u9019\u985E\u71DF\u904B\u7D30\u7BC0\uFF09\uFF0C\u624D\u628A\u9867\u5BA2\u5C0E\u5230\u5B98\u65B9 LINE\uFF1Ahttps://line.me/R/ti/p/@011tymeh
 - \u5C0E\u5411 LINE \u6642\uFF1A\u4E0D\u8981\u8AAA\u660E\u81EA\u5DF1\u67E5\u4E0D\u5230\u6216\u6C92\u6709\u8CC7\u6599\uFF0C\u8A9E\u6C23\u50CF\u5728\u5E6B\u5FD9\u8F49\u63A5\u800C\u4E0D\u662F\u63A8\u8A17\uFF1B\u6BCF\u6B21\u7684\u8AAA\u6CD5\u8981\u81EA\u7136\u8B8A\u5316\uFF0C\u4E0D\u8981\u6BCF\u5247\u90FD\u7528\u540C\u4E00\u53E5\u958B\u5834
 - \u7576\u9867\u5BA2\u63CF\u8FF0\u9700\u6C42\uFF08\u5982\u60F3\u63D0\u5347\u81EA\u4FE1\u3001\u8CA1\u904B\u3001\u611B\u60C5\u7B49\uFF09\uFF0C\u6216\u6307\u5B9A\u60F3\u627E\u7684\u6C34\u6676\u7A2E\u985E\uFF08\u5982\u7C89\u6676\u3001\u8349\u8393\u6676\u3001\u6708\u5149\u77F3\u7B49\uFF09\uFF0C\u6839\u64DA\u53C3\u8003\u8CC7\u6599\u63A8\u85A6\u9069\u5408\u7684\u73FE\u8CA8\u6B3E\u5F0F\u4E26\u9644\u4E0A\u5546\u54C1\u9023\u7D50
@@ -7979,6 +7979,26 @@ function selectRelatedProductIds(relevantChunks, scoreMin = 0.55, maxProducts = 
   }
   return uniqueProductIdsFromChunks([...standaloneProductChunks, ...fallbackRecommendationChunks.slice(0, 2)]).slice(0, maxProducts);
 }
+var CLEANSING_PATTERN = /淨化|凈化|净化|消磁/;
+var BRACELET_PATTERN = /手[鍊鏈链]|手串/;
+var CLEANSING_METHOD_PATTERN = /怎麼|怎么|如何|怎樣|怎样|方法|步驟|多久|多常|頻率|需要.{0,6}嗎|要不要/;
+var BRACELET_SHOPPING_PATTERN = /哪(?:一)?[款條条種种個个]|哪些|(?:推薦|想買|想找|想選|購買).{0,16}(?:手[鍊鏈链]|手串)|(?:手[鍊鏈链]|手串).{0,8}(?:推薦|主打)|有.{0,10}(?:淨化|消磁).{0,10}(?:手[鍊鏈链]|手串).{0,3}[嗎吗]/;
+function selectChatbotContext(question, chunks) {
+  const isCleansingCare = BRACELET_PATTERN.test(question) && CLEANSING_PATTERN.test(question) && CLEANSING_METHOD_PATTERN.test(question) && !BRACELET_SHOPPING_PATTERN.test(question);
+  if (isCleansingCare) {
+    return {
+      isCleansingCare,
+      chunksForAnswer: chunks.filter((chunk) => chunk.category === "\u5E38\u898B\u554F\u984C" && !chunk.id.startsWith("product-")),
+      productIds: [CLEAR_QUARTZ_CHIPS_PRODUCT_ID]
+    };
+  }
+  const unavailable = isUnavailableCrystalQuestion(chunks);
+  return {
+    isCleansingCare,
+    chunksForAnswer: unavailable ? chunks.filter((chunk) => chunk.id.endsWith("-unavailable") || chunk.category !== "\u5546\u54C1\u63A8\u85A6") : chunks,
+    productIds: unavailable ? [] : selectRelatedProductIds(chunks)
+  };
+}
 function normalizeProductImageUrl2(url) {
   const trimmed = url.trim();
   if (!trimmed.includes("drive.google.com")) return trimmed;
@@ -8113,18 +8133,15 @@ var chatbotRouter = router({
       });
     }
     const relevantChunks = await searchKnowledge(queryText, queryVector, 10, 0.45);
-    const hasUnavailableCrystalMatch = isUnavailableCrystalQuestion(relevantChunks);
-    const chunksForAnswer = hasUnavailableCrystalMatch ? relevantChunks.filter((chunk) => chunk.id.endsWith("-unavailable") || chunk.category !== "\u5546\u54C1\u63A8\u85A6") : relevantChunks;
-    const PRODUCT_SCORE_MIN = 0.55;
-    const relatedProductIds = hasUnavailableCrystalMatch ? [] : selectRelatedProductIds(
-      relevantChunks,
-      PRODUCT_SCORE_MIN
-    );
-    const relatedProducts = await loadRelatedProducts(relatedProductIds);
+    const { isCleansingCare, chunksForAnswer, productIds } = selectChatbotContext(input.message, relevantChunks);
+    const relatedProducts = await loadRelatedProducts(productIds);
     let ragContext = "";
     if (chunksForAnswer.length > 0) {
-      ragContext = "\n\n\u3010\u76F8\u95DC\u5E38\u898B\u554F\u984C\u3011\n" + chunksForAnswer.map((c) => `Q: ${c.question}
-A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
+      ragContext = "\n\n\u3010\u76F8\u95DC\u5E38\u898B\u554F\u984C\u3011\n" + chunksForAnswer.map((c) => {
+        const answer = isCleansingCare ? c.answer.replace(/https?:\/\/[^\s/]+\/products\/[^\s，。！？、)）]+/g, "") : c.answer;
+        return `Q: ${c.question}
+A: ${clipKnowledgeAnswer(answer)}`;
+      }).join("\n\n");
     }
     if (relatedProducts.length > 0) {
       const n = relatedProducts.length;
@@ -8137,8 +8154,11 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
    \u9023\u7D50\uFF08\u8ACB\u65BC\u56DE\u7B54\u4E2D\u9010\u5B57\u4F7F\u7528\uFF09\uFF1A${PUBLIC_SITE2}/products/${p.id}`
       ).join("\n\n");
     }
-    const hasGoodMatch = chunksForAnswer.some((c) => c.score >= 0.5);
-    if (!hasGoodMatch) {
+    if (isCleansingCare) {
+      ragContext += "\n\n\u3010\u672C\u6B21\u56DE\u7B54\u9806\u5E8F\u3011\u5148\u8AAA\u660E\u624B\u934A\u7684\u6DE8\u5316\u65B9\u6CD5\uFF0C\u518D\u63A8\u85A6\u6E05\u55AE\u4E2D\u7684\u767D\u6C34\u6676\u788E\u77F3\u4E26\u9644\u4E0A\u9023\u7D50\u3002\u6E05\u55AE\u82E5\u6C92\u6709\u5546\u54C1\uFF0C\u53EA\u56DE\u7B54\u6DE8\u5316\u65B9\u6CD5\u3002\u5373\u4F7F\u5148\u524D\u804A\u904E\u5176\u4ED6\u5546\u54C1\uFF0C\u672C\u6B21\u4E5F\u4E0D\u8981\u63A8\u85A6\u5176\u4ED6\u5546\u54C1\u6216\u5BA2\u88FD\u5316\u670D\u52D9\u3002";
+    }
+    const usedFallback = !isCleansingCare && !chunksForAnswer.some((c) => c.score >= 0.5);
+    if (usedFallback) {
       ragContext += "\n\n\u3010\u5099\u63F4\u8CC7\u8A0A\u3011\n\u82E5\u9867\u5BA2\u7684\u529F\u6548\u9700\u6C42\u5728\u73FE\u6709\u5546\u54C1\u4E2D\u627E\u4E0D\u5230\u5B8C\u5168\u7B26\u5408\u7684\u6B3E\u5F0F\uFF0C\u53EF\u63A8\u85A6\u300C\u5BA2\u88FD\u5316\u6C34\u6676\u624B\u934A\u300D\u670D\u52D9\u3002\u8A2D\u8A08\u5E2B\u6703\u6839\u64DA\u529F\u6548\u9700\u6C42\uFF08\u5982\u62DB\u6843\u82B1\u3001\u6539\u5584\u5065\u5EB7\u3001\u5316\u89E3\u5C0F\u4EBA\u3001\u63D0\u5347\u67D0\u7A2E\u7279\u5B9A\u904B\u52E2\u7B49\uFF09\u91CF\u8EAB\u8A2D\u8A08\u5C08\u5C6C\u624B\u934A\u3002\u82E5\u9867\u5BA2\u6307\u5B9A\u67D0\u7A2E\u6676\u77F3\u4F46\u53C3\u8003\u8CC7\u6599\u6216\u73FE\u8CA8\u6C92\u6709\uFF0C\u8ACB\u8AA0\u5BE6\u8AAA\u660E\u76EE\u524D\u73FE\u8CA8\u6C92\u6709\uFF0C\u512A\u5148\u63D0\u4F9B\u529F\u6548\u6216\u80FD\u91CF\u65B9\u5411\u76F8\u8FD1\u7684\u66FF\u4EE3\u73FE\u8CA8\uFF1B\u4E0D\u53EF\u627F\u8AFE\u5BA2\u88FD\u5316\u4E00\u5B9A\u6703\u6709\u8A72\u6307\u5B9A\u6676\u77F3\uFF0C\u53EA\u80FD\u8AAA\u53EF\u8207\u5E97\u5BB6\u8A0E\u8AD6\u9700\u6C42\u8207\u53EF\u7528\u6750\u6599\u3002\u5BA2\u88FD\u5316\u65B9\u6848\u9801\u9762\uFF1Ahttps://goodaytarot.com/custom\n\u4E5F\u6B61\u8FCE\u900F\u904E LINE \u8A62\u554F\uFF1Ahttps://line.me/R/ti/p/@011tymeh";
     }
     const reply = await generateAnswer(
@@ -8172,7 +8192,7 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
       question: input.message,
       reply,
       chunks: chunksForAnswer,
-      usedFallback: !hasGoodMatch
+      usedFallback
     });
     await saveChatbotLog({
       ...baseLog,
@@ -8183,7 +8203,7 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
       answerStatus: answerAssessment.status,
       answerStatusReason: answerAssessment.reason,
       topKnowledgeScore: answerAssessment.topScore === null ? null : Number(answerAssessment.topScore.toFixed(4)),
-      usedFallback: !hasGoodMatch
+      usedFallback
     });
     return {
       reply,
@@ -8269,17 +8289,17 @@ A: ${clipKnowledgeAnswer(c.answer)}`).join("\n\n");
       throw new TRPCError6({ code: "SERVICE_UNAVAILABLE", message: "\u66AB\u6642\u7121\u6CD5\u7522\u751F\u5411\u91CF\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66", cause: error });
     }
     const chunks = await searchKnowledge(input.question, vector, 10, 0.45);
-    const productIds = selectRelatedProductIds(chunks, 0.55);
+    const { isCleansingCare, chunksForAnswer, productIds } = selectChatbotContext(input.question, chunks);
     const products2 = await loadRelatedProducts(productIds);
     return {
-      results: chunks.map((chunk) => ({
+      results: chunksForAnswer.map((chunk) => ({
         id: chunk.id,
         question: chunk.question,
         category: chunk.category,
         score: Math.round(chunk.score * 100) / 100
       })),
       products: products2.map((product) => ({ id: product.id, name: product.name })),
-      usesFallback: !chunks.some((chunk) => chunk.score >= 0.5)
+      usesFallback: !isCleansingCare && !chunksForAnswer.some((chunk) => chunk.score >= 0.5)
     };
   })
 });

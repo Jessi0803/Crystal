@@ -7,6 +7,7 @@ import { searchKnowledge, type ScoredChunk } from "../crystalKnowledge";
 import { ENV } from "../_core/env";
 import { products } from "../../client/src/lib/data";
 import { chatbotLogs, dbProducts } from "../../drizzle/schema";
+import { CLEAR_QUARTZ_CHIPS_PRODUCT_ID } from "@shared/const";
 import {
   FAQ_ANSWER_MAX,
   FAQ_CATEGORIES,
@@ -32,7 +33,7 @@ const SYSTEM_PROMPT = `你是「椛˙Crystal」水晶店的 AI 顧問助理，�
 - 絕對不要對顧客提到「知識庫」「資料庫」「系統」「我的資料」等內部用語，顧客不需要知道這些；也不要解釋你為什麼答不出來
 - 當顧客描述能量需求（如招桃花、提升人緣、改善健康、化解小人等），若參考資料中沒有完全符合的現貨商品，可推薦客製化手鍊服務，說明可以依功效需求量身設計，並附上連結 https://goodaytarot.com/custom
 - 當顧客指定想找的水晶種類，但參考資料或現貨清單沒有該晶石時，必須誠實說「目前現貨沒有這款晶石」；可以提供功效相近或能量方向相近的現貨替代款。不可說客製化方案一定會有、一定能做、可指定取得該晶石；若提到客製化，只能說可與店家討論需求與可用材料
-- 只要【可推薦的相關商品】清單裡有款式，就一定要先推薦清單上的款式並附連結。顧客問的是分類（例如「有吊飾嗎」「有項鍊嗎」）時也一樣，先把清單上的款式介紹給他，不可以跳過推薦直接把人導到 LINE
+- 只要【可推薦的相關商品】清單裡有款式，就一定要推薦清單上的款式並附連結。除非本次指定回答順序，請先介紹商品。顧客問的是分類（例如「有吊飾嗎」「有項鍊嗎」）時也一樣，不可以跳過推薦直接把人導到 LINE
 - 只有在清單是空的、參考資料也答不出來時（例如商品規格數字、匯款帳號、折扣政策這類營運細節），才把顧客導到官方 LINE：https://line.me/R/ti/p/@011tymeh
 - 導向 LINE 時：不要說明自己查不到或沒有資料，語氣像在幫忙轉接而不是推託；每次的說法要自然變化，不要每則都用同一句開場
 - 當顧客描述需求（如想提升自信、財運、愛情等），或指定想找的水晶種類（如粉晶、草莓晶、月光石等），根據參考資料推薦適合的現貨款式並附上商品連結
@@ -361,6 +362,36 @@ export function selectRelatedProductIds(
     .slice(0, maxProducts);
 }
 
+const CLEANSING_PATTERN = /淨化|凈化|净化|消磁/;
+const BRACELET_PATTERN = /手[鍊鏈链]|手串/;
+const CLEANSING_METHOD_PATTERN = /怎麼|怎么|如何|怎樣|怎样|方法|步驟|多久|多常|頻率|需要.{0,6}嗎|要不要/;
+const BRACELET_SHOPPING_PATTERN = /哪(?:一)?[款條条種种個个]|哪些|(?:推薦|想買|想找|想選|購買).{0,16}(?:手[鍊鏈链]|手串)|(?:手[鍊鏈链]|手串).{0,8}(?:推薦|主打)|有.{0,10}(?:淨化|消磁).{0,10}(?:手[鍊鏈链]|手串).{0,3}[嗎吗]/;
+
+export function selectChatbotContext(question: string, chunks: ScoredChunk[]) {
+  const isCleansingCare =
+    BRACELET_PATTERN.test(question) &&
+    CLEANSING_PATTERN.test(question) &&
+    CLEANSING_METHOD_PATTERN.test(question) &&
+    !BRACELET_SHOPPING_PATTERN.test(question);
+
+  if (isCleansingCare) {
+    return {
+      isCleansingCare,
+      chunksForAnswer: chunks.filter((chunk) => chunk.category === "常見問題" && !chunk.id.startsWith("product-")),
+      productIds: [CLEAR_QUARTZ_CHIPS_PRODUCT_ID],
+    };
+  }
+
+  const unavailable = isUnavailableCrystalQuestion(chunks);
+  return {
+    isCleansingCare,
+    chunksForAnswer: unavailable
+      ? chunks.filter((chunk) => chunk.id.endsWith("-unavailable") || chunk.category !== "商品推薦")
+      : chunks,
+    productIds: unavailable ? [] : selectRelatedProductIds(chunks),
+  };
+}
+
 function normalizeProductImageUrl(url: string) {
   const trimmed = url.trim();
   if (!trimmed.includes("drive.google.com")) return trimmed;
@@ -539,20 +570,10 @@ export const chatbotRouter = router({
 
       // 2. RAG 檢索
       const relevantChunks = await searchKnowledge(queryText, queryVector, 10, 0.45);
-      const hasUnavailableCrystalMatch = isUnavailableCrystalQuestion(relevantChunks);
-      const chunksForAnswer = hasUnavailableCrystalMatch
-        ? relevantChunks.filter((chunk) => chunk.id.endsWith("-unavailable") || chunk.category !== "商品推薦")
-        : relevantChunks;
+      const { isCleansingCare, chunksForAnswer, productIds } = selectChatbotContext(input.message, relevantChunks);
 
-      // 3. 關聯商品：合併最高分的相關推薦，讓複合需求可看到更多但仍精準的選項。
-      const PRODUCT_SCORE_MIN = 0.55;
-      const relatedProductIds = hasUnavailableCrystalMatch
-        ? []
-        : selectRelatedProductIds(
-            relevantChunks,
-            PRODUCT_SCORE_MIN
-          );
-      const relatedProducts = await loadRelatedProducts(relatedProductIds);
+      // 3. 載入本次可推薦的商品。
+      const relatedProducts = await loadRelatedProducts(productIds);
 
       // 4. 組建 RAG 上下文
       let ragContext = "";
@@ -560,7 +581,12 @@ export const chatbotRouter = router({
         ragContext =
           "\n\n【相關常見問題】\n" +
           chunksForAnswer
-            .map((c) => `Q: ${c.question}\nA: ${clipKnowledgeAnswer(c.answer)}`)
+            .map((c) => {
+              const answer = isCleansingCare
+                ? c.answer.replace(/https?:\/\/[^\s/]+\/products\/[^\s，。！？、)）]+/g, "")
+                : c.answer;
+              return `Q: ${c.question}\nA: ${clipKnowledgeAnswer(answer)}`;
+            })
             .join("\n\n");
       }
 
@@ -576,9 +602,15 @@ export const chatbotRouter = router({
             .join("\n\n");
       }
 
+      if (isCleansingCare) {
+        ragContext +=
+          "\n\n【本次回答順序】先說明手鍊的淨化方法，再推薦清單中的白水晶碎石並附上連結。" +
+          "清單若沒有商品，只回答淨化方法。即使先前聊過其他商品，本次也不要推薦其他商品或客製化服務。";
+      }
+
       // 當沒有撈到任何相關結果時，補入客製化服務資訊作為備援
-      const hasGoodMatch = chunksForAnswer.some((c) => c.score >= 0.5);
-      if (!hasGoodMatch) {
+      const usedFallback = !isCleansingCare && !chunksForAnswer.some((c) => c.score >= 0.5);
+      if (usedFallback) {
         ragContext +=
           "\n\n【備援資訊】\n" +
           "若顧客的功效需求在現有商品中找不到完全符合的款式，可推薦「客製化水晶手鍊」服務。" +
@@ -622,7 +654,7 @@ export const chatbotRouter = router({
         question: input.message,
         reply,
         chunks: chunksForAnswer,
-        usedFallback: !hasGoodMatch,
+        usedFallback,
       });
 
       await saveChatbotLog({
@@ -636,7 +668,7 @@ export const chatbotRouter = router({
         topKnowledgeScore: answerAssessment.topScore === null
           ? null
           : Number(answerAssessment.topScore.toFixed(4)),
-        usedFallback: !hasGoodMatch,
+        usedFallback,
       });
 
       return {
@@ -756,17 +788,17 @@ export const chatbotRouter = router({
         throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "暫時無法產生向量，請稍後再試", cause: error });
       }
       const chunks = await searchKnowledge(input.question, vector, 10, 0.45);
-      const productIds = selectRelatedProductIds(chunks, 0.55);
+      const { isCleansingCare, chunksForAnswer, productIds } = selectChatbotContext(input.question, chunks);
       const products = await loadRelatedProducts(productIds);
       return {
-        results: chunks.map((chunk) => ({
+        results: chunksForAnswer.map((chunk) => ({
           id: chunk.id,
           question: chunk.question,
           category: chunk.category,
           score: Math.round(chunk.score * 100) / 100,
         })),
         products: products.map((product) => ({ id: product.id, name: product.name })),
-        usesFallback: !chunks.some((chunk) => chunk.score >= 0.5),
+        usesFallback: !isCleansingCare && !chunksForAnswer.some((chunk) => chunk.score >= 0.5),
       };
     }),
 });
