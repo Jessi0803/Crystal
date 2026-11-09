@@ -10,6 +10,7 @@ import { logTrpcError } from "../_core/trpc";
 import { registerLineOAuthRoutes } from "../lineOAuthRoutes";
 import { registerLineWebhookRoutes } from "../lineWebhookRoutes";
 import { enforceTrustedOrigin, publicServerError, setSecurityHeaders } from "../_core/httpSecurity";
+import { serveSitemap } from "../sitemap";
 
 const app = express();
 app.use(setSecurityHeaders);
@@ -20,6 +21,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
   res.json({ ok: true, at: new Date().toISOString() });
 });
+app.get(["/sitemap.xml", "/api/trpc/sitemap", "/sitemap"], serveSitemap);
 
 // LINE Login：與本地 server 共用路由，且走已部署的 /api/trpc/* function（單一路徑段）
 registerLineOAuthRoutes(app);

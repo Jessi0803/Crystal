@@ -8705,8 +8705,8 @@ var memberRouter = router({
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq20 } = await import("drizzle-orm");
-        await db2.update(users2).set({ role: "admin" }).where(eq20(users2.id, user.id));
+        const { eq: eq21 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq21(users2.id, user.id));
         user = { ...user, role: "admin" };
       }
     }
@@ -8805,7 +8805,7 @@ var memberRouter = router({
     const db2 = await getDb();
     if (!db2) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR" });
     const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { and: and13, eq: eq20, isNull: isNull3 } = await import("drizzle-orm");
+    const { and: and13, eq: eq21, isNull: isNull3 } = await import("drizzle-orm");
     if (input.birthday) {
       const current = birthdayFromUser(ctx.user);
       const same = current && current.year === input.birthday.year && current.month === input.birthday.month && current.day === input.birthday.day;
@@ -8818,7 +8818,7 @@ var memberRouter = router({
           birthYear: input.birthday.year,
           birthMonth: input.birthday.month,
           birthDay: input.birthday.day
-        }).where(and13(eq20(users2.id, ctx.user.id), isNull3(users2.birthMonth)));
+        }).where(and13(eq21(users2.id, ctx.user.id), isNull3(users2.birthMonth)));
         const affected = Array.isArray(result) ? result[0] : result;
         if (!affected?.affectedRows) {
           throw new TRPCError7({ code: "FORBIDDEN", message: BIRTHDAY_LOCKED_MESSAGE });
@@ -8826,7 +8826,7 @@ var memberRouter = router({
         return { success: true };
       }
     }
-    await db2.update(users2).set({ name: input.name }).where(eq20(users2.id, ctx.user.id));
+    await db2.update(users2).set({ name: input.name }).where(eq21(users2.id, ctx.user.id));
     return { success: true };
   }),
   /** 查詢自己的訂單 */
@@ -10789,8 +10789,8 @@ async function lineOAuthCallback(req, res) {
       const db2 = await getDb();
       if (db2) {
         const { users: users2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq20 } = await import("drizzle-orm");
-        await db2.update(users2).set({ role: "admin" }).where(eq20(users2.id, user.id));
+        const { eq: eq21 } = await import("drizzle-orm");
+        await db2.update(users2).set({ role: "admin" }).where(eq21(users2.id, user.id));
         user = await getUserByOpenId(openId);
       }
     }
@@ -10945,6 +10945,57 @@ function publicServerError(err) {
   return "Internal Server Error";
 }
 
+// server/sitemap.ts
+import { eq as eq20, inArray as inArray8, or as or6 } from "drizzle-orm";
+init_schema();
+var SITE_ORIGIN = "https://goodaytarot.com";
+var PUBLIC_PATHS = [
+  "/",
+  "/products",
+  "/quiz",
+  "/custom",
+  "/custom/form",
+  "/custom/form-b",
+  "/custom/form-c",
+  "/custom/form-d",
+  "/knowledge",
+  "/shopping-guide",
+  "/crystal-workshop",
+  "/contact",
+  "/about",
+  "/terms",
+  "/privacy"
+];
+var staticProductIds = products.filter((product) => product.category !== "test").map((product) => product.id);
+async function serveSitemap(_req, res) {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    const rows = await db.select({ id: dbProducts.id, active: dbProducts.active, category: dbProducts.category }).from(dbProducts).where(or6(eq20(dbProducts.active, true), inArray8(dbProducts.id, staticProductIds)));
+    const databaseIds = new Set(rows.map((product) => product.id));
+    const productIds = [
+      ...rows.filter((product) => product.active && product.category !== "test").map((product) => product.id),
+      ...staticProductIds.filter((id) => !databaseIds.has(id))
+    ];
+    const paths = [
+      ...PUBLIC_PATHS,
+      ...productIds.sort().map((id) => `/products/${encodeURIComponent(id)}`)
+    ];
+    const urls = paths.map((path2) => `  <url><loc>${SITE_ORIGIN}${path2}</loc></url>`);
+    const xml = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...urls,
+      "</urlset>",
+      ""
+    ].join("\n");
+    res.set("Cache-Control", "public, max-age=0, s-maxage=300").type("application/xml").send(xml);
+  } catch (error) {
+    console.error("[sitemap] failed to load public products", error);
+    res.status(503).set("Cache-Control", "no-store").type("text/plain").send("Sitemap temporarily unavailable");
+  }
+}
+
 // server/_entry/trpcHandler.ts
 var app = express2();
 app.use(setSecurityHeaders);
@@ -10954,6 +11005,7 @@ app.use(express2.urlencoded({ limit: "10mb", extended: true }));
 app.get(["/api/trpc/ping", "/ping"], (_req, res) => {
   res.json({ ok: true, at: (/* @__PURE__ */ new Date()).toISOString() });
 });
+app.get(["/sitemap.xml", "/api/trpc/sitemap", "/sitemap"], serveSitemap);
 registerLineOAuthRoutes(app);
 app.use(enforceTrustedOrigin);
 app.use(

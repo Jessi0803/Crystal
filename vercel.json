@@ -85,7 +85,11 @@
       "destination": "/api/trpc/line-oauth-callback"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/sitemap.xml",
+      "destination": "/api/trpc/sitemap"
+    },
+    {
+      "source": "/((?!api/|robots\\.txt$).*)",
       "destination": "/index.html"
     }
   ]

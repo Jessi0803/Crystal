@@ -1,0 +1,13 @@
+User-agent: *
+Disallow: /admin
+Disallow: /member
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /checkout
+Disallow: /order/
+Disallow: /balance/
+
+Sitemap: https://goodaytarot.com/sitemap.xml

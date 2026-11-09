@@ -13,6 +13,7 @@ import { logTrpcError } from "./trpc";
 import { serveStatic, setupVite } from "./vite";
 import { registerECPayRoutes } from "../ecpayRoutes";
 import { enforceTrustedOrigin, setSecurityHeaders } from "./httpSecurity";
+import { serveSitemap } from "../sitemap";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   app.use(setSecurityHeaders);
+  app.get("/sitemap.xml", serveSitemap);
   const server = createServer(app);
   const uploadDir = process.env.LOCAL_STORAGE_DIR
     ? path.resolve(process.env.LOCAL_STORAGE_DIR)
