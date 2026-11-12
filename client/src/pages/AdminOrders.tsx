@@ -304,6 +304,7 @@ function OrderRowCard({
     }
   );
 
+  const ecpayPaymentsForReview = detail?.ecpayPaymentsForReview ?? [];
   const createBalancePaymentLink = trpc.order.createBalancePaymentLink.useMutation({
     onSuccess: async (data) => {
       await utils.order.getOrderDetail.invalidate({ orderId: order.id });
@@ -548,6 +549,29 @@ function OrderRowCard({
                     ))}
                   </div>
                 </div>
+              )}
+
+              {ecpayPaymentsForReview.length > 0 && (
+                <section className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                  <h3 className="font-medium">綠界款項待客服核對</h3>
+                  <p className="mt-1 text-xs">請先在綠界核對下列交易序號與金額，再處理退款。</p>
+                  {detail.tradeNo && (
+                    <p className="mt-2 text-xs">原訂單已入帳的綠界交易序號 <span className="font-mono">{detail.tradeNo}</span></p>
+                  )}
+                  <ul className="mt-3 space-y-2 text-xs">
+                    {ecpayPaymentsForReview.map(payment => (
+                      <li key={payment.merchantTradeNo} className="rounded border border-red-200 bg-white/70 p-2.5">
+                        <p className="font-medium">
+                          {payment.status === "duplicate_paid" ? "重複收款" : "付款狀態異常"} · NT$ {payment.totalAmount.toLocaleString()}
+                        </p>
+                        <dl className="mt-1.5 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                          <div><dt>特店交易編號</dt><dd className="break-all font-mono">{payment.merchantTradeNo}</dd></div>
+                          <div><dt>綠界交易序號</dt><dd className="break-all font-mono">{payment.tradeNo}</dd></div>
+                        </dl>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               )}
 
               {((detail as any).transferReceiptUrl || detail.transferLastFive || detail.paymentMethod === "atm") && (

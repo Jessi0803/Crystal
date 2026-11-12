@@ -5,14 +5,19 @@ import {
   getBalancePaymentByMerchantTradeNo,
   getBalancePaymentAttemptByMerchantTradeNo,
   getOrderByMerchantTradeNo,
-  updateOrderPaymentStatus,
   updateBalancePaymentAttemptStatus,
 } from "./orderDb";
-import { deductInventoryAfterBalancePayment, deductInventoryAfterPayment } from "./inventoryDb";
+import { deductInventoryAfterBalancePayment } from "./inventoryDb";
+import { settleECPayOrderPayment } from "./ecpayOrderPayments";
 import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
 
 vi.mock("./ecpay", () => ({
   verifyCheckMacValue: vi.fn(),
+}));
+
+vi.mock("./ecpayOrderPayments", () => ({
+  findECPayOrderReplacement: vi.fn().mockResolvedValue(undefined),
+  settleECPayOrderPayment: vi.fn(),
 }));
 
 vi.mock("./ecpayLogistics", () => ({
@@ -60,8 +65,7 @@ const getOrderByMerchantTradeNoMock = vi.mocked(getOrderByMerchantTradeNo);
 const getBalancePaymentByMerchantTradeNoMock = vi.mocked(getBalancePaymentByMerchantTradeNo);
 const getBalancePaymentAttemptByMerchantTradeNoMock = vi.mocked(getBalancePaymentAttemptByMerchantTradeNo);
 const updateBalancePaymentAttemptStatusMock = vi.mocked(updateBalancePaymentAttemptStatus);
-const updateOrderPaymentStatusMock = vi.mocked(updateOrderPaymentStatus);
-const deductInventoryAfterPaymentMock = vi.mocked(deductInventoryAfterPayment);
+const settleECPayOrderPaymentMock = vi.mocked(settleECPayOrderPayment);
 const deductInventoryAfterBalancePaymentMock = vi.mocked(deductInventoryAfterBalancePayment);
 const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
 
@@ -81,26 +85,23 @@ describe("ECPay order placed notification timing", () => {
     verifyCheckMacValueMock.mockReturnValue(true);
     getBalancePaymentByMerchantTradeNoMock.mockResolvedValue(null);
     getBalancePaymentAttemptByMerchantTradeNoMock.mockResolvedValue(null);
-    updateOrderPaymentStatusMock.mockResolvedValue(true);
+    settleECPayOrderPaymentMock.mockResolvedValue("paid");
   });
 
   it("notifies the customer when a pending credit-card order is paid", async () => {
     getOrderByMerchantTradeNoMock.mockResolvedValue({
       id: 301,
       merchantTradeNo: "CREDIT001",
+      paymentMethod: "credit",
       paymentStatus: "pending",
       totalAmount: 1880,
     } as Awaited<ReturnType<typeof getOrderByMerchantTradeNo>>);
 
     await expect(handleECPayPaymentNotify(ecpayPaidPayload())).resolves.toBe("1|OK");
 
-    expect(updateOrderPaymentStatusMock).toHaveBeenCalledWith(
-      "CREDIT001",
-      "paid",
-      "TRADE001",
-      expect.objectContaining({ MerchantTradeNo: "CREDIT001" })
+    expect(settleECPayOrderPaymentMock).toHaveBeenCalledWith(
+      301, expect.objectContaining({ MerchantTradeNo: "CREDIT001", TradeNo: "TRADE001" })
     );
-    expect(deductInventoryAfterPaymentMock).toHaveBeenCalledWith("CREDIT001");
     expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledWith(301);
   });
 
@@ -108,16 +109,16 @@ describe("ECPay order placed notification timing", () => {
     getOrderByMerchantTradeNoMock.mockResolvedValue({
       id: 302,
       merchantTradeNo: "CREDIT001",
+      paymentMethod: "credit",
       paymentStatus: "paid",
       totalAmount: 1880,
     } as Awaited<ReturnType<typeof getOrderByMerchantTradeNo>>);
 
-    updateOrderPaymentStatusMock.mockResolvedValue(false);
+    settleECPayOrderPaymentMock.mockResolvedValue("replayed");
 
     await expect(handleECPayPaymentNotify(ecpayPaidPayload())).resolves.toBe("1|OK");
 
-    expect(updateOrderPaymentStatusMock).toHaveBeenCalled();
-    expect(deductInventoryAfterPaymentMock).not.toHaveBeenCalled();
+    expect(settleECPayOrderPaymentMock).toHaveBeenCalled();
     expect(notifyCustomerOrderPlacedSafelyMock).not.toHaveBeenCalled();
   });
 });

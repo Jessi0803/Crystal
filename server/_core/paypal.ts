@@ -24,6 +24,7 @@ async function getAccessToken(): Promise<string> {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(8000),
   });
   const data = (await res.json()) as { access_token?: string; error_description?: string };
   if (!res.ok || !data.access_token) {
@@ -87,26 +88,50 @@ export async function createPayPalCheckoutOrder(params: {
   return { paypalOrderId: data.id, approvalUrl: approval };
 }
 
-/** 確認 PayPal 訂單的 custom_id 與本站訂單編號一致，避免誤扣他人付款 */
+type PayPalOrderDetails = Record<string, unknown> & {
+  status?: string;
+  links?: { href: string; rel: string }[];
+  purchase_units?: {
+    custom_id?: string;
+    amount?: { currency_code?: string; value?: string };
+    payments?: { captures?: { id?: string; status?: string }[] };
+  }[];
+  message?: string;
+};
+
+export async function getPayPalOrderDetails(
+  paypalOrderId: string,
+  merchantTradeNo: string,
+  totalAmountTwd?: number
+): Promise<PayPalOrderDetails> {
+  const token = await getAccessToken();
+  const res = await fetch(`${getApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  const data = (await res.json()) as PayPalOrderDetails;
+  if (!res.ok) {
+    throw new Error(data.message ?? `PayPal get order HTTP ${res.status}`);
+  }
+  const unit = data.purchase_units?.[0];
+  if (unit?.custom_id !== merchantTradeNo || (totalAmountTwd !== undefined &&
+      (unit.amount?.currency_code !== "TWD" || Number(unit.amount.value) !== totalAmountTwd))) {
+    throw new Error("PAYPAL_ORDER_MISMATCH");
+  }
+  return data;
+}
+
 export async function verifyPayPalOrderBelongsToMerchant(
   paypalOrderId: string,
   merchantTradeNo: string
 ): Promise<void> {
-  const token = await getAccessToken();
-  const res = await fetch(`${getApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = (await res.json()) as {
-    purchase_units?: { custom_id?: string }[];
-    message?: string;
-  };
-  if (!res.ok) {
-    throw new Error(data.message ?? `PayPal get order HTTP ${res.status}`);
-  }
-  const customId = data.purchase_units?.[0]?.custom_id;
-  if (customId !== merchantTradeNo) {
-    throw new Error("PAYPAL_ORDER_MISMATCH");
-  }
+  await getPayPalOrderDetails(paypalOrderId, merchantTradeNo);
+}
+
+export function getCompletedPayPalCapture(details: PayPalOrderDetails) {
+  return details.purchase_units?.[0]?.payments?.captures?.find(
+    capture => capture.status === "COMPLETED" && capture.id
+  )?.id;
 }
 
 export type PayPalCaptureResult =
@@ -120,8 +145,10 @@ export async function capturePayPalOrder(paypalOrderId: string): Promise<PayPalC
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      "PayPal-Request-Id": `capture-${paypalOrderId}`,
     },
     body: "{}",
+    signal: AbortSignal.timeout(8000),
   });
   const raw = (await res.json()) as Record<string, unknown> & {
     status?: string;

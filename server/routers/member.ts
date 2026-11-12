@@ -15,7 +15,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { protectedProcedure, rateLimitedProtectedProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
-import { resolveMemberIdentity } from "../memberOrderAccess";
+import { isOrderOwnedByMember, resolveMemberIdentity } from "../memberOrderAccess";
 import { sdk } from "../_core/sdk";
 import * as crypto from "crypto";
 import * as db from "../db";
@@ -309,6 +309,12 @@ export const memberRouter = router({
       userId: identity.userId,
       email: identity.verifiedEmail,
     });
-    return memberOrders.map(toCustomerFacingOrder);
+    return memberOrders.map(order => ({
+      ...toCustomerFacingOrder(order),
+      canResumePayment:
+        isOrderOwnedByMember(order, identity) &&
+        order.orderStatus === "pending_payment" && order.paymentStatus === "pending" &&
+        (order.paymentMethod === "credit" || (order.paymentMethod === "paypal" && Boolean(order.paypalOrderId))),
+    }));
   }),
 });

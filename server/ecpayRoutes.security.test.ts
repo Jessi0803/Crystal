@@ -6,13 +6,18 @@ import {
   getOrderByMerchantTradeNo,
   updateOrderPaymentStatus,
 } from "./orderDb";
-import { deductInventoryAfterPayment } from "./inventoryDb";
+import { settleECPayOrderPayment } from "./ecpayOrderPayments";
 import { notifyCustomerOrderPlacedSafely } from "./customerOrderNotification";
 import { recordAuditEventSafely } from "./auditDb";
 import { markCouponUsedForOrderSafely, releaseCouponsForOrdersSafely } from "./couponDb";
 
 vi.mock("./ecpay", () => ({
   verifyCheckMacValue: vi.fn(),
+}));
+
+vi.mock("./ecpayOrderPayments", () => ({
+  findECPayOrderReplacement: vi.fn(),
+  settleECPayOrderPayment: vi.fn(),
 }));
 
 vi.mock("./ecpayLogistics", () => ({
@@ -57,7 +62,7 @@ const verifyCheckMacValueMock = vi.mocked(verifyCheckMacValue);
 const getOrderByMerchantTradeNoMock = vi.mocked(getOrderByMerchantTradeNo);
 const getBalancePaymentByMerchantTradeNoMock = vi.mocked(getBalancePaymentByMerchantTradeNo);
 const updateOrderPaymentStatusMock = vi.mocked(updateOrderPaymentStatus);
-const deductInventoryAfterPaymentMock = vi.mocked(deductInventoryAfterPayment);
+const settleECPayOrderPaymentMock = vi.mocked(settleECPayOrderPayment);
 const notifyCustomerOrderPlacedSafelyMock = vi.mocked(notifyCustomerOrderPlacedSafely);
 const recordAuditEventSafelyMock = vi.mocked(recordAuditEventSafely);
 const markCouponUsedForOrderMock = vi.mocked(markCouponUsedForOrderSafely);
@@ -90,12 +95,13 @@ describe("ECPay callback security regression coverage", () => {
   });
 
   it("rejects a signed callback whose amount differs from the stored order total", async () => {
+    settleECPayOrderPaymentMock.mockResolvedValueOnce("amount_mismatch");
     await expect(
       handleECPayPaymentNotify(paidPayload({ TradeAmt: "1" }))
     ).resolves.toBe("0|TradeAmt Error");
 
     expect(updateOrderPaymentStatusMock).not.toHaveBeenCalled();
-    expect(deductInventoryAfterPaymentMock).not.toHaveBeenCalled();
+    expect(notifyCustomerOrderPlacedSafelyMock).not.toHaveBeenCalled();
     expect(recordAuditEventSafelyMock).toHaveBeenCalledWith(expect.objectContaining({
       action: "ecpay.order.callback",
       outcome: "rejected",
@@ -104,16 +110,15 @@ describe("ECPay callback security regression coverage", () => {
   });
 
   it("claims a simultaneous paid callback only once", async () => {
-    updateOrderPaymentStatusMock
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    settleECPayOrderPaymentMock
+      .mockResolvedValueOnce("paid")
+      .mockResolvedValueOnce("replayed");
     await Promise.all([
       handleECPayPaymentNotify(paidPayload()),
       handleECPayPaymentNotify(paidPayload()),
     ]);
 
-    expect(updateOrderPaymentStatusMock).toHaveBeenCalledTimes(2);
-    expect(deductInventoryAfterPaymentMock).toHaveBeenCalledTimes(1);
+    expect(settleECPayOrderPaymentMock).toHaveBeenCalledTimes(2);
     expect(markCouponUsedForOrderMock).toHaveBeenCalledTimes(1);
     expect(markCouponUsedForOrderMock).toHaveBeenCalledWith(301, expect.anything());
     expect(notifyCustomerOrderPlacedSafelyMock).toHaveBeenCalledTimes(1);
@@ -122,9 +127,9 @@ describe("ECPay callback security regression coverage", () => {
   });
 
   it("returns the coupon once when ECPay reports a failed payment", async () => {
-    updateOrderPaymentStatusMock
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    settleECPayOrderPaymentMock
+      .mockResolvedValueOnce("order_failed")
+      .mockResolvedValueOnce("replayed");
     await handleECPayPaymentNotify(paidPayload({ RtnCode: "10100058" }));
     await handleECPayPaymentNotify(paidPayload({ RtnCode: "10100058" }));
 
@@ -134,6 +139,7 @@ describe("ECPay callback security regression coverage", () => {
   });
 
   it("does not use or return coupons for a rejected callback", async () => {
+    settleECPayOrderPaymentMock.mockResolvedValueOnce("amount_mismatch");
     await handleECPayPaymentNotify(paidPayload({ TradeAmt: "1" }));
 
     expect(markCouponUsedForOrderMock).not.toHaveBeenCalled();

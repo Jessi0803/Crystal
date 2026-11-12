@@ -4,12 +4,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TRPCError } from "@trpc/server";
 
+vi.mock("./ecpayOrderPayments", () => ({
+  listECPayOrderReplacements: vi.fn().mockResolvedValue([]),
+  createECPayOrderReplacement: vi.fn().mockResolvedValue("REPLACEMENT001"),
+}));
+
 vi.mock("./promotionDb", () => ({ getActivePromotion: vi.fn().mockResolvedValue(null) }));
 
 vi.mock("./orderDb", () => ({
   setCustomFinalPrice: vi.fn(),
   getCustomQuoteSummary: vi.fn().mockResolvedValue(null),
-  markOrderPaidPayPal: vi.fn(),
+  markOrderPaidPayPal: vi.fn().mockResolvedValue(true),
   // 真實實作只是剝掉 adminNote / customFormToken，mock 直接原樣回傳即可
   toCustomerFacingOrder: (order: unknown) => order,
   getAdminOrderSummaries: vi.fn().mockResolvedValue({
@@ -55,11 +60,13 @@ vi.mock("./orderDb", () => ({
 
 vi.mock("./db", () => ({
   getDb: vi.fn(),
+  getUserByOpenId: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./ecpay", () => ({
   generateMerchantTradeNo: vi.fn().mockReturnValue("MOCK001"),
   buildCreditPaymentParams: vi.fn().mockReturnValue({}),
+  queryECPayTradeStatus: vi.fn(),
   ECPAY_CONFIG: { PaymentURL: "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5" },
   usePaymentSandbox: false,
 }));
@@ -81,7 +88,9 @@ vi.mock("./ecpayLogistics", async (importOriginal) => ({
   useLogisticsSandbox: true,
 }));
 
-vi.mock("./_core/paypal", () => ({
+vi.mock("./_core/paypal", async importOriginal => ({
+  ...(await importOriginal<typeof import("./_core/paypal")>()),
+  getPayPalOrderDetails: vi.fn(),
   createPayPalCheckoutOrder: vi.fn(),
   verifyPayPalOrderBelongsToMerchant: vi.fn(),
   capturePayPalOrder: vi.fn(),
@@ -113,6 +122,7 @@ vi.mock("./couponDb", async (importOriginal) => {
 
 import {
   createOrder,
+  markOrderPaidPayPal,
   isCustomDepositProduct,
   getAdminOrderSummaries,
   getOrderWithItems,
@@ -123,13 +133,15 @@ import {
   createOrReplaceBalancePayment,
 } from "./orderDb";
 import { getDb } from "./db";
+import { listECPayOrderReplacements, createECPayOrderReplacement } from "./ecpayOrderPayments";
 import { appRouter } from "./appRouter";
 import { deductInventoryAfterBalancePayment, getProductAvailability } from "./inventoryDb";
 import {
   capturePayPalOrder,
+  getPayPalOrderDetails,
   verifyPayPalOrderBelongsToMerchant,
 } from "./_core/paypal";
-import { buildCreditPaymentParams } from "./ecpay";
+import { buildCreditPaymentParams, queryECPayTradeStatus } from "./ecpay";
 import { createCVSLogisticsOrder, EcpayLogisticsError, fetchPrintTradeDocument } from "./ecpayLogistics";
 import { isUnexpectedInternalError, PUBLIC_INTERNAL_ERROR_MESSAGE } from "./_core/trpc";
 import { storagePut } from "./storage";
@@ -181,6 +193,8 @@ function createQueryChain<T>(result: T) {
   const chain: any = {
     from: vi.fn(() => chain),
     leftJoin: vi.fn(() => chain),
+    innerJoin: vi.fn(() => chain),
+    for: vi.fn(() => chain),
     where: vi.fn(() => chain),
     limit: vi.fn(() => chain),
     then: (resolve: (value: T) => unknown, reject?: (reason: unknown) => unknown) =>
@@ -736,6 +750,8 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
         { id: 10, orderStatus: "cancelled", merchantTradeNo: "CANCEL001" },
         { id: 11, orderStatus: "cancelled", merchantTradeNo: "CANCEL002" },
       ],
+      [{ id: 10 }, { id: 11 }],
+      [],
       [{ groupId: 7 }],
     ]);
     getDbMock.mockResolvedValue(db as any);
@@ -745,8 +761,22 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
 
     expect(result).toEqual({ success: true, deletedCount: 2 });
     expect(releaseCouponsForOrdersMock).toHaveBeenCalledWith([10, 11], expect.objectContaining({ includeUsed: true }));
-    expect(db.select).toHaveBeenCalledTimes(2);
-    expect(db.delete).toHaveBeenCalledTimes(6);
+    expect(db.select).toHaveBeenCalledTimes(4);
+    expect(db.delete).toHaveBeenCalledTimes(7);
+  });
+
+  it("保留有綠界付款紀錄的已取消訂單以供對帳", async () => {
+    const db = createMockDb([
+      [{ id: 10, orderStatus: "cancelled", merchantTradeNo: "CANCEL001" }],
+      [{ id: 10 }],
+      [{ id: 22 }],
+    ]);
+    getDbMock.mockResolvedValue(db as any);
+
+    await expect(createCaller({ id: 1, role: "admin" }).order.deleteCancelledOrders({ orderIds: [10] }))
+      .rejects.toMatchObject({ code: "CONFLICT" });
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(releaseCouponsForOrdersMock).not.toHaveBeenCalled();
   });
 
   it("混入非已取消訂單時不刪除", async () => {
@@ -1620,6 +1650,7 @@ describe("order coupon lifecycle (admin procedures)", () => {
       merchantTradeNo: "COUPON004",
       paymentMethod: "paypal",
       paymentStatus: "pending",
+      orderStatus: "pending_payment",
     } as any);
     verifyPayPalOrderBelongsToMerchantMock.mockResolvedValue(undefined as any);
     capturePayPalOrderMock.mockResolvedValue({ status: "completed", captureId: "CAP", raw: {} } as any);
@@ -1724,4 +1755,123 @@ describe("logistics error messages for admins", () => {
     expect(error.message).toBe("只有宅配物流單可以列印託運單");
     expect(fetchPrintTradeDocument).not.toHaveBeenCalled();
   });
+});
+
+describe("member payment continuation", () => {
+  const order = {
+    id: 700,
+    userId: 7,
+    merchantTradeNo: "RESUME001",
+    paymentMethod: "credit",
+    paymentStatus: "pending",
+    orderStatus: "pending_payment",
+    totalAmount: 1800,
+    items: [],
+  } as NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>;
+
+  function resume(confirmPreviousTradeNo?: string) {
+    const caller = appRouter.createCaller({
+      user: { id: 7, openId: "resume-member", role: "user" } as any,
+      req: { get: (key: string) => key === "host" ? "example.test" : undefined, ip: crypto.randomUUID() } as any,
+      res: {} as any,
+    });
+    return caller.order.resumePayment({ merchantTradeNo: order.merchantTradeNo, confirmPreviousTradeNo });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getOrderWithItemsMock.mockResolvedValue(order);
+  });
+
+  it("asks for confirmation when the old transaction is unpaid", async () => {
+    vi.mocked(queryECPayTradeStatus).mockResolvedValue("0");
+    await expect(resume()).resolves.toEqual({ kind: "ecpay_confirm", previousTradeNo: "RESUME001" });
+    expect(createECPayOrderReplacement).not.toHaveBeenCalled();
+    expect(buildCreditPaymentParamsMock).not.toHaveBeenCalled();
+  });
+
+  it("checks the old trade again and blocks payment if it succeeded before confirmation", async () => {
+    vi.mocked(queryECPayTradeStatus).mockResolvedValueOnce("0").mockResolvedValueOnce("1");
+    await expect(resume()).resolves.toMatchObject({ kind: "ecpay_confirm" });
+    await expect(resume("RESUME001")).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(createECPayOrderReplacement).not.toHaveBeenCalled();
+  });
+
+  it("opens the replacement using the original order and a new trade number after confirmation", async () => {
+    vi.mocked(queryECPayTradeStatus).mockResolvedValue("0");
+    await expect(resume("RESUME001")).resolves.toMatchObject({ kind: "ecpay_credit" });
+    expect(createECPayOrderReplacement).toHaveBeenCalledWith({
+      orderId: 700,
+      totalAmount: 1800,
+      previousTradeNo: "RESUME001",
+      previousWasNeverSubmitted: false,
+    });
+    expect(buildCreditPaymentParamsMock).toHaveBeenCalledWith(expect.objectContaining({
+      merchantTradeNo: "REPLACEMENT001",
+      totalAmount: 1800,
+    }));
+  });
+
+  it("rejects confirmation from a tab that checked an earlier payment", async () => {
+    vi.mocked(listECPayOrderReplacements).mockResolvedValueOnce([{ merchantTradeNo: "REPLACEMENT001" }] as any);
+    await expect(resume("RESUME001")).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(createECPayOrderReplacement).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pending payment on an order that is no longer pending", async () => {
+    getOrderWithItemsMock.mockResolvedValue({ ...order, orderStatus: "cancelled" });
+    await expect(resume()).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(queryECPayTradeStatus).not.toHaveBeenCalled();
+  });
+
+  it("rejects an order belonging to another member", async () => {
+    getOrderWithItemsMock.mockResolvedValue({ ...order, userId: 8 });
+    await expect(resume()).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(queryECPayTradeStatus).not.toHaveBeenCalled();
+  });
+
+  it("resumes the saved PayPal order and does not create another one", async () => {
+    getOrderWithItemsMock.mockResolvedValue({ ...order, paymentMethod: "paypal", paypalOrderId: "SAVED001" });
+    vi.mocked(getPayPalOrderDetails).mockResolvedValue({
+      status: "CREATED",
+      links: [{ rel: "approve", href: "https://www.paypal.com/checkoutnow?token=SAVED001" }],
+    });
+    await expect(resume()).resolves.toMatchObject({
+      kind: "paypal",
+      approvalUrl: "https://www.paypal.com/checkoutnow?token=SAVED001",
+    });
+    expect(getPayPalOrderDetails).toHaveBeenCalledWith("SAVED001", "RESUME001", 1800);
+    expect(capturePayPalOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("records a completed PayPal capture without asking PayPal to charge again", async () => {
+    getOrderWithItemsMock.mockResolvedValue({ ...order, paymentMethod: "paypal", paypalOrderId: "SAVED001" });
+    vi.mocked(getPayPalOrderDetails).mockResolvedValue({
+      status: "COMPLETED",
+      purchase_units: [{ payments: { captures: [{ id: "CAPTURE001", status: "COMPLETED" }] } }],
+    });
+    await expect(createPublicCaller().order.capturePayPal({
+      merchantTradeNo: order.merchantTradeNo,
+      paypalOrderId: "SAVED001",
+    })).resolves.toMatchObject({ success: true });
+    expect(capturePayPalOrderMock).not.toHaveBeenCalled();
+  });
+  it("skips repeated settlement side effects when another request has already updated the order", async () => {
+    getOrderWithItemsMock
+      .mockResolvedValueOnce({ ...order, paymentMethod: "paypal", paypalOrderId: "SAVED001" })
+      .mockResolvedValueOnce({ ...order, paymentMethod: "paypal", paymentStatus: "paid", orderStatus: "paid" });
+    vi.mocked(getPayPalOrderDetails).mockResolvedValue({
+      status: "COMPLETED",
+      purchase_units: [{ payments: { captures: [{ id: "CAPTURE001", status: "COMPLETED" }] } }],
+    });
+    vi.mocked(markOrderPaidPayPal).mockResolvedValueOnce(false);
+
+    await expect(createPublicCaller().order.capturePayPal({
+      merchantTradeNo: order.merchantTradeNo,
+      paypalOrderId: "SAVED001",
+    })).resolves.toMatchObject({ success: true, alreadyPaid: true });
+    expect(capturePayPalOrderMock).not.toHaveBeenCalled();
+    expect(notifyCustomerOrderPlacedSafelyMock).not.toHaveBeenCalled();
+  });
+
 });

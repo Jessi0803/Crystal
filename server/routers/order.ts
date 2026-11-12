@@ -1,5 +1,5 @@
 import { usesPromotionFlow, PROMOTION_FLOW_VERSION, promotionProductSubtotal } from "../../shared/promotions";
-import { memberCoupons, orderBalancePaymentAttempts } from "../../drizzle/schema";
+import { memberCoupons, orderBalancePaymentAttempts, orderECPayPayments } from "../../drizzle/schema";
 import { claimBalanceCoupon, getBalanceCoupon } from "../couponDb";
 import { setCustomFinalPrice, getCustomQuoteSummary } from "../orderDb";
 import { getActivePromotion } from "../promotionDb";
@@ -11,12 +11,13 @@ import { promotionDiscount, balancePromotionTotal, PROMOTION_DISCOUNT_PRODUCT_ID
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import type { OverseasShipCountryCode } from "@shared/overseasShipping";
-import { adminProcedure, publicProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
+import { adminProcedure, publicProcedure, rateLimitedProtectedProcedure, rateLimitedPublicProcedure, router } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import { enforceRateLimit } from "../_core/rateLimit";
 import {
   generateMerchantTradeNo,
   buildCreditPaymentParams,
+  queryECPayTradeStatus,
   ECPAY_CONFIG,
   usePaymentSandbox,
 } from "../ecpay";
@@ -60,6 +61,8 @@ import {
   useLogisticsSandbox,
 } from "../ecpayLogistics";
 import { getDb } from "../db";
+import { createECPayOrderReplacement, listECPayOrderReplacements, listECPayPaymentsForReview } from "../ecpayOrderPayments";
+import { isOrderOwnedByMember, resolveMemberIdentity } from "../memberOrderAccess";
 import { normalizeOrderEmail } from "../_core/emailNormalize";
 import {
   dbProducts,
@@ -71,9 +74,11 @@ import {
   orderMergeMembers,
   type OrderItemConfigurationSnapshot,
 } from "../../drizzle/schema";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
+  getPayPalOrderDetails,
+  getCompletedPayPalCapture,
   verifyPayPalOrderBelongsToMerchant,
   capturePayPalOrder,
 } from "../_core/paypal";
@@ -99,7 +104,7 @@ import {
   TAROT_DEPOSIT_PRODUCT_ID,
 } from "@shared/tarotPricing";
 import { createOrderAccessToken, verifyOrderAccessToken } from "../orderAccess";
-import { calcCouponDiscount, COUPON_DISCOUNT_PRODUCT_ID, NON_PRODUCT_ORDER_ITEM_IDS } from "@shared/coupons";
+import { calcCouponDiscount, COUPON_DISCOUNT_PRODUCT_ID, COUPON_RESERVATION_TTL_MS, NON_PRODUCT_ORDER_ITEM_IDS } from "@shared/coupons";
 import {
   attachReservedCouponToOrder,
   cancelCouponReservation,
@@ -140,8 +145,20 @@ async function getClearQuartzChipsAddOn(db: NonNullable<Awaited<ReturnType<typeo
 async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>, orderIds: number[]) {
   if (!db) throw new Error("Database not available");
 
-  await releaseCouponsForOrdersSafely(orderIds, { includeUsed: true, reason: "刪除已取消訂單" });
   await db.transaction(async (tx) => {
+    // 先與綠界回呼鎖住相同的訂單列，保留可能晚到的款項與退款追蹤資料。
+    await tx.select({ id: orders.id }).from(orders).where(inArray(orders.id, orderIds)).for("update");
+    const [payment] = await tx.select({ id: orderECPayPayments.id })
+      .from(orderECPayPayments)
+      .innerJoin(orders, eq(orders.id, orderECPayPayments.orderId))
+      .where(and(
+        inArray(orderECPayPayments.orderId, orderIds),
+        or(ne(orderECPayPayments.merchantTradeNo, orders.merchantTradeNo), ne(orderECPayPayments.status, "failed"))
+      )).limit(1).for("update");
+    if (payment) {
+      throw new TRPCError({ code: "CONFLICT", message: "此批訂單含需保留對帳的綠界付款紀錄，無法刪除。" });
+    }
+
     const mergeMemberships = await tx
       .select({ groupId: orderMergeMembers.groupId })
       .from(orderMergeMembers)
@@ -155,11 +172,13 @@ async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>
       await tx.delete(orderMergeGroups).where(inArray(orderMergeGroups.id, mergeGroupIds));
     }
 
+    await tx.delete(orderECPayPayments).where(inArray(orderECPayPayments.orderId, orderIds));
     await tx.delete(orderBalancePayments).where(inArray(orderBalancePayments.orderId, orderIds));
     await tx.delete(logisticsOrders).where(inArray(logisticsOrders.orderId, orderIds));
     await tx.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
     await tx.delete(orders).where(inArray(orders.id, orderIds));
   });
+  await releaseCouponsForOrdersSafely(orderIds, { includeUsed: true, reason: "刪除已取消訂單" });
 }
 
 function getReceiptExtension(contentType: string, filename?: string) {
@@ -1170,6 +1189,28 @@ async function legacyBalancePaymentCheckout(
   };
 }
 
+async function assertPaymentCouponReserved(order: NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>) {
+  if (!order.items.some(item => item.productId === COUPON_DISCOUNT_PRODUCT_ID)) return;
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [coupon] = await db.select({
+    reservedAt: memberCoupons.reservedAt,
+    expiresAt: memberCoupons.expiresAt,
+  }).from(memberCoupons).where(and(
+    eq(memberCoupons.orderId, order.id),
+    eq(memberCoupons.status, "reserved")
+  )).limit(1);
+  const now = Date.now();
+  if (!coupon?.reservedAt || coupon.expiresAt.getTime() <= now ||
+      coupon.reservedAt.getTime() + COUPON_RESERVATION_TTL_MS <= now) {
+    throw new TRPCError({ code: "CONFLICT", message: "這筆訂單的優惠券保留已失效，請聯絡客服確認。" });
+  }
+}
+
+function isPendingOnlineOrder(order: { paymentStatus: string; orderStatus: string }) {
+  return order.paymentStatus === "pending" && order.orderStatus === "pending_payment";
+}
+
 export const orderRouter = router({
   /**
    * 建立訂單並取得付款資訊
@@ -1531,12 +1572,15 @@ export const orderRouter = router({
         const returnUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_return=1`;
         const cancelUrl = `${origin}/order/${encodeURIComponent(merchantTradeNo)}?paypal_cancel=1`;
         try {
-          const { approvalUrl } = await createPayPalCheckoutOrder({
+          const { approvalUrl, paypalOrderId } = await createPayPalCheckoutOrder({
             merchantTradeNo,
             totalAmountTwd: totalAmount,
             returnUrl,
             cancelUrl,
           });
+          const db = await getDb();
+          if (!db) throw new Error("Database not available");
+          await db.update(orders).set({ paypalOrderId }).where(eq(orders.id, createdOrderId));
           return {
             kind: "paypal" as const,
             merchantTradeNo,
@@ -1592,9 +1636,90 @@ export const orderRouter = router({
       };
     }),
 
-  /**
-   * PayPal 核准後於 return 頁呼叫：驗證訂單與 PayPal Order 後 Capture
-   */
+  resumePayment: rateLimitedProtectedProcedure({ scope: "payment-resume", limit: 10, windowMs: 15 * 60_000 })
+    .input(z.object({
+      merchantTradeNo: z.string().min(1).max(32),
+      confirmPreviousTradeNo: z.string().min(1).max(32).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const identity = await resolveMemberIdentity(ctx.user);
+      const order = await getOrderWithItems(input.merchantTradeNo);
+      if (!order || !isOrderOwnedByMember(order, identity)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂單" });
+      }
+      if (!isPendingOnlineOrder(order)) {
+        throw new TRPCError({ code: "CONFLICT", message: "這筆訂單目前無法繼續付款，請確認最新狀態。" });
+      }
+
+      const orderUrl = `/order/${encodeURIComponent(order.merchantTradeNo)}`;
+      if (order.paymentMethod === "paypal" && order.paypalOrderId) {
+        const details = await getPayPalOrderDetails(order.paypalOrderId, order.merchantTradeNo, order.totalAmount)
+          .catch(() => {
+            throw new TRPCError({ code: "BAD_GATEWAY", message: "暫時無法確認 PayPal 付款狀態，請稍後再試。" });
+          });
+        if (details.status === "COMPLETED" && getCompletedPayPalCapture(details)) {
+          // 沿用原本的回站流程補記已收款的交易。
+          return { kind: "paypal" as const, approvalUrl: `${orderUrl}?paypal_return=1&token=${encodeURIComponent(order.paypalOrderId)}` };
+        }
+        if (details.status === "CREATED" || details.status === "PAYER_ACTION_REQUIRED" || details.status === "APPROVED") {
+          await assertPaymentCouponReserved(order);
+          const approvalUrl = details.status === "APPROVED"
+            ? `${orderUrl}?paypal_return=1&token=${encodeURIComponent(order.paypalOrderId)}`
+            : details.links?.find(link => link.rel === "approve" || link.rel === "payer-action")?.href;
+          if (approvalUrl) return { kind: "paypal" as const, approvalUrl };
+        }
+        throw new TRPCError({ code: "CONFLICT", message: "PayPal 付款暫時無法接續，請確認付款狀態或聯絡客服。" });
+      }
+
+      if (order.paymentMethod !== "credit") {
+        throw new TRPCError({ code: "CONFLICT", message: "這筆訂單目前無法繼續付款。" });
+      }
+
+      const replacements = await listECPayOrderReplacements(order.id, order.merchantTradeNo);
+      const previousTradeNo = replacements[0]?.merchantTradeNo ?? order.merchantTradeNo;
+      if (input.confirmPreviousTradeNo && input.confirmPreviousTradeNo !== previousTradeNo) {
+        throw new TRPCError({ code: "CONFLICT", message: "此訂單已有新的付款頁，請先確認最新付款狀態。" });
+      }
+
+      // 任何較早的付款仍可能晚到，確認時也要重新查詢。
+      let previousStatus: string | undefined;
+      for (const merchantTradeNo of [...replacements.map(payment => payment.merchantTradeNo), order.merchantTradeNo]) {
+        const status = await queryECPayTradeStatus(merchantTradeNo).catch(() => {
+          throw new TRPCError({ code: "BAD_GATEWAY", message: "暫時無法確認綠界付款狀態，請稍後再試。" });
+        });
+        if (merchantTradeNo === previousTradeNo) previousStatus = status;
+        if (status === "1") {
+          throw new TRPCError({ code: "CONFLICT", message: "綠界已收到付款，請等待訂單狀態更新。" });
+        }
+        if (!["0", "10200095", "10200047"].includes(status)) {
+          throw new TRPCError({ code: "CONFLICT", message: "綠界交易仍待確認，請稍後查看訂單狀態。" });
+        }
+      }
+      if (!input.confirmPreviousTradeNo) return { kind: "ecpay_confirm" as const, previousTradeNo };
+
+      await assertPaymentCouponReserved(order);
+      const merchantTradeNo = await createECPayOrderReplacement({
+        orderId: order.id,
+        totalAmount: order.totalAmount,
+        previousTradeNo,
+        previousWasNeverSubmitted: previousStatus === "10200047",
+      });
+      const origin = siteBaseUrl(ctx.req);
+      return {
+        kind: "ecpay_credit" as const,
+        paymentURL: ECPAY_CONFIG.PaymentURL,
+        paymentParams: buildCreditPaymentParams({
+          merchantTradeNo,
+          tradeDesc: "椛Crystal能量水晶",
+          itemName: order.items.map(item => `${item.productName} x${item.quantity}`).join("#"),
+          totalAmount: order.totalAmount,
+          returnURL: `${origin}/api/ecpay/notify`,
+          orderResultURL: `${origin}/api/ecpay/order-result`,
+          clientBackURL: `${origin}/member`,
+        }),
+      };
+    }),
+
   capturePayPal: rateLimitedPublicProcedure({ scope: "paypal-capture", limit: 20, windowMs: 15 * 60_000 })
     .input(
       z.object({
@@ -1619,12 +1744,18 @@ export const orderRouter = router({
         });
         return { success: true as const, alreadyPaid: true as const };
       }
-      if (order.paymentStatus !== "pending") {
+      if (!isPendingOnlineOrder(order)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "訂單狀態無法完成付款" });
       }
 
+      let details: Awaited<ReturnType<typeof getPayPalOrderDetails>> | undefined;
       try {
-        await verifyPayPalOrderBelongsToMerchant(input.paypalOrderId, input.merchantTradeNo);
+        if (order.paypalOrderId) {
+          if (order.paypalOrderId !== input.paypalOrderId) throw new Error("PAYPAL_ORDER_MISMATCH");
+          details = await getPayPalOrderDetails(order.paypalOrderId, input.merchantTradeNo, order.totalAmount);
+        } else {
+          await verifyPayPalOrderBelongsToMerchant(input.paypalOrderId, input.merchantTradeNo);
+        }
       } catch (e) {
         console.error("[capturePayPal verify]", e);
         await recordAuditEventSafely({
@@ -1643,14 +1774,30 @@ export const orderRouter = router({
       }
 
       try {
-        const cap = await capturePayPalOrder(input.paypalOrderId);
+        const completedCaptureId = details?.status === "COMPLETED" ? getCompletedPayPalCapture(details) : undefined;
+        if (details && !completedCaptureId) {
+          if (details.status !== "APPROVED" || details.purchase_units?.[0]?.payments?.captures?.length) {
+            throw new TRPCError({ code: "CONFLICT", message: "PayPal 付款仍待確認。" });
+          }
+          await assertPaymentCouponReserved(order);
+        }
+        const cap = completedCaptureId && details
+          ? { status: "completed" as const, captureId: completedCaptureId, raw: details }
+          : await capturePayPalOrder(input.paypalOrderId);
         if (cap.status !== "completed") {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: cap.message ?? "PayPal 扣款失敗",
           });
         }
-        await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
+        const claimed = await markOrderPaidPayPal(input.merchantTradeNo, cap.captureId, cap.raw);
+        if (!claimed) {
+          const current = await getOrderWithItems(input.merchantTradeNo);
+          if (current?.paymentStatus === "paid" || current?.paymentStatus === "confirmed") {
+            return { success: true as const, alreadyPaid: true as const };
+          }
+          throw new TRPCError({ code: "CONFLICT", message: "PayPal 已收到付款，訂單狀態待確認，請聯絡客服。" });
+        }
         await markCouponUsedForOrderSafely(order.id, { merchantTradeNo: input.merchantTradeNo });
         await deductInventoryAfterPayment(input.merchantTradeNo);
         await notifyCustomerOrderPlacedSafely(order.id);
@@ -2415,6 +2562,7 @@ export const orderRouter = router({
 
       return {
         ...order,
+        ecpayPaymentsForReview: order.paymentMethod === "credit" ? await listECPayPaymentsForReview(order.id) : [],
         printURL: null,
         printAvailable: Boolean(
           order.shippingMethod === "home" &&

@@ -78,6 +78,27 @@ export function verifyCheckMacValue(params: Record<string, string>): boolean {
   return expected === CheckMacValue;
 }
 
+/** 查詢原交易，保留綠界回傳的原始狀態碼。 */
+export async function queryECPayTradeStatus(merchantTradeNo: string): Promise<string> {
+  const params = {
+    MerchantID: ECPAY_CONFIG.MerchantID,
+    MerchantTradeNo: merchantTradeNo,
+    TimeStamp: String(Math.floor(Date.now() / 1000)),
+  };
+  const res = await fetch(ECPAY_CONFIG.QueryURL, {
+    method: "POST",
+    body: new URLSearchParams({ ...params, CheckMacValue: generateCheckMacValue(params) }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`ECPay query HTTP ${res.status}`);
+  const trade = Object.fromEntries(new URLSearchParams(await res.text()));
+  if (!verifyCheckMacValue(trade) ||
+      trade.MerchantID !== params.MerchantID || trade.MerchantTradeNo !== merchantTradeNo) {
+    throw new Error("Invalid ECPay trade response");
+  }
+  return trade.TradeStatus;
+}
+
 /**
  * 產生唯一的商店訂單編號（MerchantTradeNo）
  * 格式：CA + 時間戳 + 隨機4碼，最多20字元

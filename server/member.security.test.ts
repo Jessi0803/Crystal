@@ -97,4 +97,27 @@ describe("myOrders email matching", () => {
 
     expect(getOrdersForMemberMock).toHaveBeenCalledWith({ userId: 7, email: "victim@example.com" });
   });
+  it("offers continuation only for eligible pending online orders", async () => {
+    const user = { ...baseUser, emailVerified: true };
+    getUserByOpenIdMock.mockResolvedValue(user as Awaited<ReturnType<typeof db.getUserByOpenId>>);
+    const pending = { userId: 7, paymentStatus: "pending", orderStatus: "pending_payment", paymentMethod: "credit" };
+    getOrdersForMemberMock.mockResolvedValue([
+      pending,
+      { ...pending, paymentMethod: "paypal", paypalOrderId: "PAYPAL001" },
+      { ...pending, paymentMethod: "paypal" },
+      { ...pending, paymentMethod: "atm", paymentStatus: "transfer_pending" },
+      { ...pending, paymentStatus: "paid" },
+      { ...pending, paymentStatus: "confirmed" },
+      { ...pending, paymentStatus: "failed" },
+      { ...pending, orderStatus: "cancelled" },
+      { ...pending, orderStatus: "processing" },
+      { ...pending, userId: 8 },
+    ] as Awaited<ReturnType<typeof getOrdersForMember>>);
+
+    const orders = await callerFor(user).myOrders();
+    expect(orders.map(order => order.canResumePayment)).toEqual([
+      true, true, false, false, false, false, false, false, false, false,
+    ]);
+  });
+
 });

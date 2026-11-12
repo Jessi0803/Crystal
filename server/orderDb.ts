@@ -542,10 +542,10 @@ export async function getOrderByMerchantTradeNo(merchantTradeNo: string) {
  * 顧客端有兩個出口都要套：order.getOrder 與 member.myOrders。
  * 後台走 order.getOrderDetail（adminProcedure），不受影響。
  */
-export function toCustomerFacingOrder<T extends { adminNote?: unknown; customFormToken?: unknown }>(
+export function toCustomerFacingOrder<T extends { adminNote?: unknown; customFormToken?: unknown; paypalOrderId?: unknown }>(
   order: T
-): Omit<T, "adminNote" | "customFormToken"> {
-  const { adminNote: _adminNote, customFormToken: _customFormToken, ...rest } = order;
+): Omit<T, "adminNote" | "customFormToken" | "paypalOrderId"> {
+  const { adminNote: _adminNote, customFormToken: _customFormToken, paypalOrderId: _paypalOrderId, ...rest } = order;
   return rest;
 }
 
@@ -630,7 +630,7 @@ export async function markOrderPaidPayPal(
       )
     );
 
-  return result;
+  return getAffectedRows(result) > 0;
 }
 
 export async function updateOrderPaymentStatus(

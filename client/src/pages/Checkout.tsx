@@ -1,3 +1,4 @@
+import { submitECPayPayment } from "@/lib/ecpayPayment";
 import PromotionNotice from "@/components/PromotionNotice";
 import { promotionDiscount } from "@shared/promotions";
 /**
@@ -521,21 +522,7 @@ export default function Checkout() {
         result.paymentURL &&
         result.paymentParams
       ) {
-        const hiddenForm = document.createElement("form");
-        hiddenForm.method = "POST";
-        hiddenForm.action = result.paymentURL;
-        hiddenForm.style.display = "none";
-
-        Object.entries(result.paymentParams).forEach(([key, value]) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = key;
-          input.value = value as string;
-          hiddenForm.appendChild(input);
-        });
-
-        document.body.appendChild(hiddenForm);
-        hiddenForm.submit();
+        submitECPayPayment(result.paymentURL, result.paymentParams);
       }
     } catch (err: unknown) {
       console.error(err);

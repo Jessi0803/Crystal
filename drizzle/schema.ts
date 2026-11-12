@@ -79,6 +79,7 @@ export const orders = mysqlTable("orders", {
   merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
   // 綠界回傳的交易序號
   tradeNo: varchar("tradeNo", { length: 64 }),
+  paypalOrderId: varchar("paypalOrderId", { length: 64 }),
   // 付款狀態
   paymentStatus: mysqlEnum("paymentStatus", [
     "pending",       // 待付款
@@ -304,6 +305,18 @@ export const orderBalancePaymentAttempts = mysqlTable("orderBalancePaymentAttemp
 ]);
 
 export type OrderBalancePaymentAttempt = typeof orderBalancePaymentAttempts.$inferSelect;
+
+export const orderECPayPayments = mysqlTable("orderECPayPayments", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  merchantTradeNo: varchar("merchantTradeNo", { length: 32 }).notNull().unique(),
+  totalAmount: int("totalAmount").notNull(),
+  status: mysqlEnum("status", ["pending", "failed", "paid", "duplicate_paid", "review_paid"]).default("pending").notNull(),
+  tradeNo: varchar("tradeNo", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("order_ecpay_payments_order_id_idx").on(table.orderId),
+]);
 
 // ─── 物流訂單表 ───────────────────────────────────────────────────────────────
 export const logisticsOrders = mysqlTable("logisticsOrders", {

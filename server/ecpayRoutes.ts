@@ -7,6 +7,7 @@
  */
 import { Application, Request, Response } from "express";
 import { verifyCheckMacValue } from "./ecpay";
+import { findECPayOrderReplacement, settleECPayOrderPayment } from "./ecpayOrderPayments";
 import {
   verifyLogisticsCheckMacValue,
   buildCVSMapParams,
@@ -87,6 +88,39 @@ export async function handleECPayPaymentNotify(notifyData: Record<string, string
 
   const status = rtnCode === "1" ? "paid" : "failed";
   const order = await getOrderByMerchantTradeNo(merchantTradeNo);
+  const replacement = !order ? await findECPayOrderReplacement(merchantTradeNo) : undefined;
+  if (order?.paymentMethod === "credit" || replacement) {
+    const orderId = order?.id ?? replacement!.orderId;
+    const originalTradeNo = order?.merchantTradeNo ?? replacement!.originalTradeNo;
+    const result = await settleECPayOrderPayment(orderId, notifyData);
+    if (result === "amount_mismatch" || result === "not_found") {
+      await recordAuditEventSafely({
+        source: "ecpay", category: "payment", action: "ecpay.order.callback",
+        outcome: "rejected", severity: "error", orderId, merchantTradeNo,
+        summary: result === "amount_mismatch" ? "綠界訂單回呼金額與訂單不符" : "綠界訂單回呼缺少有效交易資料",
+        details: callbackDetails,
+      });
+      return result === "amount_mismatch" ? "0|TradeAmt Error" : "0|Order Not Found";
+    }
+    if (result === "paid") {
+      await markCouponUsedForOrderSafely(orderId, { merchantTradeNo: originalTradeNo });
+      await notifyCustomerOrderPlacedSafely(orderId);
+    }
+    if (result === "order_failed") {
+      await releaseCouponsForOrdersSafely([orderId], { includeUsed: false, reason: "綠界回報付款失敗" });
+    }
+    if (result !== "duplicate_paid" && result !== "review_paid") {
+      await recordAuditEventSafely({
+        source: "ecpay", category: "payment", action: "ecpay.order.callback",
+        outcome: result === "paid" ? "success" : result === "replayed" ? "duplicate" : "failed",
+        orderId, merchantTradeNo,
+        summary: result === "paid" ? "綠界訂單付款成功"
+          : result === "replayed" ? "已處理過的綠界訂單回呼已忽略" : "綠界回報付款失敗",
+        details: callbackDetails,
+      });
+    }
+    return "1|OK";
+  }
   if (order) {
     if (!matchesECPayAmount(notifyData.TradeAmt, order.totalAmount)) {
       console.error(`[ECPay Notify] TradeAmt mismatch for ${merchantTradeNo}`);
@@ -360,7 +394,7 @@ export function registerECPayRoutes(app: Application) {
    * 讀出 MerchantTradeNo 後 302 轉回 GET /order/:merchantTradeNo，
    * 讓前端 React 路由照常顯示訂單結果頁。
    */
-  app.post("/api/ecpay/order-result", (req: Request, res: Response) => {
+  app.post("/api/ecpay/order-result", async (req: Request, res: Response) => {
     try {
       const data = req.body as Record<string, string>;
       const merchantTradeNo = data?.MerchantTradeNo ?? "";
@@ -369,7 +403,8 @@ export function registerECPayRoutes(app: Application) {
         res.redirect(302, "/");
         return;
       }
-      res.redirect(302, `/order/${encodeURIComponent(merchantTradeNo)}`);
+      const replacement = await findECPayOrderReplacement(merchantTradeNo);
+      res.redirect(302, `/order/${encodeURIComponent(replacement?.originalTradeNo ?? merchantTradeNo)}`);
     } catch (err) {
       console.error("[ECPay OrderResult] Error:", err);
       res.redirect(302, "/");

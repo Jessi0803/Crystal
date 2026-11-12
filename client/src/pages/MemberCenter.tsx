@@ -1,5 +1,7 @@
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { submitECPayPayment } from "@/lib/ecpayPayment";
 import OrderPromotionSummary from "@/components/OrderPromotionSummary";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconBadge } from "@/components/LineIcon";
 import { ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -13,6 +15,8 @@ import BirthdayFields, { EMPTY_BIRTHDAY_DRAFT, parseBirthdayDraft, type Birthday
 import { CUSTOM_LINE_URL } from "@/lib/customOrderingContent";
 import { birthdayFromUser, formatBirthday } from "@shared/birthday";
 import MemberLogisticsTimeline from "@/components/MemberLogisticsTimeline";
+
+type PaymentOrder = { id: number; merchantTradeNo: string; buyerEmail: string };
 
 type MemberTab = "orders" | "coupons" | "profile";
 
@@ -163,6 +167,53 @@ export default function MemberCenter() {
   });
 
   const utils = trpc.useUtils();
+
+  const resumePaymentMutation = trpc.order.resumePayment.useMutation();
+  const paymentNavigation = useRef(false);
+  const [resumingOrderId, setResumingOrderId] = useState<number | null>(null);
+  const [paymentConfirmation, setPaymentConfirmation] = useState<{ order: PaymentOrder; previousTradeNo: string } | null>(null);
+
+  useEffect(() => {
+    function resetPaymentNavigation(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      paymentNavigation.current = false;
+      setResumingOrderId(null);
+      void utils.member.myOrders.invalidate();
+    }
+    window.addEventListener("pageshow", resetPaymentNavigation);
+    return () => window.removeEventListener("pageshow", resetPaymentNavigation);
+  }, [utils]);
+
+  async function resumePayment(order: PaymentOrder, confirmPreviousTradeNo?: string) {
+    if (paymentNavigation.current) return;
+    paymentNavigation.current = true;
+    setResumingOrderId(order.id);
+    try {
+      const result = await resumePaymentMutation.mutateAsync({
+        merchantTradeNo: order.merchantTradeNo,
+        confirmPreviousTradeNo,
+      });
+      if (result.kind === "ecpay_confirm") {
+        setPaymentConfirmation({ order, previousTradeNo: result.previousTradeNo });
+        paymentNavigation.current = false;
+        setResumingOrderId(null);
+        return;
+      }
+      setPaymentConfirmation(null);
+      rememberOrderAccess(order.merchantTradeNo, { buyerEmail: order.buyerEmail });
+      if (result.kind === "paypal") {
+        window.location.assign(result.approvalUrl);
+      } else {
+        submitECPayPayment(result.paymentURL, result.paymentParams);
+      }
+    } catch (error) {
+      paymentNavigation.current = false;
+      setResumingOrderId(null);
+      setPaymentConfirmation(null);
+      toast.error(error instanceof Error ? error.message : "暫時無法繼續付款");
+      void utils.member.myOrders.invalidate();
+    }
+  }
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -368,7 +419,7 @@ export default function MemberCenter() {
                         {/* 訂單資訊 */}
                         <div className="border-t border-sf-line pt-3 space-y-1.5">
                           <div className="flex justify-between text-xs font-body text-sf-muted">
-                            <span>付款方式</span>
+                            <span>付款狀態</span>
                             <span>{PAYMENT_STATUS_LABEL[order.paymentStatus]}</span>
                           </div>
                           <div className="flex justify-between text-xs font-body text-sf-muted">
@@ -390,6 +441,16 @@ export default function MemberCenter() {
                             </div>
                           )}
                         </div>
+                        {order.canResumePayment && (
+                          <button
+                            type="button"
+                            className="mt-4 bg-sf-accent px-4 py-2 text-sm font-body text-white disabled:opacity-50"
+                            disabled={resumingOrderId !== null || paymentConfirmation !== null}
+                            onClick={() => void resumePayment(order)}
+                          >
+                            {resumingOrderId === order.id ? "確認付款狀態中…" : order.paymentMethod === "credit" ? "重新付款" : "繼續付款"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -398,6 +459,36 @@ export default function MemberCenter() {
             )}
           </div>
         )}
+
+        <Dialog open={paymentConfirmation !== null} onOpenChange={open => {
+          if (!open && resumingOrderId === null) setPaymentConfirmation(null);
+        }}>
+          <DialogContent className="border-sf-line bg-sf-cream text-sf-ink">
+            <DialogHeader>
+              <DialogTitle>要重新付款嗎？</DialogTitle>
+              <DialogDescription asChild>
+                <div className="space-y-2 text-left text-sf-muted">
+                  <p>如果你已送出信用卡付款、完成 Apple Pay 驗證，或不確定是否已付款，請先等待訂單更新，避免重複扣款。</p>
+                  <p>如果確定還沒送出付款，可以為這筆訂單開啟新的付款頁。若發現重複扣款，請聯絡客服協助退款。</p>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <button type="button" disabled={resumingOrderId !== null}
+                className="border border-sf-line px-4 py-2 text-sm disabled:opacity-50"
+                onClick={() => setPaymentConfirmation(null)}>
+                返回
+              </button>
+              <button type="button" disabled={resumingOrderId !== null || !paymentConfirmation}
+                className="bg-sf-accent px-4 py-2 text-sm text-white disabled:opacity-50"
+                onClick={() => {
+                  if (paymentConfirmation) void resumePayment(paymentConfirmation.order, paymentConfirmation.previousTradeNo);
+                }}>
+                {resumingOrderId === null ? "我還沒送出付款，重新付款" : "確認付款狀態中…"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {activeTab === "coupons" && <MemberCouponList />}
 

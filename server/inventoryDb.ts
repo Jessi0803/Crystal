@@ -57,16 +57,24 @@ async function isMonthlyLimitedProduct(productId: string) {
   return product?.isMonthlyLimited === true;
 }
 
-async function adjustPurchaseOptionStock(productId: string, purchaseOptionId: string | null | undefined, quantityDelta: number) {
+type InventoryTransaction = Parameters<Parameters<NonNullable<Awaited<ReturnType<typeof getDb>>>["transaction"]>[0]>[0];
+
+async function adjustPurchaseOptionStock(
+  productId: string,
+  purchaseOptionId: string | null | undefined,
+  quantityDelta: number,
+  transaction?: InventoryTransaction
+) {
   if (!purchaseOptionId) return false;
-  const db = await getDb();
+  const db = transaction ?? await getDb();
   if (!db) return false;
 
-  const [product] = await db
+  const query = db
     .select({ purchaseOptions: dbProducts.purchaseOptions })
     .from(dbProducts)
     .where(eq(dbProducts.id, productId))
     .limit(1);
+  const [product] = await (transaction ? query.for("update") : query);
   const options = product?.purchaseOptions;
   const option = options?.find((candidate) => candidate.id === purchaseOptionId);
   if (!options || !option || option.stock == null) return false;
@@ -240,14 +248,22 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
     .limit(1);
   if (!order || order.inventoryDeducted) return;
 
+  await deductOrderInventory(order.id);
+}
+
+/** 呼叫端持有訂單列鎖時，付款狀態與扣庫存可在同一交易完成。 */
+export async function deductOrderInventory(orderId: number, transaction?: InventoryTransaction) {
+  const db = transaction ?? await getDb();
+  if (!db) return;
+
   const items = await db
     .select({ productId: orderItems.productId, purchaseOptionId: orderItems.purchaseOptionId, quantity: orderItems.quantity })
     .from(orderItems)
-    .where(eq(orderItems.orderId, order.id));
+    .where(eq(orderItems.orderId, orderId));
 
   for (const item of items) {
     if (shouldSkipInventory(item.productId)) continue;
-    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, -item.quantity);
+    const handledByPurchaseOption = await adjustPurchaseOptionStock(item.productId, item.purchaseOptionId, -item.quantity, transaction);
     if (handledByPurchaseOption) continue;
     await db
       .update(productInventory)
@@ -263,7 +279,7 @@ export async function deductInventoryAfterPayment(merchantTradeNo: string) {
   await db
     .update(orders)
     .set({ inventoryDeducted: true })
-    .where(eq(orders.merchantTradeNo, merchantTradeNo));
+    .where(eq(orders.id, orderId));
 }
 
 export async function deductInventoryAfterBalancePayment(balanceMerchantTradeNo: string) {
