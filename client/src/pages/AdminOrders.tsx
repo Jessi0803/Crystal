@@ -826,7 +826,7 @@ function OrderRowCard({
                   <button
                     type="button"
                     onClick={() => {
-                      const ok = window.confirm(`確定要刪除已取消訂單 ${detail.merchantTradeNo}？此操作無法復原。`);
+                      const ok = window.confirm(`確定要刪除已取消訂單 ${detail.merchantTradeNo}？商城內的相關付款紀錄也會刪除，此操作無法復原。`);
                       if (!ok) return;
                       deleteCancelledOrder.mutate({ orderId: detail.id });
                     }}
@@ -1225,7 +1225,7 @@ export default function AdminOrders() {
 
   const bulkDeleteCancelledOrders = () => {
     if (selectedCancelledOrderIds.length === 0) return;
-    const confirmed = window.confirm(`確定要刪除選取的 ${selectedCancelledOrderIds.length} 筆已取消訂單嗎？此操作無法復原。`);
+    const confirmed = window.confirm(`確定要刪除選取的 ${selectedCancelledOrderIds.length} 筆已取消訂單嗎？商城內的相關付款紀錄也會刪除，此操作無法復原。`);
     if (!confirmed) return;
     deleteCancelledOrders.mutate({ orderIds: selectedCancelledOrderIds });
   };

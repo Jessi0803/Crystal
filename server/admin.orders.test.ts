@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TRPCError } from "@trpc/server";
+import { orderECPayPayments } from "../drizzle/schema";
 
 vi.mock("./ecpayOrderPayments", () => ({
   listECPayOrderReplacements: vi.fn().mockResolvedValue([]),
@@ -193,7 +194,6 @@ function createQueryChain<T>(result: T) {
   const chain: any = {
     from: vi.fn(() => chain),
     leftJoin: vi.fn(() => chain),
-    innerJoin: vi.fn(() => chain),
     for: vi.fn(() => chain),
     where: vi.fn(() => chain),
     limit: vi.fn(() => chain),
@@ -744,14 +744,13 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
     vi.clearAllMocks();
   });
 
-  it("批次刪除已取消訂單與相關資料", async () => {
+  it("批次刪除已取消訂單與相關資料，包含綠界付款紀錄", async () => {
     const db = createMockDb([
       [
         { id: 10, orderStatus: "cancelled", merchantTradeNo: "CANCEL001" },
         { id: 11, orderStatus: "cancelled", merchantTradeNo: "CANCEL002" },
       ],
       [{ id: 10 }, { id: 11 }],
-      [],
       [{ groupId: 7 }],
     ]);
     getDbMock.mockResolvedValue(db as any);
@@ -761,22 +760,23 @@ describe("order.deleteCancelledOrders (admin procedure)", () => {
 
     expect(result).toEqual({ success: true, deletedCount: 2 });
     expect(releaseCouponsForOrdersMock).toHaveBeenCalledWith([10, 11], expect.objectContaining({ includeUsed: true }));
-    expect(db.select).toHaveBeenCalledTimes(4);
+    expect(db.select).toHaveBeenCalledTimes(3);
     expect(db.delete).toHaveBeenCalledTimes(7);
+    expect(db.delete).toHaveBeenCalledWith(orderECPayPayments);
   });
 
-  it("保留有綠界付款紀錄的已取消訂單以供對帳", async () => {
+  it("管理員可單筆刪除已取消訂單與相關綠界付款紀錄", async () => {
     const db = createMockDb([
-      [{ id: 10, orderStatus: "cancelled", merchantTradeNo: "CANCEL001" }],
+      [{ id: 10, orderStatus: "cancelled" }],
       [{ id: 10 }],
-      [{ id: 22 }],
+      [],
     ]);
     getDbMock.mockResolvedValue(db as any);
 
-    await expect(createCaller({ id: 1, role: "admin" }).order.deleteCancelledOrders({ orderIds: [10] }))
-      .rejects.toMatchObject({ code: "CONFLICT" });
-    expect(db.delete).not.toHaveBeenCalled();
-    expect(releaseCouponsForOrdersMock).not.toHaveBeenCalled();
+    await expect(createCaller({ id: 1, role: "admin" }).order.deleteCancelledOrder({ orderId: 10 }))
+      .resolves.toEqual({ success: true });
+    expect(db.delete).toHaveBeenCalledWith(orderECPayPayments);
+    expect(releaseCouponsForOrdersMock).toHaveBeenCalledWith([10], expect.objectContaining({ includeUsed: true }));
   });
 
   it("混入非已取消訂單時不刪除", async () => {
@@ -1562,30 +1562,50 @@ describe("order.createAndPay member coupons", () => {
     expect(cancelCouponReservationMock).toHaveBeenCalledWith(9, RESERVED_AT);
   });
 
-  it("allows a coupon on a custom deposit order without charging shipping", async () => {
-    getDbMock.mockResolvedValue(createMutationMockDb([
-      [{
-        id: "custom-deposit-product",
-        name: "客製化商品",
-        price: 500,
-        image: "",
-        active: true,
-        category: "custom",
-        wristSizePriceRules: [],
-        purchaseOptions: [],
-      }],
-      [{ id: "custom-deposit-product", twoItemFreeShippingEligible: true }],
-    ]) as any);
-    isCustomDepositProductMock.mockReturnValue(true);
-    const input = checkoutInput("credit");
-    input.items = [{ id: "custom-deposit-product", name: "客製化商品", price: 500, quantity: 1, image: "" }];
+  describe("custom deposit checkout", () => {
+    beforeEach(() => {
+      getDbMock.mockResolvedValue(createMutationMockDb([
+        [{
+          id: "custom-deposit-product",
+          name: "客製化商品",
+          price: 500,
+          image: "",
+          active: true,
+          category: "custom",
+          wristSizePriceRules: [],
+          purchaseOptions: [],
+        }],
+        [{ id: "custom-deposit-product", twoItemFreeShippingEligible: true }],
+      ]) as any);
+      isCustomDepositProductMock.mockReturnValue(true);
+    });
 
-    await memberCaller().order.createAndPay({ ...input, memberCouponId: 9 });
+    const input = {
+      ...checkoutInput("credit"),
+      items: [{ id: "custom-deposit-product", name: "客製化商品", price: 500, quantity: 1, image: "" }],
+    };
 
-    expect(createOrderMock).toHaveBeenCalledWith(
-      expect.objectContaining({ totalAmount: 450, isCustomOrder: true }),
-      expect.not.arrayContaining([expect.objectContaining({ productId: "shipping-fee" })])
-    );
+    it("rejects a coupon on the deposit and leaves it available for the balance", async () => {
+      await expect(memberCaller().order.createAndPay({ ...input, memberCouponId: 9 }))
+        .rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: "客製優惠券請於最終報價後在尾款使用",
+        });
+
+      expect(getCouponForCheckoutMock).not.toHaveBeenCalled();
+      expect(reserveCouponMock).not.toHaveBeenCalled();
+      expect(createOrderMock).not.toHaveBeenCalled();
+    });
+
+    it("charges the full deposit without shipping", async () => {
+      await memberCaller().order.createAndPay(input);
+
+      expect(createOrderMock).toHaveBeenCalledWith(
+        expect.objectContaining({ totalAmount: 500, isCustomOrder: true }),
+        expect.not.arrayContaining([expect.objectContaining({ productId: "shipping-fee" })])
+      );
+      expect(reserveCouponMock).not.toHaveBeenCalled();
+    });
   });
 
   it("does not touch coupons when no coupon is selected", async () => {

@@ -74,7 +74,7 @@ import {
   orderMergeMembers,
   type OrderItemConfigurationSnapshot,
 } from "../../drizzle/schema";
-import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   createPayPalCheckoutOrder,
   getPayPalOrderDetails,
@@ -146,18 +146,8 @@ async function deleteCancelledOrderRecords(db: Awaited<ReturnType<typeof getDb>>
   if (!db) throw new Error("Database not available");
 
   await db.transaction(async (tx) => {
-    // 先與綠界回呼鎖住相同的訂單列，保留可能晚到的款項與退款追蹤資料。
+    // 與綠界回呼取得相同的訂單列鎖，避免同時刪除與更新同一筆訂單。
     await tx.select({ id: orders.id }).from(orders).where(inArray(orders.id, orderIds)).for("update");
-    const [payment] = await tx.select({ id: orderECPayPayments.id })
-      .from(orderECPayPayments)
-      .innerJoin(orders, eq(orders.id, orderECPayPayments.orderId))
-      .where(and(
-        inArray(orderECPayPayments.orderId, orderIds),
-        or(ne(orderECPayPayments.merchantTradeNo, orders.merchantTradeNo), ne(orderECPayPayments.status, "failed"))
-      )).limit(1).for("update");
-    if (payment) {
-      throw new TRPCError({ code: "CONFLICT", message: "此批訂單含需保留對帳的綠界付款紀錄，無法刪除。" });
-    }
 
     const mergeMemberships = await tx
       .select({ groupId: orderMergeMembers.groupId })
